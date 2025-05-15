@@ -79,59 +79,7 @@ function CheckInOutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUser, selectedRoom, currentActivity, navigate, activities.length]);
 
-  // Simulate a successful NFC scan - memoized to avoid recreation
-  const simulateNfcScan = useCallback(async () => {
-    // Early return if not scanning
-    if (!isScanning) return;
-
-    try {
-      const scanTime = new Date();
-      setLastScanTime(scanTime);
-
-      // Get fake student names for simulation
-      const studentNames = [
-        'Max Mustermann',
-        'Anna Schmidt',
-        'Leon Weber',
-        'Sophie Fischer',
-        'Tim Becker',
-        'Lena Hoffmann',
-      ];
-      const randomName = studentNames[Math.floor(Math.random() * studentNames.length)];
-      const randomAction = Math.random() > 0.5 ? 'eingecheckt' : 'ausgecheckt';
-
-      // Use a local logger reference to break circular dependencies
-      const eventId = Math.random().toString(36).substr(2, 9);
-
-      // Log but don't include in deps
-      logger.info('NFC scan detected', {
-        studentName: randomName,
-        eventId,
-        timestamp: scanTime.toISOString(),
-      });
-
-      // Simulate checking in/out
-      setScanMessage(`${randomName} erfolgreich ${randomAction}!`);
-      logUserAction(`student_${randomAction === 'eingecheckt' ? 'checked_in' : 'checked_out'}`, {
-        studentName: randomName,
-        eventId,
-      });
-
-      // Reset message after 3 seconds
-      setTimeout(() => {
-        if (isScanning) {
-          setScanMessage('NFC-Scan läuft. Bitte Karte an Scanner halten...');
-        }
-      }, 3000);
-    } catch (error) {
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'CheckInOutPage.simulateNfcScan'
-      );
-    }
-    // Excluding logger from deps to avoid infinite loops
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isScanning]);
+  // Real RFID daemon will handle scanning functionality
 
   // Start NFC scanning automatically when component mounts - only runs once on mount
   useEffect(() => {
@@ -146,15 +94,12 @@ function CheckInOutPage() {
         logUserAction('nfc_scan_started', { scanId });
       }
 
-      // For demo purposes, simulate a scan after 3 seconds
-      const interval = setInterval(() => {
-        void simulateNfcScan();
-      }, 8000); // Run every 8 seconds
+      // RFID daemon will handle real scanning
 
       // Cleanup function
       return () => {
         logger.debug('Cleaning up NFC scan effect', { scanId });
-        clearInterval(interval);
+        // No interval to clear
 
         // Only stop if we're the ones who started it
         stopNfcScan();
