@@ -38,7 +38,6 @@ pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(
 
     // Open log file for appending, create if it doesn't exist
     let mut file = OpenOptions::new()
-        .write(true)
         .append(true)
         .create(true)
         .open(&log_file)
@@ -63,7 +62,7 @@ fn get_log_directory<R: Runtime>(
 }
 
 /// Get the path to the current log file
-fn get_log_file_path(log_dir: &PathBuf) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn get_log_file_path(log_dir: &std::path::Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let now: DateTime<Utc> = Utc::now();
     let filename = format!("pyre-portal-{}.log", now.format("%Y-%m-%d"));
     Ok(log_dir.join(filename))
@@ -112,7 +111,7 @@ pub async fn read_log_file<R: Runtime>(
     let file_path = log_dir.join(file_name);
 
     // Security check: ensure the file is actually in the log directory
-    if !file_path.starts_with(&log_dir) || !file_path.extension().is_some_and(|ext| ext == "log") {
+    if !file_path.starts_with(&log_dir) || file_path.extension().is_none_or(|ext| ext != "log") {
         return Err("Invalid log file path".to_string());
     }
 
@@ -133,7 +132,7 @@ pub async fn clear_log_file<R: Runtime>(
     let file_path = log_dir.join(file_name);
 
     // Security check: ensure the file is actually in the log directory
-    if !file_path.starts_with(&log_dir) || !file_path.extension().is_some_and(|ext| ext == "log") {
+    if !file_path.starts_with(&log_dir) || file_path.extension().is_none_or(|ext| ext != "log") {
         return Err("Invalid log file path".to_string());
     }
 
@@ -170,7 +169,10 @@ pub async fn cleanup_old_logs<R: Runtime>(
     for entry in entries.flatten() {
         let path = entry.path();
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            if file_name.ends_with(".log") && file_name.to_string() < cutoff_filename && fs::remove_file(&path).is_ok() {
+            if file_name.ends_with(".log")
+                && file_name < &cutoff_filename[..]
+                && fs::remove_file(&path).is_ok()
+            {
                 deleted_count += 1;
             }
         }
