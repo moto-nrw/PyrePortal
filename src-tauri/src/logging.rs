@@ -85,12 +85,10 @@ pub async fn get_log_files<R: Runtime>(app: AppHandle<R>) -> Result<Vec<String>,
         fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log directory: {}", e))?;
 
     let mut log_files = Vec::new();
-    for entry in entries {
-        if let Ok(entry) = entry {
-            if let Some(file_name) = entry.file_name().to_str() {
-                if file_name.ends_with(".log") {
-                    log_files.push(file_name.to_string());
-                }
+    for entry in entries.flatten() {
+        if let Some(file_name) = entry.file_name().to_str() {
+            if file_name.ends_with(".log") {
+                log_files.push(file_name.to_string());
             }
         }
     }
@@ -114,8 +112,7 @@ pub async fn read_log_file<R: Runtime>(
     let file_path = log_dir.join(file_name);
 
     // Security check: ensure the file is actually in the log directory
-    if !file_path.starts_with(&log_dir) || !file_path.extension().map_or(false, |ext| ext == "log")
-    {
+    if !file_path.starts_with(&log_dir) || !file_path.extension().is_some_and(|ext| ext == "log") {
         return Err("Invalid log file path".to_string());
     }
 
@@ -136,8 +133,7 @@ pub async fn clear_log_file<R: Runtime>(
     let file_path = log_dir.join(file_name);
 
     // Security check: ensure the file is actually in the log directory
-    if !file_path.starts_with(&log_dir) || !file_path.extension().map_or(false, |ext| ext == "log")
-    {
+    if !file_path.starts_with(&log_dir) || !file_path.extension().is_some_and(|ext| ext == "log") {
         return Err("Invalid log file path".to_string());
     }
 
@@ -171,15 +167,11 @@ pub async fn cleanup_old_logs<R: Runtime>(
         fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log directory: {}", e))?;
 
     let mut deleted_count = 0;
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-                if file_name.ends_with(".log") && file_name.to_string() < cutoff_filename {
-                    if fs::remove_file(&path).is_ok() {
-                        deleted_count += 1;
-                    }
-                }
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+            if file_name.ends_with(".log") && file_name.to_string() < cutoff_filename && fs::remove_file(&path).is_ok() {
+                deleted_count += 1;
             }
         }
     }
