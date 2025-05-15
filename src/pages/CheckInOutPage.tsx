@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ContentBox } from '../components/ui';
@@ -28,8 +28,8 @@ function CheckInOutPage() {
   };
 
   const [scanMessage, setScanMessage] = useState<string>('');
-  const [isScanning] = useState<boolean>(true); // Always scanning
-  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
+  // const [isScanning] = useState<boolean>(true); // Always scanning
+  const [lastScanTime] = useState<Date | null>(null);
   const [displayActivity, setDisplayActivity] = useState<Activity | null>(null);
   const navigate = useNavigate();
 
