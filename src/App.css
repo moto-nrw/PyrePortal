@@ -1,10 +1,14 @@
-.logo.vite:hover {
-  filter: drop-shadow(0 0 2em #747bff);
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafb);
+html,
+body {
+  height: 100%;
 }
+
 :root {
   font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
   font-size: 16px;
@@ -13,6 +17,11 @@
 
   color: #0f0f0f;
   background-color: #f6f6f6;
+  background-image: url("/img/colors.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -21,29 +30,54 @@
   -webkit-text-size-adjust: 100%;
 }
 
+.content-box {
+  background-color: rgba(255, 255, 255, 0.99);
+  border-radius: 12px;
+  padding: 5rem;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  margin: 0 auto;
+  width: 95%;
+  height: 90%;
+  position: relative;
+  z-index: 1;
+  overflow: auto;
+}
+
 .container {
   margin: 0;
-  padding-top: 10vh;
+  height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   text-align: center;
+  position: relative;
+  z-index: 1;
 }
 
 .logo {
-  height: 6em;
-  padding: 1.5em;
+  height: auto;
+  max-width: 300px;
+  padding: 0;
+  margin-bottom: 2rem;
   will-change: filter;
   transition: 0.75s;
 }
 
-.logo.tauri:hover {
-  filter: drop-shadow(0 0 2em #24c8db);
+.logo:hover {
+  filter: drop-shadow(0 0 1em rgba(36, 200, 219, 0.7));
 }
 
-.row {
+.logo-container {
   display: flex;
   justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.user-selection {
+  display: flex;
+  justify-content: center;
+  margin: 2rem 0;
 }
 
 a {
@@ -58,10 +92,13 @@ a:hover {
 
 h1 {
   text-align: center;
+  font-size: 2.8rem;
+  margin-bottom: 2rem;
 }
 
 input,
-button {
+button,
+select {
   border-radius: 8px;
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
@@ -71,15 +108,34 @@ button {
   color: #0f0f0f;
   background-color: #ffffff;
   transition: border-color 0.25s;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4);
+}
+
+.user-dropdown {
+  min-width: 350px;
+  margin-right: 15px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 0.7em center;
+  background-size: 1em;
+  padding-right: 2.5em;
+  font-size: 1.3em;
+  height: 3em;
 }
 
 button {
   cursor: pointer;
+  min-width: 150px;
+  font-size: 1.3em;
+  font-weight: 600;
+  height: 3em;
 }
 
 button:hover {
   border-color: #396cd8;
+  background-color: #f5f5f5;
 }
 button:active {
   border-color: #396cd8;
@@ -87,18 +143,20 @@ button:active {
 }
 
 input,
-button {
+button,
+select {
   outline: none;
-}
-
-#greet-input {
-  margin-right: 5px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f6f6f6;
     background-color: #2f2f2f;
+    background-image: url("/img/colors.png");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 
   a:hover {
@@ -106,9 +164,14 @@ button {
   }
 
   input,
-  button {
+  button,
+  select {
     color: #ffffff;
     background-color: #0f0f0f98;
+  }
+
+  .user-dropdown {
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
   }
   button:active {
     background-color: #0f0f0f69;

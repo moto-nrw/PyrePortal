@@ -1,0 +1,19 @@
+# Build artifacts
+dist/
+node_modules/
+.turbo/
+build/
+coverage/
+.next/
+.idea/
+.vscode/
+
+# Rust artifacts
+src-tauri/target/
+**/debug/
+**/target/
+Cargo.lock
+**/*.rs.bk
+
+# Generated files
+**/.rustc_info.json
