@@ -40,11 +40,10 @@ function LogViewer({
   // Fetch available log files from the filesystem
   const fetchLogFiles = useCallback(async () => {
     try {
-      const files = await invoke<string[]>('get_log_files', {})
-        .catch((error) => {
-          logger.error('Failed to fetch log files', { error });
-          return [] as string[];
-        });
+      const files = await invoke<string[]>('get_log_files', {}).catch(error => {
+        logger.error('Failed to fetch log files', { error });
+        return [] as string[];
+      });
       if (files.length > 0 && !selectedLogFile) {
         setSelectedLogFile(files[0]);
       }
@@ -56,11 +55,10 @@ function LogViewer({
   // Read a specific log file
   const readLogFile = useCallback(async (fileName: string) => {
     try {
-      const content = await invoke<string>('read_log_file', { fileName })
-        .catch((error) => {
-          logger.error(`Failed to read log file ${fileName}`, { error });
-          return '';
-        });
+      const content = await invoke<string>('read_log_file', { fileName }).catch(error => {
+        logger.error(`Failed to read log file ${fileName}`, { error });
+        return '';
+      });
       // Parse log content as individual lines, filtering out empty lines
       const lines = content.split('\n').filter(line => line.trim());
       setPersistedLogs(lines);
@@ -114,7 +112,15 @@ function LogViewer({
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [autoRefresh, refreshInterval, viewType, selectedLogFile, fetchMemoryLogs, fetchLogFiles, readLogFile]);
+  }, [
+    autoRefresh,
+    refreshInterval,
+    viewType,
+    selectedLogFile,
+    fetchMemoryLogs,
+    fetchLogFiles,
+    readLogFile,
+  ]);
 
   // Fetch persisted logs when selectedLogFile changes
   useEffect(() => {
