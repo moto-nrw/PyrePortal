@@ -1,0 +1,30 @@
+on: [workflow_call]
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Tauri environment
+        uses: ./.github/actions/setup-tauri-environment
+        
+      # Add your Jest/Vitest command here if you have tests
+      # For example: npm run test
+      
+  test-rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Tauri environment
+        uses: ./.github/actions/setup-tauri-environment
+        
+      - name: Run Rust tests
+        working-directory: ./src-tauri
+        run: cargo test

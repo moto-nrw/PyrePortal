@@ -1,0 +1,28 @@
+name: PyrePortal CI
+run-name: CI workflow
+
+on: 
+  push:
+    branches:
+      - main
+      - development
+  pull_request:
+    branches:
+      - main
+      - development
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+    
+  test:
+    uses: ./.github/workflows/test.yml
+    
+  build:
+    needs: [test, lint]
+    uses: ./.github/workflows/build.yml

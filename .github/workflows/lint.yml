@@ -1,0 +1,38 @@
+on: [workflow_call]
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Tauri environment
+        uses: ./.github/actions/setup-tauri-environment
+      
+      - name: Lint frontend code
+        run: npm run lint
+      
+      - name: Type check frontend code
+        run: npm run typecheck
+        
+      - name: Check formatting
+        run: npm run format:check
+  
+  rust-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Tauri environment
+        uses: ./.github/actions/setup-tauri-environment
+      
+      - name: Check Rust formatting
+        working-directory: ./src-tauri
+        run: cargo fmt --all -- --check
+      
+      - name: Run Clippy
+        working-directory: ./src-tauri
+        run: cargo clippy -- -D warnings
