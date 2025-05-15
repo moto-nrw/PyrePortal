@@ -1,0 +1,73 @@
+Pi installation guide
+
+⏺ Here are all the commands you need to run on your Raspberry Pi to set up PyrePortal:
+
+  # 1. Install system dependencies for Tauri
+  sudo apt update
+  sudo apt install -y libwebkit2gtk-4.0-dev build-essential curl wget libssl-dev libgtk-3-dev
+  libayatana-appindicator3-dev librsvg2-dev pkg-config
+
+  # 2. Install Node.js and npm (using nvm for better version control)
+  curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+  source ~/.bashrc
+  nvm install --lts
+
+  # 3. Install Rust and Cargo
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  source $HOME/.cargo/env
+
+  # 4. Clone the repository
+  git clone https://github.com/yourusername/PyrePortal.git
+  cd PyrePortal
+
+  # 5. Install project dependencies
+  npm install
+
+  # 6. Verify installation
+  npm run tauri dev
+
+  After running these commands, the development version of the app should start.
+#
+
+
+
+⏺ You're missing two key WebKit-related libraries that Tauri needs for web rendering on Raspberry Pi: libsoup-3.0
+  and javascriptcoregtk-4.1.
+
+  Run these commands to install the missing dependencies:
+
+  sudo apt update
+  sudo apt install -y libsoup-3.0-dev libjavascriptcoregtk-4.1-dev
+
+  These libraries provide HTTP client/server functionality and JavaScript engine support that WebKit needs. They're
+   specific dependencies for Tauri on Linux systems, especially for WebView handling.
+
+  After installing, run npm run tauri dev again and it should progress further.
+
+  Now you need to install the WebKit2GTK library, which provides the web rendering engine:
+
+    sudo apt install -y libwebkit2gtk-4.1-dev
+
+    This package contains the WebKit web content engine for GTK, which Tauri requires to render web content in your
+    application. It's a different version than what was included in the initial system dependencies installation.
+
+    Run this command and then try npm run tauri dev again.
+
+
+⏺ The "Could not determine the accessibility bus address" warning relates to Linux accessibility features. Here's
+  what it means:
+
+  1. Accessibility Bus: Part of Linux's ATK (Accessibility Toolkit) that allows assistive technologies (screen
+  readers, magnifiers) to interact with applications.
+  2. Cause: The warning appears when a GTK application can't connect to the accessibility service, often because:
+    - The at-spi2-core package isn't installed
+    - The accessibility service isn't running
+    - The application can't determine where to find the service
+  3. Impact: This warning doesn't affect functionality - your application works fine despite it. It's purely
+  informational.
+  4. Fix (optional):
+    - Install the accessibility toolkit: sudo apt install at-spi2-core
+    - Or suppress the warning: export NO_AT_BRIDGE=1 in your profile
+
+  This is a common warning on Raspberry Pi OS and other Debian-based systems, particularly with GTK applications
+  like Tauri.
