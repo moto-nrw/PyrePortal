@@ -1,14 +1,14 @@
+import { listen } from '@tauri-apps/api/event';
+import { invoke } from '@tauri-apps/api/tauri';
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { invoke } from '@tauri-apps/api/tauri';
-import { listen } from '@tauri-apps/api/event';
 
+import { RfidScanModal } from '../components/RfidScanModal';
 import { ContentBox } from '../components/ui';
 import { useUserStore } from '../store/userStore';
 import type { Activity } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logUserAction, logError, logNavigation } from '../utils/logger';
-import { RfidScanModal } from '../components/RfidScanModal';
 
 function CheckInOutPage() {
   const {
@@ -93,38 +93,62 @@ function CheckInOutPage() {
         setScanMessage('NFC-Scan läuft. Bitte Karte an Scanner halten...');
         
         // Call the Tauri command to start scanning
-        invoke('start_nfc_scan')
-          .then(() => {
-            startNfcScan(); // Update Zustand store state
-            logUserAction('nfc_scan_started', { scanId });
-          })
-          .catch((error) => {
-            logError(
-              error instanceof Error ? error : new Error(String(error)),
-              'CheckInOutPage.startNfcScan'
-            );
-          });
+        try {
+          // Using a safe pattern for invoke
+          (async () => {
+            try {
+              // Using type assertion to make TypeScript happy
+              await (invoke as (command: string) => Promise<void>)('start_nfc_scan');
+              startNfcScan(); // Update Zustand store state
+              logUserAction('nfc_scan_started', { scanId });
+            } catch (error) {
+              logError(
+                error instanceof Error ? error : new Error(String(error)),
+                'CheckInOutPage.startNfcScan'
+              );
+            }
+          })().catch(() => {/* Catch already handled in the inner try/catch */});
+        } catch (error) {
+          logError(
+            error instanceof Error ? error : new Error(String(error)),
+            'CheckInOutPage.startNfcScan'
+          );
+        }
       }
 
       // Listen for RFID tag scanned events
       const cleanup: (() => void)[] = [];
       
-      listen('rfid-tag-scanned', (event) => {
+      // Use a non-async function for the event listener
+      void listen('rfid-tag-scanned', (event) => {
         const tag = event.payload as { id: string, timestamp: number };
         logger.info('RFID tag detected', { tagId: tag.id });
         setLastScanTime(new Date());
         
         // Process the tag with room and activity context
-        invoke('scan_rfid_tag', { 
-          tagId: tag.id,
-          roomId: selectedRoom?.id,
-          activityId: displayActivity?.id
-        }).catch(err => {
+        try {
+          // Using a safe pattern for invoke
+          (async () => {
+            try {
+              // Using type assertion to make TypeScript happy
+              await (invoke as (command: string, args: Record<string, unknown>) => Promise<void>)('scan_rfid_tag', { 
+                tagId: tag.id,
+                roomId: selectedRoom?.id,
+                activityId: displayActivity?.id
+              });
+            } catch (err) {
+              logError(
+                err instanceof Error ? err : new Error(String(err)),
+                'CheckInOutPage.processTag'
+              );
+            }
+          })().catch(() => {/* Catch already handled in the inner try/catch */});
+        } catch (err) {
           logError(
             err instanceof Error ? err : new Error(String(err)),
             'CheckInOutPage.processTag'
           );
-        });
+        }
       }).then(unlistenFn => {
         cleanup.push(unlistenFn);
       });
@@ -134,17 +158,27 @@ function CheckInOutPage() {
         logger.debug('Cleaning up NFC scan effect', { scanId });
         
         // Stop the RFID scanner
-        invoke('stop_nfc_scan')
-          .then(() => {
-            stopNfcScan(); // Update Zustand store state
-            logger.debug('NFC scan stopped', { scanId });
-          })
-          .catch((error) => {
-            logError(
-              error instanceof Error ? error : new Error(String(error)),
-              'CheckInOutPage.stopNfcScan'
-            );
-          });
+        try {
+          // Using a safe pattern for invoke
+          (async () => {
+            try {
+              // Using type assertion to make TypeScript happy
+              await (invoke as (command: string) => Promise<void>)('stop_nfc_scan');
+              stopNfcScan(); // Update Zustand store state
+              logger.debug('NFC scan stopped', { scanId });
+            } catch (error) {
+              logError(
+                error instanceof Error ? error : new Error(String(error)),
+                'CheckInOutPage.stopNfcScan'
+              );
+            }
+          })().catch(() => {/* Catch already handled in the inner try/catch */});
+        } catch (error) {
+          logError(
+            error instanceof Error ? error : new Error(String(error)),
+            'CheckInOutPage.stopNfcScan'
+          );
+        }
           
         // Clean up event listeners
         cleanup.forEach(fn => fn());

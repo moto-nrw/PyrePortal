@@ -4,7 +4,7 @@ use std::thread;
 use tauri::AppHandle;
 use chrono::Utc;
 use std::time::Duration;
-use log::{info, debug};
+use log::info;
 
 pub struct MockRfidReader {
     scanning: Arc<Mutex<bool>>,
@@ -70,13 +70,13 @@ impl RfidReader for MockRfidReader {
                     };
                     
                     info!("📱 Mock RFID tag detected: {}", tag_id);
-                    let _ = app_handle.emit_all("rfid-tag-scanned", tag);
+                    let _ = app_handle.emit("rfid-tag-scanned", tag);
                 }
                 
                 // Simulate occasional errors (every 10th cycle)
                 if counter % 10 == 0 {
                     info!("🛑 Simulating a temporary RFID reader error");
-                    let _ = app_handle.emit_all("rfid-error", "Simulated reader error".to_string());
+                    let _ = app_handle.emit("rfid-error", "Simulated reader error".to_string());
                 }
             }
             

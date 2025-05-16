@@ -9,6 +9,7 @@ mod rfid_logging;
 
 use std::sync::Mutex;
 use rfid::PlatformRfidReader;
+use crate::rfid::interface::RfidReader;
 
 #[tauri::command]
 async fn start_nfc_scan(
@@ -61,7 +62,7 @@ async fn scan_rfid_tag(
                 if user.is_checked_in { "checked_in" } else { "checked_out" }
             );
             // Emit event for UI
-            let _ = app_handle.emit_all("rfid-user-processed", user);
+            let _ = app_handle.emit("rfid-user-processed", user);
         },
         Ok(None) => {
             rfid_logging::log_tag_scan(&tag_id, None, "unknown_tag");
@@ -69,7 +70,7 @@ async fn scan_rfid_tag(
         Err(e) => {
             rfid_logging::log_tag_scan(&tag_id, None, &format!("error: {}", e));
             // Emit error for UI
-            let _ = app_handle.emit_all("rfid-error", e);
+            let _ = app_handle.emit("rfid-error", e);
         }
     }
     

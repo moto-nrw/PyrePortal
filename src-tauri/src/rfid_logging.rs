@@ -1,4 +1,4 @@
-use log::{LevelFilter, Record, Level, Metadata};
+use log::LevelFilter;
 use chrono::Local;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
@@ -58,7 +58,7 @@ pub fn init(log_dir: &Path) -> std::io::Result<()> {
     *TAG_LOGGER.lock().unwrap() = Some(tag_logger);
     
     // Configure general logging
-    let log_path = log_dir.join("pyreportal.log");
+    let _log_path = log_dir.join("pyreportal.log");
     
     // Use env_logger for console output
     env_logger::Builder::new()

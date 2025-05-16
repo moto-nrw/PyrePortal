@@ -1,5 +1,5 @@
 use crate::auth;
-use crate::cache::{self, PendingScan};
+use crate::cache::{self};
 use crate::config::AppConfig;
 use crate::rfid::interface::RfidTag;
 use reqwest::Client;
@@ -57,12 +57,12 @@ pub async fn send_tag_to_server(
     activity_id: Option<i32>
 ) -> Result<Option<UserInfo>, String> {
     let config = AppConfig::load();
-    let token = auth::get_auth_token();
+    let _token = auth::get_auth_token();
     let staff_id = auth::get_user_id();
     
     // Create scan request
     let terminal_id = config.device_id.clone();
-    let scan_request = ScanRequest {
+    let _scan_request = ScanRequest {
         tag_id: tag.id.clone(),
         terminal_id,
         timestamp: tag.timestamp,
@@ -306,7 +306,7 @@ async fn process_cached_scans() {
 }
 
 // Start a background task to periodically process cached scans
-pub async fn start_cache_processor(app_handle: tauri::AppHandle) {
+pub async fn start_cache_processor(_app_handle: tauri::AppHandle) {
     tokio::spawn(async move {
         loop {
             // Process cached scans every 5 minutes

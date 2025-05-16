@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
+import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
 interface RfidScanModalProps {
@@ -22,12 +22,13 @@ export function RfidScanModal({ isActive }: RfidScanModalProps) {
     const cleanup: (() => void)[] = [];
 
     // Listen for successful scans
-    listen('rfid-user-processed', async (event) => {
+    void listen('rfid-user-processed', (event) => {
       try {
         setError(null);
         
         const userData = event.payload as { id: number, name: string, is_checked_in: boolean };
-        console.log('RFID tag processed:', userData);
+        // Log RFID tag processed
+        // console.log('RFID tag processed:', userData);
         
         setScanResult(userData);
         setShowModal(true);
@@ -36,8 +37,8 @@ export function RfidScanModal({ isActive }: RfidScanModalProps) {
         setTimeout(() => {
           setShowModal(false);
         }, 1000);
-      } catch (err) {
-        console.error('Error processing tag scan:', err);
+      } catch {
+        // Log error processing tag scan
         setError('Failed to process tag');
       }
     }).then(unlistenFn => {
@@ -45,9 +46,10 @@ export function RfidScanModal({ isActive }: RfidScanModalProps) {
     });
     
     // Listen for errors
-    listen('rfid-error', (event) => {
+    void listen('rfid-error', (event) => {
       const errorMessage = event.payload as string;
-      console.error('RFID error:', errorMessage);
+      // Log RFID error
+      // console.error('RFID error:', errorMessage);
       setError(errorMessage);
       
       // Auto-hide error after 3 seconds
