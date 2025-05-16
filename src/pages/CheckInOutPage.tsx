@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { invoke } from '@tauri-apps/api/tauri';
+import { listen } from '@tauri-apps/api/event';
 
 import { ContentBox } from '../components/ui';
 import { useUserStore } from '../store/userStore';
 import type { Activity } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logUserAction, logError, logNavigation } from '../utils/logger';
+import { RfidScanModal } from '../components/RfidScanModal';
 
 function CheckInOutPage() {
   const {
@@ -29,7 +32,7 @@ function CheckInOutPage() {
 
   const [scanMessage, setScanMessage] = useState<string>('');
   // const [isScanning] = useState<boolean>(true); // Always scanning
-  const [lastScanTime] = useState<Date | null>(null);
+  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
   const [displayActivity, setDisplayActivity] = useState<Activity | null>(null);
   const navigate = useNavigate();
 
@@ -79,9 +82,7 @@ function CheckInOutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUser, selectedRoom, currentActivity, navigate, activities.length]);
 
-  // Real RFID daemon will handle scanning functionality
-
-  // Start NFC scanning automatically when component mounts - only runs once on mount
+  // Start NFC scanning with Tauri command when component mounts - only runs once on mount
   useEffect(() => {
     const scanId = Math.random().toString(36).substring(7); // Generate unique ID for this scan session
 
@@ -90,20 +91,63 @@ function CheckInOutPage() {
         // Track the scan state in a ref to avoid extra renders
         logger.info('Starting NFC scan automatically', { scanId });
         setScanMessage('NFC-Scan läuft. Bitte Karte an Scanner halten...');
-        startNfcScan();
-        logUserAction('nfc_scan_started', { scanId });
+        
+        // Call the Tauri command to start scanning
+        invoke('start_nfc_scan')
+          .then(() => {
+            startNfcScan(); // Update Zustand store state
+            logUserAction('nfc_scan_started', { scanId });
+          })
+          .catch((error) => {
+            logError(
+              error instanceof Error ? error : new Error(String(error)),
+              'CheckInOutPage.startNfcScan'
+            );
+          });
       }
 
-      // RFID daemon will handle real scanning
+      // Listen for RFID tag scanned events
+      const cleanup: (() => void)[] = [];
+      
+      listen('rfid-tag-scanned', (event) => {
+        const tag = event.payload as { id: string, timestamp: number };
+        logger.info('RFID tag detected', { tagId: tag.id });
+        setLastScanTime(new Date());
+        
+        // Process the tag with room and activity context
+        invoke('scan_rfid_tag', { 
+          tagId: tag.id,
+          roomId: selectedRoom?.id,
+          activityId: displayActivity?.id
+        }).catch(err => {
+          logError(
+            err instanceof Error ? err : new Error(String(err)),
+            'CheckInOutPage.processTag'
+          );
+        });
+      }).then(unlistenFn => {
+        cleanup.push(unlistenFn);
+      });
 
       // Cleanup function
       return () => {
         logger.debug('Cleaning up NFC scan effect', { scanId });
-        // No interval to clear
-
-        // Only stop if we're the ones who started it
-        stopNfcScan();
-        logger.debug('NFC scan stopped and interval cleared', { scanId });
+        
+        // Stop the RFID scanner
+        invoke('stop_nfc_scan')
+          .then(() => {
+            stopNfcScan(); // Update Zustand store state
+            logger.debug('NFC scan stopped', { scanId });
+          })
+          .catch((error) => {
+            logError(
+              error instanceof Error ? error : new Error(String(error)),
+              'CheckInOutPage.stopNfcScan'
+            );
+          });
+          
+        // Clean up event listeners
+        cleanup.forEach(fn => fn());
       };
     } catch (error) {
       logError(
@@ -190,6 +234,9 @@ function CheckInOutPage() {
           </div>
         </div>
       </div>
+      
+      {/* RFID Scan Modal */}
+      <RfidScanModal isActive={nfcScanActive} />
     </ContentBox>
   );
 }
