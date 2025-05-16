@@ -29,4 +29,16 @@ export default defineConfig(async () => ({
       ignored: ['**/src-tauri/**'],
     },
   },
+  
+  // Configure Tauri APIs as external dependencies
+  build: {
+    rollupOptions: {
+      external: [
+        '@tauri-apps/api',
+        '@tauri-apps/api/tauri',
+        '@tauri-apps/api/event',
+        '@tauri-apps/plugin-opener'
+      ]
+    }
+  }
 }));
