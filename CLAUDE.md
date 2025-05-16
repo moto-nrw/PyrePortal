@@ -11,8 +11,10 @@ PyrePortal is a desktop application built with Tauri v2, React, and TypeScript. 
 - **User Authentication**: Secure login with PIN verification
 - **Room Selection**: View and select available rooms with real-time status
 - **Activity Management**: Create and track activities with category selection
+- **RFID Integration**: Support for RFID tag scanning with visual feedback
+- **Offline Capability**: Caching for RFID scans during network disruptions
 - **Comprehensive Logging**: Detailed logging of user actions and system events
-- **Cross-Platform**: Runs on Windows, macOS, and Linux
+- **Cross-Platform**: Runs on Windows, macOS, and Linux (with Raspberry Pi optimizations)
 
 ## Architecture
 
@@ -24,7 +26,8 @@ PyrePortal is a desktop application built with Tauri v2, React, and TypeScript. 
 - **Backend**: Rust application using Tauri framework
   - Located in the `/src-tauri` directory
   - Exposes Rust functions to the frontend via Tauri commands
-  - Handles system-level operations like file I/O for logging
+  - Handles system-level operations like file I/O, hardware access, and network communication
+  - Provides hardware abstraction for RFID readers with platform-specific implementations
 
 The application follows the Tauri architecture where:
 
@@ -42,6 +45,9 @@ npm install
 
 # Run complete application in development mode (frontend + Tauri backend)
 npm run tauri dev
+
+# Run with mock RFID hardware (for development on non-Pi platforms)
+npm run tauri dev -- --features=mock_hardware
 
 # Run frontend only (faster for UI-focused development)
 npm run dev
@@ -97,6 +103,16 @@ cargo test
   - `/src` - Rust source code
     - `lib.rs` - Main entry point and command registration
     - `logging.rs` - Logging functionality
+    - `rfid_logging.rs` - RFID scan-specific logging
+    - `rfid/` - RFID hardware abstraction and implementations
+      - `mod.rs` - Module definitions and platform detection
+      - `interface.rs` - Common RFID interface definitions
+      - `raspberry_pi.rs` - Raspberry Pi implementation using SPI
+      - `mock.rs` - Development mock implementation
+    - `config.rs` - Application configuration management
+    - `auth.rs` - Authentication state management
+    - `api.rs` - Server API communication with offline support
+    - `cache.rs` - Offline caching system
     - `main.rs` - Application initialization
   - `Cargo.toml` - Rust dependencies
   - `tauri.conf.json` - Tauri configuration
@@ -216,6 +232,11 @@ PyrePortal has a comprehensive logging system with different components:
    - Log rotation and cleanup functionality
    - Security checks on file paths
 
+4. **RFID Logger** (`src-tauri/src/rfid_logging.rs`):
+   - CSV-based log of all RFID tag scans
+   - Records timestamp, tag ID, user info, and status
+   - Specialized for auditing scan events
+
 ### Logging Best Practices
 
 - Use appropriate log levels based on context
@@ -262,11 +283,35 @@ Ensure you have the following installed:
    - Verify data serialization/deserialization when passing between JS and Rust
    - Check for permission issues in Tauri configuration
 
+## Hardware Integration
+
+The application includes RFID/NFC reader integration with the following components:
+
+1. **Hardware Abstraction Layer**:
+   - Common interface in `src-tauri/src/rfid/interface.rs`
+   - Platform-specific implementations for Raspberry Pi and development platforms
+   - Error handling and automatic reconnection
+
+2. **MFRC522 Reader Support**:
+   - SPI communication via the `rppal` crate
+   - Limited retry mechanism (max 10 attempts)
+   - Pin configuration: SPI0, CE0, GPIO25 (default, configurable)
+
+3. **Offline Capability**:
+   - Caching system for when network connectivity is unavailable
+   - Background sync with exponential backoff
+   - Persistent storage of scan events
+
+4. **Frontend Integration**:
+   - Real-time feedback with the `RfidScanModal` component
+   - Event-based communication via Tauri events
+   - Authentication integration with user session
+
 ## Current Development Status
 
-The application is currently using mock data instead of real API calls to the Project Phoenix backend. Future development will include:
+The application now includes RFID integration, with both mock implementations for development and real hardware support for Raspberry Pi. Future development will include:
 
-- Real API integration with Project Phoenix
-- Enhanced user authentication (biometrics, RFID/NFC)
-- Offline mode with data synchronization
+- Extended API integration with Project Phoenix
+- Enhanced user authentication (biometrics)
 - Rich activity analytics and reporting
+- Multi-terminal synchronization capabilities
