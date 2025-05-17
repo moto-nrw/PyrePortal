@@ -10,6 +10,7 @@ mod rfid_logging;
 use std::sync::Mutex;
 use rfid::PlatformRfidReader;
 use crate::rfid::interface::RfidReader;
+use tauri::Emitter;
 
 #[tauri::command]
 async fn start_nfc_scan(

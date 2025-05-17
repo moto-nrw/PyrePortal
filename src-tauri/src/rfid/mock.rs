@@ -1,7 +1,7 @@
 use super::interface::{RfidReader, RfidTag, RfidError};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 use chrono::Utc;
 use std::time::Duration;
 use log::info;
