@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ContentBox } from '../components/ui';
@@ -8,12 +8,19 @@ import theme from '../styles/theme';
 import { createLogger, logUserAction, logError, logNavigation } from '../utils/logger';
 
 function CheckInOutPage() {
-  const { selectedRoom, selectedUser, currentActivity, activities, startNfcScan, stopNfcScan, nfcScanActive } =
-    useUserStore();
-    
+  const {
+    selectedRoom,
+    selectedUser,
+    currentActivity,
+    activities,
+    startNfcScan,
+    stopNfcScan,
+    nfcScanActive,
+  } = useUserStore();
+
   // Use a ref to track scan state locally to avoid dependency cycles
   const nfcScanRef = useRef(nfcScanActive);
-  
+
   // Simple ref-based state tracker to avoid re-renders
   const get = (key: string) => {
     if (key === 'nfcScanActive') return nfcScanRef.current;
@@ -21,8 +28,8 @@ function CheckInOutPage() {
   };
 
   const [scanMessage, setScanMessage] = useState<string>('');
-  const [isScanning] = useState<boolean>(true); // Always scanning
-  const [lastScanTime, setLastScanTime] = useState<Date | null>(null);
+  // const [isScanning] = useState<boolean>(true); // Always scanning
+  const [lastScanTime] = useState<Date | null>(null);
   const [displayActivity, setDisplayActivity] = useState<Activity | null>(null);
   const navigate = useNavigate();
 
@@ -68,86 +75,32 @@ function CheckInOutPage() {
       // Only log the unmount, NFC scan cleanup is handled in the NFC-specific effect
       logger.debug('CheckInOutPage component unmounted');
     };
-  // Excluding logger to prevent infinite loops
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Excluding logger to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedUser, selectedRoom, currentActivity, navigate, activities.length]);
 
-  // Simulate a successful NFC scan - memoized to avoid recreation
-  const simulateNfcScan = useCallback(async () => {
-    // Early return if not scanning
-    if (!isScanning) return;
-
-    try {
-      const scanTime = new Date();
-      setLastScanTime(scanTime);
-
-      // Get fake student names for simulation
-      const studentNames = [
-        'Max Mustermann',
-        'Anna Schmidt',
-        'Leon Weber',
-        'Sophie Fischer',
-        'Tim Becker',
-        'Lena Hoffmann',
-      ];
-      const randomName = studentNames[Math.floor(Math.random() * studentNames.length)];
-      const randomAction = Math.random() > 0.5 ? 'eingecheckt' : 'ausgecheckt';
-
-      // Use a local logger reference to break circular dependencies
-      const eventId = Math.random().toString(36).substr(2, 9);
-      
-      // Log but don't include in deps
-      logger.info('NFC scan detected', { 
-        studentName: randomName, 
-        eventId,
-        timestamp: scanTime.toISOString() 
-      });
-
-      // Simulate checking in/out
-      setScanMessage(`${randomName} erfolgreich ${randomAction}!`);
-      logUserAction(`student_${randomAction === 'eingecheckt' ? 'checked_in' : 'checked_out'}`, {
-        studentName: randomName,
-        eventId
-      });
-
-      // Reset message after 3 seconds
-      setTimeout(() => {
-        if (isScanning) {
-          setScanMessage('NFC-Scan läuft. Bitte Karte an Scanner halten...');
-        }
-      }, 3000);
-    } catch (error) {
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'CheckInOutPage.simulateNfcScan'
-      );
-    }
-  // Excluding logger from deps to avoid infinite loops
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isScanning]);
+  // Real RFID daemon will handle scanning functionality
 
   // Start NFC scanning automatically when component mounts - only runs once on mount
   useEffect(() => {
     const scanId = Math.random().toString(36).substring(7); // Generate unique ID for this scan session
-    
+
     try {
-      if (!get('nfcScanActive')) { // Track the scan state in a ref to avoid extra renders
+      if (!get('nfcScanActive')) {
+        // Track the scan state in a ref to avoid extra renders
         logger.info('Starting NFC scan automatically', { scanId });
         setScanMessage('NFC-Scan läuft. Bitte Karte an Scanner halten...');
         startNfcScan();
         logUserAction('nfc_scan_started', { scanId });
       }
 
-      // For demo purposes, simulate a scan after 3 seconds
-      const interval = setInterval(() => {
-        void simulateNfcScan();
-      }, 8000); // Run every 8 seconds
+      // RFID daemon will handle real scanning
 
       // Cleanup function
       return () => {
         logger.debug('Cleaning up NFC scan effect', { scanId });
-        clearInterval(interval);
-        
+        // No interval to clear
+
         // Only stop if we're the ones who started it
         stopNfcScan();
         logger.debug('NFC scan stopped and interval cleared', { scanId });
@@ -158,23 +111,23 @@ function CheckInOutPage() {
         'CheckInOutPage.autoStartScan'
       );
     }
-  // We deliberately exclude functions from deps to prevent re-renders
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // We deliberately exclude functions from deps to prevent re-renders
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update displayActivity when component mounts or dependencies change
   useEffect(() => {
     // Get the most recent activity from the array
     const mostRecentActivity = activities.length > 0 ? activities[activities.length - 1] : null;
-    
+
     // This is the critical fix to the issue - explicitly use the array-based activity
     // Ignore currentActivity since it becomes null after creation
     if (mostRecentActivity) {
       logger.debug('Using most recent activity from array', {
         mostRecentActivity,
-        activityName: mostRecentActivity.name
+        activityName: mostRecentActivity.name,
       });
-      
+
       // Only set if there's a valid activity
       setDisplayActivity(mostRecentActivity);
     } else {

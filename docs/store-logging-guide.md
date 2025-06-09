@@ -30,6 +30,7 @@ The state middleware generates two primary types of logs:
 ```
 
 Key components:
+
 - `[42]` - Unique action ID to trace related state changes
 - `set:selectedUser` - Detected action type and field
 - `changes` - Object showing exactly what changed (previous and new values)
@@ -64,7 +65,7 @@ Look for these patterns in logs:
     }
   }
   source: "handleNameInput (CreateActivityPage.tsx)"
-  
+
 // Later, when creating the activity:
 [DEBUG] [ZustandMiddleware] [135] State updated: createActivity
   changes: {
@@ -126,6 +127,7 @@ This suggests the activity name is being reset during navigation between compone
 ### In Development Console
 
 1. Enable verbose logging in the browser console:
+
    ```javascript
    localStorage.setItem('pyrePortalVerboseStoreLogging', 'true');
    window.location.reload();
@@ -144,16 +146,17 @@ The `storeLogger.ts` file includes helper functions for analyzing logs:
 import { analyzeActivityNameChange } from '../utils/storeLogger';
 
 // Get logs from the logger
-const nameLogs = logger.getInMemoryLogs()
+const nameLogs = logger
+  .getInMemoryLogs()
   .filter(log => log.message.includes('Activity name changed'));
-  
+
 // Parse the logs into the expected format
 const parsedLogs = nameLogs.map(log => ({
   actionId: log.data?.actionId || 0,
   prevName: log.data?.prev || '',
   nextName: log.data?.next || '',
   source: log.data?.source || 'unknown',
-  timestamp: log.timestamp
+  timestamp: log.timestamp,
 }));
 
 // Get analysis
@@ -166,22 +169,25 @@ console.log(analysis);
 ### 1. Activity Name Gets Lost When Creating
 
 **Log Pattern:**
+
 ```
 // First, name is set
 [DEBUG] State updated: updateActivityField
   changes: { currentActivity: { name: { prev: "", next: "Chess Club" } } }
-  
-// Later, name is empty when creating actual activity  
+
+// Later, name is empty when creating actual activity
 [DEBUG] State updated: createActivity
   changes: { activities: { added: { name: "" } } }
 ```
 
 **Potential Causes:**
+
 - Deep cloning issues with the activity object
 - Missing spread operation when creating the new activity
 - Timing issues with asynchronous updates
 
 **Solution:**
+
 - Ensure proper deep cloning in the `createActivity` function
 - Add explicit logging for the activity name right before creation
 - Consider using immer for more reliable state updates
@@ -189,11 +195,12 @@ console.log(analysis);
 ### 2. Activity Name Lost Between Components
 
 **Log Pattern:**
+
 ```
 // Component A sets name
 [DEBUG] State updated: updateActivityField
   source: "ComponentA"
-  
+
 // Name disappears when accessed in Component B
 [DEBUG] State updated: set:currentActivity
   source: "ComponentB"
@@ -201,11 +208,13 @@ console.log(analysis);
 ```
 
 **Potential Causes:**
+
 - Component remounting causing store recreation
 - Race conditions between state updates
 - Multiple store instances
 
 **Solution:**
+
 - Ensure all components use the same store instance
 - Add state persistence for critical fields (localStorage/sessionStorage)
 - Use store middleware for state validation
@@ -217,6 +226,7 @@ console.log(analysis);
 2. **Track action IDs**: Related state changes share the same action ID for easy correlation
 
 3. **Look for timing patterns**: Many state loss issues happen during specific user flows:
+
    - After form submission
    - During navigation
    - When switching between tabs/views
@@ -244,12 +254,15 @@ In production, logging is automatically configured to:
 When debugging the specific activity name persistence issue:
 
 1. First, get all logs related to activity name changes:
+
    ```typescript
-   const nameChangeLogs = logger.getInMemoryLogs()
+   const nameChangeLogs = logger
+     .getInMemoryLogs()
      .filter(log => log.data?.changes?.currentActivity?.name);
    ```
 
 2. Review the complete lifecycle of an activity:
+
    - Look for the initial name setting (from empty to a value)
    - Track what happens to the name during activity creation
    - Check if the name is correctly passed to the activities array

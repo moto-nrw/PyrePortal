@@ -216,7 +216,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
     set({
       currentActivity: {
-        name: "", // Initialize with empty name to ensure the field exists
+        name: '', // Initialize with empty name to ensure the field exists
         roomId,
         createdBy: selectedUser,
         category: ActivityCategory.OTHER,
@@ -224,7 +224,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         supervisorId: creator?.id ?? -1, // default to the current user as supervisor
       },
     });
-    
+
     storeLogger.debug('Activity initialized', { roomId });
   },
 
@@ -237,16 +237,16 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           [field]: value,
         },
       });
-      
+
       // Special logging for name field to help track the issue
       if (field === 'name') {
-        storeLogger.info('Activity name updated', { 
+        storeLogger.info('Activity name updated', {
           prev: currentActivity.name,
           next: value,
           activityDetails: {
             roomId: currentActivity.roomId,
             category: currentActivity.category,
-          }
+          },
         });
       }
     }
@@ -301,11 +301,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       return true;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      storeLogger.error('Failed to create activity', { 
+      storeLogger.error('Failed to create activity', {
         message: error.message,
-        stack: error.stack 
+        stack: error.stack,
       });
-      
+
       set({
         error: 'Fehler beim Erstellen der Aktivität',
         isLoading: false,
@@ -335,12 +335,12 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   startNfcScan: (() => {
     // Closure-based guard variable to prevent repeat state changes
     let isStarting = false;
-    
+
     // Using IIFE to create a stable reference that doesn't change on re-renders
     const fn = () => {
       // Skip if already in the process of starting
       if (isStarting) return;
-      
+
       isStarting = true;
       try {
         const { nfcScanActive } = get();
@@ -355,18 +355,18 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         }, 0);
       }
     };
-    return fn; 
+    return fn;
   })(),
-  
+
   stopNfcScan: (() => {
     // Closure-based guard variable to prevent repeat state changes
     let isStopping = false;
-    
+
     // Using IIFE to create a stable reference that doesn't change on re-renders
     const fn = () => {
       // Skip if already in the process of stopping
       if (isStopping) return;
-      
+
       isStopping = true;
       try {
         const { nfcScanActive } = get();
@@ -508,16 +508,13 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
 // Create the store with logging middleware
 export const useUserStore = create<UserState>(
-  loggerMiddleware(
-    createUserStore,
-    {
-      name: 'UserStore',
-      logLevel: LogLevel.DEBUG,
-      activityTracking: true,
-      stateChanges: true,
-      actionSource: true,
-      // Exclude certain high-frequency actions to reduce noise
-      excludedActions: ['functionalUpdate'],
-    }
-  )
+  loggerMiddleware(createUserStore, {
+    name: 'UserStore',
+    logLevel: LogLevel.DEBUG,
+    activityTracking: true,
+    stateChanges: true,
+    actionSource: true,
+    // Exclude certain high-frequency actions to reduce noise
+    excludedActions: ['functionalUpdate'],
+  })
 );

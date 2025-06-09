@@ -1,6 +1,6 @@
 /**
  * Store logger configuration for PyrePortal
- * 
+ *
  * This file provides configuration options specific to Zustand store logging
  * and can be used to adjust logging behavior at runtime.
  */
@@ -37,12 +37,11 @@ const productionStoreLogConfig: LoggerMiddlewareOptions = {
 };
 
 // Export current configuration based on environment
-export const storeLogConfig: LoggerMiddlewareOptions = 
-  import.meta.env.PROD
-    ? productionStoreLogConfig
-    : import.meta.env.DEV
-      ? verboseStoreLogConfig
-      : defaultStoreLogConfig;
+export const storeLogConfig: LoggerMiddlewareOptions = import.meta.env.PROD
+  ? productionStoreLogConfig
+  : import.meta.env.DEV
+    ? verboseStoreLogConfig
+    : defaultStoreLogConfig;
 
 // Helper functions for managing store logging behavior at runtime
 export const enableVerboseStoreLogging = (): void => {
@@ -73,18 +72,27 @@ export const getRuntimeStoreLogConfig = (): LoggerMiddlewareOptions => {
 
 // Sample interpretation helper for activity name changes
 export const analyzeActivityNameChange = (
-  logs: Array<{ actionId: number; prevName: string; nextName: string; source: string; timestamp: string }>
+  logs: Array<{
+    actionId: number;
+    prevName: string;
+    nextName: string;
+    source: string;
+    timestamp: string;
+  }>
 ): string => {
   if (!logs || logs.length === 0) {
     return 'No activity name changes detected.';
   }
 
   const sources = new Set(logs.map(log => log.source));
-  const timeSpan = logs.length > 1 
-    ? `${new Date(logs[0].timestamp).toLocaleTimeString()} - ${new Date(logs[logs.length - 1].timestamp).toLocaleTimeString()}`
-    : new Date(logs[0].timestamp).toLocaleTimeString();
+  const timeSpan =
+    logs.length > 1
+      ? `${new Date(logs[0].timestamp).toLocaleTimeString()} - ${new Date(logs[logs.length - 1].timestamp).toLocaleTimeString()}`
+      : new Date(logs[0].timestamp).toLocaleTimeString();
 
-  return `Found ${logs.length} activity name changes between ${timeSpan}.\n` +
+  return (
+    `Found ${logs.length} activity name changes between ${timeSpan}.\n` +
     `Changes originated from ${sources.size} different sources: ${Array.from(sources).join(', ')}.\n` +
-    `Most recent change: "${logs[logs.length - 1].prevName || '(empty)'}" → "${logs[logs.length - 1].nextName || '(empty)'}"`;
+    `Most recent change: "${logs[logs.length - 1].prevName || '(empty)'}" → "${logs[logs.length - 1].nextName || '(empty)'}"`
+  );
 };

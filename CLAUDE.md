@@ -4,22 +4,104 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PyrePortal is a desktop application built with Tauri, React, and TypeScript. The project uses Vite as the frontend build tool and combines Rust (Tauri) for the backend with React/TypeScript for the UI.
+PyrePortal is a desktop application built with Tauri v2, React, and TypeScript. The project uses Vite as the frontend build tool and combines Rust (Tauri) for the backend with React/TypeScript for the UI. It serves as a client for the Project Phoenix system, providing an interface for managing room occupancy and activities in educational settings.
+
+### Key Features
+
+- **User Authentication**: Secure login with PIN verification
+- **Room Selection**: View and select available rooms with real-time status
+- **Activity Management**: Create and track activities with category selection
+- **Comprehensive Logging**: Detailed logging of user actions and system events
+- **Cross-Platform**: Runs on Windows, macOS, and Linux
 
 ## Architecture
 
 - **Frontend**: React + TypeScript application built with Vite
   - Located in the `/src` directory
   - Uses Tailwind CSS for styling
+  - State management with Zustand
+  - Routing with React Router
 - **Backend**: Rust application using Tauri framework
   - Located in the `/src-tauri` directory
   - Exposes Rust functions to the frontend via Tauri commands
+  - Handles system-level operations like file I/O for logging
 
 The application follows the Tauri architecture where:
 
 1. The UI is built with web technologies (React)
 2. The backend logic is written in Rust
 3. Communication between frontend and backend happens via Tauri's IPC mechanism
+
+## Development Commands
+
+### Essential Commands
+
+```bash
+# Install dependencies
+npm install
+
+# Run complete application in development mode (frontend + Tauri backend)
+npm run tauri dev
+
+# Run frontend only (faster for UI-focused development)
+npm run dev
+
+# Build for production
+npm run tauri build
+
+# Check code quality
+npm run check        # Runs both ESLint and TypeScript checks
+
+# Typecheck TypeScript files
+npm run typecheck    # Only runs TypeScript checks
+
+# Lint TypeScript files
+npm run lint         # Check for linting issues
+npm run lint:fix     # Automatically fix linting issues
+
+# Format code
+npm run format       # Format all files with Prettier
+npm run format:check # Check formatting without making changes
+
+# Clean Rust build artifacts
+npm run clean:target # Removes build artifacts from src-tauri/target
+```
+
+### Rust-Specific Commands
+
+```bash
+# Run Rust code checks
+cargo check
+
+# Run the Clippy linter for Rust code
+cargo clippy
+
+# Format Rust code
+cargo fmt
+
+# Run Rust tests
+cargo test
+```
+
+## Project Structure
+
+### Key Directories and Files
+
+- `/src` - Frontend React application
+  - `/components` - Reusable UI components
+  - `/pages` - Page components for each route
+  - `/store` - Zustand state management
+  - `/utils` - Utility functions including logging
+  - `/styles` - CSS and theme configuration
+- `/src-tauri` - Rust backend
+  - `/src` - Rust source code
+    - `lib.rs` - Main entry point and command registration
+    - `logging.rs` - Logging functionality
+    - `main.rs` - Application initialization
+  - `Cargo.toml` - Rust dependencies
+  - `tauri.conf.json` - Tauri configuration
+- `/public` - Static assets
+- `/docs` - Documentation files
 
 ## Advanced Thinking Instructions
 
@@ -115,36 +197,34 @@ When working with this codebase, apply these thinking approaches based on task c
 - Consider input validation on both frontend and backend
 - Be mindful of potential attack vectors in IPC communication
 
-## Development Commands
+## Logging System
 
-### Frontend Development
+PyrePortal has a comprehensive logging system with different components:
 
-```bash
-# Install dependencies
-npm install
+1. **Frontend Logger** (`src/utils/logger.ts`):
 
-# Run development server (frontend only)
-npm run dev
+   - Multiple log levels: DEBUG, INFO, WARN, ERROR
+   - In-memory and persistent logging
+   - Context-aware logging with source tracking
 
-# Type check TypeScript files
-npm run build  # Includes TypeScript checks
-```
+2. **Store Logger** (`src/utils/storeLogger.ts`):
 
-### Tauri (Full-stack) Development
+   - Specialized for Zustand store actions
+   - Configurable verbosity for different environments
+   - Activity tracking for store changes
 
-```bash
-# Run the complete application in development mode
-npm run tauri dev
+3. **Rust Logger** (`src-tauri/src/logging.rs`):
+   - File system persistence for logs
+   - Log rotation and cleanup functionality
+   - Security checks on file paths
 
-# Build the application for production
-npm run tauri build
-```
+### Logging Best Practices
 
-## Project Configuration
-
-- **Tauri Configuration**: Found in `src-tauri/tauri.conf.json`
-- **Frontend Configuration**: Found in `vite.config.ts`
-- **TypeScript Configuration**: Found in `tsconfig.json` and `tsconfig.node.json`
+- Use appropriate log levels based on context
+- Include relevant context data with log entries
+- Never log sensitive information like PINs or tokens
+- For store actions, prefer using the built-in store logger
+- Refer to `docs/logging-guidelines.md` for detailed standards
 
 ## Rust-JS Interface
 
@@ -154,7 +234,7 @@ The application uses Tauri commands to communicate between Rust backend and Java
 2. They are registered in `src-tauri/src/lib.rs` using `invoke_handler(tauri::generate_handler![...])`
 3. Called from the frontend using `invoke("command_name", { args })`
 
-Example: The `greet` command defined in `lib.rs` is invoked from `App.tsx`
+Example: The `write_log` command defined in `logging.rs` is invoked from the Logger class in `logger.ts`
 
 ## Environment Setup
 
@@ -164,6 +244,33 @@ Ensure you have the following installed:
 - Rust and Cargo
 - Platform-specific dependencies for Tauri (see [Tauri prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites/))
 
-## Memories
+## Debugging Tips
 
-- We use Tauri v2!
+1. **Frontend Debugging**:
+
+   - Use the browser's developer tools when running in development mode
+   - Check the in-memory logs using the `logViewer.tsx` component
+   - Console logs are automatically formatted with source information
+
+2. **Backend Debugging**:
+
+   - Access Tauri logs in platform-specific locations:
+     - Windows: `%APPDATA%\pyreportal\logs`
+     - macOS: `~/Library/Logs/pyreportal`
+     - Linux: `~/.config/pyreportal/logs`
+   - Use the `write_log` command for persistent logging
+   - Enable DevTools with `cargo tauri dev -- --devtools`
+
+3. **Cross-Boundary Debugging**:
+   - Look for IPC errors in both frontend and backend logs
+   - Verify data serialization/deserialization when passing between JS and Rust
+   - Check for permission issues in Tauri configuration
+
+## Current Development Status
+
+The application is currently using mock data instead of real API calls to the Project Phoenix backend. Future development will include:
+
+- Real API integration with Project Phoenix
+- Enhanced user authentication (biometrics, RFID/NFC)
+- Offline mode with data synchronization
+- Rich activity analytics and reporting

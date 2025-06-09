@@ -335,6 +335,24 @@ cargo doc --open
 
 # Install a binary
 cargo install binary-name
+
+# Format Rust code
+cargo fmt
+
+# Run Clippy linter to check for common mistakes
+cargo clippy
+
+# Run Clippy with warnings treated as errors (like CI)
+cargo clippy -- -D warnings
+
+# Auto-fix Clippy warnings (less aggressive)
+cargo clippy --fix
+
+# Auto-fix Clippy warnings (more aggressive)
+cargo clippy --fix-aggressive
+
+# Auto-fix Clippy warnings (preserves semantics)
+cargo clippy --fix-safe
 ```
 
 ## Development Workflow Tips
@@ -401,12 +419,7 @@ Recommended `settings.json` configuration:
   "editor.codeActionsOnSave": {
     "source.fixAll.eslint": true
   },
-  "eslint.validate": [
-    "javascript",
-    "javascriptreact",
-    "typescript",
-    "typescriptreact"
-  ],
+  "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"],
   "prettier.configPath": "prettier.config.js"
 }
 ```
