@@ -202,11 +202,13 @@ When working with this codebase, apply these thinking approaches based on task c
 PyrePortal has a comprehensive logging system with different components:
 
 1. **Frontend Logger** (`src/utils/logger.ts`):
+
    - Multiple log levels: DEBUG, INFO, WARN, ERROR
    - In-memory and persistent logging
    - Context-aware logging with source tracking
 
 2. **Store Logger** (`src/utils/storeLogger.ts`):
+
    - Specialized for Zustand store actions
    - Configurable verbosity for different environments
    - Activity tracking for store changes
@@ -245,11 +247,13 @@ Ensure you have the following installed:
 ## Debugging Tips
 
 1. **Frontend Debugging**:
+
    - Use the browser's developer tools when running in development mode
    - Check the in-memory logs using the `logViewer.tsx` component
    - Console logs are automatically formatted with source information
 
 2. **Backend Debugging**:
+
    - Access Tauri logs in platform-specific locations:
      - Windows: `%APPDATA%\pyreportal\logs`
      - macOS: `~/Library/Logs/pyreportal`
