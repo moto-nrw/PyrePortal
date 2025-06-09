@@ -2,10 +2,6 @@ name: PyrePortal CI
 run-name: CI workflow
 
 on: 
-  push:
-    branches:
-      - main
-      - development
   pull_request:
     branches:
       - main
