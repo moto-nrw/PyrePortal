@@ -361,8 +361,11 @@ function TagAssignmentPage() {
                   <p style={{ margin: 0, marginBottom: theme.spacing.xs }}>
                     <strong>Scanner:</strong> {scannerStatus.platform}
                   </p>
-                  <p style={{ margin: 0, color: scannerStatus.is_available ? theme.colors.success : theme.colors.error }}>
+                  <p style={{ margin: 0, marginBottom: theme.spacing.xs, color: scannerStatus.is_available ? theme.colors.success : theme.colors.error }}>
                     Status: {scannerStatus.is_available ? 'Verfügbar' : 'Nicht verfügbar'}
+                  </p>
+                  <p style={{ margin: 0, fontSize: theme.fonts.size.small, fontStyle: 'italic' }}>
+                    Mode: {import.meta.env.VITE_ENABLE_RFID === 'true' ? 'Hardware RFID' : 'Mock Development'}
                   </p>
                   {scannerStatus.last_error && (
                     <p style={{ margin: 0, marginTop: theme.spacing.xs, color: theme.colors.error }}>
