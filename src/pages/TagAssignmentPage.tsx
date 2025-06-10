@@ -1,11 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { invoke } from '@tauri-apps/api/core';
 
 import { Button, ContentBox } from '../components/ui';
 import { useUserStore } from '../store/userStore';
 import { api, Student, TagAssignmentCheck } from '../services/api';
 import theme from '../styles/theme';
 import { logNavigation, logUserAction, logError } from '../utils/logger';
+
+// RFID scanner types from Tauri backend
+interface RfidScanResult {
+  success: boolean;
+  tag_id?: string;
+  error?: string;
+}
+
+interface RfidScannerStatus {
+  is_available: boolean;
+  platform: string;
+  last_error?: string;
+}
 
 
 /**
@@ -32,6 +46,7 @@ function TagAssignmentPage() {
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
 
   const clearStates = useCallback(() => {
     setScannedTag(null);
@@ -47,18 +62,56 @@ function TagAssignmentPage() {
     void navigate('/home');
   };
 
+  // Check RFID scanner status on component mount
+  useEffect(() => {
+    const checkScannerStatus = async () => {
+      try {
+        const status = await invoke<RfidScannerStatus>('get_rfid_scanner_status');
+        setScannerStatus(status);
+        logUserAction('RFID scanner status checked', { platform: status.platform, available: status.is_available });
+      } catch (err) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        logError(error, 'Failed to check RFID scanner status');
+        setScannerStatus({
+          is_available: false,
+          platform: 'Unknown',
+          last_error: error.message,
+        });
+      }
+    };
+
+    void checkScannerStatus();
+  }, []);
+
   // Start RFID scanning process
   const handleStartScanning = async () => {
     logUserAction('RFID scanning started');
     
     clearStates();
     setShowScanner(true);
+    setIsLoading(true);
     
-    // Connection point for future RFID hardware integration
-    // For now, simulate a scan after 2 seconds for UI testing
-    setTimeout(() => {
-      handleTagScanned('TEST-TAG-001'); // Mock tag for testing
-    }, 2000);
+    try {
+      // Use real RFID scanner through Tauri
+      const result = await invoke<RfidScanResult>('scan_rfid_single');
+      
+      if (result.success && result.tag_id) {
+        logUserAction('RFID tag scanned successfully', { tagId: result.tag_id, platform: scannerStatus?.platform });
+        void handleTagScanned(result.tag_id);
+      } else {
+        const errorMessage = result.error || 'Unknown scanning error';
+        logError(new Error(errorMessage), 'RFID scanning failed');
+        setError(`Scan-Fehler: ${errorMessage}`);
+        setShowScanner(false);
+      }
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logError(error, 'RFID scanner invocation failed');
+      setError(`Scanner-Fehler: ${error.message}`);
+      setShowScanner(false);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Handle tag scanned (connection point for RFID module)
@@ -247,10 +300,22 @@ function TagAssignmentPage() {
                 style={{
                   fontSize: theme.fonts.size.base,
                   color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.xl,
+                  marginBottom: theme.spacing.md,
                 }}
               >
-                Halten Sie das Armband an den Scanner
+                {scannerStatus?.platform.includes('Development') 
+                  ? 'Simuliere Scan-Vorgang...' 
+                  : 'Halten Sie das Armband an den Scanner'}
+              </p>
+              <p
+                style={{
+                  fontSize: theme.fonts.size.small,
+                  color: theme.colors.text.secondary,
+                  marginBottom: theme.spacing.xl,
+                  fontStyle: 'italic',
+                }}
+              >
+                Platform: {scannerStatus?.platform}
               </p>
               <Button
                 onClick={() => setShowScanner(false)}
@@ -275,17 +340,44 @@ function TagAssignmentPage() {
                 style={{
                   fontSize: theme.fonts.size.large,
                   color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.xxl,
+                  marginBottom: theme.spacing.lg,
                 }}
               >
                 Klicken Sie auf "Scannen", um ein RFID-Armband zu scannen
               </p>
+              
+              {/* Scanner Status Display */}
+              {scannerStatus && (
+                <div
+                  style={{
+                    backgroundColor: theme.colors.background.muted,
+                    borderRadius: theme.borders.radius.md,
+                    padding: theme.spacing.md,
+                    marginBottom: theme.spacing.xl,
+                    fontSize: theme.fonts.size.small,
+                    color: theme.colors.text.secondary,
+                  }}
+                >
+                  <p style={{ margin: 0, marginBottom: theme.spacing.xs }}>
+                    <strong>Scanner:</strong> {scannerStatus.platform}
+                  </p>
+                  <p style={{ margin: 0, color: scannerStatus.is_available ? theme.colors.success : theme.colors.error }}>
+                    Status: {scannerStatus.is_available ? 'Verfügbar' : 'Nicht verfügbar'}
+                  </p>
+                  {scannerStatus.last_error && (
+                    <p style={{ margin: 0, marginTop: theme.spacing.xs, color: theme.colors.error }}>
+                      {scannerStatus.last_error}
+                    </p>
+                  )}
+                </div>
+              )}
+              
               <Button
                 onClick={handleStartScanning}
-                disabled={isLoading}
+                disabled={isLoading || !scannerStatus?.is_available}
                 style={{ marginBottom: theme.spacing.lg }}
               >
-                Scannen starten
+                {scannerStatus?.platform.includes('Development') ? 'Mock Scannen' : 'Scannen starten'}
               </Button>
             </div>
           )}

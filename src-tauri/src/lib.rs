@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod logging;
+mod rfid;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -16,7 +17,10 @@ pub fn run() {
             logging::get_log_files,
             logging::read_log_file,
             logging::clear_log_file,
-            logging::cleanup_old_logs
+            logging::cleanup_old_logs,
+            rfid::scan_rfid_single,
+            rfid::get_rfid_scanner_status,
+            rfid::scan_rfid_with_timeout
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

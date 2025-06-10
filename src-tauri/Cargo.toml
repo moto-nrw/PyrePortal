@@ -23,4 +23,12 @@ tauri-plugin-opener = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 chrono = { version = "0.4", features = ["serde"] }
+tokio = { version = "1", features = ["time"] }
+
+# RFID scanner dependencies - only for Raspberry Pi (ARM64 Linux)
+[target.'cfg(all(target_arch = "aarch64", target_os = "linux"))'.dependencies]
+mfrc522 = "0.6.0"
+rppal = "0.14.1"
+embedded-hal = "0.2.7"
+linux-embedded-hal = "0.3.2"
 

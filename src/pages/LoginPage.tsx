@@ -110,10 +110,10 @@ function LoginPage() {
       {error && (
         <div
           style={{
-            backgroundColor: theme.colors.error.bg,
-            color: theme.colors.error.text,
+            backgroundColor: theme.colors.error + '20',
+            color: theme.colors.error,
             padding: theme.spacing.md,
-            borderRadius: theme.borderRadius.md,
+            borderRadius: theme.borders.radius.md,
             marginBottom: theme.spacing.lg,
             textAlign: 'center',
           }}
