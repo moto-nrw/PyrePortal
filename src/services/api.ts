@@ -314,6 +314,11 @@ export const api = {
         },
       });
       
+      // Check if we have valid session data
+      if (!response.data || !response.data.active_group_id || !response.data.activity_id) {
+        return null;
+      }
+      
       return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
