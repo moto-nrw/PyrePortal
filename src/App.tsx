@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage';
 import NFCScanningPage from './pages/NFCScanningPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
+import TagAssignmentPage from './pages/TagAssignmentPage';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
 import { createLogger, logger } from './utils/logger';
@@ -56,7 +57,7 @@ function App() {
             />
             <Route
               path="/tag-assignment"
-              element={isFullyAuthenticated ? <div>Tag Assignment Page (TODO)</div> : <Navigate to="/" replace />}
+              element={isFullyAuthenticated ? <TagAssignmentPage /> : <Navigate to="/" replace />}
             />
             <Route
               path="/activity-selection"

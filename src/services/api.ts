@@ -343,7 +343,138 @@ export const api = {
       },
     });
   },
+
+  /**
+   * Get teacher's students for tag assignment
+   * Endpoint: GET /api/iot/students
+   */
+  async getStudents(pin: string): Promise<Student[]> {
+    const response = await apiCall<{
+      status: string;
+      data: Student[];
+      message: string;
+    }>('/api/iot/students', {
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+    });
+    
+    return response.data;
+  },
+
+  /**
+   * Check RFID tag assignment status
+   * Endpoint: GET /api/rfid-cards/{tagId}
+   */
+  async checkTagAssignment(pin: string, tagId: string): Promise<TagAssignmentCheck> {
+    try {
+      const response = await apiCall<TagAssignmentCheck>(`/api/rfid-cards/${tagId}`, {
+        headers: {
+          'Authorization': `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+        },
+      });
+      
+      return response;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // 404 means tag is not assigned, which is fine
+      if (errorMessage.includes('404')) {
+        return { assigned: false };
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Assign RFID tag to student
+   * Endpoint: POST /api/students/{studentId}/rfid
+   */
+  async assignTag(pin: string, studentId: number, tagId: string): Promise<TagAssignmentResult> {
+    const response = await apiCall<TagAssignmentResult>(`/api/students/${studentId}/rfid`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+      body: JSON.stringify({
+        rfid_tag: tagId,
+      }),
+    });
+    
+    return response;
+  },
+
+  /**
+   * Process RFID check-in/check-out
+   * Endpoint: POST /api/iot/checkin
+   */
+  async processRfidScan(pin: string, tagId: string, action: 'checkin' | 'checkout', roomId: number): Promise<RfidScanResult> {
+    const response = await apiCall<RfidScanResult>('/api/iot/checkin', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+      body: JSON.stringify({
+        student_rfid: tagId,
+        action,
+        room_id: roomId,
+      }),
+    });
+    
+    return response;
+  },
 };
+
+/**
+ * Student data structure from /api/iot/students
+ */
+export interface Student {
+  student_id: number;
+  person_id: number;
+  first_name: string;
+  last_name: string;
+  school_class: string;
+  group_name: string;
+  rfid_tag?: string;
+}
+
+/**
+ * Tag assignment check response from /api/rfid-cards/{tagId}
+ */
+export interface TagAssignmentCheck {
+  assigned: boolean;
+  student?: {
+    id: number;
+    name: string;
+    group: string;
+  };
+}
+
+/**
+ * Tag assignment result from POST /api/students/{studentId}/rfid
+ */
+export interface TagAssignmentResult {
+  success: boolean;
+  previous_tag?: string;
+  message?: string;
+}
+
+/**
+ * RFID scan result from POST /api/iot/checkin
+ */
+export interface RfidScanResult {
+  student_id: number;
+  student_name: string;
+  action: 'checked_in' | 'checked_out';
+  visit_id: number;
+  room_name: string;
+  processed_at: string;
+  message: string;
+  status: string;
+}
 
 /**
  * Configuration utilities
