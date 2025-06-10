@@ -365,11 +365,11 @@ export const api = {
 
   /**
    * Check RFID tag assignment status
-   * Endpoint: GET /api/rfid-cards/{tagId}
+   * Endpoint: GET /api/iot/rfid/{tagId}
    */
   async checkTagAssignment(pin: string, tagId: string): Promise<TagAssignmentCheck> {
     try {
-      const response = await apiCall<TagAssignmentCheck>(`/api/rfid-cards/${tagId}`, {
+      const response = await apiCall<TagAssignmentCheck>(`/api/iot/rfid/${tagId}`, {
         headers: {
           'Authorization': `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,

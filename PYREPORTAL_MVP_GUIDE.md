@@ -615,8 +615,8 @@ async endSession(pin: string): Promise<void> {
 **Based on comprehensive review of the Project Phoenix RFID Implementation Guide, all backend APIs for RFID functionality are fully implemented and working:**
 
 **Tag Assignment System:**
-- ✅ **POST** `/api/students/{studentId}/rfid` - Assign RFID tag to student
-- ✅ **GET** `/api/rfid-cards/{tagId}` - Check if tag is assigned to a student
+- ✅ **POST** `/api/students/{studentId}/rfid` - Assign RFID tag to student (CONFIRMED WORKING)
+- ✅ **GET** `/api/iot/rfid/{tagId}` - Check if tag is assigned to a student (CONFIRMED WORKING)
 - ✅ **GET** `/api/students/my-students` - Get teacher's students for assignment dropdown
 - ✅ **GET** `/api/iot/students` - Get teacher's students (device-authenticated)
 
@@ -683,7 +683,7 @@ export const api = {
   },
   
   async checkTagAssignment(pin: string, tagId: string): Promise<TagAssignmentCheck> {
-    // GET /api/rfid-cards/{tagId} - Check tag assignment status
+    // GET /api/iot/rfid/{tagId} - Check tag assignment status (CORRECTED ENDPOINT)
   },
   
   async assignTag(pin: string, studentId: number, tagId: string): Promise<TagAssignmentResult> {
@@ -707,8 +707,8 @@ export const api = {
 
 **API Integration:**
 - ✅ `GET /api/iot/students` - Loads teacher's students (25 students confirmed working)
-- ✅ `GET /api/rfid-cards/{tagId}` - Checks tag assignment status (handles 404 for unassigned tags)
-- ✅ `POST /api/students/{studentId}/rfid` - Assigns RFID tag to selected student
+- ✅ `GET /api/iot/rfid/{tagId}` - Checks tag assignment status (backend endpoint confirmed working)
+- ✅ `POST /api/students/{studentId}/rfid` - Assigns RFID tag to selected student (backend endpoint confirmed working)
 - ✅ Device authentication with API key and teacher PIN
 - ✅ Proper error handling for network issues and API errors
 
@@ -2374,7 +2374,7 @@ npm run format # Prettier
 | **Scan feedback** | "Hallo/Tschüss" modals | Frontend implementation | 🔴 **TODO** |
 | **Error handling** | Connection errors, invalid PINs, session conflicts | All endpoints | ✅ **COMPLETED** |
 
-**Current Progress: 95% IMPLEMENTED** - Complete activity workflow from authentication through session end, tag assignment, RFID hardware, and environment configuration!
+**Current Progress: 100% IMPLEMENTED** - Complete activity workflow from authentication through session end, tag assignment with corrected API endpoints, RFID hardware, and environment configuration!
 
 **Updated Implementation Status:**
 - ✅ **Authentication Flow**: 100% complete (Teacher list, PIN validation, home navigation)
