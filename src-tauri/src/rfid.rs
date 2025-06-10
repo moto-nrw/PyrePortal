@@ -16,7 +16,7 @@ pub struct RfidScannerStatus {
 }
 
 // Platform-specific RFID implementation for Raspberry Pi
-#[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+#[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
 mod raspberry_pi {
     use super::*;
     use linux_embedded_hal::{
@@ -35,7 +35,6 @@ mod raspberry_pi {
     enum RfidError {
         DeviceError(String),
         IoError(std::io::Error),
-        CardError,
     }
 
     impl fmt::Display for RfidError {
@@ -43,7 +42,6 @@ mod raspberry_pi {
             match self {
                 RfidError::DeviceError(s) => write!(f, "Device error: {}", s),
                 RfidError::IoError(e) => write!(f, "IO error: {}", e),
-                RfidError::CardError => write!(f, "Card error"),
             }
         }
     }
@@ -201,7 +199,7 @@ mod raspberry_pi {
 }
 
 // Mock implementation for development platforms (MacBook, etc.)
-#[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
+#[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
 mod mock_platform {
     use super::*;
 
@@ -225,7 +223,7 @@ mod mock_platform {
 // Tauri commands that use the platform-specific implementations
 #[tauri::command]
 pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
         match raspberry_pi::scan_rfid_hardware().await {
             Ok(tag_id) => Ok(RfidScanResult {
@@ -241,7 +239,7 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
         }
     }
     
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
         match mock_platform::scan_rfid_hardware().await {
             Ok(tag_id) => Ok(RfidScanResult {
@@ -261,23 +259,28 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
 #[tauri::command]
 pub async fn get_rfid_scanner_status() -> Result<RfidScannerStatus, String> {
     println!("get_rfid_scanner_status called!");
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+    
+    // Debug: Check what platform we're on
+    println!("Target arch: {}", std::env::consts::ARCH);
+    println!("Target OS: {}", std::env::consts::OS);
+    
+    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
         println!("Using Raspberry Pi platform");
-        Ok(raspberry_pi::check_rfid_hardware())
+        return Ok(raspberry_pi::check_rfid_hardware());
     }
     
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
         println!("Using mock platform (not ARM64 Linux)");
-        Ok(mock_platform::check_rfid_hardware())
+        return Ok(mock_platform::check_rfid_hardware());
     }
 }
 
 #[tauri::command]
-pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResult, String> {
+pub async fn scan_rfid_with_timeout(_timeout_seconds: u64) -> Result<RfidScanResult, String> {
     // For future implementation - continuous scanning with custom timeout
-    #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
+    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
         // TODO: Implement timeout-based scanning
         raspberry_pi::scan_rfid_hardware().await.map(|tag_id| RfidScanResult {
@@ -291,7 +294,7 @@ pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResu
         }))
     }
     
-    #[cfg(not(all(target_arch = "aarch64", target_os = "linux")))]
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
         tokio::time::sleep(Duration::from_secs(std::cmp::min(timeout_seconds, 5))).await;
         Ok(RfidScanResult {
