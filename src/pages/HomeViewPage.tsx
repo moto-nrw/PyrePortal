@@ -11,7 +11,7 @@ import { logNavigation, logUserAction } from '../utils/logger';
  * Displays after successful PIN validation
  */
 function HomeViewPage() {
-  const { authenticatedUser, logout } = useUserStore();
+  const { authenticatedUser, currentSession, logout, fetchCurrentSession } = useUserStore();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -31,18 +31,32 @@ function HomeViewPage() {
     void navigate('/activity-selection');
   };
 
+  const handleContinueActivity = () => {
+    if (currentSession) {
+      logNavigation('Home View', '/nfc-scanning', {
+        activeGroupId: currentSession.active_group_id,
+        activityName: currentSession.activity_name,
+      });
+      void navigate('/nfc-scanning');
+    }
+  };
+
   const handleSettings = () => {
     // Skip for MVP according to documentation
     logUserAction('Settings clicked (MVP - skipped)');
   };
 
-  // Redirect to login if no authenticated user
+  // Redirect to login if no authenticated user and fetch current session
   React.useEffect(() => {
     if (!authenticatedUser) {
       logNavigation('Home View', '/');
       void navigate('/');
+      return;
     }
-  }, [authenticatedUser, navigate]);
+
+    // Check for existing session when component mounts
+    void fetchCurrentSession();
+  }, [authenticatedUser, navigate, fetchCurrentSession]);
 
   if (!authenticatedUser) {
     return null; // Will redirect via useEffect
@@ -134,11 +148,19 @@ function HomeViewPage() {
             title="Armband scannen"
             icon="📱"
           />
-          <ActionCard
-            onClick={handleStartActivity}
-            title="Aktivität starten"
-            icon="🎯"
-          />
+          {currentSession ? (
+            <ActionCard
+              onClick={handleContinueActivity}
+              title={currentSession.activity_name ? `${currentSession.activity_name} fortsetzen` : 'Aktivität fortsetzen'}
+              icon="▶️"
+            />
+          ) : (
+            <ActionCard
+              onClick={handleStartActivity}
+              title="Aktivität starten"
+              icon="🎯"
+            />
+          )}
           <ActionCard
             onClick={handleSettings}
             title="Einstellungen"

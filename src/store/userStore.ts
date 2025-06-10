@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { api, type Teacher, type ActivityResponse } from '../services/api';
+import { api, type Teacher, type ActivityResponse, type Room, type CurrentSession } from '../services/api';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -39,13 +39,7 @@ export interface Student {
   isCheckedIn: boolean;
 }
 
-// Define the Room interface
-interface Room {
-  id: number;
-  name: string;
-  isOccupied: boolean;
-  occupiedBy?: string;
-}
+// Room interface imported from API service
 
 // Define the User interface
 interface User {
@@ -78,6 +72,8 @@ interface UserState {
   authenticatedUser: AuthenticatedUser | null;
   rooms: Room[];
   selectedRoom: Room | null;
+  selectedActivity: ActivityResponse | null;
+  currentSession: CurrentSession | null;
   activities: Activity[];
   currentActivity: Partial<Activity> | null;
   isLoading: boolean;
@@ -87,9 +83,11 @@ interface UserState {
   // Actions
   setSelectedUser: (user: string) => void;
   setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string; pin: string }) => void;
+  setSelectedActivity: (activity: ActivityResponse) => void;
   fetchTeachers: () => Promise<void>;
   fetchRooms: () => Promise<void>;
-  selectRoom: (roomId: number) => Promise<boolean>;
+  selectRoom: (roomId: number) => void;
+  fetchCurrentSession: () => Promise<void>;
   logout: () => void;
 
   // Activity-related actions
@@ -142,6 +140,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   authenticatedUser: null,
   rooms: [] as Room[],
   selectedRoom: null,
+  selectedActivity: null,
+  currentSession: null,
   activities: [] as Activity[],
   currentActivity: null,
   isLoading: false,
@@ -162,6 +162,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       }
     });
   },
+
+  setSelectedActivity: (activity: ActivityResponse) => set({ selectedActivity: activity }),
 
   fetchTeachers: async () => {
     const { isLoading, users } = get();
@@ -198,58 +200,106 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   fetchRooms: async () => {
+    const { authenticatedUser } = get();
+    
+    if (!authenticatedUser?.pin) {
+      storeLogger.warn('Cannot fetch rooms: no authenticated user or PIN');
+      set({ error: 'Keine Authentifizierung für das Laden von Räumen', isLoading: false });
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Only load mock data for initial fetch, preserve state for subsequent fetches
-      if (get().rooms.length === 0) {
-        const mockRooms: Room[] = [
-          { id: 1, name: 'Raum 101', isOccupied: false },
-          { id: 2, name: 'Raum 102', isOccupied: true, occupiedBy: 'Thomas Müller' },
-          { id: 3, name: 'Raum 103', isOccupied: false },
-          { id: 4, name: 'Toilette EG', isOccupied: false },
-          { id: 5, name: 'Schulhof', isOccupied: false },
-        ];
-
-        set({ rooms: mockRooms, isLoading: false });
-      } else {
-        // Just update loading state for subsequent calls to preserve existing room state
-        set({ isLoading: false });
-      }
-    } catch {
-      set({ error: 'Fehler beim Laden der Räume', isLoading: false });
+      storeLogger.info('Fetching available rooms from API', {
+        staffId: authenticatedUser.staffId,
+        staffName: authenticatedUser.staffName,
+      });
+      
+      const rooms = await api.getRooms(authenticatedUser.pin);
+      
+      storeLogger.debug('Available rooms fetched successfully', { count: rooms.length });
+      set({ rooms, isLoading: false });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Fehler beim Laden der Räume';
+      storeLogger.error('Failed to fetch available rooms', { error: errorMessage });
+      set({ error: errorMessage, isLoading: false });
     }
   },
 
-  // Store the selected room and mark it as occupied
-  selectRoom: async (roomId: number) => {
-    const { rooms, selectedUser } = get();
+  // Store the selected room
+  selectRoom: (roomId: number) => {
+    const { rooms } = get();
     const roomToSelect = rooms.find(r => r.id === roomId);
 
-    if (!roomToSelect || roomToSelect.isOccupied) {
-      return false;
+    if (roomToSelect) {
+      storeLogger.info('Room selected', { roomId, roomName: roomToSelect.name });
+      set({ selectedRoom: roomToSelect });
+    } else {
+      storeLogger.warn('Room not found', { roomId });
+    }
+  },
+
+  fetchCurrentSession: async () => {
+    const { authenticatedUser } = get();
+    
+    if (!authenticatedUser?.pin) {
+      storeLogger.warn('Cannot fetch current session: no authenticated user or PIN');
+      return;
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      // Mark the room as occupied by the selected user
-      const updatedRooms = rooms.map(r =>
-        r.id === roomId ? { ...r, isOccupied: true, occupiedBy: selectedUser } : r
-      );
-
-      // Update both the selectedRoom and the rooms array
-      set({
-        selectedRoom: roomToSelect,
-        rooms: updatedRooms,
-      });
-
-      return true;
-    } catch {
-      return false;
+      storeLogger.info('Fetching current session for device');
+      const session = await api.getCurrentSession(authenticatedUser.pin);
+      
+      if (session) {
+        storeLogger.info('Active session found', {
+          activeGroupId: session.active_group_id,
+          activityId: session.activity_id,
+          activityName: session.activity_name,
+          roomName: session.room_name,
+          startTime: session.start_time,
+          duration: session.duration,
+        });
+        
+        // Also set selected activity and room based on session if we have the data
+        let sessionActivity: ActivityResponse | null = null;
+        let sessionRoom: Room | null = null;
+        
+        if (session.activity_name) {
+          sessionActivity = {
+            id: session.activity_id,
+            name: session.activity_name,
+            category_name: '',
+            category_color: '',
+            room_name: session.room_name || '',
+            enrollment_count: 0,
+            max_participants: 0,
+            has_spots: true,
+            supervisor_name: authenticatedUser.staffName,
+            is_active: session.is_active ?? true,
+          };
+        }
+        
+        if (session.room_id && session.room_name) {
+          sessionRoom = {
+            id: session.room_id,
+            name: session.room_name,
+          };
+        }
+        
+        set({ 
+          currentSession: session,
+          selectedActivity: sessionActivity,
+          selectedRoom: sessionRoom,
+        });
+      } else {
+        storeLogger.debug('No active session found for device');
+        set({ currentSession: null });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      storeLogger.error('Failed to fetch current session', { error: errorMessage });
+      // Don't set error state for session check, just log it
     }
   },
 
@@ -258,6 +308,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       selectedUser: '',
       authenticatedUser: null,
       selectedRoom: null,
+      selectedActivity: null,
+      currentSession: null,
       currentActivity: null,
     });
   },

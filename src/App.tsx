@@ -5,6 +5,7 @@ import CheckInOutPage from './pages/CheckInOutPage';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
 import LoginPage from './pages/LoginPage';
+import NFCScanningPage from './pages/NFCScanningPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
 import { useUserStore } from './store/userStore';
@@ -13,7 +14,7 @@ import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { selectedUser, authenticatedUser, selectedRoom, activities } = useUserStore();
+  const { selectedUser, authenticatedUser, selectedRoom, selectedActivity, activities } = useUserStore();
   const appLogger = createLogger('App');
 
   // Initialize logger with runtime config
@@ -35,6 +36,9 @@ function App() {
 
   // Check if there are activities for the check-in-out page
   const hasActivity = isFullyAuthenticated && (!!selectedRoom || activities.length > 0);
+  
+  // Check if session is active (has activity, room, and authenticated user)
+  const hasActiveSession = isFullyAuthenticated && !!selectedActivity && !!selectedRoom;
 
   return (
     <ErrorBoundary>
@@ -61,6 +65,10 @@ function App() {
             <Route
               path="/rooms"
               element={isFullyAuthenticated ? <RoomSelectionPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/nfc-scanning"
+              element={hasActiveSession ? <NFCScanningPage /> : <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />}
             />
             <Route
               path="/create-activity"

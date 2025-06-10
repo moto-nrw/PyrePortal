@@ -88,6 +88,59 @@ interface ActivitiesResponse {
 }
 
 /**
+ * Room data structure from API
+ */
+export interface Room {
+  id: number;
+  name: string;
+  room_type?: string;
+  capacity?: number;
+}
+
+/**
+ * API response structure for rooms
+ */
+interface RoomsResponse {
+  status: string;
+  data: Room[];
+  message: string;
+}
+
+/**
+ * Session start request structure
+ */
+export interface SessionStartRequest {
+  activity_id: number;
+  force?: boolean;
+}
+
+/**
+ * Session start response structure
+ */
+export interface SessionStartResponse {
+  active_group_id: number;
+  status: string;
+  session_id: number;
+  activity_name: string;
+  room_name: string;
+}
+
+/**
+ * Current session info structure
+ */
+export interface CurrentSession {
+  active_group_id: number;
+  activity_id: number;
+  activity_name?: string;
+  room_id?: number;
+  room_name?: string;
+  device_id: number;
+  start_time: string;
+  duration: string;
+  is_active?: boolean;
+}
+
+/**
  * API functions
  */
 export const api = {
@@ -203,6 +256,73 @@ export const api = {
         'X-Staff-PIN': pin,
       },
     });
+  },
+
+  /**
+   * Get available rooms (device authenticated)
+   * Endpoint: GET /api/iot/rooms/available
+   */
+  async getRooms(pin: string, capacity?: number): Promise<Room[]> {
+    const params = new URLSearchParams();
+    if (capacity) {
+      params.append('capacity', capacity.toString());
+    }
+    
+    const endpoint = `/api/iot/rooms/available${params.toString() ? `?${params.toString()}` : ''}`;
+    
+    const response = await apiCall<RoomsResponse>(endpoint, {
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+    });
+    
+    return response.data;
+  },
+
+  /**
+   * Start activity session
+   * Endpoint: POST /api/iot/session/start
+   */
+  async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
+    const response = await apiCall<SessionStartResponse>('/api/iot/session/start', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+      body: JSON.stringify(request),
+    });
+    
+    return response;
+  },
+
+  /**
+   * Get current session for device
+   * Endpoint: GET /api/iot/session/current
+   */
+  async getCurrentSession(pin: string): Promise<CurrentSession | null> {
+    try {
+      const response = await apiCall<{
+        status: string;
+        data: CurrentSession;
+        message: string;
+      }>('/api/iot/session/current', {
+        headers: {
+          'Authorization': `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // 404 means no current session, which is fine
+      if (errorMessage.includes('404')) {
+        return null;
+      }
+      throw error;
+    }
   },
 };
 

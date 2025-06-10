@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import type { ActivityResponse } from '../services/api';
 import { Button, ContentBox } from '../components/ui';
 import { useUserStore } from '../store/userStore';
-import type { ActivityResponse } from '../services/api';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
@@ -14,6 +14,7 @@ function CreateActivityPage() {
     error,
     logout,
     fetchActivities,
+    setSelectedActivity,
   } = useUserStore();
 
   const [activities, setActivities] = useState<ActivityResponse[]>([]);
@@ -127,6 +128,9 @@ function CreateActivityPage() {
         category: activity.category_name,
         roomName: activity.room_name,
       });
+
+      // Store the selected activity for the room selection page
+      setSelectedActivity(activity);
 
       // Navigate to room selection with selected activity
       logNavigation('ActivitySelectionPage', 'RoomSelectionPage', {

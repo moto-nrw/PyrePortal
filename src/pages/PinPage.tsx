@@ -145,8 +145,8 @@ function PinPage() {
         });
         logUserAction('pin_verified', { user: selectedUser });
 
-        // Navigate to room selection page after successful PIN entry
-        logNavigation('PinPage', 'RoomSelectionPage');
+        // Navigate to home page after successful PIN entry
+        logNavigation('PinPage', 'HomeViewPage');
 
         // Performance measurement
         performance.mark('pin-verification-end');
