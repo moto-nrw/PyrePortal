@@ -369,14 +369,18 @@ export const api = {
    */
   async checkTagAssignment(pin: string, tagId: string): Promise<TagAssignmentCheck> {
     try {
-      const response = await apiCall<TagAssignmentCheck>(`/api/iot/rfid/${tagId}`, {
+      const response = await apiCall<{
+        status: string;
+        message: string;
+        data: TagAssignmentCheck;
+      }>(`/api/iot/rfid/${tagId}`, {
         headers: {
           'Authorization': `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
         },
       });
       
-      return response;
+      return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means tag is not assigned, which is fine
@@ -392,7 +396,16 @@ export const api = {
    * Endpoint: POST /api/students/{studentId}/rfid
    */
   async assignTag(pin: string, studentId: number, tagId: string): Promise<TagAssignmentResult> {
-    const response = await apiCall<TagAssignmentResult>(`/api/students/${studentId}/rfid`, {
+    const response = await apiCall<{
+      status: string;
+      data?: {
+        student_id: number;
+        rfid_tag: string;
+        previous_tag?: string;
+        message?: string;
+      };
+      message?: string;
+    }>(`/api/students/${studentId}/rfid`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${DEVICE_API_KEY}`,
@@ -403,7 +416,12 @@ export const api = {
       }),
     });
     
-    return response;
+    // Transform the API response to match our expected TagAssignmentResult interface
+    return {
+      success: response.status === 'success',
+      message: response.data?.message ?? response.message ?? 'Tag erfolgreich zugewiesen',
+      previous_tag: response.data?.previous_tag,
+    };
   },
 
   /**
