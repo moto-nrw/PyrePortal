@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import CheckInOutPage from './pages/CheckInOutPage';
 import CreateActivityPage from './pages/CreateActivityPage';
+import HomeViewPage from './pages/HomeViewPage';
 import LoginPage from './pages/LoginPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
@@ -12,7 +13,7 @@ import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { selectedUser, selectedRoom, activities } = useUserStore();
+  const { selectedUser, authenticatedUser, selectedRoom, activities } = useUserStore();
   const appLogger = createLogger('App');
 
   // Initialize logger with runtime config
@@ -25,14 +26,15 @@ function App() {
     });
   }, []); // Empty dependency array - only run once on mount
 
-  // Simple auth check for protected routes
-  const isAuthenticated = !!selectedUser;
+  // Auth states
+  const hasSelectedUser = !!selectedUser; // Teacher selected, need PIN
+  const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authenticated
 
   // Check if a room is selected for the activity creation page
   const hasSelectedRoom = !!selectedRoom;
 
   // Check if there are activities for the check-in-out page
-  const hasActivity = isAuthenticated && (!!selectedRoom || activities.length > 0);
+  const hasActivity = isFullyAuthenticated && (!!selectedRoom || activities.length > 0);
 
   return (
     <ErrorBoundary>
@@ -40,28 +42,43 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LoginPage />} />
-            <Route path="/pin" element={<PinPage />} />
+            <Route 
+              path="/pin" 
+              element={hasSelectedUser ? <PinPage /> : <Navigate to="/" replace />} 
+            />
+            <Route
+              path="/home"
+              element={isFullyAuthenticated ? <HomeViewPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/tag-assignment"
+              element={isFullyAuthenticated ? <div>Tag Assignment Page (TODO)</div> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/activity-selection"
+              element={isFullyAuthenticated ? <div>Activity Selection Page (TODO)</div> : <Navigate to="/" replace />}
+            />
             <Route
               path="/rooms"
-              element={isAuthenticated ? <RoomSelectionPage /> : <Navigate to="/" replace />}
+              element={isFullyAuthenticated ? <RoomSelectionPage /> : <Navigate to="/" replace />}
             />
             <Route
               path="/create-activity"
               element={
-                isAuthenticated && hasSelectedRoom ? (
+                isFullyAuthenticated && hasSelectedRoom ? (
                   <CreateActivityPage />
                 ) : (
-                  <Navigate to={isAuthenticated ? '/rooms' : '/'} replace />
+                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
                 )
               }
             />
             <Route
               path="/check-in-out"
               element={
-                isAuthenticated && hasActivity ? (
+                isFullyAuthenticated && hasActivity ? (
                   <CheckInOutPage />
                 ) : (
-                  <Navigate to={isAuthenticated ? '/rooms' : '/'} replace />
+                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
                 )
               }
             />

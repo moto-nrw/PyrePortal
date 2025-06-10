@@ -30,14 +30,14 @@ const ContentBox: React.FC<ContentBoxProps> = ({
   const roundedMap = {
     sm: theme.borders.radius.sm,
     md: theme.borders.radius.md,
-    lg: theme.borders.radius.lg,
+    lg: '24px', // Increased from theme.borders.radius.lg for better touch feel
   };
 
   // Map shadow options to shadow values
   const shadowMap = {
     sm: theme.shadows.sm,
     md: theme.shadows.md,
-    lg: theme.shadows.lg,
+    lg: '0 8px 16px rgba(0, 0, 0, 0.2)', // Enhanced shadow for better depth
   };
 
   // Base styles

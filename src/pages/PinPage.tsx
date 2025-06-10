@@ -161,7 +161,7 @@ function PinPage() {
           deviceName: result.userData?.deviceName
         });
 
-        void navigate('/rooms');
+        void navigate('/home');
       } else {
         setError(result.error ?? 'Ungültiger PIN. Bitte versuchen Sie es erneut.');
         logger.warn('PIN verification failed', {
