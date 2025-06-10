@@ -14,9 +14,9 @@ function HomeViewPage() {
   const { authenticatedUser, currentSession, logout, fetchCurrentSession } = useUserStore();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     logUserAction('User logout initiated');
-    logout();
+    await logout();
     logNavigation('Home View', '/');
     void navigate('/');
   };

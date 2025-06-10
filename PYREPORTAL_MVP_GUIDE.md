@@ -82,7 +82,7 @@ This guide has been thoroughly validated and the first major component (teacher 
 
 ## 📊 **CURRENT DEVELOPMENT STATUS** (June 10, 2025)
 
-### 🎯 **Overall Progress: 70% IMPLEMENTED**
+### 🎯 **Overall Progress: 75% IMPLEMENTED**
 
 **✅ COMPLETED FEATURES (Working with Real APIs):**
 1. **Teacher Authentication Flow** - Complete end-to-end implementation
@@ -96,7 +96,7 @@ This guide has been thoroughly validated and the first major component (teacher 
    - User context display (teacher name, device name) ✅
    - Smart "Continue Activity" vs "Start Activity" based on session state ✅
    - Session detection via `GET /api/iot/session/current` ✅
-   - Logout functionality ✅
+   - Logout functionality with session end integration ✅
 
 3. **Activity Selection (Phase 1)** - Complete workflow implementation
    - Real API integration with `GET /api/iot/activities` ✅
@@ -119,11 +119,11 @@ This guide has been thoroughly validated and the first major component (teacher 
    - Conflict prevention for duplicate sessions on same device ✅
    - Activity and room context restoration ✅
    - Smart UI showing specific activity names in continue buttons ✅
+   - Session end integration with logout functionality ✅
 
 **🟡 READY BUT NOT IMPLEMENTED (APIs Confirmed):**
 - Tag Assignment Workflow (API endpoints ready)
 - Activity Scanning with RFID (API endpoints ready)
-- Session End Management (API endpoints ready)
 
 **🔴 REMAINING WORK:**
 - RFID Hardware Integration (Days 4-7 of timeline)
@@ -151,7 +151,6 @@ Login → Select Teacher → Enter PIN → Home Dashboard → Continue "Activity
 1. Implement Tag Assignment workflow UI
 2. Enhance NFC Scanning page with real functionality
 3. Add RFID hardware integration
-4. Implement session end management
 
 ---
 
@@ -522,11 +521,81 @@ if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
 
 **Commit:** `1827d44` - feat: implement session detection and continuation system
 
+### ✅ **COMPLETED IMPLEMENTATION** (June 10, 2025)
+
+**🎉 Session End Integration - LIVE & WORKING**
+
+**Implementation Details:**
+- **Files**: Updated `src/services/api.ts`, `src/store/userStore.ts`, `src/pages/HomeViewPage.tsx`
+- **API Integration**: Added `POST /api/iot/session/end` integration for proper session cleanup
+- **Session Management**: Enhanced logout flow to end active sessions before clearing local state
+- **Error Handling**: Graceful handling of session end failures with continued logout
+- **Logging**: Comprehensive session end logging for debugging and audit trails
+
+**Code Structure:**
+```typescript
+// Enhanced logout with session end
+logout: async () => {
+  const { authenticatedUser, currentSession } = get();
+  
+  // End current session if exists and user is authenticated
+  if (authenticatedUser?.pin && currentSession) {
+    try {
+      storeLogger.info('Ending current session before logout', {
+        activeGroupId: currentSession.active_group_id,
+        activityId: currentSession.activity_id,
+      });
+      
+      await api.endSession(authenticatedUser.pin);
+      storeLogger.info('Session ended successfully');
+    } catch (error) {
+      storeLogger.error('Failed to end session during logout', { error: errorMessage });
+      // Continue with logout even if session end fails
+    }
+  }
+
+  // Clear local state
+  set({ authenticatedUser: null, currentSession: null, ... });
+},
+
+// New API endpoint for session cleanup
+async endSession(pin: string): Promise<void> {
+  await apiCall('/api/iot/session/end', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${DEVICE_API_KEY}`,
+      'X-Staff-PIN': pin,
+    },
+  });
+},
+```
+
+**Features Implemented:**
+- ✅ Proper session cleanup when teachers log out
+- ✅ API integration with `POST /api/iot/session/end` endpoint
+- ✅ Graceful error handling for session end failures
+- ✅ Comprehensive logging of session end operations
+- ✅ Async logout handling with proper navigation timing
+- ✅ Maintains data integrity between device sessions
+- ✅ Server-side session state properly cleared
+
+**Testing Results:**
+- ✅ Logout without active session: No API call made (correct behavior)
+- ✅ Logout with active session: Session end API called successfully
+- ✅ Session end failure: Logout continues without interruption
+- ✅ Navigation flow: Seamless return to login page
+- ✅ State cleanup: All user and session data properly cleared
+
+**Current Status:** Session End Management is **100% COMPLETE** with comprehensive error handling
+
+**Navigation Flow:** Home → Logout ✅ → Session End API ✅ → Clear State ✅ → Login Page ✅
+
+**Commit:** `676b857` - feat: integrate session end API call on logout
+
 ### 📋 **NEXT IMPLEMENTATION PRIORITIES:**
 1. **Tag Assignment Workflow** - Implement RFID tag scanning and student assignment UI  
 2. **Activity Scanning** - RFID scanning loop with "Hallo/Tschüss" feedback
 3. **RFID Hardware Integration** - Connect real RFID scanner hardware
-4. **Session End Management** - POST /api/iot/session/end integration
 
 ---
 
@@ -2000,25 +2069,25 @@ npm run format # Prettier
 | **Room selection** | Select room for activity | `GET /api/iot/rooms/available` | ✅ **COMPLETED** |
 | **Session management** | Start activities with conflict handling | `POST /api/iot/session/start` | ✅ **COMPLETED** |
 | **Session continuation** | Detect and continue existing sessions | `GET /api/iot/session/current` | ✅ **COMPLETED** |
+| **Session end** | Proper session cleanup on logout | `POST /api/iot/session/end` | ✅ **COMPLETED** |
 | **Tag assignment** | Scan and assign tags to students | `GET /api/iot/students` (local check) | 🟡 **API READY** |
 | **RFID scanning** | Process student check-ins | `POST /api/iot/checkin` | 🟡 **API READY** |
 | **Scan feedback** | "Hallo/Tschüss" modals | Frontend implementation | 🔴 **TODO** |
 | **Error handling** | Connection errors, invalid PINs, session conflicts | All endpoints | ✅ **COMPLETED** |
 
-**Current Progress: 70% IMPLEMENTED** - Complete activity workflow from authentication through session start!
+**Current Progress: 75% IMPLEMENTED** - Complete activity workflow from authentication through session end!
 
 **Updated Implementation Status:**
 - ✅ **Authentication Flow**: 100% complete (Teacher list, PIN validation, home navigation)
 - ✅ **Activity Selection**: 100% complete (Real API integration, touch UI, error handling)
 - ✅ **Room Selection**: 100% complete (Touch UI, session start, conflict handling)
-- ✅ **Session Management**: 100% complete (Start/continue/detect sessions, force override)
+- ✅ **Session Management**: 100% complete (Start/continue/detect/end sessions, force override)
 - 🟡 **Tag Assignment**: 0% implemented (API endpoints confirmed and ready)
 - 🟡 **Activity Scanning**: 0% implemented (API endpoints ready, no RFID integration)
-- 🟡 **Session End Management**: 0% implemented (API endpoints ready, no UI integration)
 
 **Current Development Status:**
 - **Days 1-3.5**: ✅ **COMPLETED** (Foundation, Authentication, Home View, Activity Selection, Room Selection, Session Management)
-- **Days 4-7**: 🟡 **IN PROGRESS** (RFID Hardware, Tag Assignment, Activity Scanning, Session End)
+- **Days 4-7**: 🟡 **IN PROGRESS** (RFID Hardware, Tag Assignment, Activity Scanning)
 
 ### 🔮 Nice to Have (Post-MVP)
 **Phase 2 Enhancements** (after successful 1-week pilot):

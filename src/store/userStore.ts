@@ -88,7 +88,7 @@ interface UserState {
   fetchRooms: () => Promise<void>;
   selectRoom: (roomId: number) => void;
   fetchCurrentSession: () => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 
   // Activity-related actions
   initializeActivity: (roomId: number) => void;
@@ -303,7 +303,26 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
   },
 
-  logout: () => {
+  logout: async () => {
+    const { authenticatedUser, currentSession } = get();
+    
+    // End current session if exists and user is authenticated
+    if (authenticatedUser?.pin && currentSession) {
+      try {
+        storeLogger.info('Ending current session before logout', {
+          activeGroupId: currentSession.active_group_id,
+          activityId: currentSession.activity_id,
+        });
+        
+        await api.endSession(authenticatedUser.pin);
+        storeLogger.info('Session ended successfully');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        storeLogger.error('Failed to end session during logout', { error: errorMessage });
+        // Continue with logout even if session end fails
+      }
+    }
+
     set({
       selectedUser: '',
       authenticatedUser: null,

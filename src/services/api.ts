@@ -329,6 +329,20 @@ export const api = {
       throw error;
     }
   },
+
+  /**
+   * End current session
+   * Endpoint: POST /api/iot/session/end
+   */
+  async endSession(pin: string): Promise<void> {
+    await apiCall('/api/iot/session/end', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+    });
+  },
 };
 
 /**
