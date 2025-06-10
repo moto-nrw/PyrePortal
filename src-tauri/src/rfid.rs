@@ -116,17 +116,27 @@ mod raspberry_pi {
         let mfrc522 = Mfrc522::new(spi_interface);
         
         // Initialize the MFRC522 (this transitions to the Initialized state)
+        println!("Attempting to initialize MFRC522...");
         let mut mfrc522 = match mfrc522.init() {
-            Ok(m) => m,
+            Ok(m) => {
+                println!("MFRC522 initialized successfully");
+                m
+            },
             Err(e) => {
+                println!("Failed to initialize MFRC522: {:?}", e);
                 return Err(format!("Failed to initialize MFRC522: {:?}", e));
             }
         };
         
         // Try to read version to verify communication
+        println!("Reading MFRC522 version...");
         let _version = match mfrc522.version() {
-            Ok(v) => v,
+            Ok(v) => {
+                println!("MFRC522 version: {:?}", v);
+                v
+            },
             Err(e) => {
+                println!("Failed to read MFRC522 version: {:?}", e);
                 return Err(format!("Failed to read MFRC522 version: {:?}", e));
             }
         };
