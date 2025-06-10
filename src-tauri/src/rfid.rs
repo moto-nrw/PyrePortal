@@ -260,8 +260,10 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
 
 #[tauri::command]
 pub async fn get_rfid_scanner_status() -> Result<RfidScannerStatus, String> {
+    println!("get_rfid_scanner_status called!");
     #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
     {
+        println!("Using Raspberry Pi platform");
         Ok(raspberry_pi::check_rfid_hardware())
     }
     
