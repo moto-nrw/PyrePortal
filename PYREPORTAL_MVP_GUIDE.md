@@ -361,7 +361,7 @@ const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authen
 **Implementation Details:**
 - **File**: `src/pages/CreateActivityPage.tsx` - Activity selection interface (transformed from creation to selection)
 - **API Integration**: Real data from `GET /api/iot/activities` with teacher's PIN authentication
-- **Design**: Touch-optimized grid layout matching HomeViewPage style and feel
+- **Design**: Touch-optimized grid layout with fixed header and scrollable content area (updated June 10, 2025)
 - **Data Flow**: Uses stored PIN from authenticated user context for API calls
 - **Navigation**: Proper back button to HomeView and logout functionality
 
@@ -389,6 +389,8 @@ const ActivityCard: React.FC<{
 - ✅ Real API integration with `GET /api/iot/activities` endpoint
 - ✅ Production-ready PIN authentication using stored PIN from login
 - ✅ Touch-optimized activity cards with category icons and enrollment data
+- ✅ Fixed header design with scrollable content area (updated June 10, 2025)
+- ✅ Flexbox layout structure matching room selection page consistency
 - ✅ Grid layout with responsive design for different screen sizes
 - ✅ Proper error handling for network failures and authentication errors
 - ✅ Loading states with German localization

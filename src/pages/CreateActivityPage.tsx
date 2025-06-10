@@ -283,9 +283,10 @@ function CreateActivityPage() {
 
   return (
     <ContentBox centered shadow="md" rounded="lg">
-      <div style={{ width: '100%', maxWidth: '800px' }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: theme.spacing.xxl }}>
+      <div style={{ width: '100%', maxWidth: '800px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* Fixed Header */}
+        <div style={{ flexShrink: 0 }}>
+          {/* Navigation buttons */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.lg }}>
             <Button onClick={handleBack} variant="outline" size="medium">
               ← Zurück
@@ -294,90 +295,97 @@ function CreateActivityPage() {
               Abmelden
             </Button>
           </div>
-          <h1
-            style={{
-              fontSize: theme.fonts.size.xxl,
-              fontWeight: theme.fonts.weight.bold,
-              marginBottom: theme.spacing.lg,
-              color: theme.colors.text.primary,
-            }}
-          >
-            Aktivität auswählen
-          </h1>
-          <p
-            style={{
-              fontSize: theme.fonts.size.large,
-              color: theme.colors.text.secondary,
-              marginBottom: theme.spacing.sm,
-            }}
-          >
-            {authenticatedUser.staffName} • {authenticatedUser.deviceName}
-          </p>
+          
+          {/* Title and info */}
+          <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
+            <h1
+              style={{
+                fontSize: theme.fonts.size.xxl,
+                fontWeight: theme.fonts.weight.bold,
+                marginBottom: theme.spacing.lg,
+                color: theme.colors.text.primary,
+              }}
+            >
+              Aktivität auswählen
+            </h1>
+            
+            <p
+              style={{
+                fontSize: theme.fonts.size.base,
+                color: theme.colors.text.secondary,
+              }}
+            >
+              {authenticatedUser.staffName} • {authenticatedUser.deviceName}
+            </p>
+          </div>
         </div>
 
-        {/* Error message from store */}
-        {error && (
-          <div style={{
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: theme.borders.radius.md,
-            padding: theme.spacing.md,
-            marginBottom: theme.spacing.lg,
-            textAlign: 'center',
-            color: '#dc2626',
-          }}>
-            {error}
-          </div>
-        )}
-
-        {/* Loading state */}
-        {isLoading && (
-          <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
-            <div style={{ fontSize: theme.fonts.size.large, color: theme.colors.text.secondary }}>
-              Lade Aktivitäten...
+        {/* Scrollable Content Area */}
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: theme.spacing.sm }}>
+          {/* Loading state */}
+          {isLoading && (
+            <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
+              <div style={{ fontSize: theme.fonts.size.large, color: theme.colors.text.secondary }}>
+                Lade Aktivitäten...
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Activities grid */}
-        {!isLoading && activities.length > 0 && (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: theme.spacing.lg,
-              width: '100%',
-            }}
-          >
-            {activities.map((activity) => (
-              <ActivityCard
-                key={activity.id}
-                activity={activity}
-                onClick={handleActivitySelect}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* No activities state */}
-        {!isLoading && activities.length === 0 && (
-          <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
-            <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📅</div>
+          {/* Error state */}
+          {error && !isLoading && (
             <div style={{
-              fontSize: theme.fonts.size.large,
-              color: theme.colors.text.secondary,
-              marginBottom: theme.spacing.md,
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: theme.borders.radius.md,
+              padding: theme.spacing.md,
+              marginBottom: theme.spacing.lg,
+              textAlign: 'center',
+              color: '#dc2626',
             }}>
-              Keine Aktivitäten verfügbar
+              {error}
             </div>
-            <div style={{
-              fontSize: theme.fonts.size.base,
-              color: theme.colors.text.secondary,
-            }}>
-              Sie haben derzeit keine zugewiesenen Aktivitäten.
+          )}
+
+          {/* Activities grid */}
+          {!isLoading && !error && activities.length > 0 && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gap: theme.spacing.lg,
+                width: '100%',
+              }}
+            >
+              {activities.map((activity) => (
+                <ActivityCard
+                  key={activity.id}
+                  activity={activity}
+                  onClick={handleActivitySelect}
+                />
+              ))}
             </div>
-          </div>
-        )}
+          )}
+
+          {/* No activities state */}
+          {!isLoading && !error && activities.length === 0 && (
+            <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
+              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📅</div>
+              <div style={{
+                fontSize: theme.fonts.size.large,
+                color: theme.colors.text.secondary,
+                marginBottom: theme.spacing.md,
+              }}>
+                Keine Aktivitäten verfügbar
+              </div>
+              <div style={{
+                fontSize: theme.fonts.size.base,
+                color: theme.colors.text.secondary,
+              }}>
+                Sie haben derzeit keine zugewiesenen Aktivitäten.
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </ContentBox>
   );
