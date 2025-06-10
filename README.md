@@ -13,11 +13,35 @@ PyrePortal is a desktop application built with Tauri, React, and TypeScript that
 
 ### Key Features
 
-- **User Authentication**: Secure login with PIN verification
+- **✅ Real API Integration**: Teacher list fetched from live backend API
+- **User Authentication**: Secure login with PIN verification  
 - **Room Selection**: View and select available rooms with real-time status
 - **Activity Management**: Create and track activities with category selection
 - **Comprehensive Logging**: Detailed logging of user actions and system events
 - **Cross-Platform**: Runs on Windows, macOS, and Linux
+
+## 🚀 Implementation Status
+
+### ✅ Completed Features
+- **Teacher List API Integration** (June 10, 2025)
+  - Real-time teacher data from backend API
+  - Device authentication with API key
+  - Single request with deduplication
+  - Error handling and loading states
+  - Environment-based configuration
+
+### 🏗️ In Development
+- PIN validation via `/api/iot/status`
+- Room selection from backend
+- RFID tag assignment workflow
+- Activity session management
+- Student check-in/check-out with RFID
+
+### 📋 Planned Features  
+- Complete offline support
+- Advanced error recovery
+- Session timeout management
+- Comprehensive audit logging
 
 ## Architecture
 
@@ -39,7 +63,7 @@ flowchart TB
 
     Backend --> |API Calls| Server
 
-    Note[Current implementation uses mock data\ninstead of real API calls]
+    Note[✅ Teacher List API: IMPLEMENTED\n⏳ Other APIs: Mock data (planned)]
     Backend --- Note
 ```
 
