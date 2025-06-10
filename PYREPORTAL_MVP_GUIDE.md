@@ -11,9 +11,9 @@ Complete implementation plan for PyrePortal 1-week RFID pilot. This document out
 
 **🔴 Critical Fix #1: Teacher List API**
 - **Issue**: Original guide claimed non-existent `/api/teachers/device-list` endpoint
-- **Solution**: Updated to use existing `/api/teachers/` with device authentication
-- **Implementation**: Added proper bearer token authentication pattern
-- **Status**: ✅ RESOLVED
+- **Solution**: Updated to use verified `/api/iot/teachers` with device authentication
+- **Implementation**: Added proper bearer token authentication pattern with confirmed endpoint
+- **Status**: ✅ RESOLVED & VERIFIED
 
 **🔴 Critical Fix #2: Tag Assignment Authentication**  
 - **Issue**: `GET /api/users/by-tag/{tagId}` requires JWT auth, not device auth
@@ -77,7 +77,7 @@ Pi Device Boot → Auto-Update → Device Authentication
 ### 2. Teacher Login Workflow
 ```
 Teacher Selection → PIN Entry → Home View
-1. Teacher selects their name from dropdown (fetched from /api/teachers/ with device auth)
+1. Teacher selects their name from dropdown (fetched from /api/iot/teachers with device auth)
 2. Teacher enters 4-digit PIN
 3. Device validates PIN with server (/api/iot/status with X-Staff-PIN header)
 4. On success: Navigate to Home View
@@ -183,7 +183,7 @@ Phase 5: Authenticated Home View
 
 #### 1. Teacher Selection Page (`/`)
 **Components:**
-- `TeacherDropdown` - List from `/api/teachers/` (with device auth)
+- `TeacherDropdown` - List from `/api/iot/teachers` (with device auth)
 - `LoadingSpinner` - While fetching teachers
 - `ErrorMessage` - Connection/API errors
 
@@ -304,14 +304,19 @@ interface AppStore {
 Headers: { "Authorization": "Bearer dev_xyz123..." }
 
 // Teacher list (device-authenticated)
-GET /api/teachers/
-Headers: { "Authorization": "Bearer dev_xyz123..." }
-Response: [{ 
-  id: 1, 
-  first_name: "Frau", 
-  last_name: "Schmidt",
-  person: { first_name: "Frau", last_name: "Schmidt" }
-}]
+GET /api/iot/teachers
+Headers: { "Authorization": "Bearer dev_bc17223f4417bd2251742e659efc5a7d14671f714154d3cc207fe8ee0feedeaa" }
+Response: {
+  "status": "success",
+  "data": [{
+    "staff_id": 31,
+    "person_id": 151,
+    "first_name": "Yannick",
+    "last_name": "Wenger",
+    "display_name": "Yannick Wenger"
+  }],
+  "message": "Available teachers retrieved successfully"
+}
 
 // PIN validation
 GET /api/iot/status
@@ -671,9 +676,9 @@ export const api = {
   
   // Device-authenticated endpoints (require API key + PIN)
   async getTeachers() {
-    return apiCall('/api/teachers/device-list', {
+    return apiCall('/api/iot/teachers', {
       headers: {
-        'Authorization': `Device ${getDeviceApiKey()}`
+        'Authorization': `Bearer ${getDeviceApiKey()}`
       }
     });
   },
@@ -785,7 +790,7 @@ function setStoredDeviceApiKey(apiKey: string): void {
 // src/store/userStore.ts - Remove ALL mock data, use real APIs
 const createUserStore = (set, get) => ({
   // Initialize with empty arrays - no hardcoded mock data
-  users: [], // Will be loaded from /api/teachers/device-list
+  users: [], // Will be loaded from /api/iot/teachers
   rooms: [],
   activities: [],
   students: [],
@@ -1209,7 +1214,7 @@ async fn validate_teacher_pin(teacher_id: u32, pin: String) -> Result<TeacherInf
 async fn fetch_teachers() -> Result<Vec<Teacher>, String> {
     let client = reqwest::Client::new();
     let response = client
-        .get(&format!("{}/api/teachers/", get_api_base_url()))
+        .get(&format!("{}/api/iot/teachers", get_api_base_url()))
         .header("Authorization", format!("Bearer {}", get_device_api_key()))
         .send()
         .await
@@ -1291,13 +1296,21 @@ struct StudentData {
     rfid_tag: Option<String>,
 }
 
-// Teacher data structure (from /api/teachers/)
+// Teacher data structure (from /api/iot/teachers)
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct TeacherResponse {
-    id: u32,
+struct Teacher {
+    staff_id: u32,
+    person_id: u32,
     first_name: String,
     last_name: String,
-    person: PersonInfo,
+    display_name: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct TeacherResponse {
+    status: String,
+    data: Vec<Teacher>,
+    message: String,
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone)]
@@ -1387,7 +1400,7 @@ npm run format # Prettier
   - [ ] Create device status checking functionality
   - [ ] Add device health ping implementation
 - [ ] **Teacher Selection** (2h)
-  - [ ] Build teacher dropdown with data from `/api/teachers/` (device authenticated)
+  - [ ] Build teacher dropdown with data from `/api/iot/teachers` (device authenticated)
   - [ ] Add loading states and error handling
   - [ ] Implement teacher selection state management
 - [ ] **PIN Entry** (3h)
@@ -1813,7 +1826,7 @@ tail -f /var/log/pyreportal/rfid.log
    - **Impact**: Simplified - Easier implementation than device-authenticated endpoint
    - **Implementation**: Direct fetch, no device credentials needed
 
-2. **Teacher List API** - ✅ CORRECTED: Use existing `GET /api/teachers/` with device auth
+2. **Teacher List API** - ✅ VERIFIED: Use confirmed `GET /api/iot/teachers` with device auth
    - **Confidence**: 90% - Existing endpoint with proper authentication
    - **Impact**: Medium - Requires device authentication but endpoint exists
    - **Implementation**: Device bearer token authentication required
@@ -1843,7 +1856,7 @@ tail -f /var/log/pyreportal/rfid.log
 
 ### 🎯 Implementation Dependencies - ✅ ALL RESOLVED WITH CORRECTIONS
 1. **✅ RESOLVED**: Room list API - Use public `GET /api/rooms/`
-2. **✅ CORRECTED**: Teacher list API - Use existing `GET /api/teachers/` with device auth  
+2. **✅ VERIFIED**: Teacher list API - Use confirmed `GET /api/iot/teachers` with device auth  
 3. **✅ CORRECTED**: Tag assignment API - Use student list checking via `/api/iot/students`
 4. **✅ ENHANCED**: Device configuration - Complete Rust config management added
 5. **✅ ENHANCED**: Code examples - Added proper imports and error handling
