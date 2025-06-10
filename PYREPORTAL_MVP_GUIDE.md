@@ -1847,7 +1847,7 @@ tail -f /var/log/pyreportal/rfid.log
    - **Implementation**: Direct fetch, no device credentials needed
 
 2. **Teacher List API** - ✅ VERIFIED: Use confirmed `GET /api/iot/teachers` with device auth
-   - **Confidence**: 90% - Existing endpoint with proper authentication
+   - **Confidence**: 100% - Live tested endpoint with verified response structure
    - **Impact**: Medium - Requires device authentication but endpoint exists
    - **Implementation**: Device bearer token authentication required
 
