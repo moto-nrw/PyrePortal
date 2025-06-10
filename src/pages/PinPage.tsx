@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button, ContentBox } from '../components/ui';
+import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function PinPage() {
-  const { selectedUser } = useUserStore();
+  const { selectedUser, setAuthenticatedUser } = useUserStore();
   const [pin, setPin] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const navigate = useNavigate();
 
   // Create logger instance for this component
@@ -101,15 +103,45 @@ function PinPage() {
   };
 
   // Handle PIN submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     try {
+      // Check PIN length first
+      if (pin.length !== maxPinLength) {
+        const errorMsg = 'Bitte geben Sie einen 4-stelligen PIN ein';
+        setError(errorMsg);
+        logger.warn('PIN verification failed', {
+          reason: 'incomplete_pin',
+          pinLength: pin.length,
+          user: selectedUser,
+        });
+        logUserAction('pin_verification_failed', {
+          reason: 'incomplete_pin',
+          user: selectedUser,
+        });
+        return;
+      }
+
       // Performance marking for PIN verification flow
       performance.mark('pin-verification-start');
+      setIsLoading(true);
+      setError(null);
 
-      // For demo purposes, any 4-digit PIN is valid
-      // In a real application, you would validate against a stored PIN
-      if (pin.length === maxPinLength) {
-        logger.info('PIN verified successfully', { user: selectedUser });
+      // Validate PIN with real API
+      const result: PinValidationResult = await api.validateTeacherPin(pin);
+      
+      if (result.success && result.userData) {
+        // Store authenticated user context
+        setAuthenticatedUser({
+          staffId: result.userData.staffId,
+          staffName: result.userData.staffName,
+          deviceName: result.userData.deviceName,
+        });
+
+        logger.info('PIN verified successfully', { 
+          user: selectedUser,
+          staffName: result.userData.staffName,
+          deviceName: result.userData.deviceName
+        });
         logUserAction('pin_verified', { user: selectedUser });
 
         // Navigate to room selection page after successful PIN entry
@@ -123,24 +155,32 @@ function PinPage() {
           'pin-verification-end'
         );
         const measure = performance.getEntriesByName('pin-verification-process')[0];
-        logger.debug('PIN verification performance', { duration_ms: measure.duration });
+        logger.debug('PIN verification performance', { 
+          duration_ms: measure.duration,
+          staffName: result.userData?.staffName,
+          deviceName: result.userData?.deviceName
+        });
 
         void navigate('/rooms');
       } else {
-        const errorMsg = 'Bitte geben Sie einen 4-stelligen PIN ein';
-        setError(errorMsg);
+        setError(result.error ?? 'Ungültiger PIN. Bitte versuchen Sie es erneut.');
         logger.warn('PIN verification failed', {
-          reason: 'incomplete_pin',
-          pinLength: pin.length,
+          reason: result.isLocked ? 'account_locked' : 'invalid_pin',
           user: selectedUser,
+          isLocked: result.isLocked
         });
         logUserAction('pin_verification_failed', {
-          reason: 'incomplete_pin',
+          reason: result.isLocked ? 'account_locked' : 'invalid_pin',
           user: selectedUser,
         });
       }
     } catch (error) {
+      const errorMsg = 'Fehler bei der PIN-Überprüfung. Bitte versuchen Sie es erneut.';
+      setError(errorMsg);
+      logger.error('PIN verification error', { error, user: selectedUser });
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleSubmit');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -270,9 +310,9 @@ function PinPage() {
             onClick={handleSubmit}
             variant="secondary"
             size="medium"
-            disabled={pin.length < maxPinLength}
+            disabled={pin.length < maxPinLength || isLoading}
           >
-            Bestätigen
+            {isLoading ? 'Überprüfung...' : 'Bestätigen'}
           </Button>
         </div>
       </div>

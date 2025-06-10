@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 
+import { api, type Teacher } from '../services/api';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
-import { api, type Teacher } from '../services/api';
 
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
@@ -61,11 +61,20 @@ function teacherToUser(teacher: Teacher): User {
   };
 }
 
+// Authenticated user context
+interface AuthenticatedUser {
+  staffId: number;
+  staffName: string;
+  deviceName: string;
+  authenticatedAt: Date;
+}
+
 // Define the store state interface
 interface UserState {
   // State
   users: User[];
   selectedUser: string;
+  authenticatedUser: AuthenticatedUser | null;
   rooms: Room[];
   selectedRoom: Room | null;
   activities: Activity[];
@@ -76,6 +85,7 @@ interface UserState {
 
   // Actions
   setSelectedUser: (user: string) => void;
+  setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string }) => void;
   fetchTeachers: () => Promise<void>;
   fetchRooms: () => Promise<void>;
   selectRoom: (roomId: number) => Promise<boolean>;
@@ -128,6 +138,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   // Initial state
   users: [] as User[],
   selectedUser: '',
+  authenticatedUser: null,
   rooms: [] as Room[],
   selectedRoom: null,
   activities: [] as Activity[],
@@ -138,6 +149,17 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   // Actions
   setSelectedUser: (user: string) => set({ selectedUser: user }),
+  
+  setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string }) => {
+    set({ 
+      authenticatedUser: {
+        staffId: userData.staffId,
+        staffName: userData.staffName,
+        deviceName: userData.deviceName,
+        authenticatedAt: new Date()
+      }
+    });
+  },
 
   fetchTeachers: async () => {
     const { isLoading, users } = get();
@@ -232,6 +254,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   logout: () => {
     set({
       selectedUser: '',
+      authenticatedUser: null,
       selectedRoom: null,
       currentActivity: null,
     });

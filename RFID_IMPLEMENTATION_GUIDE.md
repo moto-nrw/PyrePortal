@@ -7,7 +7,7 @@ This document outlines the complete implementation plan for the RFID-based stude
 
 ### Components
 1. **Moto Webapp** (this repo) - Backend API and web dashboard
-2. **PyrePortal** (Pi app) - Tauri-based RFID scanner application
+2. **PyrePortal** (Pi app) - Tauri-based RFID scanner application ✅ **PIN AUTH COMPLETE**
 3. **Raspberry Pi Devices** - Physical devices with RFID readers
 4. **Mobile Interface** - Teacher activity creation on phones
 
