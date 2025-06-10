@@ -176,9 +176,15 @@ mod raspberry_pi {
     pub fn check_rfid_hardware() -> RfidScannerStatus {
         // Check if SPI device exists
         let spi_available = std::path::Path::new("/dev/spidev0.0").exists();
+        println!("SPI device /dev/spidev0.0 available: {}", spi_available);
         
         // Check if GPIO is accessible
-        let gpio_available = Gpio::new().is_ok();
+        let gpio_result = Gpio::new();
+        let gpio_available = gpio_result.is_ok();
+        println!("GPIO access available: {}", gpio_available);
+        if let Err(ref e) = gpio_result {
+            println!("GPIO error: {:?}", e);
+        }
         
         RfidScannerStatus {
             is_available: spi_available && gpio_available,
