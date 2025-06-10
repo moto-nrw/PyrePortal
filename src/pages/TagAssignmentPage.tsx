@@ -65,12 +65,16 @@ function TagAssignmentPage() {
   // Check RFID scanner status on component mount
   useEffect(() => {
     const checkScannerStatus = async () => {
+      console.log('Checking RFID scanner status...');
       try {
+        console.log('Calling get_rfid_scanner_status...');
         const status = await invoke<RfidScannerStatus>('get_rfid_scanner_status');
+        console.log('Scanner status received:', status);
         setScannerStatus(status);
         logUserAction('RFID scanner status checked', { platform: status.platform, available: status.is_available });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
+        console.log('Scanner status error:', error);
         logError(error, 'Failed to check RFID scanner status');
         setScannerStatus({
           is_available: false,
