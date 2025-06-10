@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
+import { api, type Teacher } from '../services/api';
 
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
@@ -52,6 +53,14 @@ interface User {
   name: string;
 }
 
+// Transform Teacher to User interface
+function teacherToUser(teacher: Teacher): User {
+  return {
+    id: teacher.staff_id,
+    name: teacher.display_name,
+  };
+}
+
 // Define the store state interface
 interface UserState {
   // State
@@ -67,6 +76,7 @@ interface UserState {
 
   // Actions
   setSelectedUser: (user: string) => void;
+  fetchTeachers: () => Promise<void>;
   fetchRooms: () => Promise<void>;
   selectRoom: (roomId: number) => Promise<boolean>;
   logout: () => void;
@@ -116,14 +126,7 @@ const mockStudents: Student[] = [
 // Define base store without logging middleware
 const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => ({
   // Initial state
-  users: [
-    { id: 1, name: 'Christian Kamann' },
-    { id: 2, name: 'Florian Lüttgenau' },
-    { id: 3, name: 'Yannick Wenger' },
-    { id: 4, name: 'Tobias Brandt' },
-    { id: 5, name: 'Niklas Korte' },
-    { id: 6, name: 'Max Zieren' },
-  ],
+  users: [] as User[],
   selectedUser: '',
   rooms: [] as Room[],
   selectedRoom: null,
@@ -135,6 +138,40 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   // Actions
   setSelectedUser: (user: string) => set({ selectedUser: user }),
+
+  fetchTeachers: async () => {
+    const { isLoading, users } = get();
+    
+    // Prevent duplicate requests
+    if (isLoading) {
+      storeLogger.debug('Teachers fetch already in progress, skipping');
+      return;
+    }
+    
+    // Skip if we already have teachers
+    if (users.length > 0) {
+      storeLogger.debug('Teachers already loaded, skipping fetch');
+      return;
+    }
+    
+    set({ isLoading: true, error: null });
+    try {
+      storeLogger.info('Fetching teachers from API');
+      const teachers = await api.getTeachers();
+      const users = teachers.map(teacherToUser);
+      
+      storeLogger.info('Teachers loaded successfully', { count: users.length });
+      set({ users, isLoading: false });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      storeLogger.error('Failed to fetch teachers', { error: errorMessage });
+      set({ 
+        error: 'Fehler beim Laden der Lehrer. Bitte versuchen Sie es erneut.',
+        isLoading: false 
+      });
+      throw error;
+    }
+  },
 
   fetchRooms: async () => {
     set({ isLoading: true, error: null });

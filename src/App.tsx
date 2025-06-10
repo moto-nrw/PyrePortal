@@ -23,7 +23,7 @@ function App() {
       version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
       environment: import.meta.env.MODE,
     });
-  }, [appLogger]);
+  }, []); // Empty dependency array - only run once on mount
 
   // Simple auth check for protected routes
   const isAuthenticated = !!selectedUser;
