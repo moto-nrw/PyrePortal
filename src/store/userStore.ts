@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { api, type Teacher } from '../services/api';
+import { api, type Teacher, type ActivityResponse } from '../services/api';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -67,6 +67,7 @@ interface AuthenticatedUser {
   staffName: string;
   deviceName: string;
   authenticatedAt: Date;
+  pin: string; // Store PIN for subsequent API calls
 }
 
 // Define the store state interface
@@ -85,7 +86,7 @@ interface UserState {
 
   // Actions
   setSelectedUser: (user: string) => void;
-  setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string }) => void;
+  setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string; pin: string }) => void;
   fetchTeachers: () => Promise<void>;
   fetchRooms: () => Promise<void>;
   selectRoom: (roomId: number) => Promise<boolean>;
@@ -95,7 +96,7 @@ interface UserState {
   initializeActivity: (roomId: number) => void;
   updateActivityField: <K extends keyof Activity>(field: K, value: Activity[K]) => void;
   createActivity: () => Promise<boolean>;
-  fetchActivities: () => Promise<void>;
+  fetchActivities: () => Promise<ActivityResponse[] | null>;
   cancelActivityCreation: () => void;
 
   // Check-in/check-out actions
@@ -150,12 +151,13 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   // Actions
   setSelectedUser: (user: string) => set({ selectedUser: user }),
   
-  setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string }) => {
+  setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string; pin: string }) => {
     set({ 
       authenticatedUser: {
         staffId: userData.staffId,
         staffName: userData.staffName,
         deviceName: userData.deviceName,
+        pin: userData.pin,
         authenticatedAt: new Date()
       }
     });
@@ -374,22 +376,75 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
   },
 
-  fetchActivities: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
+  fetchActivities: (() => {
+    let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
+    
+    return async (): Promise<ActivityResponse[] | null> => {
+      // Return existing promise if already fetching
+      if (fetchPromise) {
+        storeLogger.debug('Activities fetch already in progress, returning existing promise');
+        return fetchPromise;
+      }
 
-      // For now, we'll just return the activities stored in the state
-      set({ isLoading: false });
-      return;
-    } catch {
-      set({
-        error: 'Fehler beim Laden der Aktivitäten',
-        isLoading: false,
-      });
-    }
-  },
+      const { authenticatedUser } = get();
+      set({ isLoading: true, error: null });
+      
+      if (!authenticatedUser) {
+        set({
+          error: 'Keine Authentifizierung für das Laden von Aktivitäten',
+          isLoading: false,
+        });
+        return null;
+      }
+
+      if (!authenticatedUser.pin) {
+        set({
+          error: 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.',
+          isLoading: false,
+        });
+        return null;
+      }
+
+      // Create new fetch promise
+      fetchPromise = (async () => {
+        try {
+          storeLogger.info('Fetching activities from API', {
+            staffId: authenticatedUser.staffId,
+            staffName: authenticatedUser.staffName,
+          });
+
+          const activitiesData = await api.getActivities(authenticatedUser.pin);
+          
+          storeLogger.info('Activities loaded successfully', {
+            count: activitiesData.length,
+            activities: activitiesData.map(a => ({ id: a.id, name: a.name, category: a.category_name })),
+          });
+
+          set({ isLoading: false });
+          return activitiesData;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          
+          storeLogger.error('Failed to fetch activities', {
+            error: errorMessage,
+            staffId: authenticatedUser.staffId,
+          });
+
+          set({
+            error: 'Fehler beim Laden der Aktivitäten',
+            isLoading: false,
+          });
+          
+          return null;
+        } finally {
+          // Clear the promise when done
+          fetchPromise = null;
+        }
+      })();
+
+      return fetchPromise;
+    };
+  })(),
 
   // Check-in/check-out related actions with deep safeguards to prevent infinite loops
   startNfcScan: (() => {

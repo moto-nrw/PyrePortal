@@ -80,6 +80,62 @@ curl -X GET http://localhost:8080/api/iot/teachers \
 
 This guide has been thoroughly validated and the first major component (teacher list API) has been successfully implemented in the PyrePortal frontend.
 
+## 📊 **CURRENT DEVELOPMENT STATUS** (June 10, 2025)
+
+### 🎯 **Overall Progress: 40% IMPLEMENTED**
+
+**✅ COMPLETED FEATURES (Working with Real APIs):**
+1. **Teacher Authentication Flow** - Complete end-to-end implementation
+   - Teacher list from `GET /api/iot/teachers` ✅
+   - PIN validation with `GET /api/iot/status` ✅  
+   - Secure PIN storage for subsequent API calls ✅
+   - Navigation to HomeView after authentication ✅
+
+2. **HomeView Dashboard** - Touch-optimized main interface
+   - 2x2 action grid with large touch-friendly buttons ✅
+   - User context display (teacher name, device name) ✅
+   - Navigation to all main workflows ✅
+   - Logout functionality ✅
+
+3. **Activity Selection (Phase 1)** - Complete workflow implementation
+   - Real API integration with `GET /api/iot/activities` ✅
+   - Touch-optimized activity cards with category icons ✅
+   - Enrollment information and availability status ✅
+   - Error handling and loading states ✅
+   - Navigation to room selection (not yet implemented) ✅
+
+**🟡 READY BUT NOT IMPLEMENTED (APIs Confirmed):**
+- Tag Assignment Workflow (API endpoints ready)
+- Room Selection (Public API endpoint ready) 
+- Activity Scanning with RFID (API endpoints ready)
+- Session Management (API endpoints ready)
+
+**🔴 REMAINING WORK:**
+- RFID Hardware Integration (Days 4-7 of timeline)
+- Tag Assignment UI Implementation
+- Room Selection UI Implementation  
+- Activity Scanning Loop Implementation
+- Session Management Integration
+
+**⚠️ TECHNICAL DEBT:**
+- TypeScript compilation errors in LoginPage.tsx
+- ESLint warnings and errors throughout codebase
+- Some mock data still present in userStore.ts
+- Uncommitted changes need cleanup before commit
+
+### 🚀 **WHAT'S WORKING RIGHT NOW:**
+```
+Login → Select Teacher → Enter PIN → Home Dashboard → Select Activity ✅
+```
+
+### 🔧 **NEXT IMMEDIATE TASKS:**
+1. Fix TypeScript and linting errors
+2. Remove remaining mock data  
+3. Implement Room Selection page
+4. Begin RFID hardware integration
+
+---
+
 ## 🎉 **COMPLETED IMPLEMENTATION** (June 10, 2025)
 
 ### ✅ **Teacher List API Integration - LIVE & WORKING**
@@ -146,22 +202,23 @@ VITE_DEVICE_API_KEY=dev_bc17223f4417bd2251742e659efc5a7d14671f714154d3cc207fe8ee
 - **Authentication**: Two-layer security (Device API key + Teacher PIN)
 - **Endpoint**: `GET /api/iot/status` with `X-Staff-PIN` header (verified working)
 - **Security Features**: Account lockout (5 attempts), PIN masking, German error messages
-- **User Context**: Authenticated teacher data stored in userStore for subsequent API calls
-- **Navigation**: Automatic redirect to room selection after successful authentication
+- **User Context**: Authenticated teacher data stored in userStore with PIN for subsequent API calls
+- **Navigation**: Automatic redirect to HomeView after successful authentication
 
 **Code Structure:**
 ```typescript
-// Real PIN validation (no mock data)
+// Real PIN validation (no mock data) with PIN storage
 const result: PinValidationResult = await api.validateTeacherPin(pin);
 
 if (result.success && result.userData) {
-  // Store authenticated user context
+  // Store authenticated user context with PIN for API calls
   setAuthenticatedUser({
     staffId: result.userData.staffId,
     staffName: result.userData.staffName,
     deviceName: result.userData.deviceName,
+    pin: pin, // Store PIN for subsequent API calls
   });
-  navigate('/rooms');
+  navigate('/home'); // Navigate to HomeView, not rooms
 }
 ```
 
@@ -179,9 +236,10 @@ if (result.success && result.userData) {
 - ✅ Account lockout mechanism working
 - ✅ Error handling for network failures
 - ✅ Secure credential handling (no sensitive data logged)
-- ✅ Seamless navigation to room selection page
+- ✅ Seamless navigation to HomeView page
+- ✅ PIN storage in authenticated user context for subsequent API calls
 
-**Commit:** Latest changes - Security fixes and PIN validation completion
+**Commit:** `8667d3a` - feat: implement touch-optimized HomeViewPage with 2x2 action grid
 
 ### ✅ **COMPLETED IMPLEMENTATION** (June 10, 2025)
 
@@ -251,7 +309,7 @@ const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authen
 <Route path="/pin" element={hasSelectedUser ? <PinPage /> : <Navigate to="/" replace />} />
 <Route path="/home" element={isFullyAuthenticated ? <HomeViewPage /> : <Navigate to="/" replace />} />
 <Route path="/tag-assignment" element={isFullyAuthenticated ? <div>Tag Assignment Page (TODO)</div> : <Navigate to="/" replace />} />
-<Route path="/activity-selection" element={isFullyAuthenticated ? <div>Activity Selection Page (TODO)</div> : <Navigate to="/" replace />} />
+<Route path="/activity-selection" element={isFullyAuthenticated ? <CreateActivityPage /> : <Navigate to="/" replace />} />
 ```
 
 **UI Enhancements:**
@@ -260,13 +318,101 @@ const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authen
 - ✅ Exported ActionButton component for reuse across the application
 - ✅ Large icons (4rem) and text (xl size) for accessibility on touchscreen
 
-**Commit:** Latest changes - HomeViewPage implementation with touch-optimized design
+**Commit:** `8667d3a` - feat: implement touch-optimized HomeViewPage with 2x2 action grid
+
+### ✅ **COMPLETED IMPLEMENTATION** (June 10, 2025)
+
+**🎉 Activity Selection Page - LIVE & WORKING**
+
+**Implementation Details:**
+- **File**: `src/pages/CreateActivityPage.tsx` - Activity selection interface (transformed from creation to selection)
+- **API Integration**: Real data from `GET /api/iot/activities` with teacher's PIN authentication
+- **Design**: Touch-optimized grid layout matching HomeViewPage style and feel
+- **Data Flow**: Uses stored PIN from authenticated user context for API calls
+- **Navigation**: Proper back button to HomeView and logout functionality
+
+**Code Structure:**
+```typescript
+// Real API integration with stored PIN
+const fetchActivitiesData = useCallback(async () => {
+  const activitiesData = await fetchActivities(); // Uses stored PIN from auth context
+  if (activitiesData && Array.isArray(activitiesData)) {
+    setActivities(activitiesData);
+  }
+}, [authenticatedUser, fetchActivities]);
+
+// Activity card component matching HomeViewPage style
+const ActivityCard: React.FC<{
+  activity: ActivityResponse;
+  onClick: (activity: ActivityResponse) => void;
+}> = ({ activity, onClick }) => {
+  // Touch-friendly cards with activity data
+  // Shows: name, category icon, room, enrollment count, availability
+};
+```
+
+**Features Implemented:**
+- ✅ Real API integration with `GET /api/iot/activities` endpoint
+- ✅ Production-ready PIN authentication using stored PIN from login
+- ✅ Touch-optimized activity cards with category icons and enrollment data
+- ✅ Grid layout with responsive design for different screen sizes
+- ✅ Proper error handling for network failures and authentication errors
+- ✅ Loading states with German localization
+- ✅ Back navigation to HomeView and logout functionality
+- ✅ Activity selection triggers navigation to room selection (not yet implemented)
+- ✅ Comprehensive logging of user actions and performance metrics
+
+**API Integration:**
+```typescript
+// Enhanced API service with activities endpoint
+export const api = {
+  async getActivities(pin: string): Promise<ActivityResponse[]> {
+    const response = await apiCall<ActivitiesResponse>('/api/iot/activities', {
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+    });
+    return response.data;
+  },
+};
+
+// Enhanced store with PIN storage and real API calls
+interface AuthenticatedUser {
+  staffId: number;
+  staffName: string;
+  deviceName: string;
+  pin: string; // Store PIN for subsequent API calls
+}
+```
+
+**UI Enhancements:**
+- ✅ Category-based icons (⚽ Sport, 🎨 Kunst, 🎵 Musik, 🔬 Wissenschaft, etc.)
+- ✅ Real-time enrollment information (12/20 participants)
+- ✅ Availability status (✅ Verfügbar / ❌ Voll)
+- ✅ Room location display (📍 Room name)
+- ✅ Responsive grid layout with proper spacing and shadows
+- ✅ Consistent styling with HomeViewPage design language
+
+**Testing Results:**
+- ✅ Real API calls to backend server working correctly
+- ✅ 5 activities loaded and displayed successfully
+- ✅ No infinite request loops (previous AbortController issue resolved)
+- ✅ Proper error handling for authentication failures
+- ✅ Smooth touch interaction on activity cards
+- ✅ German localization for all user-facing text
+
+**Current Status:** Activity Selection (Phase 1) is **100% COMPLETE** and working with real backend data
+
+**Navigation Flow:** Home → Activity Selection ✅ → Room Selection (TODO) → Activity Scanning (TODO)
+
+**Status:** 🟡 **UNCOMMITTED CHANGES** - Ready for commit after cleanup
 
 ### 📋 **NEXT IMPLEMENTATION PRIORITIES:**
-1. **Tag Assignment Workflow** - Implement RFID tag scanning and student assignment UI
-2. **Activity Selection Page** - Teacher's activities list and selection interface
-3. **Room Selection** - Fetch available rooms and room selection UI
-4. **Activity Scanning** - RFID scanning loop with "Hallo/Tschüss" feedback
+1. **Room Selection Page** - Implement Phase 2 of Activity Workflow
+2. **Tag Assignment Workflow** - Implement RFID tag scanning and student assignment UI  
+3. **Activity Scanning** - RFID scanning loop with "Hallo/Tschüss" feedback
+4. **Session Management** - POST /api/iot/session/start and end integration
 
 ---
 
@@ -1621,20 +1767,37 @@ npm run format # Prettier
   - [ ] Verify error handling for network issues
   - [ ] Test authentication persistence
 
-#### Day 3: Home View & Core Navigation (4-6 hours)
-- [ ] **Home View Implementation** (3h)
-  - [ ] Create four action buttons: Logout, Einstellungen, Armbänder zuweisen, Aktivität starten
-  - [ ] Add teacher information display
-  - [ ] Implement device status indicator
-  - [ ] Style for Pi touch interface
-- [ ] **Navigation Logic** (2h)
-  - [ ] Implement logout functionality
-  - [ ] Add navigation guards for authenticated routes
-  - [ ] Create "Einstellungen" placeholder (skip for MVP)
-- [ ] **Error Handling** (1h)
-  - [ ] Global error boundary implementation
-  - [ ] Network error detection and recovery
-  - [ ] User-friendly German error messages
+#### Day 3: Home View & Core Navigation (4-6 hours) ✅ **COMPLETED**
+- [x] **Home View Implementation** (3h) ✅ **DONE**
+  - [x] Create four action buttons: Logout, Einstellungen, Armbänder zuweisen, Aktivität starten
+  - [x] Add teacher information display
+  - [x] Implement device status indicator
+  - [x] Style for Pi touch interface
+- [x] **Navigation Logic** (2h) ✅ **DONE**
+  - [x] Implement logout functionality
+  - [x] Add navigation guards for authenticated routes
+  - [x] Create "Einstellungen" placeholder (skip for MVP)
+- [x] **Error Handling** (1h) ✅ **DONE**
+  - [x] Global error boundary implementation
+  - [x] Network error detection and recovery
+  - [x] User-friendly German error messages
+
+#### Day 3.5: Activity Selection Implementation (4-6 hours) ✅ **COMPLETED** 
+- [x] **Activity Selection Page** (4h) ✅ **DONE**
+  - [x] Transform CreateActivityPage from creation to selection interface
+  - [x] Integrate real API data from `GET /api/iot/activities`
+  - [x] Implement touch-optimized activity cards with category icons
+  - [x] Add enrollment information and availability status
+- [x] **API Integration** (2h) ✅ **DONE**
+  - [x] Add getActivities endpoint to API service
+  - [x] Implement PIN-based authentication for activities
+  - [x] Add proper TypeScript interfaces for ActivityResponse
+  - [x] Handle authentication errors and network failures
+- [x] **Performance Optimization** (1h) ✅ **DONE**
+  - [x] Resolve infinite API request loops with AbortController removal
+  - [x] Implement proper request deduplication
+  - [x] Add component-level loading states
+  - [x] Fix React.StrictMode compatibility issues
 
 #### Day 4: RFID Hardware Integration (6-8 hours)
 - [ ] **Hardware Adaptation** (3h)
@@ -1714,25 +1877,32 @@ npm run format # Prettier
   - [ ] Bug fixes and UI polish
   - [ ] Deployment preparation and documentation
 
-### ✅ Must Have (Week 1) - Success Criteria
+### ✅ Must Have (Week 1) - Success Criteria **UPDATED PROGRESS**
 | Feature | Implementation | API Endpoint | Status |
 |---------|----------------|--------------|--------|
-| **Teacher login** | PIN validation with server | `GET /api/iot/status` | 🎯 Ready |
-| **Tag assignment** | Scan and assign tags to students | `GET /api/iot/students` (local check) | 🎯 Ready |
-| **Activity selection** | Choose from teacher's activities | `GET /api/iot/activities` | 🎯 Ready |
-| **Room selection** | Select room for activity | `GET /api/rooms/` | 🎯 Ready |
-| **RFID scanning** | Process student check-ins | `POST /api/iot/checkin` | 🎯 Ready |
-| **Scan feedback** | "Hallo/Tschüss" modals | Frontend implementation | 🎯 Ready |
-| **Error handling** | Connection errors, invalid PINs | All endpoints | 🎯 Ready |
-| **Session management** | Start/stop activities properly | `POST /api/iot/session/*` | 🎯 Ready |
+| **Teacher login** | PIN validation with server | `GET /api/iot/status` | ✅ **COMPLETED** |
+| **Home navigation** | Touch-optimized 2x2 action grid | Frontend implementation | ✅ **COMPLETED** |
+| **Activity selection** | Choose from teacher's activities | `GET /api/iot/activities` | ✅ **COMPLETED** |
+| **Tag assignment** | Scan and assign tags to students | `GET /api/iot/students` (local check) | 🟡 **API READY** |
+| **Room selection** | Select room for activity | `GET /api/rooms/` | 🟡 **API READY** |
+| **RFID scanning** | Process student check-ins | `POST /api/iot/checkin` | 🟡 **API READY** |
+| **Scan feedback** | "Hallo/Tschüss" modals | Frontend implementation | 🔴 **TODO** |
+| **Error handling** | Connection errors, invalid PINs | All endpoints | ✅ **COMPLETED** |
+| **Session management** | Start/stop activities properly | `POST /api/iot/session/*` | 🟡 **API READY** |
 
-**Overall Readiness: 95%** - All APIs confirmed with corrected authentication patterns!
+**Current Progress: 40% IMPLEMENTED** - Core authentication and activity selection working with real APIs!
 
-**Updated Confidence Assessment:**
-- ✅ Core functionality: 95% ready
-- ✅ API integration: 90% ready (authentication patterns corrected)
-- ✅ Code examples: 90% ready (proper imports and config added)
-- ✅ Production deployment: 85% ready (enhanced config management)
+**Updated Implementation Status:**
+- ✅ **Authentication Flow**: 100% complete (Teacher list, PIN validation, home navigation)
+- ✅ **Activity Selection**: 100% complete (Real API integration, touch UI, error handling)
+- 🟡 **Tag Assignment**: 0% implemented (API endpoints confirmed and ready)
+- 🟡 **Room Selection**: 0% implemented (Public API endpoint ready, no UI)
+- 🟡 **Activity Scanning**: 0% implemented (API endpoints ready, no RFID integration)
+- 🟡 **Session Management**: 0% implemented (API endpoints ready, no UI integration)
+
+**Current Development Status:**
+- **Days 1-3**: ✅ **COMPLETED** (Foundation, Authentication, Home View, Activity Selection)
+- **Days 4-7**: 🔴 **TODO** (RFID Hardware, Tag Assignment, Room Selection, Activity Scanning)
 
 ### 🔮 Nice to Have (Post-MVP)
 **Phase 2 Enhancements** (after successful 1-week pilot):

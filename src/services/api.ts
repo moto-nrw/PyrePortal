@@ -63,6 +63,31 @@ export interface PinValidationResult {
 }
 
 /**
+ * Activity data structure from API
+ */
+export interface ActivityResponse {
+  id: number;
+  name: string;
+  category_name: string;
+  category_color: string;
+  room_name: string;
+  enrollment_count: number;
+  max_participants: number;
+  has_spots: boolean;
+  supervisor_name: string;
+  is_active: boolean;
+}
+
+/**
+ * API response structure for activities
+ */
+interface ActivitiesResponse {
+  status: string;
+  data: ActivityResponse[];
+  message: string;
+}
+
+/**
  * API functions
  */
 export const api = {
@@ -149,6 +174,21 @@ export const api = {
         };
       }
     }
+  },
+
+  /**
+   * Get teacher's activities for today
+   * Endpoint: GET /api/iot/activities
+   */
+  async getActivities(pin: string): Promise<ActivityResponse[]> {
+    const response = await apiCall<ActivitiesResponse>('/api/iot/activities', {
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+    });
+    
+    return response.data;
   },
 
   /**

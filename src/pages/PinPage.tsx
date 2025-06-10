@@ -130,11 +130,12 @@ function PinPage() {
       const result: PinValidationResult = await api.validateTeacherPin(pin);
       
       if (result.success && result.userData) {
-        // Store authenticated user context
+        // Store authenticated user context with PIN
         setAuthenticatedUser({
           staffId: result.userData.staffId,
           staffName: result.userData.staffName,
           deviceName: result.userData.deviceName,
+          pin: pin,
         });
 
         logger.info('PIN verified successfully', { 

@@ -56,7 +56,7 @@ function App() {
             />
             <Route
               path="/activity-selection"
-              element={isFullyAuthenticated ? <div>Activity Selection Page (TODO)</div> : <Navigate to="/" replace />}
+              element={isFullyAuthenticated ? <CreateActivityPage /> : <Navigate to="/" replace />}
             />
             <Route
               path="/rooms"
