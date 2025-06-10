@@ -2393,6 +2393,66 @@ npm run format # Prettier
 - **Day 5**: ✅ **COMPLETED** (Tag Assignment Workflow - Full UI implementation with real API integration)
 - **Days 4, 6-7**: 🟡 **REMAINING** (RFID Hardware, Activity Scanning)
 
+## ⚡ **CURRENT ISSUE: RFID Hardware Debugging** (June 10, 2025)
+
+**🔍 Investigation Status: GPIO/SPI Communication**
+
+**Issue Description:**
+The RFID Tag Assignment workflow is fully implemented and working end-to-end, but the physical MFRC522 hardware scanning is not functioning properly on the Raspberry Pi. The app correctly detects the ARM64 platform and attempts hardware scanning, but the scan button remains disabled due to hardware availability checks.
+
+**What's Working:**
+- ✅ Backend API integration (all endpoints working)
+- ✅ Frontend-backend communication confirmed  
+- ✅ Platform detection working (ARM64 Linux detected correctly)
+- ✅ Tauri command registration and execution
+- ✅ SPI device detection (`/dev/spidev0.0` exists with proper permissions)
+- ✅ Mock scanning flow (TEST-TAG-001 → student assignment workflow)
+- ✅ Real API tag assignment calls to Project Phoenix server
+
+**Current Problem:**
+The `get_rfid_scanner_status` function returns `is_available: false`, which disables the scan button. This prevents actual RFID hardware scanning despite the software being fully ready.
+
+**Debug Status:**
+- Added comprehensive logging to trace execution flow
+- Frontend calls backend successfully (confirmed via browser console)
+- Backend function execution confirmed via terminal logs
+- Hardware status check includes SPI and GPIO availability verification
+- Investigation needed: GPIO access permissions or MFRC522 module connection
+
+**Next Steps:**
+1. Verify MFRC522 module physical connection to Pi GPIO pins
+2. Check GPIO access permissions and SPI configuration
+3. Test hardware initialization with detailed error logging
+4. Resolve hardware availability detection
+5. Enable real RFID scanning functionality
+
+**Hardware Requirements:**
+- MFRC522 RFID reader module properly connected to Raspberry Pi GPIO
+- SPI interface enabled (`/dev/spidev0.0` available ✅)
+- GPIO access permissions configured
+- 3.3V power supply to RFID module
+
+**Expected Behavior After Fix:**
+- Scanner status shows `is_available: true` 
+- "Scannen starten" button becomes enabled
+- Real RFID tag scanning replaces mock scanning
+- Physical RFID tags trigger the tag assignment workflow
+
+## Current Development Priorities
+
+### High Priority
+1. **🔧 RFID Hardware Debugging** - Resolve GPIO/SPI communication with MFRC522
+2. **🔴 Hardware Initialization Fix** - Enable real RFID scanning functionality
+
+### Medium Priority  
+1. **Continuous RFID Scanning Implementation** - Add background scanning loop (after hardware fix)
+2. **Student Check-in Feedback** - Implement "Hallo/Tschüss" modal system
+3. **Performance Optimization** - Review app performance on Raspberry Pi
+
+### Low Priority
+1. **Error Recovery** - Enhanced error handling for network/hardware failures
+2. **Advanced Features** - Additional UI enhancements and polish
+
 ### 🔮 Nice to Have (Post-MVP)
 **Phase 2 Enhancements** (after successful 1-week pilot):
 - **Advanced error recovery** - Automatic retry with exponential backoff
