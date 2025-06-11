@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api } from '../services/api';
-import { Button, ContentBox, Modal } from '../components/ui';
+import { Button, ContentBox } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';

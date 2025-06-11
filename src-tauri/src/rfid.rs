@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use std::sync::{Arc, Mutex, OnceLock};
 use tokio::sync::mpsc;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RfidScanResult {
@@ -298,12 +298,7 @@ mod raspberry_pi {
         }
     }
 
-    use std::sync::{Mutex, OnceLock};
-    
-    // Safe persistent MFRC522 instance
-    static RFID_SCANNER: OnceLock<Mutex<mfrc522::Mfrc522<SpiInterface<Spidev>>>> = OnceLock::new();
-    
-    fn initialize_hardware() -> Result<(), String> {
+    pub async fn scan_rfid_hardware() -> Result<String, String> {
         // Initialize SPI device - matches Python implementation settings
         let mut spi = match Spidev::open("/dev/spidev0.0") {
             Ok(s) => s,
@@ -375,25 +370,6 @@ mod raspberry_pi {
                 return Err(format!("Failed to read MFRC522 version: {:?}", e));
             }
         };
-        
-        // Store the initialized scanner globally
-        RFID_SCANNER.set(Mutex::new(mfrc522))
-            .map_err(|_| "Scanner already initialized".to_string())?;
-        
-        Ok(())
-    }
-
-    pub async fn scan_rfid_hardware() -> Result<String, String> {
-        // Initialize hardware if not already done
-        if RFID_SCANNER.get().is_none() {
-            initialize_hardware()?;
-        }
-        
-        // Get the scanner instance
-        let scanner = RFID_SCANNER.get()
-            .ok_or("RFID scanner not initialized")?;
-        
-        let mut mfrc522 = scanner.lock().map_err(|e| format!("Failed to lock scanner: {:?}", e))?;
         
         // Scan for cards with timeout (shorter timeout for background service)
         let start_time = std::time::Instant::now();
@@ -580,7 +556,7 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
 }
 
 #[tauri::command]
-pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResult, String> {
+pub async fn scan_rfid_with_timeout(_timeout_seconds: u64) -> Result<RfidScanResult, String> {
     // For future implementation - continuous scanning with custom timeout
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
@@ -598,10 +574,10 @@ pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResu
     
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
-        tokio::time::sleep(Duration::from_secs(std::cmp::min(timeout_seconds, 5))).await;
+        tokio::time::sleep(Duration::from_secs(std::cmp::min(_timeout_seconds, 5))).await;
         Ok(RfidScanResult {
             success: true,
-            tag_id: Some(format!("MOCK:TIMEOUT:{}:SEC", timeout_seconds)),
+            tag_id: Some(format!("MOCK:TIMEOUT:{}:SEC", _timeout_seconds)),
             error: None,
         })
     }
