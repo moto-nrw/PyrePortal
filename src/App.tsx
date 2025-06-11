@@ -1,18 +1,20 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import CheckInOutPage from './pages/CheckInOutPage';
+import ActivityScanningPage from './pages/ActivityScanningPage';
 import CreateActivityPage from './pages/CreateActivityPage';
+import HomeViewPage from './pages/HomeViewPage';
 import LoginPage from './pages/LoginPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
+import TagAssignmentPage from './pages/TagAssignmentPage';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
 import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { selectedUser, selectedRoom, activities } = useUserStore();
+  const { selectedUser, authenticatedUser, selectedRoom, selectedActivity } = useUserStore();
   const appLogger = createLogger('App');
 
   // Initialize logger with runtime config
@@ -23,16 +25,17 @@ function App() {
       version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
       environment: import.meta.env.MODE,
     });
-  }, [appLogger]);
+  }, [appLogger]); // Include appLogger in dependency array
 
-  // Simple auth check for protected routes
-  const isAuthenticated = !!selectedUser;
+  // Auth states
+  const hasSelectedUser = !!selectedUser; // Teacher selected, need PIN
+  const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authenticated
 
   // Check if a room is selected for the activity creation page
   const hasSelectedRoom = !!selectedRoom;
 
-  // Check if there are activities for the check-in-out page
-  const hasActivity = isAuthenticated && (!!selectedRoom || activities.length > 0);
+  // Check if session is active (has activity, room, and authenticated user)
+  const hasActiveSession = isFullyAuthenticated && !!selectedActivity && !!selectedRoom;
 
   return (
     <ErrorBoundary>
@@ -40,28 +43,43 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LoginPage />} />
-            <Route path="/pin" element={<PinPage />} />
             <Route
-              path="/rooms"
-              element={isAuthenticated ? <RoomSelectionPage /> : <Navigate to="/" replace />}
+              path="/pin"
+              element={hasSelectedUser ? <PinPage /> : <Navigate to="/" replace />}
             />
             <Route
-              path="/create-activity"
+              path="/home"
+              element={isFullyAuthenticated ? <HomeViewPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/tag-assignment"
+              element={isFullyAuthenticated ? <TagAssignmentPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/activity-selection"
+              element={isFullyAuthenticated ? <CreateActivityPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/rooms"
+              element={isFullyAuthenticated ? <RoomSelectionPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/nfc-scanning"
               element={
-                isAuthenticated && hasSelectedRoom ? (
-                  <CreateActivityPage />
+                hasActiveSession ? (
+                  <ActivityScanningPage />
                 ) : (
-                  <Navigate to={isAuthenticated ? '/rooms' : '/'} replace />
+                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
                 )
               }
             />
             <Route
-              path="/check-in-out"
+              path="/create-activity"
               element={
-                isAuthenticated && hasActivity ? (
-                  <CheckInOutPage />
+                isFullyAuthenticated && hasSelectedRoom ? (
+                  <CreateActivityPage />
                 ) : (
-                  <Navigate to={isAuthenticated ? '/rooms' : '/'} replace />
+                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
                 )
               }
             />

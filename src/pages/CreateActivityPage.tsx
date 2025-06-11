@@ -1,335 +1,160 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox, Select } from '../components/ui';
-import { useUserStore, ActivityCategory } from '../store/userStore';
+import { Button, ContentBox } from '../components/ui';
+import type { ActivityResponse } from '../services/api';
+import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function CreateActivityPage() {
-  const {
-    users,
-    selectedRoom,
-    selectedUser,
-    currentActivity,
-    isLoading,
-    error,
-    initializeActivity,
-    updateActivityField,
-    createActivity,
-    cancelActivityCreation,
-    logout,
-  } = useUserStore();
+  const { authenticatedUser, isLoading, error, logout, fetchActivities, setSelectedActivity } =
+    useUserStore();
 
-  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [activities, setActivities] = useState<ActivityResponse[]>([]);
+  const [isFetching, setIsFetching] = useState(false);
+  const mountedRef = useRef(false);
+  const fetchedRef = useRef(false);
+
   const navigate = useNavigate();
 
   // Create logger instance for this component
-  const logger = createLogger('CreateActivityPage');
+  const logger = createLogger('ActivitySelectionPage');
 
-  // Log component mount/unmount and initialization state
-  useEffect(() => {
-    logger.debug('CreateActivityPage component mounted', {
-      user: selectedUser,
-      hasSelectedRoom: !!selectedRoom,
-      hasCurrentActivity: !!currentActivity,
-    });
+  // Fetch activities data with useCallback to prevent recreation
+  const fetchActivitiesData = useCallback(async () => {
+    if (!authenticatedUser || isFetching) return;
 
-    // Check authentication and prerequisites
-    if (!selectedUser) {
-      logger.warn('Unauthenticated access to CreateActivityPage');
-    }
-
-    if (!selectedRoom) {
-      logger.warn('CreateActivityPage accessed without selected room');
-    }
-
-    return () => {
-      logger.debug('CreateActivityPage component unmounted');
-    };
-  }, [selectedUser, selectedRoom, currentActivity, logger]);
-
-  // Initialize currentActivity with selected room if not already done
-  useEffect(() => {
-    if (!currentActivity && selectedRoom) {
-      logger.info('Initializing new activity', {
-        roomId: selectedRoom.id,
-        roomName: selectedRoom.name,
+    setIsFetching(true);
+    try {
+      logger.info('Fetching activities for teacher', {
+        staffId: authenticatedUser.staffId,
+        staffName: authenticatedUser.staffName,
       });
 
-      performance.mark('activity-init-start');
-      initializeActivity(selectedRoom.id);
-      performance.mark('activity-init-end');
-      performance.measure('activity-init-duration', 'activity-init-start', 'activity-init-end');
-
-      const measure = performance.getEntriesByName('activity-init-duration')[0];
-      logger.debug('Activity initialization performance', { duration_ms: measure.duration });
-    } else if (!selectedRoom) {
-      // Redirect to room selection if no room is selected
-      logger.warn('No room selected, redirecting to room selection');
-      logNavigation('CreateActivityPage', 'RoomSelectionPage', { reason: 'no_room_selected' });
-      void navigate('/rooms');
-    }
-  }, [currentActivity, selectedRoom, initializeActivity, navigate, logger]);
-
-  // Convert enum to array for dropdown
-  const categoryOptions = Object.values(ActivityCategory).map(category => ({
-    value: category,
-    label: category,
-  }));
-
-  // Create supervisor options from users
-  const supervisorOptions = users.map(user => ({
-    value: user.id.toString(),
-    label: user.name,
-  }));
-
-  // Handle input changes for regular inputs
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const { name, value } = e.target;
-
-      logger.debug('Activity form field changed', { field: name, value });
-
-      // Clear error for this field
-      if (formErrors[name]) {
-        logger.debug('Clearing validation error', { field: name, previousError: formErrors[name] });
-        setFormErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors[name];
-          return newErrors;
-        });
-      }
-
-      // Handle maxParticipants as a special case (convert to number)
-      if (name === 'maxParticipants') {
-        const parsedValue = value ? parseInt(value) : undefined;
-        logger.debug('Setting max participants', { value: parsedValue });
-        updateActivityField('maxParticipants', parsedValue);
-      } else {
-        updateActivityField(name as 'name', value);
-      }
-
-      logUserAction('activity_field_updated', {
-        field: name,
-        activity: currentActivity?.name ?? 'New Activity',
-      });
-    } catch (error) {
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'CreateActivityPage.handleInputChange'
-      );
-    }
-  };
-
-  // Handle select change for supervisor
-  const handleSupervisorChange = (value: string) => {
-    try {
-      // Get supervisor name for logging
-      const supervisorName = users.find(u => u.id.toString() === value)?.name ?? 'Unknown';
-      logger.debug('Supervisor changed', { supervisorId: value, supervisorName });
-
-      // Clear error
-      if (formErrors.supervisorId) {
-        logger.debug('Clearing supervisor validation error');
-        setFormErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors.supervisorId;
-          return newErrors;
-        });
-      }
-
-      updateActivityField('supervisorId', parseInt(value));
-      logUserAction('activity_supervisor_changed', {
-        supervisorId: value,
-        supervisorName,
-        activity: currentActivity?.name ?? 'New Activity',
-      });
-    } catch (error) {
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'CreateActivityPage.handleSupervisorChange'
-      );
-    }
-  };
-
-  // Handle select change for category
-  const handleCategoryChange = (value: string) => {
-    try {
-      logger.debug('Activity category changed', { category: value });
-
-      // Clear error
-      if (formErrors.category) {
-        logger.debug('Clearing category validation error');
-        setFormErrors(prev => {
-          const newErrors = { ...prev };
-          delete newErrors.category;
-          return newErrors;
-        });
-      }
-
-      updateActivityField('category', value as ActivityCategory);
-      logUserAction('activity_category_changed', {
-        category: value,
-        activity: currentActivity?.name ?? 'New Activity',
-      });
-    } catch (error) {
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'CreateActivityPage.handleCategoryChange'
-      );
-    }
-  };
-
-  // Validate form
-  const validateForm = (): boolean => {
-    try {
-      logger.debug('Validating activity form');
-      performance.mark('form-validation-start');
-
-      const errors: Record<string, string> = {};
-
-      if (!currentActivity?.name) {
-        errors.name = 'Bitte gib einen Namen für die Aktivität ein';
-      }
-
-      if (!currentActivity?.supervisorId) {
-        errors.supervisorId = 'Bitte wähle einen Betreuer aus';
-      }
-
-      if (!currentActivity?.category) {
-        errors.category = 'Bitte wähle eine Kategorie aus';
-      }
-
-      setFormErrors(errors);
-      const isValid = Object.keys(errors).length === 0;
-
-      performance.mark('form-validation-end');
+      performance.mark('activities-fetch-start');
+      const activitiesData = await fetchActivities();
+      performance.mark('activities-fetch-end');
       performance.measure(
-        'form-validation-duration',
-        'form-validation-start',
-        'form-validation-end'
+        'activities-fetch-duration',
+        'activities-fetch-start',
+        'activities-fetch-end'
       );
-      const measure = performance.getEntriesByName('form-validation-duration')[0];
 
-      logger.info('Form validation complete', {
-        isValid,
-        errors: Object.keys(errors),
-        validationTime_ms: measure.duration,
-      });
+      const measure = performance.getEntriesByName('activities-fetch-duration')[0];
+      logger.debug('Activities fetch performance', { duration_ms: measure.duration });
 
-      if (!isValid) {
-        logUserAction('activity_validation_failed', {
-          errors: Object.keys(errors),
-          activity: currentActivity?.name ?? 'New Activity',
+      if (activitiesData && Array.isArray(activitiesData)) {
+        setActivities(activitiesData);
+        logger.info('Activities loaded successfully', {
+          count: activitiesData.length,
+          activities: activitiesData.map(a => ({ id: a.id, name: a.name })),
         });
+      } else {
+        logger.warn('No activities data returned from fetchActivities');
+        setActivities([]);
       }
-
-      return isValid;
     } catch (error) {
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'CreateActivityPage.validateForm'
-      );
-      return false;
-    }
-  };
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
-  // Handle form submission
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    try {
-      logger.info('Activity form submission initiated', {
-        activityName: currentActivity?.name,
-        category: currentActivity?.category,
-        roomId: selectedRoom?.id,
-        roomName: selectedRoom?.name,
-      });
-
-      if (!validateForm()) {
+      // Check for authentication errors
+      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        logger.warn('Authentication failed during activity fetch, redirecting to login', {
+          error: errorMessage,
+        });
+        logUserAction('authentication_expired_during_activity_fetch');
+        // Logout and redirect to login
+        void logout();
+        void navigate('/');
         return;
       }
 
-      // Performance tracking for activity creation
-      performance.mark('activity-creation-start');
-
-      logUserAction('activity_submission', {
-        activityName: currentActivity?.name ?? 'Unnamed Activity',
-        category: currentActivity?.category,
-        roomId: selectedRoom?.id,
-        roomName: selectedRoom?.name,
-      });
-
-      const success = await createActivity();
-
-      performance.mark('activity-creation-end');
-      performance.measure(
-        'activity-creation-duration',
-        'activity-creation-start',
-        'activity-creation-end'
-      );
-      const measure = performance.getEntriesByName('activity-creation-duration')[0];
-
-      if (success) {
-        logger.info('Activity created successfully', {
-          activityName: currentActivity?.name,
-          duration_ms: measure.duration,
-        });
-
-        logUserAction('activity_created', {
-          activityName: currentActivity?.name ?? 'Unnamed Activity',
-          roomName: selectedRoom?.name,
-        });
-
-        logNavigation('CreateActivityPage', 'CheckInOutPage', {
-          reason: 'activity_created_successfully',
-        });
-
-        // Navigate to the check-in-out page for student management
-        void navigate('/check-in-out');
-      } else {
-        logger.error('Activity creation failed', {
-          duration_ms: measure.duration,
-          error: error ?? 'Unknown error',
-        });
-
-        logUserAction('activity_creation_failed', {
-          activityName: currentActivity?.name ?? 'Unnamed Activity',
-          error: error ?? 'Unknown error',
-        });
-      }
-    } catch (error) {
+      logger.error('Failed to fetch activities', { error });
       logError(
         error instanceof Error ? error : new Error(String(error)),
-        'CreateActivityPage.handleSubmit'
+        'ActivitySelectionPage.fetchActivitiesData'
       );
+    } finally {
+      setIsFetching(false);
     }
-  };
+  }, [authenticatedUser, isFetching, logger, logout, navigate, fetchActivities]);
 
-  // Handle back button - now cancels the activity creation
-  const handleBack = () => {
+  // Log component mount/unmount and fetch activities
+  useEffect(() => {
+    // Prevent double execution in React.StrictMode
+    if (mountedRef.current) return;
+    mountedRef.current = true;
+
+    logger.debug('ActivitySelectionPage component mounted', {
+      user: authenticatedUser?.staffName,
+      isAuthenticated: !!authenticatedUser,
+    });
+
+    // Check authentication
+    if (!authenticatedUser) {
+      logger.warn('Unauthenticated access to ActivitySelectionPage');
+      void navigate('/');
+      return;
+    }
+
+    // Fetch activities on mount only once
+    if (!fetchedRef.current) {
+      fetchedRef.current = true;
+      void fetchActivitiesData();
+    }
+
+    return () => {
+      logger.debug('ActivitySelectionPage component unmounted');
+      mountedRef.current = false;
+    };
+  }, [authenticatedUser, navigate, logger, fetchActivitiesData]);
+
+  // Handle activity selection
+  const handleActivitySelect = (activity: ActivityResponse) => {
     try {
-      logger.info('Activity creation cancelled by user', {
-        roomId: selectedRoom?.id,
-        roomName: selectedRoom?.name,
+      logger.info('Activity selected', {
+        activityId: activity.id,
+        activityName: activity.name,
+        category: activity.category_name,
+        roomName: activity.room_name,
       });
 
-      // Cancel the activity creation process and release the room
-      cancelActivityCreation();
-
-      logUserAction('activity_creation_cancelled', {
-        roomId: selectedRoom?.id,
-        roomName: selectedRoom?.name,
-        activityName: currentActivity?.name ?? 'Unnamed Activity',
+      logUserAction('activity_selected', {
+        activityId: activity.id,
+        activityName: activity.name,
+        category: activity.category_name,
+        roomName: activity.room_name,
       });
 
-      logNavigation('CreateActivityPage', 'RoomSelectionPage', { reason: 'user_cancelled' });
+      // Store the selected activity for the room selection page
+      setSelectedActivity(activity);
+
+      // Navigate to room selection with selected activity
+      logNavigation('ActivitySelectionPage', 'RoomSelectionPage', {
+        reason: 'activity_selected',
+        activityId: activity.id,
+      });
       void navigate('/rooms');
     } catch (error) {
       logError(
         error instanceof Error ? error : new Error(String(error)),
-        'CreateActivityPage.handleBack'
+        'ActivitySelectionPage.handleActivitySelect'
+      );
+    }
+  };
+
+  // Handle back button - navigate to home
+  const handleBack = () => {
+    try {
+      logger.info('User navigating back to home from activity selection');
+
+      logUserAction('activity_selection_back');
+      logNavigation('ActivitySelectionPage', 'HomeViewPage', { reason: 'user_back' });
+      void navigate('/home');
+    } catch (error) {
+      logError(
+        error instanceof Error ? error : new Error(String(error)),
+        'ActivitySelectionPage.handleBack'
       );
     }
   };
@@ -337,158 +162,249 @@ function CreateActivityPage() {
   // Handle logout
   const handleLogout = () => {
     try {
-      logger.info('User logging out during activity creation', {
-        user: selectedUser,
-        roomId: selectedRoom?.id,
-        roomName: selectedRoom?.name,
+      logger.info('User logging out from activity selection', {
+        user: authenticatedUser?.staffName,
       });
 
-      // Cancel activity creation when logging out
-      cancelActivityCreation();
-
-      logUserAction('logout_during_activity_creation', {
-        username: selectedUser,
-        roomName: selectedRoom?.name,
-        activityProgress: currentActivity ? Object.keys(currentActivity).length : 0,
+      logUserAction('logout_from_activity_selection', {
+        username: authenticatedUser?.staffName,
       });
 
-      logout();
+      void logout();
 
-      logNavigation('CreateActivityPage', 'LoginPage');
+      logNavigation('ActivitySelectionPage', 'LoginPage');
       void navigate('/');
     } catch (error) {
       logError(
         error instanceof Error ? error : new Error(String(error)),
-        'CreateActivityPage.handleLogout'
+        'ActivitySelectionPage.handleLogout'
       );
     }
   };
 
-  return (
-    <ContentBox shadow="md" rounded="lg" height="95%" className="overflow-auto" centered={false}>
-      <div className="mx-auto w-full max-w-2xl px-4 py-6">
-        {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <h1
+  // Activity card component (similar to HomeViewPage ActionCard)
+  const ActivityCard: React.FC<{
+    activity: ActivityResponse;
+    onClick: (activity: ActivityResponse) => void;
+  }> = ({ activity, onClick }) => {
+    const cardStyles: React.CSSProperties = {
+      backgroundColor: theme.colors.background.light,
+      borderRadius: theme.borders.radius.lg,
+      boxShadow: theme.shadows.md,
+      padding: theme.spacing.xl,
+      cursor: 'pointer',
+      transition: theme.animation.transition.fast,
+      border: `1px solid ${theme.colors.border.light}`,
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      height: '200px',
+      position: 'relative',
+    };
+
+    const getCategoryIcon = (category: string) => {
+      switch (category.toLowerCase()) {
+        case 'sport':
+          return '⚽';
+        case 'kunst':
+          return '🎨';
+        case 'musik':
+          return '🎵';
+        case 'wissenschaft':
+          return '🔬';
+        case 'literatur':
+          return '📚';
+        case 'spiele':
+          return '🎲';
+        default:
+          return '🎯';
+      }
+    };
+
+    return (
+      <div
+        onClick={() => onClick(activity)}
+        style={cardStyles}
+        className="hover:bg-gray-100 hover:shadow-lg active:bg-gray-200"
+      >
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: '3rem', marginBottom: theme.spacing.md }}>
+            {getCategoryIcon(activity.category_name)}
+          </div>
+          <div
             style={{
-              fontSize: theme.fonts.size.xl,
+              fontSize: theme.fonts.size.large,
               fontWeight: theme.fonts.weight.bold,
+              color: theme.colors.text.primary,
+              marginBottom: theme.spacing.sm,
             }}
           >
-            Aktivität erstellen
-          </h1>
-          <div className="flex items-center">
-            <p className="mr-3 font-medium text-[#396cd8]">{selectedUser}</p>
-            <div className="flex gap-2">
-              <Button onClick={handleLogout} variant="outline" size="small">
-                Abmelden
-              </Button>
-            </div>
+            {activity.name}
+          </div>
+        </div>
+        <div>
+          <div
+            style={{
+              fontSize: theme.fonts.size.base,
+              color: theme.colors.text.secondary,
+              marginBottom: theme.spacing.xs,
+            }}
+          >
+            📍 {activity.room_name}
+          </div>
+          <div
+            style={{
+              fontSize: theme.fonts.size.base,
+              color: theme.colors.text.secondary,
+              marginBottom: theme.spacing.xs,
+            }}
+          >
+            👥 {activity.enrollment_count}/{activity.max_participants}
+          </div>
+          <div
+            style={{
+              fontSize: theme.fonts.size.small,
+              color: activity.has_spots ? '#16a34a' : '#dc2626',
+              fontWeight: theme.fonts.weight.medium,
+            }}
+          >
+            {activity.has_spots ? '✅ Verfügbar' : '❌ Voll'}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (!authenticatedUser) {
+    return null; // Will redirect via useEffect
+  }
+
+  return (
+    <ContentBox centered shadow="md" rounded="lg">
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '800px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        {/* Fixed Header */}
+        <div style={{ flexShrink: 0 }}>
+          {/* Navigation buttons */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: theme.spacing.lg,
+            }}
+          >
+            <Button onClick={handleBack} variant="outline" size="medium">
+              ← Zurück
+            </Button>
+            <Button onClick={handleLogout} variant="outline" size="small">
+              Abmelden
+            </Button>
+          </div>
+
+          {/* Title and info */}
+          <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
+            <h1
+              style={{
+                fontSize: theme.fonts.size.xxl,
+                fontWeight: theme.fonts.weight.bold,
+                marginBottom: theme.spacing.lg,
+                color: theme.colors.text.primary,
+              }}
+            >
+              Aktivität auswählen
+            </h1>
+
+            <p
+              style={{
+                fontSize: theme.fonts.size.base,
+                color: theme.colors.text.secondary,
+              }}
+            >
+              {authenticatedUser.staffName} • {authenticatedUser.deviceName}
+            </p>
           </div>
         </div>
 
-        {/* Room Info */}
-        {selectedRoom && (
-          <div className="mb-6 rounded-lg border border-blue-100 bg-blue-50 p-4">
-            <p className="font-medium text-blue-800">Raum: {selectedRoom.name}</p>
-          </div>
-        )}
+        {/* Scrollable Content Area */}
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: theme.spacing.sm }}>
+          {/* Loading state */}
+          {isLoading && (
+            <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
+              <div style={{ fontSize: theme.fonts.size.large, color: theme.colors.text.secondary }}>
+                Lade Aktivitäten...
+              </div>
+            </div>
+          )}
 
-        {/* Error message from store */}
-        {error && (
-          <div className="mb-6 rounded-md bg-red-100 p-3 text-center text-red-800">{error}</div>
-        )}
-
-        {/* Activity Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Activity Name */}
-          <div>
-            <label htmlFor="name" className="mb-1 block text-sm font-medium text-gray-700">
-              Aktivitätsname*
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={currentActivity?.name ?? ''}
-              onChange={handleInputChange}
-              className={`w-full rounded-md border px-3 py-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none ${
-                formErrors.name ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="Name der Aktivität"
-            />
-            {formErrors.name && <p className="mt-1 text-sm text-red-600">{formErrors.name}</p>}
-          </div>
-
-          {/* Supervisor */}
-          <div>
-            <label htmlFor="supervisorId" className="mb-1 block text-sm font-medium text-gray-700">
-              Betreuer*
-            </label>
-            <Select
-              id="supervisorId"
-              name="supervisorId"
-              value={currentActivity?.supervisorId?.toString() ?? ''}
-              onChange={handleSupervisorChange}
-              options={supervisorOptions}
-              placeholder="Betreuer auswählen"
-              error={formErrors.supervisorId}
-            />
-            {formErrors.supervisorId && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.supervisorId}</p>
-            )}
-          </div>
-
-          {/* Category */}
-          <div>
-            <label htmlFor="category" className="mb-1 block text-sm font-medium text-gray-700">
-              Kategorie*
-            </label>
-            <Select
-              id="category"
-              name="category"
-              value={currentActivity?.category ?? ''}
-              onChange={handleCategoryChange}
-              options={categoryOptions}
-              placeholder="Kategorie auswählen"
-              error={formErrors.category}
-            />
-            {formErrors.category && (
-              <p className="mt-1 text-sm text-red-600">{formErrors.category}</p>
-            )}
-          </div>
-
-          {/* Max Participants */}
-          <div>
-            <label
-              htmlFor="maxParticipants"
-              className="mb-1 block text-sm font-medium text-gray-700"
+          {/* Error state */}
+          {error && !isLoading && (
+            <div
+              style={{
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: theme.borders.radius.md,
+                padding: theme.spacing.md,
+                marginBottom: theme.spacing.lg,
+                textAlign: 'center',
+                color: '#dc2626',
+              }}
             >
-              Maximale Teilnehmerzahl (optional)
-            </label>
-            <input
-              type="number"
-              id="maxParticipants"
-              name="maxParticipants"
-              min="1"
-              value={currentActivity?.maxParticipants ?? ''}
-              onChange={handleInputChange}
-              className="w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-              placeholder="Maximale Anzahl an Teilnehmern"
-            />
-          </div>
+              {error}
+            </div>
+          )}
 
-          {/* Submit Buttons */}
-          <div className="flex justify-between pt-4">
-            <Button onClick={handleBack} variant="outline" size="medium" type="button">
-              Abbrechen
-            </Button>
+          {/* Activities grid */}
+          {!isLoading && !error && activities.length > 0 && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gap: theme.spacing.lg,
+                width: '100%',
+              }}
+            >
+              {activities.map(activity => (
+                <ActivityCard
+                  key={activity.id}
+                  activity={activity}
+                  onClick={handleActivitySelect}
+                />
+              ))}
+            </div>
+          )}
 
-            <Button variant="secondary" size="medium" type="submit" disabled={isLoading}>
-              {isLoading ? 'Wird erstellt...' : 'Aktivität erstellen'}
-            </Button>
-          </div>
-        </form>
+          {/* No activities state */}
+          {!isLoading && !error && activities.length === 0 && (
+            <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
+              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📅</div>
+              <div
+                style={{
+                  fontSize: theme.fonts.size.large,
+                  color: theme.colors.text.secondary,
+                  marginBottom: theme.spacing.md,
+                }}
+              >
+                Keine Aktivitäten verfügbar
+              </div>
+              <div
+                style={{
+                  fontSize: theme.fonts.size.base,
+                  color: theme.colors.text.secondary,
+                }}
+              >
+                Sie haben derzeit keine zugewiesenen Aktivitäten.
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </ContentBox>
   );

@@ -7,21 +7,26 @@ import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function LoginPage() {
-  const { users, setSelectedUser } = useUserStore();
+  const { users, fetchTeachers, setSelectedUser, isLoading, error } = useUserStore();
   const [localSelectedUser, setLocalSelectedUser] = useState('');
   const navigate = useNavigate();
 
   // Create logger instance for this component
   const logger = createLogger('LoginPage');
 
-  // Log component mount/unmount
+  // Log component mount and fetch teachers once
   useEffect(() => {
     logger.debug('LoginPage component mounted');
+
+    // Always fetch teachers on mount (the store will handle deduplication)
+    fetchTeachers().catch(error => {
+      logger.error('Failed to fetch teachers on mount', { error });
+    });
 
     return () => {
       logger.debug('LoginPage component unmounted');
     };
-  }, [logger]);
+  }, [fetchTeachers, logger]); // Include fetchTeachers and logger in dependency array
 
   const handleLogin = () => {
     try {
@@ -102,6 +107,21 @@ function LoginPage() {
         />
       </div>
 
+      {error && (
+        <div
+          style={{
+            backgroundColor: theme.colors.error + '20',
+            color: theme.colors.error,
+            padding: theme.spacing.md,
+            borderRadius: theme.borders.radius.md,
+            marginBottom: theme.spacing.lg,
+            textAlign: 'center',
+          }}
+        >
+          {error}
+        </div>
+      )}
+
       <div
         style={{
           display: 'flex',
@@ -115,11 +135,18 @@ function LoginPage() {
           options={userOptions}
           value={localSelectedUser}
           onChange={handleUserChange}
-          placeholder="Benutzer auswählen..."
+          placeholder={isLoading ? 'Lade Lehrer...' : 'Benutzer auswählen...'}
           width="350px"
+          disabled={isLoading}
         />
-        <Button type="button" onClick={handleLogin} variant="secondary" size="medium">
-          Anmelden
+        <Button
+          type="button"
+          onClick={handleLogin}
+          variant="secondary"
+          size="medium"
+          disabled={isLoading || !localSelectedUser}
+        >
+          {isLoading ? 'Lädt...' : 'Anmelden'}
         </Button>
       </div>
     </ContentBox>

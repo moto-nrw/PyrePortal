@@ -1,5 +1,13 @@
 import { create } from 'zustand';
 
+import {
+  api,
+  type Teacher,
+  type ActivityResponse,
+  type Room,
+  type CurrentSession,
+  type RfidScanResult,
+} from '../services/api';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -38,13 +46,7 @@ export interface Student {
   isCheckedIn: boolean;
 }
 
-// Define the Room interface
-interface Room {
-  id: number;
-  name: string;
-  isOccupied: boolean;
-  occupiedBy?: string;
-}
+// Room interface imported from API service
 
 // Define the User interface
 interface User {
@@ -52,30 +54,72 @@ interface User {
   name: string;
 }
 
+// Transform Teacher to User interface
+function teacherToUser(teacher: Teacher): User {
+  return {
+    id: teacher.staff_id,
+    name: teacher.display_name,
+  };
+}
+
+// Authenticated user context
+interface AuthenticatedUser {
+  staffId: number;
+  staffName: string;
+  deviceName: string;
+  authenticatedAt: Date;
+  pin: string; // Store PIN for subsequent API calls
+}
+
+// RFID scanning state
+interface RfidState {
+  isScanning: boolean;
+  currentScan: RfidScanResult | null;
+  blockedTags: Map<string, number>; // tagId -> blockUntilTimestamp
+  scanTimeout: number; // 3 seconds default
+  modalDisplayTime: number; // 1.25 seconds default
+  showModal: boolean;
+}
+
 // Define the store state interface
 interface UserState {
   // State
   users: User[];
   selectedUser: string;
+  authenticatedUser: AuthenticatedUser | null;
   rooms: Room[];
   selectedRoom: Room | null;
+  selectedActivity: ActivityResponse | null;
+  currentSession: CurrentSession | null;
   activities: Activity[];
   currentActivity: Partial<Activity> | null;
   isLoading: boolean;
   error: string | null;
   nfcScanActive: boolean;
 
+  // RFID scanning state
+  rfid: RfidState;
+
   // Actions
   setSelectedUser: (user: string) => void;
+  setAuthenticatedUser: (userData: {
+    staffId: number;
+    staffName: string;
+    deviceName: string;
+    pin: string;
+  }) => void;
+  setSelectedActivity: (activity: ActivityResponse) => void;
+  fetchTeachers: () => Promise<void>;
   fetchRooms: () => Promise<void>;
-  selectRoom: (roomId: number) => Promise<boolean>;
-  logout: () => void;
+  selectRoom: (roomId: number) => void;
+  fetchCurrentSession: () => Promise<void>;
+  logout: () => Promise<void>;
 
   // Activity-related actions
   initializeActivity: (roomId: number) => void;
   updateActivityField: <K extends keyof Activity>(field: K, value: Activity[K]) => void;
   createActivity: () => Promise<boolean>;
-  fetchActivities: () => Promise<void>;
+  fetchActivities: () => Promise<ActivityResponse[] | null>;
   cancelActivityCreation: () => void;
 
   // Check-in/check-out actions
@@ -87,6 +131,16 @@ interface UserState {
   ) => Promise<boolean>;
   checkOutStudent: (activityId: number, studentId: number) => Promise<boolean>;
   getActivityStudents: (activityId: number) => Student[];
+
+  // RFID actions
+  startRfidScanning: () => void;
+  stopRfidScanning: () => void;
+  setScanResult: (result: RfidScanResult | null) => void;
+  blockTag: (tagId: string, duration: number) => void;
+  isTagBlocked: (tagId: string) => boolean;
+  clearBlockedTag: (tagId: string) => void;
+  showScanModal: () => void;
+  hideScanModal: () => void;
 }
 
 // Define the type for the Zustand set function
@@ -116,86 +170,215 @@ const mockStudents: Student[] = [
 // Define base store without logging middleware
 const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => ({
   // Initial state
-  users: [
-    { id: 1, name: 'Christian Kamann' },
-    { id: 2, name: 'Florian Lüttgenau' },
-    { id: 3, name: 'Yannick Wenger' },
-    { id: 4, name: 'Tobias Brandt' },
-    { id: 5, name: 'Niklas Korte' },
-    { id: 6, name: 'Max Zieren' },
-  ],
+  users: [] as User[],
   selectedUser: '',
+  authenticatedUser: null,
   rooms: [] as Room[],
   selectedRoom: null,
+  selectedActivity: null,
+  currentSession: null,
   activities: [] as Activity[],
   currentActivity: null,
   isLoading: false,
   error: null,
   nfcScanActive: false,
 
+  // RFID initial state
+  rfid: {
+    isScanning: false,
+    currentScan: null,
+    blockedTags: new Map<string, number>(),
+    scanTimeout: 3000, // 3 seconds
+    modalDisplayTime: 1250, // 1.25 seconds
+    showModal: false,
+  },
+
   // Actions
   setSelectedUser: (user: string) => set({ selectedUser: user }),
 
-  fetchRooms: async () => {
+  setAuthenticatedUser: (userData: {
+    staffId: number;
+    staffName: string;
+    deviceName: string;
+    pin: string;
+  }) => {
+    set({
+      authenticatedUser: {
+        staffId: userData.staffId,
+        staffName: userData.staffName,
+        deviceName: userData.deviceName,
+        pin: userData.pin,
+        authenticatedAt: new Date(),
+      },
+    });
+  },
+
+  setSelectedActivity: (activity: ActivityResponse) => set({ selectedActivity: activity }),
+
+  fetchTeachers: async () => {
+    const { isLoading, users } = get();
+
+    // Prevent duplicate requests
+    if (isLoading) {
+      storeLogger.debug('Teachers fetch already in progress, skipping');
+      return;
+    }
+
+    // Skip if we already have teachers
+    if (users.length > 0) {
+      storeLogger.debug('Teachers already loaded, skipping fetch');
+      return;
+    }
+
     set({ isLoading: true, error: null });
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      storeLogger.info('Fetching teachers from API');
+      const teachers = await api.getTeachers();
+      const users = teachers.map(teacherToUser);
 
-      // Only load mock data for initial fetch, preserve state for subsequent fetches
-      if (get().rooms.length === 0) {
-        const mockRooms: Room[] = [
-          { id: 1, name: 'Raum 101', isOccupied: false },
-          { id: 2, name: 'Raum 102', isOccupied: true, occupiedBy: 'Thomas Müller' },
-          { id: 3, name: 'Raum 103', isOccupied: false },
-          { id: 4, name: 'Toilette EG', isOccupied: false },
-          { id: 5, name: 'Schulhof', isOccupied: false },
-        ];
-
-        set({ rooms: mockRooms, isLoading: false });
-      } else {
-        // Just update loading state for subsequent calls to preserve existing room state
-        set({ isLoading: false });
-      }
-    } catch {
-      set({ error: 'Fehler beim Laden der Räume', isLoading: false });
+      storeLogger.info('Teachers loaded successfully', { count: users.length });
+      set({ users, isLoading: false });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      storeLogger.error('Failed to fetch teachers', { error: errorMessage });
+      set({
+        error: 'Fehler beim Laden der Lehrer. Bitte versuchen Sie es erneut.',
+        isLoading: false,
+      });
+      throw error;
     }
   },
 
-  // Store the selected room and mark it as occupied
-  selectRoom: async (roomId: number) => {
-    const { rooms, selectedUser } = get();
+  fetchRooms: async () => {
+    const { authenticatedUser } = get();
+
+    if (!authenticatedUser?.pin) {
+      storeLogger.warn('Cannot fetch rooms: no authenticated user or PIN');
+      set({ error: 'Keine Authentifizierung für das Laden von Räumen', isLoading: false });
+      return;
+    }
+
+    set({ isLoading: true, error: null });
+    try {
+      storeLogger.info('Fetching available rooms from API', {
+        staffId: authenticatedUser.staffId,
+        staffName: authenticatedUser.staffName,
+      });
+
+      const rooms = await api.getRooms(authenticatedUser.pin);
+
+      storeLogger.debug('Available rooms fetched successfully', { count: rooms.length });
+      set({ rooms, isLoading: false });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Fehler beim Laden der Räume';
+      storeLogger.error('Failed to fetch available rooms', { error: errorMessage });
+      set({ error: errorMessage, isLoading: false });
+    }
+  },
+
+  // Store the selected room
+  selectRoom: (roomId: number) => {
+    const { rooms } = get();
     const roomToSelect = rooms.find(r => r.id === roomId);
 
-    if (!roomToSelect || roomToSelect.isOccupied) {
-      return false;
+    if (roomToSelect) {
+      storeLogger.info('Room selected', { roomId, roomName: roomToSelect.name });
+      set({ selectedRoom: roomToSelect });
+    } else {
+      storeLogger.warn('Room not found', { roomId });
+    }
+  },
+
+  fetchCurrentSession: async () => {
+    const { authenticatedUser } = get();
+
+    if (!authenticatedUser?.pin) {
+      storeLogger.warn('Cannot fetch current session: no authenticated user or PIN');
+      return;
     }
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
+      storeLogger.info('Fetching current session for device');
+      const session = await api.getCurrentSession(authenticatedUser.pin);
 
-      // Mark the room as occupied by the selected user
-      const updatedRooms = rooms.map(r =>
-        r.id === roomId ? { ...r, isOccupied: true, occupiedBy: selectedUser } : r
-      );
+      if (session) {
+        storeLogger.info('Active session found', {
+          activeGroupId: session.active_group_id,
+          activityId: session.activity_id,
+          activityName: session.activity_name,
+          roomName: session.room_name,
+          startTime: session.start_time,
+          duration: session.duration,
+        });
 
-      // Update both the selectedRoom and the rooms array
-      set({
-        selectedRoom: roomToSelect,
-        rooms: updatedRooms,
-      });
+        // Also set selected activity and room based on session if we have the data
+        let sessionActivity: ActivityResponse | null = null;
+        let sessionRoom: Room | null = null;
 
-      return true;
-    } catch {
-      return false;
+        if (session.activity_name) {
+          sessionActivity = {
+            id: session.activity_id,
+            name: session.activity_name,
+            category_name: '',
+            category_color: '',
+            room_name: session.room_name ?? '',
+            enrollment_count: 0,
+            max_participants: 0,
+            has_spots: true,
+            supervisor_name: authenticatedUser.staffName,
+            is_active: session.is_active ?? true,
+          };
+        }
+
+        if (session.room_id && session.room_name) {
+          sessionRoom = {
+            id: session.room_id,
+            name: session.room_name,
+          };
+        }
+
+        set({
+          currentSession: session,
+          selectedActivity: sessionActivity,
+          selectedRoom: sessionRoom,
+        });
+      } else {
+        storeLogger.debug('No active session found for device');
+        set({ currentSession: null });
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      storeLogger.error('Failed to fetch current session', { error: errorMessage });
+      // Don't set error state for session check, just log it
     }
   },
 
-  logout: () => {
+  logout: async () => {
+    const { authenticatedUser, currentSession } = get();
+
+    // End current session if exists and user is authenticated
+    if (authenticatedUser?.pin && currentSession) {
+      try {
+        storeLogger.info('Ending current session before logout', {
+          activeGroupId: currentSession.active_group_id,
+          activityId: currentSession.activity_id,
+        });
+
+        await api.endSession(authenticatedUser.pin);
+        storeLogger.info('Session ended successfully');
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        storeLogger.error('Failed to end session during logout', { error: errorMessage });
+        // Continue with logout even if session end fails
+      }
+    }
+
     set({
       selectedUser: '',
+      authenticatedUser: null,
       selectedRoom: null,
+      selectedActivity: null,
+      currentSession: null,
       currentActivity: null,
     });
   },
@@ -314,22 +497,79 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
   },
 
-  fetchActivities: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 800));
+  fetchActivities: (() => {
+    let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
 
-      // For now, we'll just return the activities stored in the state
-      set({ isLoading: false });
-      return;
-    } catch {
-      set({
-        error: 'Fehler beim Laden der Aktivitäten',
-        isLoading: false,
-      });
-    }
-  },
+    return async (): Promise<ActivityResponse[] | null> => {
+      // Return existing promise if already fetching
+      if (fetchPromise) {
+        storeLogger.debug('Activities fetch already in progress, returning existing promise');
+        return fetchPromise;
+      }
+
+      const { authenticatedUser } = get();
+      set({ isLoading: true, error: null });
+
+      if (!authenticatedUser) {
+        set({
+          error: 'Keine Authentifizierung für das Laden von Aktivitäten',
+          isLoading: false,
+        });
+        return null;
+      }
+
+      if (!authenticatedUser.pin) {
+        set({
+          error: 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.',
+          isLoading: false,
+        });
+        return null;
+      }
+
+      // Create new fetch promise
+      fetchPromise = (async () => {
+        try {
+          storeLogger.info('Fetching activities from API', {
+            staffId: authenticatedUser.staffId,
+            staffName: authenticatedUser.staffName,
+          });
+
+          const activitiesData = await api.getActivities(authenticatedUser.pin);
+
+          storeLogger.info('Activities loaded successfully', {
+            count: activitiesData.length,
+            activities: activitiesData.map(a => ({
+              id: a.id,
+              name: a.name,
+              category: a.category_name,
+            })),
+          });
+
+          set({ isLoading: false });
+          return activitiesData;
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          storeLogger.error('Failed to fetch activities', {
+            error: errorMessage,
+            staffId: authenticatedUser.staffId,
+          });
+
+          set({
+            error: 'Fehler beim Laden der Aktivitäten',
+            isLoading: false,
+          });
+
+          return null;
+        } finally {
+          // Clear the promise when done
+          fetchPromise = null;
+        }
+      })();
+
+      return fetchPromise;
+    };
+  })(),
 
   // Check-in/check-out related actions with deep safeguards to prevent infinite loops
   startNfcScan: (() => {
@@ -503,6 +743,71 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
 
     return activity.checkedInStudents;
+  },
+
+  // RFID actions
+  startRfidScanning: () => {
+    set(state => ({
+      rfid: { ...state.rfid, isScanning: true },
+    }));
+  },
+
+  stopRfidScanning: () => {
+    set(state => ({
+      rfid: { ...state.rfid, isScanning: false, currentScan: null },
+    }));
+  },
+
+  setScanResult: (result: RfidScanResult | null) => {
+    set(state => ({
+      rfid: { ...state.rfid, currentScan: result },
+    }));
+  },
+
+  blockTag: (tagId: string, duration: number) => {
+    const blockUntil = Date.now() + duration;
+    set(state => {
+      const newBlockedTags = new Map(state.rfid.blockedTags);
+      newBlockedTags.set(tagId, blockUntil);
+      return {
+        rfid: { ...state.rfid, blockedTags: newBlockedTags },
+      };
+    });
+  },
+
+  isTagBlocked: (tagId: string) => {
+    const { rfid } = get();
+    const blockUntil = rfid.blockedTags.get(tagId);
+    if (!blockUntil) return false;
+
+    const isBlocked = Date.now() < blockUntil;
+    if (!isBlocked) {
+      // Clean up expired block
+      get().clearBlockedTag(tagId);
+    }
+    return isBlocked;
+  },
+
+  clearBlockedTag: (tagId: string) => {
+    set(state => {
+      const newBlockedTags = new Map(state.rfid.blockedTags);
+      newBlockedTags.delete(tagId);
+      return {
+        rfid: { ...state.rfid, blockedTags: newBlockedTags },
+      };
+    });
+  },
+
+  showScanModal: () => {
+    set(state => ({
+      rfid: { ...state.rfid, showModal: true },
+    }));
+  },
+
+  hideScanModal: () => {
+    set(state => ({
+      rfid: { ...state.rfid, showModal: false, currentScan: null },
+    }));
   },
 });
 

@@ -2,14 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button, ContentBox } from '../components/ui';
+import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function PinPage() {
-  const { selectedUser } = useUserStore();
+  const { selectedUser, setAuthenticatedUser } = useUserStore();
   const [pin, setPin] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const navigate = useNavigate();
 
   // Create logger instance for this component
@@ -101,32 +103,10 @@ function PinPage() {
   };
 
   // Handle PIN submission
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     try {
-      // Performance marking for PIN verification flow
-      performance.mark('pin-verification-start');
-
-      // For demo purposes, any 4-digit PIN is valid
-      // In a real application, you would validate against a stored PIN
-      if (pin.length === maxPinLength) {
-        logger.info('PIN verified successfully', { user: selectedUser });
-        logUserAction('pin_verified', { user: selectedUser });
-
-        // Navigate to room selection page after successful PIN entry
-        logNavigation('PinPage', 'RoomSelectionPage');
-
-        // Performance measurement
-        performance.mark('pin-verification-end');
-        performance.measure(
-          'pin-verification-process',
-          'pin-verification-start',
-          'pin-verification-end'
-        );
-        const measure = performance.getEntriesByName('pin-verification-process')[0];
-        logger.debug('PIN verification performance', { duration_ms: measure.duration });
-
-        void navigate('/rooms');
-      } else {
+      // Check PIN length first
+      if (pin.length !== maxPinLength) {
         const errorMsg = 'Bitte geben Sie einen 4-stelligen PIN ein';
         setError(errorMsg);
         logger.warn('PIN verification failed', {
@@ -138,9 +118,70 @@ function PinPage() {
           reason: 'incomplete_pin',
           user: selectedUser,
         });
+        return;
+      }
+
+      // Performance marking for PIN verification flow
+      performance.mark('pin-verification-start');
+      setIsLoading(true);
+      setError(null);
+
+      // Validate PIN with real API
+      const result: PinValidationResult = await api.validateTeacherPin(pin);
+
+      if (result.success && result.userData) {
+        // Store authenticated user context with PIN
+        setAuthenticatedUser({
+          staffId: result.userData.staffId,
+          staffName: result.userData.staffName,
+          deviceName: result.userData.deviceName,
+          pin: pin,
+        });
+
+        logger.info('PIN verified successfully', {
+          user: selectedUser,
+          staffName: result.userData.staffName,
+          deviceName: result.userData.deviceName,
+        });
+        logUserAction('pin_verified', { user: selectedUser });
+
+        // Navigate to home page after successful PIN entry
+        logNavigation('PinPage', 'HomeViewPage');
+
+        // Performance measurement
+        performance.mark('pin-verification-end');
+        performance.measure(
+          'pin-verification-process',
+          'pin-verification-start',
+          'pin-verification-end'
+        );
+        const measure = performance.getEntriesByName('pin-verification-process')[0];
+        logger.debug('PIN verification performance', {
+          duration_ms: measure.duration,
+          staffName: result.userData?.staffName,
+          deviceName: result.userData?.deviceName,
+        });
+
+        void navigate('/home');
+      } else {
+        setError(result.error ?? 'Ungültiger PIN. Bitte versuchen Sie es erneut.');
+        logger.warn('PIN verification failed', {
+          reason: result.isLocked ? 'account_locked' : 'invalid_pin',
+          user: selectedUser,
+          isLocked: result.isLocked,
+        });
+        logUserAction('pin_verification_failed', {
+          reason: result.isLocked ? 'account_locked' : 'invalid_pin',
+          user: selectedUser,
+        });
       }
     } catch (error) {
+      const errorMsg = 'Fehler bei der PIN-Überprüfung. Bitte versuchen Sie es erneut.';
+      setError(errorMsg);
+      logger.error('PIN verification error', { error, user: selectedUser });
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleSubmit');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -151,19 +192,19 @@ function PinPage() {
     children: React.ReactNode;
   }> = ({ onClick, isAction = false, children }) => {
     const baseStyles: React.CSSProperties = {
-      width: '100%',
-      height: '64px',
+      width: '90px',
+      height: '73px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: '50%',
-      fontSize: isAction ? theme.fonts.size.large : theme.fonts.size.xl,
-      fontWeight: isAction ? theme.fonts.weight.semibold : theme.fonts.weight.bold,
-      backgroundColor: isAction ? '#e5e7eb' : theme.colors.background.light,
-      color: isAction ? '#4b5563' : theme.colors.text.primary,
-      border: `1px solid ${isAction ? '#d1d5db' : theme.colors.border.light}`,
+      borderRadius: theme.borders.radius.md,
+      fontSize: isAction ? theme.fonts.size.large : '2.2rem',
+      fontWeight: theme.fonts.weight.bold,
+      backgroundColor: theme.colors.background.light,
+      color: isAction ? theme.colors.text.secondary : theme.colors.text.primary,
+      border: `2px solid ${theme.colors.border.light}`,
       boxShadow: theme.shadows.sm,
-      transition: theme.animation.transition.fast,
+      transition: 'all 0.1s ease',
       cursor: 'pointer',
       outline: 'none',
     };
@@ -172,9 +213,7 @@ function PinPage() {
       <button
         onClick={onClick}
         style={baseStyles}
-        className={
-          isAction ? 'hover:bg-gray-300 active:bg-gray-400' : 'hover:bg-gray-100 active:bg-gray-200'
-        }
+        className="hover:bg-gray-50 hover:shadow-md active:scale-95 active:bg-gray-100"
       >
         {children}
       </button>
@@ -191,7 +230,16 @@ function PinPage() {
     ];
 
     return (
-      <div className="mx-auto grid max-w-[350px] grid-cols-3 gap-6">
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: theme.spacing.md,
+          maxWidth: '340px',
+          margin: '0 auto',
+          justifyItems: 'center',
+        }}
+      >
         {numpadLayout.flat().map((item, _index) => {
           if (item === 'clear') {
             return (
@@ -219,7 +267,15 @@ function PinPage() {
 
   return (
     <ContentBox centered shadow="md" rounded="lg">
-      <div className="relative flex w-full max-w-md flex-col items-center">
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '450px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
         {/* User name display */}
         <h1
           style={{
@@ -227,23 +283,39 @@ function PinPage() {
             fontWeight: theme.fonts.weight.bold,
             marginBottom: theme.spacing.xl,
             textAlign: 'center',
+            color: theme.colors.text.primary,
           }}
         >
           {selectedUser}
         </h1>
 
         {/* PIN display */}
-        <div className="mb-8 flex justify-center gap-3">
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: theme.spacing.lg,
+            marginBottom: theme.spacing.xl,
+          }}
+        >
           {Array.from({ length: maxPinLength }).map((_, i) => (
             <div
               key={i}
-              className="flex h-12 w-12 items-center justify-center rounded-md text-2xl transition-colors duration-200"
               style={{
-                boxSizing: 'border-box',
-                border: '2px solid transparent',
-                borderColor: i < pin.length ? theme.colors.primary : 'transparent',
-                backgroundColor: i < pin.length ? theme.colors.primary : 'transparent',
+                width: '60px',
+                height: '60px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: theme.borders.radius.lg,
+                fontSize: '2rem',
+                fontWeight: theme.fonts.weight.bold,
+                transition: 'all 0.1s ease',
+                border: `3px solid ${i < pin.length ? theme.colors.primary : theme.colors.border.light}`,
+                backgroundColor:
+                  i < pin.length ? theme.colors.primary : theme.colors.background.light,
                 color: i < pin.length ? theme.colors.text.light : 'transparent',
+                boxShadow: i < pin.length ? theme.shadows.md : theme.shadows.sm,
               }}
             >
               •
@@ -252,27 +324,47 @@ function PinPage() {
         </div>
 
         {/* Error message */}
-        {error && <div className="mb-4 text-red-500">{error}</div>}
+        {error && (
+          <div
+            style={{
+              color: '#dc2626',
+              fontSize: theme.fonts.size.base,
+              textAlign: 'center',
+              marginBottom: theme.spacing.lg,
+              padding: theme.spacing.md,
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: theme.borders.radius.md,
+              width: '100%',
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         {/* Numpad */}
-        <div className="w-full">{numpadGrid()}</div>
-
-        {/* Spacer */}
-        <div className="h-40"></div>
+        <div style={{ width: '100%', marginBottom: theme.spacing.xl }}>{numpadGrid()}</div>
 
         {/* Action buttons */}
-        <div className="flex w-full max-w-[450px] justify-between px-4">
+        <div
+          style={{
+            display: 'flex',
+            width: '100%',
+            justifyContent: 'space-between',
+            gap: theme.spacing.lg,
+          }}
+        >
           <Button onClick={handleBack} variant="outline" size="medium">
             Zurück
           </Button>
 
           <Button
             onClick={handleSubmit}
-            variant="secondary"
+            variant="primary"
             size="medium"
-            disabled={pin.length < maxPinLength}
+            disabled={pin.length < maxPinLength || isLoading}
           >
-            Bestätigen
+            {isLoading ? 'Überprüfung...' : 'Bestätigen'}
           </Button>
         </div>
       </div>

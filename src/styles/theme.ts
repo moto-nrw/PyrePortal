@@ -5,6 +5,8 @@ export const theme = {
   colors: {
     primary: '#24c8db',
     secondary: '#396cd8',
+    success: '#10b981',
+    error: '#ef4444',
     text: {
       primary: '#0f0f0f',
       secondary: '#4a4a4a',
@@ -14,6 +16,7 @@ export const theme = {
       light: '#ffffff',
       dark: '#2f2f2f',
       transparent: 'rgba(255, 255, 255, 0.99)',
+      muted: '#f9f9f9',
     },
     border: {
       transparent: 'transparent',
@@ -59,6 +62,11 @@ export const theme = {
   // Borders
   borders: {
     radius: {
+      sm: '8px',
+      md: '12px',
+      lg: '20px',
+    },
+    borderRadius: {
       sm: '8px',
       md: '12px',
       lg: '20px',

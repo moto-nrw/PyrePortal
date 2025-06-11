@@ -2,3 +2,5 @@
 export { default as Button } from './Button';
 export { default as Select } from './Select';
 export { default as ContentBox } from './ContentBox';
+export { default as ActionButton } from './ActionButton';
+export { Modal } from './Modal';
