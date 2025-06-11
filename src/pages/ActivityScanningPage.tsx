@@ -35,6 +35,15 @@ const ActivityScanningPage: React.FC = () => {
         studentName: currentScan.student_name,
         action: currentScan.action 
       });
+      
+      // Additional debug logging
+      console.log('🎯 Modal rendering with currentScan:', {
+        action: currentScan.action,
+        actionCheck: currentScan.action === 'checked_in',
+        studentName: currentScan.student_name,
+        message: currentScan.message,
+        fullScan: currentScan
+      });
     }
   }, [showModal, currentScan]);
 
