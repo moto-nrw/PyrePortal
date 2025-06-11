@@ -462,6 +462,39 @@ export const api = {
       }),
     });
   },
+  
+  /**
+   * Get current session information including active student count
+   * Endpoint: GET /api/iot/session/current
+   */
+  async getCurrentSessionInfo(pin: string): Promise<{ activity_name: string; room_name: string; active_students: number } | null> {
+    try {
+      const response = await apiCall<{
+        status: string;
+        data: {
+          activity_name: string;
+          room_name: string;
+          active_students: number;
+          last_activity: string;
+        };
+        message: string;
+      }>('/api/iot/session/current', {
+        headers: {
+          'Authorization': `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+        },
+      });
+      
+      return response.data;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      // 404 means no current session
+      if (errorMessage.includes('404')) {
+        return null;
+      }
+      throw error;
+    }
+  },
 };
 
 /**
@@ -505,11 +538,11 @@ export interface RfidScanResult {
   student_id: number;
   student_name: string;
   action: 'checked_in' | 'checked_out';
-  visit_id: number;
-  room_name: string;
-  processed_at: string;
-  message: string;
-  status: string;
+  visit_id?: number;
+  room_name?: string;
+  processed_at?: string;
+  message?: string;
+  status?: string;
 }
 
 /**

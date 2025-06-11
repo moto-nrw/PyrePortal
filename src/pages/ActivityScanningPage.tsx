@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { api } from '../services/api';
 import { Button, ContentBox, Modal } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import { useUserStore } from '../store/userStore';
@@ -75,18 +76,46 @@ const ActivityScanningPage: React.FC = () => {
   };
 
   // Track student count based on check-ins
-  const [studentCount, setStudentCount] = useState(selectedActivity?.enrollment_count || 0);
+  const [studentCount, setStudentCount] = useState(0);
   
-  // Update student count when a new scan occurs
-  useEffect(() => {
-    if (currentScan) {
-      if (currentScan.action === 'checked_in') {
-        setStudentCount(prev => prev + 1);
-      } else if (currentScan.action === 'checked_out' && studentCount > 0) {
-        setStudentCount(prev => Math.max(0, prev - 1));
+  // Function to fetch current session info
+  const fetchSessionInfo = async () => {
+    if (!authenticatedUser?.pin) return;
+    
+    try {
+      const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
+      if (sessionInfo) {
+        setStudentCount(sessionInfo.active_students);
       }
+    } catch (error) {
+      logger.error('Failed to fetch session info', { error });
     }
-  }, [currentScan, studentCount]);
+  };
+  
+  // Initialize and periodically update student count
+  useEffect(() => {
+    // Initial fetch
+    void fetchSessionInfo();
+    
+    // Set up periodic updates every 5 seconds
+    const interval = setInterval(() => {
+      void fetchSessionInfo();
+    }, 5000);
+    
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authenticatedUser?.pin]); // fetchSessionInfo is stable within this component lifecycle
+  
+  // Also update immediately after a scan
+  useEffect(() => {
+    if (currentScan && showModal) {
+      // Delay slightly to ensure server has processed the scan
+      setTimeout(() => {
+        void fetchSessionInfo();
+      }, 500);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentScan, showModal]); // fetchSessionInfo is stable within this component lifecycle
 
   return (
     <>
@@ -95,10 +124,7 @@ const ActivityScanningPage: React.FC = () => {
           {/* Fixed Header */}
           <div style={{ flexShrink: 0 }}>
             {/* Navigation buttons */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.lg }}>
-              <Button onClick={() => navigate('/home')} variant="outline" size="medium">
-                ← Zurück
-              </Button>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: theme.spacing.lg }}>
               <Button onClick={handleAnmelden} variant="outline" size="small">
                 Anmelden
               </Button>
