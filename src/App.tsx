@@ -25,7 +25,7 @@ function App() {
       version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
       environment: import.meta.env.MODE,
     });
-  }, []); // Empty dependency array - only run once on mount
+  }, [appLogger]); // Include appLogger in dependency array
 
   // Auth states
   const hasSelectedUser = !!selectedUser; // Teacher selected, need PIN

@@ -26,7 +26,7 @@ function LoginPage() {
     return () => {
       logger.debug('LoginPage component unmounted');
     };
-  }, []); // Empty dependency array - only run once on mount
+  }, [fetchTeachers, logger]); // Include fetchTeachers and logger in dependency array
 
   const handleLogin = () => {
     try {

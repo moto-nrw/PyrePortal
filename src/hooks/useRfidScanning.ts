@@ -64,7 +64,7 @@ export const useRfidScanning = () => {
       logger.info(`Scan result: ${result.action} for ${result.student_name}`);
       
       // Debug: Log the complete result to see what server returned
-      console.log('🔍 Complete RFID scan result:', {
+      logger.debug('Complete RFID scan result', {
         action: result.action,
         student_name: result.student_name,
         student_id: result.student_id,

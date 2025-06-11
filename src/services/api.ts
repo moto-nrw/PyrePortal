@@ -3,9 +3,13 @@
  * Handles all communication with the backend API
  */
 
+import { createLogger } from '../utils/logger';
+
+const logger = createLogger('API');
+
 // Environment configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
-const DEVICE_API_KEY = import.meta.env.VITE_DEVICE_API_KEY ?? 'dev_bc17223f4417bd2251742e659efc5a7d14671f714154d3cc207fe8ee0feedeaa';
+const API_BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
+const DEVICE_API_KEY: string = (import.meta.env.VITE_DEVICE_API_KEY as string) ?? 'dev_bc17223f4417bd2251742e659efc5a7d14671f714154d3cc207fe8ee0feedeaa';
 
 /**
  * Generic API call function with error handling
@@ -25,7 +29,7 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new Error(`API Error: ${response.status} - ${response.statusText}`);
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }
 
 /**
@@ -164,7 +168,7 @@ export const api = {
    */
   async validateTeacherPin(pin: string): Promise<PinValidationResult> {
     try {
-      console.log('🔍 Starting PIN validation');
+      logger.debug('Starting PIN validation');
       
       const response = await apiCall<{
         status: string;
@@ -182,11 +186,11 @@ export const api = {
         },
       });
       
-      console.log('✅ PIN validation successful');
+      logger.info('PIN validation successful');
       
       // Check if response has the expected structure
       if (!response.data?.device || !response.data.person || !response.data.staff) {
-        console.error('❌ Unexpected response structure:', response);
+        logger.error('Unexpected response structure', { response });
         return {
           success: false,
           error: 'Unerwartete Server-Antwort. Bitte versuchen Sie es erneut.'
@@ -204,7 +208,7 @@ export const api = {
         }
       };
     } catch (error) {
-      console.error('❌ PIN validation failed, error:', error);
+      logger.error('PIN validation failed', { error: error instanceof Error ? error.message : String(error) });
       
       // Enhanced error handling for security features
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -485,7 +489,7 @@ export const api = {
         },
       });
       
-      console.log('getCurrentSessionInfo response:', response);
+      logger.debug('getCurrentSessionInfo response', { response });
       return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -550,6 +554,6 @@ export interface RfidScanResult {
  * Configuration utilities
  */
 export const config = {
-  getApiBaseUrl: () => API_BASE_URL,
-  getDeviceApiKey: () => DEVICE_API_KEY,
+  getApiBaseUrl: (): string => API_BASE_URL,
+  getDeviceApiKey: (): string => DEVICE_API_KEY,
 };

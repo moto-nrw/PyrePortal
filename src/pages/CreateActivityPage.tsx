@@ -110,7 +110,7 @@ function CreateActivityPage() {
       logger.debug('ActivitySelectionPage component unmounted');
       mountedRef.current = false;
     };
-  }, [authenticatedUser, navigate, logger]);
+  }, [authenticatedUser, navigate, logger, fetchActivitiesData]);
 
   // Handle activity selection
   const handleActivitySelect = (activity: ActivityResponse) => {

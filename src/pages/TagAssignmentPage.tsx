@@ -5,8 +5,10 @@ import { Button, ContentBox } from '../components/ui';
 import { api, type Student, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
-import { logNavigation, logUserAction, logError } from '../utils/logger';
+import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
+
+const logger = createLogger('TagAssignmentPage');
 
 // RFID scanner types from Tauri backend
 interface RfidScanResult {
@@ -65,10 +67,10 @@ function TagAssignmentPage() {
   // Check RFID scanner status on component mount
   useEffect(() => {
     const checkScannerStatus = async () => {
-      console.log('Checking RFID scanner status...');
+      logger.debug('Checking RFID scanner status');
       
       if (!isTauriContext()) {
-        console.log('Not in Tauri context, using development status');
+        logger.debug('Not in Tauri context, using development status');
         setScannerStatus({
           is_available: false,
           platform: 'Development (Web)',
@@ -78,14 +80,14 @@ function TagAssignmentPage() {
       }
       
       try {
-        console.log('Calling get_rfid_scanner_status...');
+        logger.debug('Calling get_rfid_scanner_status');
         const status = await safeInvoke<RfidScannerStatus>('get_rfid_scanner_status');
-        console.log('Scanner status received:', status);
+        logger.debug('Scanner status received', { status });
         setScannerStatus(status);
         logUserAction('RFID scanner status checked', { platform: status.platform, available: status.is_available });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        console.log('Scanner status error:', error);
+        logger.error('Scanner status error', { error: error.message });
         logError(error, 'Failed to check RFID scanner status');
         setScannerStatus({
           is_available: false,

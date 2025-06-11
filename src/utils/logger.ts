@@ -267,9 +267,10 @@ export class Logger {
     } catch (error) {
       // Avoid recursive logging by writing directly to console
       // Only log if it's not a Tauri context issue
-      if (!error || !(error instanceof Error ? error.message : String(error)).includes('Tauri context not available')) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!error || !errorMessage.includes('Tauri context not available')) {
         // eslint-disable-next-line no-console
-        console.error('Failed to persist log:', error instanceof Error ? error.message : String(error));
+        console.error('Failed to persist log:', errorMessage);
       }
     }
   }

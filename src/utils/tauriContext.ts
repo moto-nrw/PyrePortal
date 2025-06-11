@@ -5,6 +5,10 @@
  * and handle invoke calls gracefully when Tauri is not available.
  */
 
+import { createLogger } from './logger';
+
+const logger = createLogger('TauriContext');
+
 // Check if we're running in a Tauri context
 export const isTauriContext = (): boolean => {
   // Primary check: Tauri runtime indicators
@@ -58,7 +62,7 @@ export const isRfidEnabled = (): boolean => {
   const tauriAvailable = isTauriContext();
   
   // Debug logging to help troubleshoot
-  console.log('RFID Status Check:', {
+  logger.debug('RFID Status Check', {
     VITE_ENABLE_RFID: import.meta.env.VITE_ENABLE_RFID,
     rfidEnvEnabled,
     tauriAvailable,
