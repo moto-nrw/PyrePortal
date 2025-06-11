@@ -304,7 +304,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
             name: session.activity_name,
             category_name: '',
             category_color: '',
-            room_name: session.room_name || '',
+            room_name: session.room_name ?? '',
             enrollment_count: 0,
             max_participants: 0,
             has_spots: true,

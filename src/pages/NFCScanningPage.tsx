@@ -58,7 +58,7 @@ function NFCScanningPage() {
     try {
       logger.info('User logging out', { user: authenticatedUser?.staffName });
       logUserAction('logout', { username: authenticatedUser?.staffName });
-      logout();
+      void logout();
       logNavigation('NFCScanningPage', 'LoginPage');
       void navigate('/');
     } catch (error) {

@@ -67,7 +67,7 @@ function CreateActivityPage() {
         logger.warn('Authentication failed during activity fetch, redirecting to login', { error: errorMessage });
         logUserAction('authentication_expired_during_activity_fetch');
         // Logout and redirect to login
-        logout();
+        void logout();
         void navigate('/');
         return;
       }
@@ -178,7 +178,7 @@ function CreateActivityPage() {
         username: authenticatedUser?.staffName,
       });
 
-      logout();
+      void logout();
 
       logNavigation('ActivitySelectionPage', 'LoginPage');
       void navigate('/');

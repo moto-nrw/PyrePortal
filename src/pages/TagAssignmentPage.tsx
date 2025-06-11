@@ -495,7 +495,7 @@ function TagAssignmentPage() {
                   {tagAssignment.assigned ? 'Neuen Schüler zuweisen:' : 'Schüler auswählen:'}
                 </label>
                 <select
-                  value={selectedStudentId || ''}
+                  value={selectedStudentId ?? ''}
                   onChange={(e) => setSelectedStudentId(Number(e.target.value) || null)}
                   style={{
                     width: '100%',
