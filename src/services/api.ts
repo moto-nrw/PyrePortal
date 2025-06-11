@@ -428,21 +428,39 @@ export const api = {
    * Process RFID check-in/check-out
    * Endpoint: POST /api/iot/checkin
    */
-  async processRfidScan(pin: string, tagId: string, action: 'checkin' | 'checkout', roomId: number): Promise<RfidScanResult> {
+  async processRfidScan(scanData: {
+    student_rfid: string;
+    action: 'checkin' | 'checkout';
+    room_id: number;
+  }, pin: string): Promise<RfidScanResult> {
     const response = await apiCall<RfidScanResult>('/api/iot/checkin', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
-      body: JSON.stringify({
-        student_rfid: tagId,
-        action,
-        room_id: roomId,
-      }),
+      body: JSON.stringify(scanData),
     });
     
     return response;
+  },
+
+  /**
+   * Update session activity to prevent timeout
+   * Endpoint: POST /api/iot/session/activity
+   */
+  async updateSessionActivity(pin: string): Promise<void> {
+    await apiCall('/api/iot/session/activity', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+      body: JSON.stringify({
+        activity_type: 'rfid_scan',  // Changed from 'student_scan' to 'rfid_scan'
+        timestamp: new Date().toISOString(),
+      }),
+    });
   },
 };
 

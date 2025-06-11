@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import { api, type Teacher, type ActivityResponse, type Room, type CurrentSession } from '../services/api';
+import { api, type Teacher, type ActivityResponse, type Room, type CurrentSession, type RfidScanResult } from '../services/api';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -64,6 +64,16 @@ interface AuthenticatedUser {
   pin: string; // Store PIN for subsequent API calls
 }
 
+// RFID scanning state
+interface RfidState {
+  isScanning: boolean;
+  currentScan: RfidScanResult | null;
+  blockedTags: Map<string, number>; // tagId -> blockUntilTimestamp
+  scanTimeout: number; // 3 seconds default
+  modalDisplayTime: number; // 1.25 seconds default
+  showModal: boolean;
+}
+
 // Define the store state interface
 interface UserState {
   // State
@@ -79,6 +89,9 @@ interface UserState {
   isLoading: boolean;
   error: string | null;
   nfcScanActive: boolean;
+  
+  // RFID scanning state
+  rfid: RfidState;
 
   // Actions
   setSelectedUser: (user: string) => void;
@@ -106,6 +119,16 @@ interface UserState {
   ) => Promise<boolean>;
   checkOutStudent: (activityId: number, studentId: number) => Promise<boolean>;
   getActivityStudents: (activityId: number) => Student[];
+  
+  // RFID actions
+  startRfidScanning: () => void;
+  stopRfidScanning: () => void;
+  setScanResult: (result: RfidScanResult | null) => void;
+  blockTag: (tagId: string, duration: number) => void;
+  isTagBlocked: (tagId: string) => boolean;
+  clearBlockedTag: (tagId: string) => void;
+  showScanModal: () => void;
+  hideScanModal: () => void;
 }
 
 // Define the type for the Zustand set function
@@ -147,6 +170,16 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   isLoading: false,
   error: null,
   nfcScanActive: false,
+  
+  // RFID initial state
+  rfid: {
+    isScanning: false,
+    currentScan: null,
+    blockedTags: new Map<string, number>(),
+    scanTimeout: 3000, // 3 seconds
+    modalDisplayTime: 1250, // 1.25 seconds
+    showModal: false,
+  },
 
   // Actions
   setSelectedUser: (user: string) => set({ selectedUser: user }),
@@ -689,6 +722,71 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
 
     return activity.checkedInStudents;
+  },
+  
+  // RFID actions
+  startRfidScanning: () => {
+    set((state) => ({
+      rfid: { ...state.rfid, isScanning: true }
+    }));
+  },
+  
+  stopRfidScanning: () => {
+    set((state) => ({
+      rfid: { ...state.rfid, isScanning: false, currentScan: null }
+    }));
+  },
+  
+  setScanResult: (result: RfidScanResult | null) => {
+    set((state) => ({
+      rfid: { ...state.rfid, currentScan: result }
+    }));
+  },
+  
+  blockTag: (tagId: string, duration: number) => {
+    const blockUntil = Date.now() + duration;
+    set((state) => {
+      const newBlockedTags = new Map(state.rfid.blockedTags);
+      newBlockedTags.set(tagId, blockUntil);
+      return {
+        rfid: { ...state.rfid, blockedTags: newBlockedTags }
+      };
+    });
+  },
+  
+  isTagBlocked: (tagId: string) => {
+    const { rfid } = get();
+    const blockUntil = rfid.blockedTags.get(tagId);
+    if (!blockUntil) return false;
+    
+    const isBlocked = Date.now() < blockUntil;
+    if (!isBlocked) {
+      // Clean up expired block
+      get().clearBlockedTag(tagId);
+    }
+    return isBlocked;
+  },
+  
+  clearBlockedTag: (tagId: string) => {
+    set((state) => {
+      const newBlockedTags = new Map(state.rfid.blockedTags);
+      newBlockedTags.delete(tagId);
+      return {
+        rfid: { ...state.rfid, blockedTags: newBlockedTags }
+      };
+    });
+  },
+  
+  showScanModal: () => {
+    set((state) => ({
+      rfid: { ...state.rfid, showModal: true }
+    }));
+  },
+  
+  hideScanModal: () => {
+    set((state) => ({
+      rfid: { ...state.rfid, showModal: false, currentScan: null }
+    }));
   },
 });
 

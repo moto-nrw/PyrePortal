@@ -1,11 +1,10 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
-import CheckInOutPage from './pages/CheckInOutPage';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
 import LoginPage from './pages/LoginPage';
-import NFCScanningPage from './pages/NFCScanningPage';
+import ActivityScanningPage from './pages/ActivityScanningPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
@@ -35,8 +34,6 @@ function App() {
   // Check if a room is selected for the activity creation page
   const hasSelectedRoom = !!selectedRoom;
 
-  // Check if there are activities for the check-in-out page
-  const hasActivity = isFullyAuthenticated && (!!selectedRoom || activities.length > 0);
   
   // Check if session is active (has activity, room, and authenticated user)
   const hasActiveSession = isFullyAuthenticated && !!selectedActivity && !!selectedRoom;
@@ -69,23 +66,13 @@ function App() {
             />
             <Route
               path="/nfc-scanning"
-              element={hasActiveSession ? <NFCScanningPage /> : <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />}
+              element={hasActiveSession ? <ActivityScanningPage /> : <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />}
             />
             <Route
               path="/create-activity"
               element={
                 isFullyAuthenticated && hasSelectedRoom ? (
                   <CreateActivityPage />
-                ) : (
-                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
-                )
-              }
-            />
-            <Route
-              path="/check-in-out"
-              element={
-                isFullyAuthenticated && hasActivity ? (
-                  <CheckInOutPage />
                 ) : (
                   <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
                 )
