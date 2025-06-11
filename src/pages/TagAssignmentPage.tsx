@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { invoke } from '@tauri-apps/api/core';
 
 import { Button, ContentBox } from '../components/ui';
 import { useUserStore } from '../store/userStore';
-import { api, Student, TagAssignmentCheck } from '../services/api';
+import { api, type Student, type TagAssignmentCheck } from '../services/api';
 import theme from '../styles/theme';
 import { logNavigation, logUserAction, logError } from '../utils/logger';
+import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
 
 // RFID scanner types from Tauri backend
 interface RfidScanResult {
@@ -66,9 +66,20 @@ function TagAssignmentPage() {
   useEffect(() => {
     const checkScannerStatus = async () => {
       console.log('Checking RFID scanner status...');
+      
+      if (!isTauriContext()) {
+        console.log('Not in Tauri context, using development status');
+        setScannerStatus({
+          is_available: false,
+          platform: 'Development (Web)',
+          last_error: 'Tauri context not available in development mode',
+        });
+        return;
+      }
+      
       try {
         console.log('Calling get_rfid_scanner_status...');
-        const status = await invoke<RfidScannerStatus>('get_rfid_scanner_status');
+        const status = await safeInvoke<RfidScannerStatus>('get_rfid_scanner_status');
         console.log('Scanner status received:', status);
         setScannerStatus(status);
         logUserAction('RFID scanner status checked', { platform: status.platform, available: status.is_available });
@@ -96,14 +107,24 @@ function TagAssignmentPage() {
     setIsLoading(true);
     
     try {
+      if (!isRfidEnabled()) {
+        // Development mock behavior
+        setTimeout(() => {
+          const mockTagId = `DEV_TAG_${Date.now().toString().slice(-6)}`;
+          logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
+          void handleTagScanned(mockTagId);
+        }, 2000);
+        return;
+      }
+
       // Use real RFID scanner through Tauri
-      const result = await invoke<RfidScanResult>('scan_rfid_single');
+      const result = await safeInvoke<RfidScanResult>('scan_rfid_single');
       
       if (result.success && result.tag_id) {
         logUserAction('RFID tag scanned successfully', { tagId: result.tag_id, platform: scannerStatus?.platform });
         void handleTagScanned(result.tag_id);
       } else {
-        const errorMessage = result.error || 'Unknown scanning error';
+        const errorMessage = result.error ?? 'Unknown scanning error';
         logError(new Error(errorMessage), 'RFID scanning failed');
         setError(`Scan-Fehler: ${errorMessage}`);
         setShowScanner(false);
@@ -204,7 +225,7 @@ function TagAssignmentPage() {
           previousTag: result.previous_tag
         });
       } else {
-        throw new Error(result.message || 'Tag-Zuweisung fehlgeschlagen');
+        throw new Error(result.message ?? 'Tag-Zuweisung fehlgeschlagen');
       }
 
     } catch (err) {
@@ -381,7 +402,7 @@ function TagAssignmentPage() {
               
               <Button
                 onClick={handleStartScanning}
-                disabled={isLoading || !scannerStatus?.is_available}
+                disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
                 style={{ marginBottom: theme.spacing.lg }}
               >
                 {scannerStatus?.platform.includes('Development') ? 'Mock Scannen' : 'Scannen starten'}
@@ -488,7 +509,7 @@ function TagAssignmentPage() {
                   <option value="">Schüler auswählen...</option>
                   {students.map((student) => (
                     <option key={student.student_id} value={student.student_id}>
-                      {student.first_name} {student.last_name} ({student.school_class})
+                      {student.first_name} {student.last_name} ({student.school_class ?? ''})
                     </option>
                   ))}
                 </select>

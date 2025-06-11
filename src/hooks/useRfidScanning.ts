@@ -1,9 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
+import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('useRfidScanning');
 
@@ -82,8 +82,15 @@ export const useRfidScanning = () => {
           logger.debug(`Scan loop still running, scan count: ${scanCount}`);
         }
         
+        // Check if RFID is available before attempting scan
+        if (!isRfidEnabled()) {
+          // In development without Tauri, skip scanning
+          await new Promise(resolve => setTimeout(resolve, 100));
+          continue;
+        }
+
         // Use Tauri command to scan for RFID with timeout
-        const result = await invoke<{ success: boolean; tag_id: string | null; error: string | null }>('scan_rfid_with_timeout', {
+        const result = await safeInvoke<{ success: boolean; tag_id: string | null; error: string | null }>('scan_rfid_with_timeout', {
           timeoutSeconds: 1 // 1 second timeout
         });
         
@@ -105,8 +112,11 @@ export const useRfidScanning = () => {
           }
         }
       } catch (error) {
-        // Timeout or error - continue scanning
-        logger.error('RFID scan failed with exception', { error });
+        // Only log non-Tauri context errors
+        if (!String(error).includes('Tauri context not available')) {
+          logger.error('RFID scan failed with exception', { error });
+        }
+        // For Tauri context issues, just continue with delay
       }
       
       // Small delay to prevent CPU overuse
