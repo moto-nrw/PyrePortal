@@ -89,11 +89,9 @@ function HomeViewPage() {
       <div
         onClick={disabled ? undefined : onClick}
         style={cardStyles}
-        className={disabled ? '' : 'hover:bg-gray-100 active:bg-gray-200 hover:shadow-lg'}
+        className={disabled ? '' : 'hover:bg-gray-100 hover:shadow-lg active:bg-gray-200'}
       >
-        <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>
-          {icon}
-        </div>
+        <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>{icon}</div>
         <div
           style={{
             fontSize: theme.fonts.size.xl,
@@ -143,35 +141,22 @@ function HomeViewPage() {
             width: '100%',
           }}
         >
-          <ActionCard
-            onClick={handleTagAssignment}
-            title="Armband scannen"
-            icon="📱"
-          />
+          <ActionCard onClick={handleTagAssignment} title="Armband scannen" icon="📱" />
           {currentSession ? (
             <ActionCard
               onClick={handleContinueActivity}
-              title={currentSession.activity_name ? `${currentSession.activity_name} fortsetzen` : 'Aktivität fortsetzen'}
+              title={
+                currentSession.activity_name
+                  ? `${currentSession.activity_name} fortsetzen`
+                  : 'Aktivität fortsetzen'
+              }
               icon="▶️"
             />
           ) : (
-            <ActionCard
-              onClick={handleStartActivity}
-              title="Aktivität starten"
-              icon="🎯"
-            />
+            <ActionCard onClick={handleStartActivity} title="Aktivität starten" icon="🎯" />
           )}
-          <ActionCard
-            onClick={handleSettings}
-            title="Einstellungen"
-            icon="⚙️"
-            disabled={true}
-          />
-          <ActionCard
-            onClick={handleLogout}
-            title="Abmelden"
-            icon="🚪"
-          />
+          <ActionCard onClick={handleSettings} title="Einstellungen" icon="⚙️" disabled={true} />
+          <ActionCard onClick={handleLogout} title="Abmelden" icon="🚪" />
         </div>
       </div>
     </ContentBox>

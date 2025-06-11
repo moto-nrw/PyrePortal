@@ -36,36 +36,28 @@ const ActionButton: React.FC<ActionButtonProps> = ({
     xl: 'h-48 text-5xl py-8',
   };
 
-  const disabledClasses = disabled
-    ? 'opacity-50 cursor-not-allowed'
-    : 'cursor-pointer';
+  const disabledClasses = disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer';
 
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`
-        ${variantClasses[variant]}
-        ${disabledClasses}
-        ${sizeClasses[size]}
-        ${className}
-        w-full rounded-3xl 
-        transition-all duration-200 
-        flex flex-col items-center justify-center 
-        shadow-lg hover:shadow-xl
-        p-6 gap-3
-        font-medium
-        transform hover:scale-[1.02] active:scale-[0.98]
-      `}
+      className={` ${variantClasses[variant]} ${disabledClasses} ${sizeClasses[size]} ${className} flex w-full transform flex-col items-center justify-center gap-3 rounded-3xl p-6 font-medium shadow-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-xl active:scale-[0.98]`}
     >
-      <div className={size === 'xl' ? 'text-6xl mb-2' : 'text-4xl'}>
-        {icon}
-      </div>
-      <div className={size === 'xl' ? 'text-2xl font-bold text-center' : 'text-xl font-semibold text-center'}>
+      <div className={size === 'xl' ? 'mb-2 text-6xl' : 'text-4xl'}>{icon}</div>
+      <div
+        className={
+          size === 'xl' ? 'text-center text-2xl font-bold' : 'text-center text-xl font-semibold'
+        }
+      >
         {title}
       </div>
       {subtitle && (
-        <div className={size === 'xl' ? 'text-lg opacity-80 text-center' : 'text-sm opacity-80 text-center'}>
+        <div
+          className={
+            size === 'xl' ? 'text-center text-lg opacity-80' : 'text-center text-sm opacity-80'
+          }
+        >
           {subtitle}
         </div>
       )}

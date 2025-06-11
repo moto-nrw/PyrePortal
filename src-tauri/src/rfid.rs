@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use std::sync::{Arc, Mutex, OnceLock};
-use tokio::sync::mpsc;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter};
+use tokio::sync::mpsc;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RfidScanResult {
@@ -70,14 +70,16 @@ impl RfidBackgroundService {
             println!("RFID Background Service already initialized, skipping");
             return Ok(());
         }
-        
-        RFID_SERVICE.set(Arc::new(Mutex::new({
-            let mut service = Self::new();
-            service.app_handle = Some(app_handle);
-            service.start_background_task()?;
-            println!("RFID Background Service initialized");
-            service
-        }))).map_err(|_| "Service already initialized".to_string())
+
+        RFID_SERVICE
+            .set(Arc::new(Mutex::new({
+                let mut service = Self::new();
+                service.app_handle = Some(app_handle);
+                service.start_background_task()?;
+                println!("RFID Background Service initialized");
+                service
+            })))
+            .map_err(|_| "Service already initialized".to_string())
     }
 
     pub fn get_instance() -> Option<Arc<Mutex<RfidBackgroundService>>> {
@@ -87,14 +89,14 @@ impl RfidBackgroundService {
     fn start_background_task(&mut self) -> Result<(), String> {
         let (tx, mut rx) = mpsc::unbounded_channel::<ServiceCommand>();
         self.command_tx = Some(tx);
-        
+
         let state = Arc::clone(&self.state);
         let app_handle = self.app_handle.clone();
-        
+
         tokio::spawn(async move {
             Self::background_scanning_loop(state, app_handle, &mut rx).await;
         });
-        
+
         Ok(())
     }
 
@@ -112,7 +114,7 @@ impl RfidBackgroundService {
                     if !is_scanning {
                         println!("Starting RFID background scanning...");
                         is_scanning = true;
-                        
+
                         // Update state
                         if let Ok(mut state_guard) = state.lock() {
                             state_guard.is_running = true;
@@ -130,7 +132,7 @@ impl RfidBackgroundService {
                     if is_scanning {
                         println!("Stopping RFID background scanning...");
                         is_scanning = false;
-                        
+
                         // Update state
                         if let Ok(mut state_guard) = state.lock() {
                             state_guard.is_running = false;
@@ -215,7 +217,7 @@ impl RfidBackgroundService {
         {
             raspberry_pi::scan_rfid_hardware().await
         }
-        
+
         #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
         {
             mock_platform::scan_rfid_hardware().await
@@ -227,7 +229,7 @@ impl RfidBackgroundService {
         {
             "Raspberry Pi (ARM64)".to_string()
         }
-        
+
         #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
         {
             format!("Development Platform ({})", std::env::consts::ARCH)
@@ -236,14 +238,16 @@ impl RfidBackgroundService {
 
     pub fn send_command(&self, command: ServiceCommand) -> Result<(), String> {
         if let Some(ref tx) = self.command_tx {
-            tx.send(command).map_err(|e| format!("Failed to send command: {}", e))
+            tx.send(command)
+                .map_err(|e| format!("Failed to send command: {}", e))
         } else {
             Err("Service not initialized".to_string())
         }
     }
 
     pub fn get_state(&self) -> Result<RfidServiceState, String> {
-        self.state.lock()
+        self.state
+            .lock()
             .map(|guard| guard.clone())
             .map_err(|e| format!("Failed to get state: {}", e))
     }
@@ -254,15 +258,12 @@ impl RfidBackgroundService {
 mod raspberry_pi {
     use super::*;
     use linux_embedded_hal::{
-        spidev::{SpidevOptions, SpiModeFlags},
+        spidev::{SpiModeFlags, SpidevOptions},
         Spidev,
     };
-    use mfrc522::{
-        Mfrc522, 
-        comm::eh02::spi::SpiInterface,
-    };
+    use mfrc522::{comm::eh02::spi::SpiInterface, Mfrc522};
     use rppal::gpio::Gpio;
-    use std::{thread, error::Error, fmt};
+    use std::{error::Error, fmt, thread};
 
     // Custom error type matching the original implementation
     #[derive(Debug)]
@@ -301,35 +302,39 @@ mod raspberry_pi {
     }
 
     use std::sync::{Mutex, OnceLock};
-    
+
     // Track initialization state to prevent repeated setup
     static HARDWARE_INITIALIZED: OnceLock<bool> = OnceLock::new();
     static INITIALIZATION_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
-    
+
     fn ensure_hardware_ready() -> Result<(), String> {
         // Get or create the mutex
         let mutex = INITIALIZATION_MUTEX.get_or_init(|| Mutex::new(()));
-        let _lock = mutex.lock().map_err(|e| format!("Failed to acquire lock: {}", e))?;
-        
+        let _lock = mutex
+            .lock()
+            .map_err(|e| format!("Failed to acquire lock: {}", e))?;
+
         // Check if already initialized
         if HARDWARE_INITIALIZED.get().is_some() {
             return Ok(());
         }
-        
+
         // Perform one-time hardware check/setup if needed
         println!("Performing one-time RFID hardware validation...");
-        
+
         // Mark as initialized
-        HARDWARE_INITIALIZED.set(true).map_err(|_| "Already initialized")?;
+        HARDWARE_INITIALIZED
+            .set(true)
+            .map_err(|_| "Already initialized")?;
         println!("RFID hardware validation complete");
-        
+
         Ok(())
     }
 
     pub async fn scan_rfid_hardware() -> Result<String, String> {
         // Ensure hardware is ready (but don't hold resources)
         ensure_hardware_ready()?;
-        
+
         // Initialize SPI device - matches Python implementation settings
         let mut spi = match Spidev::open("/dev/spidev0.0") {
             Ok(s) => s,
@@ -337,98 +342,102 @@ mod raspberry_pi {
                 return Err(format!("Failed to open SPI device 0.0: {:?}", e));
             }
         };
-        
+
         // SPI configuration - match Python speed of 1MHz
         let options = SpidevOptions::new()
             .bits_per_word(8)
             .max_speed_hz(1_000_000)
             .mode(SpiModeFlags::SPI_MODE_0)
             .build();
-        
+
         if let Err(e) = spi.configure(&options) {
             return Err(format!("Failed to configure SPI: {:?}", e));
         }
-        
+
         // Setup GPIO - Python uses BCM 22 (physical pin 15)
         let gpio = match Gpio::new() {
             Ok(g) => g,
             Err(e) => return Err(format!("Failed to initialize GPIO: {:?}", e)),
         };
-        
+
         let reset_pin_number = 22; // Matches Python default value
         let mut reset_pin = match gpio.get(reset_pin_number) {
             Ok(pin) => pin.into_output(),
-            Err(e) => return Err(format!("Failed to setup reset pin on GPIO {}: {:?}", reset_pin_number, e)),
+            Err(e) => {
+                return Err(format!(
+                    "Failed to setup reset pin on GPIO {}: {:?}",
+                    reset_pin_number, e
+                ))
+            }
         };
-        
+
         // Initialize with reset HIGH (Python does this)
         reset_pin.set_high();
-        
+
         // Perform hardware reset (Python does MFRC522_Reset)
         reset_pin.set_low();
         thread::sleep(Duration::from_millis(50));
         reset_pin.set_high();
         thread::sleep(Duration::from_millis(50));
-        
+
         // Create an interface for the MFRC522
         let spi_interface = SpiInterface::new(spi);
-        
+
         // Create MFRC522 instance with proper initialization
         let mfrc522 = Mfrc522::new(spi_interface);
-        
+
         // Initialize the MFRC522 (this transitions to the Initialized state)
         println!("Attempting to initialize MFRC522...");
         let mut mfrc522 = match mfrc522.init() {
             Ok(m) => {
                 println!("MFRC522 initialized successfully");
                 m
-            },
+            }
             Err(e) => {
                 println!("Failed to initialize MFRC522: {:?}", e);
                 return Err(format!("Failed to initialize MFRC522: {:?}", e));
             }
         };
-        
+
         // Try to read version to verify communication
         println!("Reading MFRC522 version...");
         let _version = match mfrc522.version() {
             Ok(v) => {
                 println!("MFRC522 version: {:?}", v);
                 v
-            },
+            }
             Err(e) => {
                 println!("Failed to read MFRC522 version: {:?}", e);
                 return Err(format!("Failed to read MFRC522 version: {:?}", e));
             }
         };
-        
+
         // Scan for cards with timeout (shorter timeout for background service)
         let start_time = std::time::Instant::now();
         let timeout = Duration::from_millis(500); // Shorter timeout for responsive background service
-        
+
         loop {
             // Check for timeout
             if start_time.elapsed() > timeout {
                 return Err("Scan timeout - no card detected".to_string());
             }
-            
+
             // Request card
             if let Ok(atqa) = mfrc522.reqa() {
                 // Select card
                 if let Ok(uid) = mfrc522.select(&atqa) {
                     // Convert UID bytes to hex string
                     let uid_bytes = uid.as_bytes();
-                    let uid_hex: Vec<String> = uid_bytes.iter()
-                        .map(|b| format!("{:02X}", b))
-                        .collect();
-                    
+                    let uid_hex: Vec<String> =
+                        uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
+
                     // Go back to idle state
                     let _ = mfrc522.hlta();
-                    
+
                     return Ok(uid_hex.join(":"));
                 }
             }
-            
+
             // Sleep a bit before next check (like Python)
             thread::sleep(Duration::from_millis(50)); // Faster polling for responsiveness
         }
@@ -438,7 +447,7 @@ mod raspberry_pi {
         // Check if SPI device exists
         let spi_available = std::path::Path::new("/dev/spidev0.0").exists();
         println!("SPI device /dev/spidev0.0 available: {}", spi_available);
-        
+
         // Check if GPIO is accessible
         let gpio_result = Gpio::new();
         let gpio_available = gpio_result.is_ok();
@@ -446,7 +455,7 @@ mod raspberry_pi {
         if let Err(ref e) = gpio_result {
             println!("GPIO error: {:?}", e);
         }
-        
+
         RfidScannerStatus {
             is_available: spi_available && gpio_available,
             platform: "Raspberry Pi (ARM64)".to_string(),
@@ -469,12 +478,12 @@ mod mock_platform {
     pub async fn scan_rfid_hardware() -> Result<String, String> {
         // Simulate scanning delay - shorter for background service
         tokio::time::sleep(Duration::from_millis(500)).await;
-        
+
         // Simulate occasional "no card" timeouts to mimic real hardware
         if rand::random::<u8>() % 10 == 0 {
             return Err("Scan timeout - no card detected".to_string());
         }
-        
+
         // Return mock tag ID with random variation
         let random_id = rand::random::<u16>();
         Ok(format!("MOCK:{:04X}:ABCD:EF01", random_id))
@@ -493,7 +502,9 @@ mod mock_platform {
 #[tauri::command]
 pub async fn start_rfid_service() -> Result<String, String> {
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        let service = service_arc.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
+        let service = service_arc
+            .lock()
+            .map_err(|e| format!("Failed to lock service: {}", e))?;
         service.send_command(ServiceCommand::Start)?;
         Ok("RFID service started".to_string())
     } else {
@@ -504,7 +515,9 @@ pub async fn start_rfid_service() -> Result<String, String> {
 #[tauri::command]
 pub async fn stop_rfid_service() -> Result<String, String> {
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        let service = service_arc.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
+        let service = service_arc
+            .lock()
+            .map_err(|e| format!("Failed to lock service: {}", e))?;
         service.send_command(ServiceCommand::Stop)?;
         Ok("RFID service stopped".to_string())
     } else {
@@ -515,7 +528,9 @@ pub async fn stop_rfid_service() -> Result<String, String> {
 #[tauri::command]
 pub async fn get_rfid_service_status() -> Result<RfidServiceState, String> {
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        let service = service_arc.lock().map_err(|e| format!("Failed to lock service: {}", e))?;
+        let service = service_arc
+            .lock()
+            .map_err(|e| format!("Failed to lock service: {}", e))?;
         service.get_state()
     } else {
         Err("RFID service not initialized".to_string())
@@ -525,17 +540,17 @@ pub async fn get_rfid_service_status() -> Result<RfidServiceState, String> {
 #[tauri::command]
 pub async fn get_rfid_scanner_status() -> Result<RfidScannerStatus, String> {
     println!("get_rfid_scanner_status called!");
-    
+
     // Debug: Check what platform we're on
     println!("Target arch: {}", std::env::consts::ARCH);
     println!("Target OS: {}", std::env::consts::OS);
-    
+
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
         println!("Using Raspberry Pi platform");
         return Ok(raspberry_pi::check_rfid_hardware());
     }
-    
+
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
         println!("Using mock platform (not ARM64 Linux)");
@@ -568,7 +583,7 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
             }),
         }
     }
-    
+
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
         match mock_platform::scan_rfid_hardware().await {
@@ -593,17 +608,22 @@ pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResu
     {
         // Use the timeout parameter for future implementation
         let _timeout = timeout_seconds; // Acknowledge parameter usage
-        raspberry_pi::scan_rfid_hardware().await.map(|tag_id| RfidScanResult {
-            success: true,
-            tag_id: Some(tag_id),
-            error: None,
-        }).or_else(|error| Ok(RfidScanResult {
-            success: false,
-            tag_id: None,
-            error: Some(error),
-        }))
+        raspberry_pi::scan_rfid_hardware()
+            .await
+            .map(|tag_id| RfidScanResult {
+                success: true,
+                tag_id: Some(tag_id),
+                error: None,
+            })
+            .or_else(|error| {
+                Ok(RfidScanResult {
+                    success: false,
+                    tag_id: None,
+                    error: Some(error),
+                })
+            })
     }
-    
+
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
         tokio::time::sleep(Duration::from_secs(std::cmp::min(timeout_seconds, 5))).await;

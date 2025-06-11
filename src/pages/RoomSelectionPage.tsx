@@ -61,10 +61,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           boxShadow: theme.shadows.lg,
         }}
       >
-        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
-          🎯
-        </div>
-        
+        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>🎯</div>
+
         <h2
           style={{
             fontSize: theme.fonts.size.xl,
@@ -75,7 +73,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         >
           Aktivität starten?
         </h2>
-        
+
         <div style={{ marginBottom: theme.spacing.xl }}>
           <div
             style={{
@@ -117,20 +115,10 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         </div>
 
         <div style={{ display: 'flex', gap: theme.spacing.md, justifyContent: 'center' }}>
-          <Button
-            onClick={onCancel}
-            variant="outline"
-            size="large"
-            disabled={isLoading}
-          >
+          <Button onClick={onCancel} variant="outline" size="large" disabled={isLoading}>
             Abbrechen
           </Button>
-          <Button
-            onClick={onConfirm}
-            variant="primary"
-            size="large"
-            disabled={isLoading}
-          >
+          <Button onClick={onConfirm} variant="primary" size="large" disabled={isLoading}>
             {isLoading ? 'Starte...' : 'Aktivität starten'}
           </Button>
         </div>
@@ -175,10 +163,8 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
           boxShadow: theme.shadows.lg,
         }}
       >
-        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
-          ⚠️
-        </div>
-        
+        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>⚠️</div>
+
         <h2
           style={{
             fontSize: theme.fonts.size.xl,
@@ -189,7 +175,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         >
           Session Konflikt
         </h2>
-        
+
         <div style={{ marginBottom: theme.spacing.xl }}>
           <div
             style={{
@@ -201,7 +187,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
           >
             Es läuft bereits eine Session für diese Aktivität oder diesen Raum.
           </div>
-          
+
           <div
             style={{
               fontSize: theme.fonts.size.base,
@@ -244,12 +230,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         </div>
 
         <div style={{ display: 'flex', gap: theme.spacing.md, justifyContent: 'center' }}>
-          <Button
-            onClick={onCancel}
-            variant="outline"
-            size="large"
-            disabled={isLoading}
-          >
+          <Button onClick={onCancel} variant="outline" size="large" disabled={isLoading}>
             Abbrechen
           </Button>
           <Button
@@ -389,15 +370,15 @@ function RoomSelectionPage() {
       });
 
       void navigate('/nfc-scanning');
-
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Fehler beim Starten der Session';
+      const errorMessage =
+        error instanceof Error ? error.message : 'Fehler beim Starten der Session';
       logger.error('Session start failed', {
         error: errorMessage,
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
       });
-      
+
       logError(
         error instanceof Error ? error : new Error(String(error)),
         'RoomSelectionPage.handleConfirmSession'
@@ -459,9 +440,9 @@ function RoomSelectionPage() {
       });
 
       void navigate('/nfc-scanning');
-
     } catch (forceError) {
-      const forceErrorMessage = forceError instanceof Error ? forceError.message : 'Fehler beim Überschreiben der Session';
+      const forceErrorMessage =
+        forceError instanceof Error ? forceError.message : 'Fehler beim Überschreiben der Session';
       logger.error('Force session start also failed', {
         error: forceErrorMessage,
         activityId: selectedActivity.id,
@@ -527,15 +508,21 @@ function RoomSelectionPage() {
     const getRoomIcon = (roomName: string, roomType?: string) => {
       if (roomType) {
         switch (roomType.toLowerCase()) {
-          case 'classroom': return '🏫';
-          case 'laboratory': return '🔬';
-          case 'gym': return '🏀';
-          case 'library': return '📚';
-          case 'outdoor': return '🌳';
-          default: return '🏢';
+          case 'classroom':
+            return '🏫';
+          case 'laboratory':
+            return '🔬';
+          case 'gym':
+            return '🏀';
+          case 'library':
+            return '📚';
+          case 'outdoor':
+            return '🌳';
+          default:
+            return '🏢';
         }
       }
-      
+
       // Fallback to name-based detection
       if (roomName.toLowerCase().includes('toilette')) return '🚻';
       if (roomName.toLowerCase().includes('schulhof')) return '🌳';
@@ -548,7 +535,7 @@ function RoomSelectionPage() {
       <div
         onClick={() => onClick(room)}
         style={cardStyles}
-        className="hover:bg-gray-100 active:bg-gray-200 hover:shadow-lg"
+        className="hover:bg-gray-100 hover:shadow-lg active:bg-gray-200"
       >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: theme.spacing.md }}>
@@ -600,11 +587,26 @@ function RoomSelectionPage() {
 
   return (
     <ContentBox centered shadow="md" rounded="lg">
-      <div style={{ width: '100%', maxWidth: '800px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '800px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Fixed Header */}
         <div style={{ flexShrink: 0 }}>
           {/* Navigation buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.lg }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: theme.spacing.lg,
+            }}
+          >
             <Button onClick={handleGoBack} variant="outline" size="medium">
               ← Zurück
             </Button>
@@ -612,7 +614,7 @@ function RoomSelectionPage() {
               Abmelden
             </Button>
           </div>
-          
+
           {/* Title and info */}
           <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
             <h1
@@ -625,7 +627,7 @@ function RoomSelectionPage() {
             >
               Raum auswählen
             </h1>
-            
+
             <p
               style={{
                 fontSize: theme.fonts.size.large,
@@ -635,7 +637,7 @@ function RoomSelectionPage() {
             >
               für: {selectedActivity.name}
             </p>
-            
+
             <p
               style={{
                 fontSize: theme.fonts.size.base,
@@ -660,15 +662,17 @@ function RoomSelectionPage() {
 
           {/* Error state */}
           {error && !isLoading && (
-            <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: theme.borders.radius.md,
-              padding: theme.spacing.md,
-              marginBottom: theme.spacing.lg,
-              textAlign: 'center',
-              color: '#dc2626',
-            }}>
+            <div
+              style={{
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: theme.borders.radius.md,
+                padding: theme.spacing.md,
+                marginBottom: theme.spacing.lg,
+                textAlign: 'center',
+                color: '#dc2626',
+              }}
+            >
               {error}
             </div>
           )}
@@ -683,12 +687,8 @@ function RoomSelectionPage() {
                 width: '100%',
               }}
             >
-              {rooms.map((room) => (
-                <RoomCard
-                  key={room.id}
-                  room={room}
-                  onClick={handleRoomSelect}
-                />
+              {rooms.map(room => (
+                <RoomCard key={room.id} room={room} onClick={handleRoomSelect} />
               ))}
             </div>
           )}
@@ -697,17 +697,21 @@ function RoomSelectionPage() {
           {!isLoading && !error && rooms.length === 0 && (
             <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
               <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>🏢</div>
-              <div style={{
-                fontSize: theme.fonts.size.large,
-                color: theme.colors.text.secondary,
-                marginBottom: theme.spacing.md,
-              }}>
+              <div
+                style={{
+                  fontSize: theme.fonts.size.large,
+                  color: theme.colors.text.secondary,
+                  marginBottom: theme.spacing.md,
+                }}
+              >
                 Keine Räume verfügbar
               </div>
-              <div style={{
-                fontSize: theme.fonts.size.base,
-                color: theme.colors.text.secondary,
-              }}>
+              <div
+                style={{
+                  fontSize: theme.fonts.size.base,
+                  color: theme.colors.text.secondary,
+                }}
+              >
                 Es sind derzeit keine Räume für die Auswahl verfügbar.
               </div>
             </div>

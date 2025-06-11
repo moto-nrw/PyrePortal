@@ -7,12 +7,7 @@ import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function NFCScanningPage() {
-  const {
-    authenticatedUser,
-    selectedActivity,
-    selectedRoom,
-    logout,
-  } = useUserStore();
+  const { authenticatedUser, selectedActivity, selectedRoom, logout } = useUserStore();
 
   const navigate = useNavigate();
 
@@ -102,7 +97,7 @@ function NFCScanningPage() {
           >
             NFC Armband scannen
           </h1>
-          
+
           <div
             style={{
               fontSize: theme.fonts.size.large,
@@ -112,7 +107,7 @@ function NFCScanningPage() {
           >
             📚 {selectedActivity.name}
           </div>
-          
+
           <div
             style={{
               fontSize: theme.fonts.size.base,
@@ -122,7 +117,7 @@ function NFCScanningPage() {
           >
             📍 {selectedRoom.name}
           </div>
-          
+
           <div
             style={{
               fontSize: theme.fonts.size.base,
@@ -135,9 +130,7 @@ function NFCScanningPage() {
 
         {/* NFC Scanning Icon */}
         <div style={{ marginBottom: theme.spacing.xxl }}>
-          <div style={{ fontSize: '8rem', marginBottom: theme.spacing.lg }}>
-            📱
-          </div>
+          <div style={{ fontSize: '8rem', marginBottom: theme.spacing.lg }}>📱</div>
           <div
             style={{
               fontSize: theme.fonts.size.xl,

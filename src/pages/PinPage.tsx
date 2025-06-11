@@ -128,7 +128,7 @@ function PinPage() {
 
       // Validate PIN with real API
       const result: PinValidationResult = await api.validateTeacherPin(pin);
-      
+
       if (result.success && result.userData) {
         // Store authenticated user context with PIN
         setAuthenticatedUser({
@@ -138,10 +138,10 @@ function PinPage() {
           pin: pin,
         });
 
-        logger.info('PIN verified successfully', { 
+        logger.info('PIN verified successfully', {
           user: selectedUser,
           staffName: result.userData.staffName,
-          deviceName: result.userData.deviceName
+          deviceName: result.userData.deviceName,
         });
         logUserAction('pin_verified', { user: selectedUser });
 
@@ -156,10 +156,10 @@ function PinPage() {
           'pin-verification-end'
         );
         const measure = performance.getEntriesByName('pin-verification-process')[0];
-        logger.debug('PIN verification performance', { 
+        logger.debug('PIN verification performance', {
           duration_ms: measure.duration,
           staffName: result.userData?.staffName,
-          deviceName: result.userData?.deviceName
+          deviceName: result.userData?.deviceName,
         });
 
         void navigate('/home');
@@ -168,7 +168,7 @@ function PinPage() {
         logger.warn('PIN verification failed', {
           reason: result.isLocked ? 'account_locked' : 'invalid_pin',
           user: selectedUser,
-          isLocked: result.isLocked
+          isLocked: result.isLocked,
         });
         logUserAction('pin_verification_failed', {
           reason: result.isLocked ? 'account_locked' : 'invalid_pin',
@@ -213,7 +213,7 @@ function PinPage() {
       <button
         onClick={onClick}
         style={baseStyles}
-        className="hover:bg-gray-50 active:bg-gray-100 hover:shadow-md active:scale-95"
+        className="hover:bg-gray-50 hover:shadow-md active:scale-95 active:bg-gray-100"
       >
         {children}
       </button>
@@ -230,14 +230,16 @@ function PinPage() {
     ];
 
     return (
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(3, 1fr)',
-        gap: theme.spacing.md,
-        maxWidth: '340px',
-        margin: '0 auto',
-        justifyItems: 'center',
-      }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: theme.spacing.md,
+          maxWidth: '340px',
+          margin: '0 auto',
+          justifyItems: 'center',
+        }}
+      >
         {numpadLayout.flat().map((item, _index) => {
           if (item === 'clear') {
             return (
@@ -265,7 +267,15 @@ function PinPage() {
 
   return (
     <ContentBox centered shadow="md" rounded="lg">
-      <div style={{ width: '100%', maxWidth: '450px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '450px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+        }}
+      >
         {/* User name display */}
         <h1
           style={{
@@ -280,12 +290,14 @@ function PinPage() {
         </h1>
 
         {/* PIN display */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          gap: theme.spacing.lg, 
-          marginBottom: theme.spacing.xl 
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            gap: theme.spacing.lg,
+            marginBottom: theme.spacing.xl,
+          }}
+        >
           {Array.from({ length: maxPinLength }).map((_, i) => (
             <div
               key={i}
@@ -300,7 +312,8 @@ function PinPage() {
                 fontWeight: theme.fonts.weight.bold,
                 transition: 'all 0.1s ease',
                 border: `3px solid ${i < pin.length ? theme.colors.primary : theme.colors.border.light}`,
-                backgroundColor: i < pin.length ? theme.colors.primary : theme.colors.background.light,
+                backgroundColor:
+                  i < pin.length ? theme.colors.primary : theme.colors.background.light,
                 color: i < pin.length ? theme.colors.text.light : 'transparent',
                 boxShadow: i < pin.length ? theme.shadows.md : theme.shadows.sm,
               }}
@@ -312,33 +325,35 @@ function PinPage() {
 
         {/* Error message */}
         {error && (
-          <div style={{
-            color: '#dc2626',
-            fontSize: theme.fonts.size.base,
-            textAlign: 'center',
-            marginBottom: theme.spacing.lg,
-            padding: theme.spacing.md,
-            backgroundColor: '#fef2f2',
-            border: '1px solid #fecaca',
-            borderRadius: theme.borders.radius.md,
-            width: '100%',
-          }}>
+          <div
+            style={{
+              color: '#dc2626',
+              fontSize: theme.fonts.size.base,
+              textAlign: 'center',
+              marginBottom: theme.spacing.lg,
+              padding: theme.spacing.md,
+              backgroundColor: '#fef2f2',
+              border: '1px solid #fecaca',
+              borderRadius: theme.borders.radius.md,
+              width: '100%',
+            }}
+          >
             {error}
           </div>
         )}
 
         {/* Numpad */}
-        <div style={{ width: '100%', marginBottom: theme.spacing.xl }}>
-          {numpadGrid()}
-        </div>
+        <div style={{ width: '100%', marginBottom: theme.spacing.xl }}>{numpadGrid()}</div>
 
         {/* Action buttons */}
-        <div style={{ 
-          display: 'flex', 
-          width: '100%', 
-          justifyContent: 'space-between', 
-          gap: theme.spacing.lg 
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            width: '100%',
+            justifyContent: 'space-between',
+            gap: theme.spacing.lg,
+          }}
+        >
           <Button onClick={handleBack} variant="outline" size="medium">
             Zurück
           </Button>

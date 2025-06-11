@@ -8,14 +8,8 @@ import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function CreateActivityPage() {
-  const {
-    authenticatedUser,
-    isLoading,
-    error,
-    logout,
-    fetchActivities,
-    setSelectedActivity,
-  } = useUserStore();
+  const { authenticatedUser, isLoading, error, logout, fetchActivities, setSelectedActivity } =
+    useUserStore();
 
   const [activities, setActivities] = useState<ActivityResponse[]>([]);
   const [isFetching, setIsFetching] = useState(false);
@@ -31,7 +25,6 @@ function CreateActivityPage() {
   const fetchActivitiesData = useCallback(async () => {
     if (!authenticatedUser || isFetching) return;
 
-
     setIsFetching(true);
     try {
       logger.info('Fetching activities for teacher', {
@@ -42,17 +35,20 @@ function CreateActivityPage() {
       performance.mark('activities-fetch-start');
       const activitiesData = await fetchActivities();
       performance.mark('activities-fetch-end');
-      performance.measure('activities-fetch-duration', 'activities-fetch-start', 'activities-fetch-end');
-
+      performance.measure(
+        'activities-fetch-duration',
+        'activities-fetch-start',
+        'activities-fetch-end'
+      );
 
       const measure = performance.getEntriesByName('activities-fetch-duration')[0];
       logger.debug('Activities fetch performance', { duration_ms: measure.duration });
 
       if (activitiesData && Array.isArray(activitiesData)) {
         setActivities(activitiesData);
-        logger.info('Activities loaded successfully', { 
+        logger.info('Activities loaded successfully', {
           count: activitiesData.length,
-          activities: activitiesData.map(a => ({ id: a.id, name: a.name }))
+          activities: activitiesData.map(a => ({ id: a.id, name: a.name })),
         });
       } else {
         logger.warn('No activities data returned from fetchActivities');
@@ -60,18 +56,19 @@ function CreateActivityPage() {
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
-      
+
       // Check for authentication errors
       if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-        logger.warn('Authentication failed during activity fetch, redirecting to login', { error: errorMessage });
+        logger.warn('Authentication failed during activity fetch, redirecting to login', {
+          error: errorMessage,
+        });
         logUserAction('authentication_expired_during_activity_fetch');
         // Logout and redirect to login
         void logout();
         void navigate('/');
         return;
       }
-      
+
       logger.error('Failed to fetch activities', { error });
       logError(
         error instanceof Error ? error : new Error(String(error)),
@@ -146,11 +143,6 @@ function CreateActivityPage() {
     }
   };
 
-
-
-
-
-
   // Handle back button - navigate to home
   const handleBack = () => {
     try {
@@ -212,13 +204,20 @@ function CreateActivityPage() {
 
     const getCategoryIcon = (category: string) => {
       switch (category.toLowerCase()) {
-        case 'sport': return '⚽';
-        case 'kunst': return '🎨';
-        case 'musik': return '🎵';
-        case 'wissenschaft': return '🔬';
-        case 'literatur': return '📚';
-        case 'spiele': return '🎲';
-        default: return '🎯';
+        case 'sport':
+          return '⚽';
+        case 'kunst':
+          return '🎨';
+        case 'musik':
+          return '🎵';
+        case 'wissenschaft':
+          return '🔬';
+        case 'literatur':
+          return '📚';
+        case 'spiele':
+          return '🎲';
+        default:
+          return '🎯';
       }
     };
 
@@ -226,7 +225,7 @@ function CreateActivityPage() {
       <div
         onClick={() => onClick(activity)}
         style={cardStyles}
-        className="hover:bg-gray-100 active:bg-gray-200 hover:shadow-lg"
+        className="hover:bg-gray-100 hover:shadow-lg active:bg-gray-200"
       >
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontSize: '3rem', marginBottom: theme.spacing.md }}>
@@ -280,14 +279,28 @@ function CreateActivityPage() {
     return null; // Will redirect via useEffect
   }
 
-
   return (
     <ContentBox centered shadow="md" rounded="lg">
-      <div style={{ width: '100%', maxWidth: '800px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{
+          width: '100%',
+          maxWidth: '800px',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Fixed Header */}
         <div style={{ flexShrink: 0 }}>
           {/* Navigation buttons */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.lg }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: theme.spacing.lg,
+            }}
+          >
             <Button onClick={handleBack} variant="outline" size="medium">
               ← Zurück
             </Button>
@@ -295,7 +308,7 @@ function CreateActivityPage() {
               Abmelden
             </Button>
           </div>
-          
+
           {/* Title and info */}
           <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
             <h1
@@ -308,7 +321,7 @@ function CreateActivityPage() {
             >
               Aktivität auswählen
             </h1>
-            
+
             <p
               style={{
                 fontSize: theme.fonts.size.base,
@@ -333,15 +346,17 @@ function CreateActivityPage() {
 
           {/* Error state */}
           {error && !isLoading && (
-            <div style={{
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: theme.borders.radius.md,
-              padding: theme.spacing.md,
-              marginBottom: theme.spacing.lg,
-              textAlign: 'center',
-              color: '#dc2626',
-            }}>
+            <div
+              style={{
+                backgroundColor: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: theme.borders.radius.md,
+                padding: theme.spacing.md,
+                marginBottom: theme.spacing.lg,
+                textAlign: 'center',
+                color: '#dc2626',
+              }}
+            >
               {error}
             </div>
           )}
@@ -356,7 +371,7 @@ function CreateActivityPage() {
                 width: '100%',
               }}
             >
-              {activities.map((activity) => (
+              {activities.map(activity => (
                 <ActivityCard
                   key={activity.id}
                   activity={activity}
@@ -370,17 +385,21 @@ function CreateActivityPage() {
           {!isLoading && !error && activities.length === 0 && (
             <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
               <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📅</div>
-              <div style={{
-                fontSize: theme.fonts.size.large,
-                color: theme.colors.text.secondary,
-                marginBottom: theme.spacing.md,
-              }}>
+              <div
+                style={{
+                  fontSize: theme.fonts.size.large,
+                  color: theme.colors.text.secondary,
+                  marginBottom: theme.spacing.md,
+                }}
+              >
                 Keine Aktivitäten verfügbar
               </div>
-              <div style={{
-                fontSize: theme.fonts.size.base,
-                color: theme.colors.text.secondary,
-              }}>
+              <div
+                style={{
+                  fontSize: theme.fonts.size.base,
+                  color: theme.colors.text.secondary,
+                }}
+              >
                 Sie haben derzeit keine zugewiesenen Aktivitäten.
               </div>
             </div>

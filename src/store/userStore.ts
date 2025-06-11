@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 
-import { api, type Teacher, type ActivityResponse, type Room, type CurrentSession, type RfidScanResult } from '../services/api';
+import {
+  api,
+  type Teacher,
+  type ActivityResponse,
+  type Room,
+  type CurrentSession,
+  type RfidScanResult,
+} from '../services/api';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -89,13 +96,18 @@ interface UserState {
   isLoading: boolean;
   error: string | null;
   nfcScanActive: boolean;
-  
+
   // RFID scanning state
   rfid: RfidState;
 
   // Actions
   setSelectedUser: (user: string) => void;
-  setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string; pin: string }) => void;
+  setAuthenticatedUser: (userData: {
+    staffId: number;
+    staffName: string;
+    deviceName: string;
+    pin: string;
+  }) => void;
   setSelectedActivity: (activity: ActivityResponse) => void;
   fetchTeachers: () => Promise<void>;
   fetchRooms: () => Promise<void>;
@@ -119,7 +131,7 @@ interface UserState {
   ) => Promise<boolean>;
   checkOutStudent: (activityId: number, studentId: number) => Promise<boolean>;
   getActivityStudents: (activityId: number) => Student[];
-  
+
   // RFID actions
   startRfidScanning: () => void;
   stopRfidScanning: () => void;
@@ -170,7 +182,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   isLoading: false,
   error: null,
   nfcScanActive: false,
-  
+
   // RFID initial state
   rfid: {
     isScanning: false,
@@ -183,16 +195,21 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   // Actions
   setSelectedUser: (user: string) => set({ selectedUser: user }),
-  
-  setAuthenticatedUser: (userData: { staffId: number; staffName: string; deviceName: string; pin: string }) => {
-    set({ 
+
+  setAuthenticatedUser: (userData: {
+    staffId: number;
+    staffName: string;
+    deviceName: string;
+    pin: string;
+  }) => {
+    set({
       authenticatedUser: {
         staffId: userData.staffId,
         staffName: userData.staffName,
         deviceName: userData.deviceName,
         pin: userData.pin,
-        authenticatedAt: new Date()
-      }
+        authenticatedAt: new Date(),
+      },
     });
   },
 
@@ -200,33 +217,33 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   fetchTeachers: async () => {
     const { isLoading, users } = get();
-    
+
     // Prevent duplicate requests
     if (isLoading) {
       storeLogger.debug('Teachers fetch already in progress, skipping');
       return;
     }
-    
+
     // Skip if we already have teachers
     if (users.length > 0) {
       storeLogger.debug('Teachers already loaded, skipping fetch');
       return;
     }
-    
+
     set({ isLoading: true, error: null });
     try {
       storeLogger.info('Fetching teachers from API');
       const teachers = await api.getTeachers();
       const users = teachers.map(teacherToUser);
-      
+
       storeLogger.info('Teachers loaded successfully', { count: users.length });
       set({ users, isLoading: false });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       storeLogger.error('Failed to fetch teachers', { error: errorMessage });
-      set({ 
+      set({
         error: 'Fehler beim Laden der Lehrer. Bitte versuchen Sie es erneut.',
-        isLoading: false 
+        isLoading: false,
       });
       throw error;
     }
@@ -234,7 +251,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   fetchRooms: async () => {
     const { authenticatedUser } = get();
-    
+
     if (!authenticatedUser?.pin) {
       storeLogger.warn('Cannot fetch rooms: no authenticated user or PIN');
       set({ error: 'Keine Authentifizierung für das Laden von Räumen', isLoading: false });
@@ -247,9 +264,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         staffId: authenticatedUser.staffId,
         staffName: authenticatedUser.staffName,
       });
-      
+
       const rooms = await api.getRooms(authenticatedUser.pin);
-      
+
       storeLogger.debug('Available rooms fetched successfully', { count: rooms.length });
       set({ rooms, isLoading: false });
     } catch (error) {
@@ -274,7 +291,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   fetchCurrentSession: async () => {
     const { authenticatedUser } = get();
-    
+
     if (!authenticatedUser?.pin) {
       storeLogger.warn('Cannot fetch current session: no authenticated user or PIN');
       return;
@@ -283,7 +300,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     try {
       storeLogger.info('Fetching current session for device');
       const session = await api.getCurrentSession(authenticatedUser.pin);
-      
+
       if (session) {
         storeLogger.info('Active session found', {
           activeGroupId: session.active_group_id,
@@ -293,11 +310,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           startTime: session.start_time,
           duration: session.duration,
         });
-        
+
         // Also set selected activity and room based on session if we have the data
         let sessionActivity: ActivityResponse | null = null;
         let sessionRoom: Room | null = null;
-        
+
         if (session.activity_name) {
           sessionActivity = {
             id: session.activity_id,
@@ -312,15 +329,15 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
             is_active: session.is_active ?? true,
           };
         }
-        
+
         if (session.room_id && session.room_name) {
           sessionRoom = {
             id: session.room_id,
             name: session.room_name,
           };
         }
-        
-        set({ 
+
+        set({
           currentSession: session,
           selectedActivity: sessionActivity,
           selectedRoom: sessionRoom,
@@ -338,7 +355,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   logout: async () => {
     const { authenticatedUser, currentSession } = get();
-    
+
     // End current session if exists and user is authenticated
     if (authenticatedUser?.pin && currentSession) {
       try {
@@ -346,7 +363,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           activeGroupId: currentSession.active_group_id,
           activityId: currentSession.activity_id,
         });
-        
+
         await api.endSession(authenticatedUser.pin);
         storeLogger.info('Session ended successfully');
       } catch (error) {
@@ -482,7 +499,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   fetchActivities: (() => {
     let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
-    
+
     return async (): Promise<ActivityResponse[] | null> => {
       // Return existing promise if already fetching
       if (fetchPromise) {
@@ -492,7 +509,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
       const { authenticatedUser } = get();
       set({ isLoading: true, error: null });
-      
+
       if (!authenticatedUser) {
         set({
           error: 'Keine Authentifizierung für das Laden von Aktivitäten',
@@ -518,17 +535,21 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           });
 
           const activitiesData = await api.getActivities(authenticatedUser.pin);
-          
+
           storeLogger.info('Activities loaded successfully', {
             count: activitiesData.length,
-            activities: activitiesData.map(a => ({ id: a.id, name: a.name, category: a.category_name })),
+            activities: activitiesData.map(a => ({
+              id: a.id,
+              name: a.name,
+              category: a.category_name,
+            })),
           });
 
           set({ isLoading: false });
           return activitiesData;
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
-          
+
           storeLogger.error('Failed to fetch activities', {
             error: errorMessage,
             staffId: authenticatedUser.staffId,
@@ -538,7 +559,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
             error: 'Fehler beim Laden der Aktivitäten',
             isLoading: false,
           });
-          
+
           return null;
         } finally {
           // Clear the promise when done
@@ -723,42 +744,42 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
     return activity.checkedInStudents;
   },
-  
+
   // RFID actions
   startRfidScanning: () => {
-    set((state) => ({
-      rfid: { ...state.rfid, isScanning: true }
+    set(state => ({
+      rfid: { ...state.rfid, isScanning: true },
     }));
   },
-  
+
   stopRfidScanning: () => {
-    set((state) => ({
-      rfid: { ...state.rfid, isScanning: false, currentScan: null }
+    set(state => ({
+      rfid: { ...state.rfid, isScanning: false, currentScan: null },
     }));
   },
-  
+
   setScanResult: (result: RfidScanResult | null) => {
-    set((state) => ({
-      rfid: { ...state.rfid, currentScan: result }
+    set(state => ({
+      rfid: { ...state.rfid, currentScan: result },
     }));
   },
-  
+
   blockTag: (tagId: string, duration: number) => {
     const blockUntil = Date.now() + duration;
-    set((state) => {
+    set(state => {
       const newBlockedTags = new Map(state.rfid.blockedTags);
       newBlockedTags.set(tagId, blockUntil);
       return {
-        rfid: { ...state.rfid, blockedTags: newBlockedTags }
+        rfid: { ...state.rfid, blockedTags: newBlockedTags },
       };
     });
   },
-  
+
   isTagBlocked: (tagId: string) => {
     const { rfid } = get();
     const blockUntil = rfid.blockedTags.get(tagId);
     if (!blockUntil) return false;
-    
+
     const isBlocked = Date.now() < blockUntil;
     if (!isBlocked) {
       // Clean up expired block
@@ -766,26 +787,26 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
     return isBlocked;
   },
-  
+
   clearBlockedTag: (tagId: string) => {
-    set((state) => {
+    set(state => {
       const newBlockedTags = new Map(state.rfid.blockedTags);
       newBlockedTags.delete(tagId);
       return {
-        rfid: { ...state.rfid, blockedTags: newBlockedTags }
+        rfid: { ...state.rfid, blockedTags: newBlockedTags },
       };
     });
   },
-  
+
   showScanModal: () => {
-    set((state) => ({
-      rfid: { ...state.rfid, showModal: true }
+    set(state => ({
+      rfid: { ...state.rfid, showModal: true },
     }));
   },
-  
+
   hideScanModal: () => {
-    set((state) => ({
-      rfid: { ...state.rfid, showModal: false, currentScan: null }
+    set(state => ({
+      rfid: { ...state.rfid, showModal: false, currentScan: null },
     }));
   },
 });

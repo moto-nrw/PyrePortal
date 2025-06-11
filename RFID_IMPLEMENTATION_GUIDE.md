@@ -1,17 +1,20 @@
 # RFID Check-in System Implementation Guide
 
 ## Overview
+
 This document outlines the complete implementation plan for the RFID-based student attendance tracking system, integrating the Moto webapp (this repo) with the PyrePortal Pi app.
 
 ## System Architecture
 
 ### Components
+
 1. **Moto Webapp** (this repo) - Backend API and web dashboard
 2. **PyrePortal** (Pi app) - Tauri-based RFID scanner application ✅ **PIN AUTH COMPLETE**
 3. **Raspberry Pi Devices** - Physical devices with RFID readers
 4. **Mobile Interface** - Teacher activity creation on phones
 
 ### Key Design Decisions
+
 - **Device Mobility**: Devices are not tied to rooms, teachers carry them
 - **PIN Authentication**: For access control only, not user tracking
 - **Activity-Centric**: Devices track activities, not teachers
@@ -33,6 +36,7 @@ This document outlines the complete implementation plan for the RFID-based stude
 ## Complete Workflow
 
 ### Device Registration (Admin Only) ✅ IMPLEMENTED
+
 ```
 Admin → Web Dashboard → Device Management
 1. Admin navigates to /database/devices via main database section
@@ -71,6 +75,7 @@ Important Security Notes:
 ```
 
 ### 1. Teacher Activity Creation (Mobile)
+
 ```
 Teacher → Mobile Phone → Moto Webapp
 1. Opens mobile-optimized activity creation form
@@ -80,6 +85,7 @@ Teacher → Mobile Phone → Moto Webapp
 ```
 
 ### 2. Device Setup and Login
+
 ```
 Teacher → Pi Device
 1. Powers on device (auto-updates via git pull)
@@ -91,6 +97,7 @@ Teacher → Pi Device
 ```
 
 ### 3. Activity Selection
+
 ```
 Teacher → Pi Device → Moto API
 1. Device shows teacher's activities (today's/active only)
@@ -101,6 +108,7 @@ Teacher → Pi Device → Moto API
 ```
 
 ### 4. RFID Tag Assignment
+
 ```
 Teacher → Pi Device → Student
 1. Teacher selects "Assign Tags" mode
@@ -119,6 +127,7 @@ Teacher → Pi Device → Student
 ```
 
 ### 5. Student Check-in/Check-out
+
 ```
 Student → RFID Tag → Pi Device → Moto API
 1. Student taps RFID tag on device
@@ -133,6 +142,7 @@ Student → RFID Tag → Pi Device → Moto API
 ```
 
 ### 6. Activity End
+
 ```
 Teacher → Pi Device
 1. Teacher clicks "End Activity" button
@@ -143,6 +153,7 @@ Teacher → Pi Device
 ```
 
 ### 7. Device Health Monitoring (Automatic)
+
 ```
 Pi Device → Server (Background Process)
 1. Device sends ping every 60 seconds:
@@ -159,6 +170,7 @@ Pi Device → Server (Background Process)
 ```
 
 ### 8. Device Management Interface ✅ IMPLEMENTED
+
 ```
 Admin → Web Dashboard → Device Management
 Location: /database/devices
@@ -177,7 +189,7 @@ Features:
    - Sections: Geräteinformationen, Systemdaten, API-Schlüssel
    - Device info: ID, type, name, status, online status, last seen
    - System data: Creation and update timestamps
-   - API key section: 
+   - API key section:
      * Shows "Nur bei Erstellung sichtbar" for existing devices
      * For newly created devices: Full API key with show/hide toggle
      * Copy button for easy credential copying
@@ -204,6 +216,7 @@ Features:
 ```
 
 ### PIN Management Interface ✅ IMPLEMENTED
+
 ```
 Teacher → Web Dashboard → Settings → Security & Privacy
 Location: /settings (Security & Privacy section)
@@ -223,7 +236,7 @@ Features:
 
 3. PIN Change Form (Existing PIN):
    - Current PIN input field (required for security)
-   - New PIN input field (4 digits only, masked)  
+   - New PIN input field (4 digits only, masked)
    - PIN confirmation field (must match new PIN)
    - Enhanced validation: Current PIN verification, format validation
    - Security features: Account lockout after failed attempts
@@ -258,6 +271,7 @@ Features:
 ```
 
 ### Mobile Activity Creation Interface ✅ IMPLEMENTED
+
 ```
 Teacher → Mobile Device → Moto Webapp Dashboard
 Location: Available via sidebar in all dashboard pages
@@ -265,7 +279,7 @@ Location: Available via sidebar in all dashboard pages
 Features:
 1. Quick Access Button:
    - "Schnell-Aktivität" button in main sidebar
-   - Blue background with plus icon for visual prominence  
+   - Blue background with plus icon for visual prominence
    - Available on all dashboard pages for consistent access
    - Mobile-responsive design for touch-friendly interaction
 
@@ -304,7 +318,7 @@ Features:
 
 7. Mobile Optimization:
    - Touch-friendly button sizes and spacing
-   - Responsive modal design adapts to screen sizes  
+   - Responsive modal design adapts to screen sizes
    - Keyboard-friendly for mobile input methods
    - Fast interaction flow: Minimal steps to create activity
    - Immediate feedback: Visual confirmation of all actions
@@ -319,6 +333,7 @@ Features:
 The system uses two distinct authentication layers for security and audit purposes:
 
 1. **Device Authentication (API Key)**
+
    - Identifies which physical device is making requests
    - Ensures only registered devices can access the API
    - Allows tracking device location and usage patterns
@@ -331,6 +346,7 @@ The system uses two distinct authentication layers for security and audit purpos
    - Allows multiple teachers to share devices safely
 
 This separation means:
+
 - Lost devices can be disabled without affecting teacher accounts
 - Teacher PINs work on any registered device
 - Complete audit trail shows both device AND user
@@ -339,7 +355,9 @@ This separation means:
 ### Authentication Endpoints
 
 #### Device Authentication (Layer 1) ✅ IMPLEMENTED
+
 Devices authenticate using their API key for all requests:
+
 ```typescript
 Headers: {
   "Authorization": "Bearer dev_xyz123...",  // Device's api_key
@@ -348,12 +366,15 @@ Headers: {
 ```
 
 #### Simplified PIN Architecture ✅ IMPLEMENTED
-Staff PINs are stored directly in the `auth.accounts` table rather than `users.staff`, 
-eliminating the complex lookup chain and improving performance. This architectural 
+
+Staff PINs are stored directly in the `auth.accounts` table rather than `users.staff`,
+eliminating the complex lookup chain and improving performance. This architectural
 simplification maintains all security features while reducing database complexity.
 
 #### Device-Authenticated Endpoints ✅ IMPLEMENTED
+
 The following endpoints require both device API key AND staff PIN:
+
 ```typescript
 // Device health check
 POST /api/iot/ping
@@ -405,6 +426,7 @@ Response: {
 ```
 
 #### Teacher PIN Management
+
 ```typescript
 GET /api/staff/pin
 Headers: {
@@ -432,6 +454,7 @@ Response: {
 ### Device Management
 
 #### Device Registration (Admin Only)
+
 ```typescript
 POST /api/iot/devices/register
 Headers: {
@@ -451,6 +474,7 @@ Response: {
 ```
 
 #### Device-Authenticated Teacher List
+
 ```typescript
 GET /api/teachers/device-list
 Headers: {
@@ -467,6 +491,7 @@ Response: {
 ### Activity Management
 
 #### Quick Activity Creation (Mobile) ✅ IMPLEMENTED
+
 ```typescript
 POST /api/activities/quick-create
 Headers: {
@@ -495,6 +520,7 @@ Response: {
 ```
 
 #### Start Active Session
+
 ```typescript
 POST /api/active/quick-start
 Headers: {
@@ -523,6 +549,7 @@ Response (Conflict): {
 ### Device Health Monitoring ✅ IMPLEMENTED
 
 #### Device Ping (Updated)
+
 ```typescript
 POST /api/iot/ping
 Headers: {
@@ -531,7 +558,7 @@ Headers: {
 }
 Response: {
   "device_id": "f47ac10b-58cc-4372",
-  "device_name": "Classroom Pi 01", 
+  "device_name": "Classroom Pi 01",
   "status": "active",
   "staff_id": 123,
   "person_id": 456,
@@ -546,6 +573,7 @@ Response: {
 ### RFID Operations
 
 #### Check Tag Assignment
+
 ```typescript
 GET /api/rfid-cards/{tagId}
 Headers: {
@@ -565,6 +593,7 @@ Response (Unassigned): {
 ```
 
 #### Assign Tag to Student
+
 ```typescript
 POST /api/students/{studentId}/rfid
 Headers: {
@@ -580,6 +609,7 @@ Response: {
 ```
 
 #### Get Teacher's Students
+
 ```typescript
 GET /api/students/my-students
 Headers: {
@@ -594,6 +624,7 @@ Response: {
 ```
 
 #### Process RFID Scan ✅ FULLY IMPLEMENTED
+
 ```typescript
 POST /api/iot/checkin
 Headers: {
@@ -602,7 +633,7 @@ Headers: {
 }
 Request: {
   "student_rfid": "RFID-001001",
-  "action": "checkin",  // or "checkout" 
+  "action": "checkin",  // or "checkout"
   "room_id": 1
 }
 Response: {
@@ -620,6 +651,7 @@ Response: {
 ```
 
 #### Get Teacher's Students (Device-Authenticated) ✅ COMPLETED
+
 ```typescript
 GET /api/iot/students
 Headers: {
@@ -643,6 +675,7 @@ Response: [
 ```
 
 #### Get Teacher's Activities (Device-Authenticated) ✅ COMPLETED
+
 ```typescript
 GET /api/iot/activities
 Headers: {
@@ -664,7 +697,7 @@ Response: [
   },
   {
     "id": 124,
-    "name": "Fußball Training", 
+    "name": "Fußball Training",
     "category_name": "Sport",
     "category_color": "#4ECDC4",
     "room_name": "Sporthalle",
@@ -682,6 +715,7 @@ Response: [
 ```
 
 #### Activity Session Management ✅ COMPLETED
+
 ```typescript
 // Start activity session with conflict detection
 POST /api/iot/session/start
@@ -776,6 +810,7 @@ Response (Conflict): {
 ### Session Timeout Management ✅ IMPLEMENTED
 
 #### Session Timeout Configuration
+
 ```typescript
 GET /api/iot/session/timeout-config
 Headers: {
@@ -859,31 +894,34 @@ Response: {
 ## Database Changes Required
 
 ### 1. Make device_id Optional in active_groups
+
 ```sql
 -- Migration: Make device_id nullable
-ALTER TABLE active.groups 
+ALTER TABLE active.groups
 ALTER COLUMN device_id DROP NOT NULL;
 ```
 
 ### 2. PIN Storage Architecture Simplification
+
 ```sql
 -- Migration: Move PIN storage from users.staff to auth.accounts
 -- This simplifies the authentication chain from Account→Person→Staff→PIN to Account→PIN
 
 -- Add PIN fields to auth.accounts table
-ALTER TABLE auth.accounts 
+ALTER TABLE auth.accounts
 ADD COLUMN pin_hash VARCHAR(255),
 ADD COLUMN pin_attempts INTEGER DEFAULT 0,
 ADD COLUMN pin_locked_until TIMESTAMPTZ;
 
 -- Remove PIN fields from users.staff table (if they existed)
--- ALTER TABLE users.staff 
+-- ALTER TABLE users.staff
 -- DROP COLUMN pin_hash,
 -- DROP COLUMN pin_attempts,
 -- DROP COLUMN pin_locked_until;
 ```
 
 ### PIN Architecture Benefits ✅ IMPLEMENTED
+
 The simplified PIN architecture provides several advantages:
 
 - **Simplified Storage**: PINs stored directly in `auth.accounts` table (not `users.staff`)
@@ -894,6 +932,7 @@ The simplified PIN architecture provides several advantages:
 - **Easier Maintenance**: Single source of truth for authentication data
 
 ### 3. Add Device Authentication
+
 ```sql
 -- Migration: Add API key to devices
 ALTER TABLE iot.devices
@@ -902,12 +941,14 @@ ADD COLUMN last_activity TIMESTAMP;
 ```
 
 ### 4. Update Device Table for Health Monitoring
+
 ```sql
 -- Already included in migration 3 above:
 -- ADD COLUMN last_activity TIMESTAMP;
 ```
 
 ### 5. Add Device Session Tracking (Optional for MVP)
+
 ```sql
 -- Migration: Track device usage sessions
 CREATE TABLE device_sessions (
@@ -925,6 +966,7 @@ CREATE TABLE device_sessions (
 **Overall Progress: 100% Complete** (Last updated: June 9, 2025)
 
 ### What's Currently Working ✅
+
 1. **✅ Database Schema**: RFID system tables with API keys, PIN storage, health monitoring (5/5 migrations complete)
 2. **✅ Device Authentication Middleware**: Complete two-layer authentication (API key + staff PIN)
 3. **✅ PIN Infrastructure**: Teacher PIN storage, validation, and security features (hashing, account locking)
@@ -953,9 +995,11 @@ CREATE TABLE device_sessions (
 26. **✅ Mobile Activity Creation Interface**: Complete mobile-optimized activity creation form in sidebar with modal
 
 ### Critical Gaps Remaining ❌
-*All critical functionality has been implemented!* 🎉
+
+_All critical functionality has been implemented!_ 🎉
 
 ### Implementation Priority Order
+
 **✅ Phase 1 (COMPLETED)**: Device authentication middleware and PIN validation endpoints
 **✅ Phase 2 (COMPLETED)**: Core RFID student processing functionality complete
 **✅ Phase 3 (COMPLETED)**: Teacher-student relationships and privacy-compliant APIs
@@ -976,6 +1020,7 @@ CREATE TABLE device_sessions (
 #### Backend Tasks
 
 **✅ COMPLETED - Device Authentication Foundation**
+
 - [x] **✅ Database migrations** (5/5 complete - API keys, PIN storage, health monitoring)
 - [x] **✅ Device registration endpoint** (admin only - `/api/iot/devices` with API key generation)
 - [x] **✅ Device authentication middleware** (complete two-layer auth: API key + staff PIN)
@@ -987,6 +1032,7 @@ CREATE TABLE device_sessions (
 - [x] **✅ RFID assignment endpoints** (basic linking - `/api/users/{id}/rfid`)
 
 **✅ COMPLETED - RFID Student Processing**
+
 - [x] **✅ Complete RFID check-in logic** (full student processing workflow implemented)
 - [x] **✅ Student lookup by RFID** (find student by tag and create/end visits)
 - [x] **✅ German response messages** ("Hallo Max!" / "Tschüss Max!" for student feedback)
@@ -995,11 +1041,13 @@ CREATE TABLE device_sessions (
 - [x] **✅ Active group association** (link visits to active groups in specified rooms)
 
 **✅ COMPLETED - Teacher APIs & Student Management**
+
 - [x] **✅ COMPLETED: Teacher-Student APIs** (device endpoints for teachers to see their students)
 - [x] **✅ COMPLETED: My students endpoint for teachers** (filtered by teacher's groups with GDPR compliance)
 - [x] **✅ COMPLETED: Student-group relationship filtering** (privacy-compliant data access)
 
 **✅ COMPLETED - Mobile Activity Creation & Device Selection**
+
 - [x] **✅ Quick activity creation endpoint** (mobile-optimized activity creation - `/api/activities/quick-create`)
 - [x] **✅ Teacher auto-assignment as supervisor** (authenticated teacher becomes primary supervisor)
 - [x] **✅ Smart defaults for mobile** (is_open=true, no complex scheduling, immediate availability)
@@ -1008,6 +1056,7 @@ CREATE TABLE device_sessions (
 - [x] **✅ Activity filtering for devices** (today's/active only with enrollment counts and room assignments)
 
 **✅ COMPLETED - Activity Session Management**
+
 - [x] **✅ Activity conflict detection** (one device per activity validation with atomic transaction safety)
 - [x] **✅ Activity session management** (start/end activity on devices with race condition prevention)
 - [x] **✅ Session conflict API endpoints** (conflict detection, override capabilities, current session lookup)
@@ -1015,6 +1064,7 @@ CREATE TABLE device_sessions (
 - [x] **✅ Session lifecycle management** (atomic session creation, graceful termination, device session tracking)
 
 **✅ COMPLETED - Session Timeout Implementation**
+
 - [x] **✅ Session timeout system** (configurable timeout settings with device validation)
 - [x] **✅ Timeout API endpoints** (complete timeout management with validation and info endpoints)
 - [x] **✅ Background cleanup service** (automated cleanup of abandoned sessions with safety thresholds)
@@ -1022,15 +1072,19 @@ CREATE TABLE device_sessions (
 - [x] **✅ Timeout configuration management** (global defaults with device-specific overrides)
 
 **✅ COMPLETED - Device Registration Frontend**
+
 - [x] **✅ Device registration page** (`/database/devices`) - Complete admin interface with secure API key management
 
 **✅ COMPLETED - Mobile Activity Creation Frontend**
+
 - [x] **✅ Mobile activity creation form** (teachers create activities on phones) - COMPLETED
 
 **✅ COMPLETED - PIN Management Frontend**
+
 - [x] **✅ PIN management interface** (`/settings` → Security section) - Complete teacher PIN management with status display, creation/update forms, and error handling
 
 #### Frontend Tasks
+
 - [x] **✅ Mobile activity creation form** - COMPLETED
 - [x] **✅ PIN management in user settings** - COMPLETED
 - [x] **✅ Device registration page** (`/database/devices`) - COMPLETED
@@ -1040,6 +1094,7 @@ CREATE TABLE device_sessions (
 ### PyrePortal (Pi App)
 
 #### Core Features
+
 - [ ] PIN login screen with teacher dropdown
 - [ ] Activity selection interface (today's/active only)
 - [ ] RFID tag assignment UI
@@ -1054,6 +1109,7 @@ CREATE TABLE device_sessions (
 - [ ] Auto-logout when entering different room
 
 #### UI Components
+
 - [ ] Teacher selection dropdown
 - [ ] PIN input pad
 - [ ] Activity list view
@@ -1064,6 +1120,7 @@ CREATE TABLE device_sessions (
 ## Security & Privacy
 
 ### Access Control ✅ IMPLEMENTED
+
 - **✅ Two-layer authentication** (see Authentication Architecture section):
   1. **✅ Device auth**: API key validates device identity via `Authorization: Bearer` header
   2. **✅ Teacher auth**: PIN validates user identity via `X-Staff-PIN` header
@@ -1076,8 +1133,9 @@ CREATE TABLE device_sessions (
 - Student data cached locally, cleared on logout (Pi app feature)
 
 ### Security Features Implemented ✅
+
 - **✅ Constant-time operations**: bcrypt handles timing attack protection for PIN validation
-- **✅ API key security**: Device API keys stored in database, never exposed in JSON responses  
+- **✅ API key security**: Device API keys stored in database, never exposed in JSON responses
 - **✅ Session security**: Device and staff context properly isolated and validated
 - **✅ Error handling**: Comprehensive error responses without information leakage
 - **✅ Input validation**: All authentication inputs validated before processing
@@ -1085,6 +1143,7 @@ CREATE TABLE device_sessions (
 - **✅ Account lockout**: Automatic staff account locking prevents brute force attacks
 
 ### Data Flow
+
 - All communication via HTTPS
 - Minimal data transmission (3 fields for check-in)
 - No student data persisted on devices
@@ -1093,6 +1152,7 @@ CREATE TABLE device_sessions (
 ## Error Handling (MVP)
 
 ### Simplified Approach ("Let It Crash")
+
 - Assume happy path for pilot
 - Fix issues as they arise
 - No complex error recovery
@@ -1100,6 +1160,7 @@ CREATE TABLE device_sessions (
 - Crash recovery: Resume active sessions on restart
 
 ### Device Lifecycle
+
 1. **Registration**: Admin creates device record, gets credentials
 2. **Configuration**: Device stores API key locally
 3. **Active**: Device pings server, available for use
@@ -1108,9 +1169,11 @@ CREATE TABLE device_sessions (
 6. **Reactivation**: Admin can re-enable deactivated devices
 
 ### Current Implementation Status
+
 **RFID system core functionality is complete and production-ready. Students can check-in/out with immediate feedback:**
 
 **✅ FULLY IMPLEMENTED & WORKING:**
+
 - **✅ Device Authentication**: RFID devices authenticate with API keys + staff PINs (two-layer security)
 - **✅ Staff PIN System**: Complete authentication with bcrypt hashing and account locking
 - **✅ Device Health Monitoring**: Ping system with authentication audit trail (`/api/iot/ping`)
@@ -1124,6 +1187,7 @@ CREATE TABLE device_sessions (
 - **✅ Database Schema**: All required tables and relationships implemented
 
 **✅ RECENTLY COMPLETED:**
+
 - **✅ Quick Activity Creation**: Mobile-optimized activity creation for teachers (`/api/activities/quick-create`)
 - **✅ Teacher Auto-Assignment**: Authenticated teachers automatically become primary supervisors
 - **✅ Mobile Integration Ready**: Activities immediately available for RFID device selection
@@ -1132,6 +1196,7 @@ CREATE TABLE device_sessions (
 - **✅ Atomic Session Control**: Race condition prevention with transaction-level locking
 
 **✅ RECENTLY COMPLETED - PIN Management Interface:**
+
 - **✅ Settings Integration**: PIN management integrated into `/settings` page security section
 - **✅ Complete PIN Workflow**: Status display, creation form, change form with current PIN validation
 - **✅ Real-time Status**: Shows "PIN ist eingerichtet" vs "Keine PIN eingerichtet" with last changed timestamp
@@ -1142,6 +1207,7 @@ CREATE TABLE device_sessions (
 - **✅ API Integration**: Frontend route handlers with proper error mapping
 
 **✅ RECENTLY COMPLETED - Mobile Activity Creation Interface:**
+
 - **✅ Sidebar Integration**: "Schnell-Aktivität" button in main dashboard sidebar
 - **✅ Mobile-Optimized Modal**: Touch-friendly form with activity name, category, max participants
 - **✅ Category Loading**: Dynamic category dropdown populated from backend API
@@ -1151,9 +1217,11 @@ CREATE TABLE device_sessions (
 - **✅ Success Workflow**: Modal closes on success, activity immediately available for devices
 
 **🚨 CURRENT DEVELOPMENT FOCUS:**
+
 - **🚨 PyrePortal Integration**: Connect with Pi app for complete system
 
 **📋 FUTURE DEVELOPMENT:**
+
 - **Advanced Admin Features**: Device status monitoring dashboard, lifecycle management UI
 - **Enhanced Features**: Multi-room activities, offline support, analytics
 - **Optimization**: Performance monitoring, advanced device management
@@ -1161,6 +1229,7 @@ CREATE TABLE device_sessions (
 ### What Can Be Tested Right Now ✅
 
 **✅ Mobile Activity Creation Interface:**
+
 ```bash
 # 1. Login as teacher via web interface (y.wenger@gmx.de / Test1234%)
 # 2. Navigate to any dashboard page
@@ -1170,7 +1239,7 @@ CREATE TABLE device_sessions (
 #    - Kategorie: Select from dropdown (loaded from API)
 #    - Max. Teilnehmer: 15 (default)
 # 5. Click "Aktivität erstellen"
-# 
+#
 # Expected: Success confirmation, modal closes, activity available for RFID devices
 
 # Error testing - try as non-teacher (admin@example.com):
@@ -1178,6 +1247,7 @@ CREATE TABLE device_sessions (
 ```
 
 **✅ Quick Activity Creation (API):**
+
 ```bash
 # Direct API testing:
 curl -X POST http://localhost:8080/api/activities/quick-create \
@@ -1202,6 +1272,7 @@ curl -X POST http://localhost:8080/api/activities/quick-create \
 ```
 
 **✅ Activity Categories for Mobile Forms:**
+
 ```bash
 # Get available categories for mobile activity creation
 curl -X GET http://localhost:8080/api/activities/categories \
@@ -1211,6 +1282,7 @@ curl -X GET http://localhost:8080/api/activities/categories \
 ```
 
 **✅ Teacher Activity Selection (RFID Device):**
+
 ```bash
 # Device can get teacher's today activities for selection
 curl -X GET http://localhost:8080/api/iot/activities \
@@ -1235,6 +1307,7 @@ curl -X GET http://localhost:8080/api/iot/activities \
 ```
 
 **✅ Activity Session Management (RFID Device):**
+
 ```bash
 # 1. Check for conflicts before starting session
 curl -X POST http://localhost:8080/api/iot/session/check-conflict \
@@ -1320,6 +1393,7 @@ curl -X POST http://localhost:8080/api/iot/session/start \
 ```
 
 **✅ Device Registration & Authentication:**
+
 ```bash
 # 1. Admin registers device via web dashboard (/database/devices)
 # 2. Device authenticates with API key + staff PIN:
@@ -1332,6 +1406,7 @@ curl -X POST http://localhost:8080/api/iot/ping \
 ```
 
 **✅ Device Health Monitoring:**
+
 ```bash
 # Device can ping server for health check
 curl -X GET http://localhost:8080/api/iot/status \
@@ -1342,6 +1417,7 @@ curl -X GET http://localhost:8080/api/iot/status \
 ```
 
 **✅ RFID Student Check-in/Check-out:**
+
 ```bash
 # Device can process student check-ins with full workflow
 curl -X POST http://localhost:8080/api/iot/checkin \
@@ -1353,7 +1429,7 @@ curl -X POST http://localhost:8080/api/iot/checkin \
 # Expected: Full student processing with German response
 # {
 #   "student_id": 1,
-#   "student_name": "Max Mustermann", 
+#   "student_name": "Max Mustermann",
 #   "action": "checked_in",
 #   "visit_id": 123,
 #   "room_name": "Room 1",
@@ -1363,6 +1439,7 @@ curl -X POST http://localhost:8080/api/iot/checkin \
 ```
 
 **✅ Teacher-Student API (GDPR Compliant):**
+
 ```bash
 # Device can get teacher's supervised students for tag assignment
 curl -X GET http://localhost:8080/api/iot/students \
@@ -1376,7 +1453,7 @@ curl -X GET http://localhost:8080/api/iot/students \
 #     "person_id": 456,
 #     "first_name": "Max",
 #     "last_name": "Mustermann",
-#     "school_class": "5A", 
+#     "school_class": "5A",
 #     "group_name": "OGS Gruppe 1",
 #     "rfid_tag": "RFID-001001"
 #   }
@@ -1384,12 +1461,14 @@ curl -X GET http://localhost:8080/api/iot/students \
 ```
 
 **✅ Security Features:**
+
 - Staff PIN attempts tracked and accounts locked after 5 failures
 - All device authentication events logged for audit trail
 - API keys never exposed in responses
 - Proper HTTP status codes for all error conditions
 
 **✅ Device Login Testing (Bruno Verified):**
+
 ```bash
 # Complete device authentication test suite passing
 ./dev-test.sh devices  # ✅ Device auth OK (192ms)
@@ -1399,7 +1478,7 @@ bru run dev --env Local  # ✅ All 8 tests passed (441ms)
 # ✅ Admin login OK
 # ✅ Device auth OK (API key + PIN validation)
 # ✅ Groups API OK - 25 groups
-# ✅ Rooms API OK - 24 rooms  
+# ✅ Rooms API OK - 24 rooms
 # ✅ Students API OK - 50 students
 # ✅ Teacher login OK
 # ✅ PIN status retrieved: {"has_pin": true, "last_changed": "2025-06-09T12:00:52.581217Z"}
@@ -1411,6 +1490,7 @@ bru run dev --env Local  # ✅ All 8 tests passed (441ms)
 ```
 
 **✅ Session Timeout Management:**
+
 ```bash
 # 1. Get timeout configuration for device
 curl -X GET http://localhost:8080/api/iot/session/timeout-config \
@@ -1490,6 +1570,7 @@ curl -X POST http://localhost:8080/api/iot/session/validate-timeout \
 ```
 
 **✅ Code Quality:**
+
 - Implementation passes all linting checks (golangci-lint: 0 issues)
 - Follows established Go best practices and codebase patterns
 - Comprehensive error handling with switch statements
@@ -1497,6 +1578,7 @@ curl -X POST http://localhost:8080/api/iot/session/validate-timeout \
 - Clean architecture with service layer separation
 
 ### Additional Known Limitations (Design)
+
 - No offline tag assignment
 - No PIN recovery mechanism
 - **No concurrent device handling**: One device per activity at a time
@@ -1519,6 +1601,7 @@ curl -X POST http://localhost:8080/api/iot/session/validate-timeout \
 ## Operational Details
 
 ### PIN Management
+
 - **Mandatory**: Every teacher must have a PIN set
 - Migration: Existing teachers get default PIN "0000"
 - First login forces PIN change
@@ -1526,6 +1609,7 @@ curl -X POST http://localhost:8080/api/iot/session/validate-timeout \
 - PIN is for access control only, not tracking
 
 ### Activity Lifecycle
+
 - Activities shown: Today's and currently active only
 - Immediate availability: Activities available right after creation
 - Conflict handling: One device per activity, error message with override option
@@ -1534,11 +1618,13 @@ curl -X POST http://localhost:8080/api/iot/session/validate-timeout \
 - Auto-logout: Students automatically logged out when entering different room
 
 ### Device Health
+
 - Devices ping every minute to show online status
 - Dashboard shows device online/offline status
 - Offline after 5 minutes without ping
 
 ### RFID Assignment Flow
+
 1. New student created → assigned to group
 2. Teacher assigns RFID tag via device
 3. Only sees students from their supervised groups
@@ -1553,24 +1639,28 @@ curl -X POST http://localhost:8080/api/iot/session/validate-timeout \
 ### Troubleshooting Guide
 
 #### Device Won't Connect
+
 1. Check device has internet connection
 2. Verify API key is correctly configured
 3. Check server logs for authentication errors
 4. Ensure device is not deactivated in admin panel
 
 #### Teacher PIN Not Working
+
 1. Verify teacher has PIN set (not null in database)
 2. Check PIN hasn't been changed recently
 3. Ensure teacher account is active
 4. Try resetting PIN via web interface
 
 #### RFID Tag Not Scanning
+
 1. Check RFID reader hardware connection
 2. Verify tag is compatible (NFC/RFID type)
 3. Test with known working tag
 4. Check device logs for scan errors
 
 #### Device Shows Offline
+
 1. Normal if no activity for 5+ minutes
 2. Check network connectivity
 3. Restart device to resume pinging
@@ -1579,6 +1669,7 @@ curl -X POST http://localhost:8080/api/iot/session/validate-timeout \
 ## Pilot Success Criteria
 
 **✅ ACHIEVED:**
+
 1. **✅ Devices authenticate with API key + PIN** - Two-layer authentication working
 2. **✅ Device health monitoring** - Ping system with audit trail functional
 3. **✅ RFID request processing** - Complete student check-in/out workflow with German responses
@@ -1587,23 +1678,14 @@ curl -X POST http://localhost:8080/api/iot/session/validate-timeout \
 6. **✅ RFID tags can be assigned to students** - Complete assignment system with validation
 7. **✅ Teachers can see their supervised students on devices** - GDPR-compliant API endpoints implemented
 
-**✅ ACHIEVED:**
-8. **Teachers can create activities on mobile** - Complete mobile interface with sidebar button and optimized modal
-9. **Teachers can select activities on devices** - Device activity selection API complete (`/api/iot/activities`)
-10. **Activity conflict detection works** - One device per activity enforced with atomic session management
+**✅ ACHIEVED:** 8. **Teachers can create activities on mobile** - Complete mobile interface with sidebar button and optimized modal 9. **Teachers can select activities on devices** - Device activity selection API complete (`/api/iot/activities`) 10. **Activity conflict detection works** - One device per activity enforced with atomic session management
 
-**✅ ACHIEVED:**
-11. **Device registration interface working** - Complete admin interface at `/database/devices`
-12. **Teacher PIN management interface working** - Complete PIN management in `/settings` security section
-13. **Mobile activity creation interface working** - Complete mobile-optimized form in sidebar with validation
+**✅ ACHIEVED:** 11. **Device registration interface working** - Complete admin interface at `/database/devices` 12. **Teacher PIN management interface working** - Complete PIN management in `/settings` security section 13. **Mobile activity creation interface working** - Complete mobile-optimized form in sidebar with validation
 
-**✅ ACHIEVED:**
-14. **Activities auto-end after configured timeout** - Session timeout system implemented with device validation
+**✅ ACHIEVED:** 14. **Activities auto-end after configured timeout** - Session timeout system implemented with device validation
 
-**🚨 IN PROGRESS:**
-15. **Dashboard shows attendance (5-min refresh)** - Frontend integration needed
+**🚨 IN PROGRESS:** 15. **Dashboard shows attendance (5-min refresh)** - Frontend integration needed
 
-**📋 REMAINING:**
-16. **System works with intermittent network** - Pi app feature
+**📋 REMAINING:** 16. **System works with intermittent network** - Pi app feature
 
 **CURRENT STATUS: 14/16 criteria fully met (87.5% complete → Mobile activity creation interface completed!)**

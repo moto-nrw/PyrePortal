@@ -8,15 +8,18 @@ import { createLogger } from '../utils/logger';
 const logger = createLogger('API');
 
 // Environment configuration
-const API_BASE_URL: string = (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
-const DEVICE_API_KEY: string = (import.meta.env.VITE_DEVICE_API_KEY as string) ?? 'dev_bc17223f4417bd2251742e659efc5a7d14671f714154d3cc207fe8ee0feedeaa';
+const API_BASE_URL: string =
+  (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
+const DEVICE_API_KEY: string =
+  (import.meta.env.VITE_DEVICE_API_KEY as string) ??
+  'dev_bc17223f4417bd2251742e659efc5a7d14671f714154d3cc207fe8ee0feedeaa';
 
 /**
  * Generic API call function with error handling
  */
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
-  
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -155,10 +158,10 @@ export const api = {
   async getTeachers(): Promise<Teacher[]> {
     const response = await apiCall<TeacherResponse>('/api/iot/teachers', {
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
       },
     });
-    
+
     return response.data;
   },
 
@@ -169,7 +172,7 @@ export const api = {
   async validateTeacherPin(pin: string): Promise<PinValidationResult> {
     try {
       logger.debug('Starting PIN validation');
-      
+
       const response = await apiCall<{
         status: string;
         data: {
@@ -181,53 +184,55 @@ export const api = {
         message: string;
       }>('/api/iot/status', {
         headers: {
-          'Authorization': `Bearer ${DEVICE_API_KEY}`,
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
         },
       });
-      
+
       logger.info('PIN validation successful');
-      
+
       // Check if response has the expected structure
       if (!response.data?.device || !response.data.person || !response.data.staff) {
         logger.error('Unexpected response structure', { response });
         return {
           success: false,
-          error: 'Unerwartete Server-Antwort. Bitte versuchen Sie es erneut.'
+          error: 'Unerwartete Server-Antwort. Bitte versuchen Sie es erneut.',
         };
       }
-      
+
       const { device, person, staff } = response.data;
-      
+
       return {
         success: true,
         userData: {
           deviceName: device.name || 'Unknown Device',
           staffName: `${person.first_name || ''} ${person.last_name || ''}`.trim(),
           staffId: staff.id,
-        }
+        },
       };
     } catch (error) {
-      logger.error('PIN validation failed', { error: error instanceof Error ? error.message : String(error) });
-      
+      logger.error('PIN validation failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
       // Enhanced error handling for security features
       const errorMessage = error instanceof Error ? error.message : String(error);
-      
+
       if (errorMessage.includes('423')) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: 'Konto vorübergehend gesperrt. Versuchen Sie es später erneut.',
-          isLocked: true 
+          isLocked: true,
         };
       } else if (errorMessage.includes('401')) {
-        return { 
-          success: false, 
-          error: 'Ungültiger PIN. Bitte versuchen Sie es erneut.' 
+        return {
+          success: false,
+          error: 'Ungültiger PIN. Bitte versuchen Sie es erneut.',
         };
       } else {
-        return { 
-          success: false, 
-          error: 'Verbindungsfehler. Bitte überprüfen Sie Ihre Netzwerkverbindung.' 
+        return {
+          success: false,
+          error: 'Verbindungsfehler. Bitte überprüfen Sie Ihre Netzwerkverbindung.',
         };
       }
     }
@@ -240,11 +245,11 @@ export const api = {
   async getActivities(pin: string): Promise<ActivityResponse[]> {
     const response = await apiCall<ActivitiesResponse>('/api/iot/activities', {
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
     });
-    
+
     return response.data;
   },
 
@@ -256,7 +261,7 @@ export const api = {
     await apiCall('/api/iot/ping', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
     });
@@ -271,16 +276,16 @@ export const api = {
     if (capacity) {
       params.append('capacity', capacity.toString());
     }
-    
+
     const endpoint = `/api/iot/rooms/available${params.toString() ? `?${params.toString()}` : ''}`;
-    
+
     const response = await apiCall<RoomsResponse>(endpoint, {
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
     });
-    
+
     return response.data;
   },
 
@@ -292,12 +297,12 @@ export const api = {
     const response = await apiCall<SessionStartResponse>('/api/iot/session/start', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
       body: JSON.stringify(request),
     });
-    
+
     return response;
   },
 
@@ -313,16 +318,16 @@ export const api = {
         message: string;
       }>('/api/iot/session/current', {
         headers: {
-          'Authorization': `Bearer ${DEVICE_API_KEY}`,
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
         },
       });
-      
+
       // Check if we have valid session data
       if (!response.data?.active_group_id || !response.data.activity_id) {
         return null;
       }
-      
+
       return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -342,7 +347,7 @@ export const api = {
     await apiCall('/api/iot/session/end', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
     });
@@ -359,11 +364,11 @@ export const api = {
       message: string;
     }>('/api/iot/students', {
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
     });
-    
+
     return response.data;
   },
 
@@ -379,11 +384,11 @@ export const api = {
         data: TagAssignmentCheck;
       }>(`/api/iot/rfid/${tagId}`, {
         headers: {
-          'Authorization': `Bearer ${DEVICE_API_KEY}`,
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
         },
       });
-      
+
       return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -412,14 +417,14 @@ export const api = {
     }>(`/api/students/${studentId}/rfid`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
       body: JSON.stringify({
         rfid_tag: tagId,
       }),
     });
-    
+
     // Transform the API response to match our expected TagAssignmentResult interface
     return {
       success: response.status === 'success',
@@ -432,20 +437,23 @@ export const api = {
    * Process RFID check-in/check-out
    * Endpoint: POST /api/iot/checkin
    */
-  async processRfidScan(scanData: {
-    student_rfid: string;
-    action: 'checkin' | 'checkout';
-    room_id: number;
-  }, pin: string): Promise<RfidScanResult> {
+  async processRfidScan(
+    scanData: {
+      student_rfid: string;
+      action: 'checkin' | 'checkout';
+      room_id: number;
+    },
+    pin: string
+  ): Promise<RfidScanResult> {
     const response = await apiCall<RfidScanResult>('/api/iot/checkin', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
       body: JSON.stringify(scanData),
     });
-    
+
     return response;
   },
 
@@ -457,21 +465,23 @@ export const api = {
     await apiCall('/api/iot/session/activity', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${DEVICE_API_KEY}`,
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
       },
       body: JSON.stringify({
-        activity_type: 'rfid_scan',  // Changed from 'student_scan' to 'rfid_scan'
+        activity_type: 'rfid_scan', // Changed from 'student_scan' to 'rfid_scan'
         timestamp: new Date().toISOString(),
       }),
     });
   },
-  
+
   /**
    * Get current session information including active student count
    * Endpoint: GET /api/iot/session/current
    */
-  async getCurrentSessionInfo(pin: string): Promise<{ activity_name: string; room_name: string; active_students: number } | null> {
+  async getCurrentSessionInfo(
+    pin: string
+  ): Promise<{ activity_name: string; room_name: string; active_students: number } | null> {
     try {
       const response = await apiCall<{
         status: string;
@@ -484,11 +494,11 @@ export const api = {
         message: string;
       }>('/api/iot/session/current', {
         headers: {
-          'Authorization': `Bearer ${DEVICE_API_KEY}`,
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
         },
       });
-      
+
       logger.debug('getCurrentSessionInfo response', { response });
       return response.data;
     } catch (error) {

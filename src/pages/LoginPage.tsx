@@ -19,7 +19,7 @@ function LoginPage() {
     logger.debug('LoginPage component mounted');
 
     // Always fetch teachers on mount (the store will handle deduplication)
-    fetchTeachers().catch((error) => {
+    fetchTeachers().catch(error => {
       logger.error('Failed to fetch teachers on mount', { error });
     });
 
@@ -135,14 +135,14 @@ function LoginPage() {
           options={userOptions}
           value={localSelectedUser}
           onChange={handleUserChange}
-          placeholder={isLoading ? "Lade Lehrer..." : "Benutzer auswählen..."}
+          placeholder={isLoading ? 'Lade Lehrer...' : 'Benutzer auswählen...'}
           width="350px"
           disabled={isLoading}
         />
-        <Button 
-          type="button" 
-          onClick={handleLogin} 
-          variant="secondary" 
+        <Button
+          type="button"
+          onClick={handleLogin}
+          variant="secondary"
           size="medium"
           disabled={isLoading || !localSelectedUser}
         >

@@ -34,7 +34,6 @@ function App() {
   // Check if a room is selected for the activity creation page
   const hasSelectedRoom = !!selectedRoom;
 
-  
   // Check if session is active (has activity, room, and authenticated user)
   const hasActiveSession = isFullyAuthenticated && !!selectedActivity && !!selectedRoom;
 
@@ -44,9 +43,9 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LoginPage />} />
-            <Route 
-              path="/pin" 
-              element={hasSelectedUser ? <PinPage /> : <Navigate to="/" replace />} 
+            <Route
+              path="/pin"
+              element={hasSelectedUser ? <PinPage /> : <Navigate to="/" replace />}
             />
             <Route
               path="/home"
@@ -66,7 +65,13 @@ function App() {
             />
             <Route
               path="/nfc-scanning"
-              element={hasActiveSession ? <ActivityScanningPage /> : <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />}
+              element={
+                hasActiveSession ? (
+                  <ActivityScanningPage />
+                ) : (
+                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
+                )
+              }
             />
             <Route
               path="/create-activity"

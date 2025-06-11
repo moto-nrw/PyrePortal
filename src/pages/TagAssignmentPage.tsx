@@ -23,10 +23,9 @@ interface RfidScannerStatus {
   last_error?: string;
 }
 
-
 /**
  * Tag Assignment Page - Handle RFID tag assignment to students
- * 
+ *
  * Workflow:
  * 1. Teacher clicks "Scan RFID Tag" button
  * 2. RFID scanner modal opens (future integration)
@@ -68,7 +67,7 @@ function TagAssignmentPage() {
   useEffect(() => {
     const checkScannerStatus = async () => {
       logger.debug('Checking RFID scanner status');
-      
+
       if (!isTauriContext()) {
         logger.debug('Not in Tauri context, using development status');
         setScannerStatus({
@@ -78,13 +77,16 @@ function TagAssignmentPage() {
         });
         return;
       }
-      
+
       try {
         logger.debug('Calling get_rfid_scanner_status');
         const status = await safeInvoke<RfidScannerStatus>('get_rfid_scanner_status');
         logger.debug('Scanner status received', { status });
         setScannerStatus(status);
-        logUserAction('RFID scanner status checked', { platform: status.platform, available: status.is_available });
+        logUserAction('RFID scanner status checked', {
+          platform: status.platform,
+          available: status.is_available,
+        });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
         logger.error('Scanner status error', { error: error.message });
@@ -103,11 +105,11 @@ function TagAssignmentPage() {
   // Start RFID scanning process
   const handleStartScanning = async () => {
     logUserAction('RFID scanning started');
-    
+
     clearStates();
     setShowScanner(true);
     setIsLoading(true);
-    
+
     try {
       if (!isRfidEnabled()) {
         // Development mock behavior
@@ -121,9 +123,12 @@ function TagAssignmentPage() {
 
       // Use real RFID scanner through Tauri
       const result = await safeInvoke<RfidScanResult>('scan_rfid_single');
-      
+
       if (result.success && result.tag_id) {
-        logUserAction('RFID tag scanned successfully', { tagId: result.tag_id, platform: scannerStatus?.platform });
+        logUserAction('RFID tag scanned successfully', {
+          tagId: result.tag_id,
+          platform: scannerStatus?.platform,
+        });
         void handleTagScanned(result.tag_id);
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';
@@ -146,18 +151,17 @@ function TagAssignmentPage() {
     setIsLoading(true);
     setShowScanner(false);
     setScannedTag(tagId);
-    
+
     try {
       logUserAction('RFID tag scanned', { tagId });
-      
+
       // Check if tag is already assigned
       const assignment = await checkTagAssignment(tagId);
       setTagAssignment(assignment);
-      
+
       // Fetch teacher's students for assignment dropdown
       const teacherStudents = await fetchStudents();
       setStudents(teacherStudents);
-      
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       const errorMessage = error.message;
@@ -202,34 +206,33 @@ function TagAssignmentPage() {
         throw new Error('Student nicht gefunden');
       }
 
-      logUserAction('Tag assignment initiated', { 
-        tagId: scannedTag, 
+      logUserAction('Tag assignment initiated', {
+        tagId: scannedTag,
         studentId: selectedStudentId,
-        studentName: `${selectedStudent.first_name} ${selectedStudent.last_name}`
+        studentName: `${selectedStudent.first_name} ${selectedStudent.last_name}`,
       });
 
       // Call the actual API endpoint
       const result = await api.assignTag(authenticatedUser.pin, selectedStudentId, scannedTag);
-      
+
       if (result.success) {
         const studentName = `${selectedStudent.first_name} ${selectedStudent.last_name}`;
         let successMessage = `Tag erfolgreich zugewiesen an ${studentName}`;
-        
+
         if (result.previous_tag) {
           successMessage += ` (Vorheriger Tag: ${result.previous_tag})`;
         }
-        
+
         setSuccess(successMessage);
-        
-        logUserAction('Tag assignment completed successfully', { 
-          tagId: scannedTag, 
+
+        logUserAction('Tag assignment completed successfully', {
+          tagId: scannedTag,
           studentName,
-          previousTag: result.previous_tag
+          previousTag: result.previous_tag,
         });
       } else {
         throw new Error(result.message ?? 'Tag-Zuweisung fehlgeschlagen');
       }
-
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       const errorMessage = error.message;
@@ -310,9 +313,7 @@ function TagAssignmentPage() {
                 minWidth: '300px',
               }}
             >
-              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>
-                📱
-              </div>
+              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📱</div>
               <h2
                 style={{
                   fontSize: theme.fonts.size.xl,
@@ -330,8 +331,8 @@ function TagAssignmentPage() {
                   marginBottom: theme.spacing.md,
                 }}
               >
-                {scannerStatus?.platform.includes('Development') 
-                  ? 'Simuliere Scan-Vorgang...' 
+                {scannerStatus?.platform.includes('Development')
+                  ? 'Simuliere Scan-Vorgang...'
                   : 'Halten Sie das Armband an den Scanner'}
               </p>
               <p
@@ -344,10 +345,7 @@ function TagAssignmentPage() {
               >
                 Platform: {scannerStatus?.platform}
               </p>
-              <Button
-                onClick={() => setShowScanner(false)}
-                variant="secondary"
-              >
+              <Button onClick={() => setShowScanner(false)} variant="secondary">
                 Abbrechen
               </Button>
             </div>
@@ -356,13 +354,10 @@ function TagAssignmentPage() {
 
         {/* Main Content */}
         <div style={{ padding: theme.spacing.lg }}>
-          
           {/* Initial State - Start Scanning */}
           {!scannedTag && !isLoading && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.xl }}>
-                📱
-              </div>
+              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.xl }}>📱</div>
               <p
                 style={{
                   fontSize: theme.fonts.size.large,
@@ -372,7 +367,7 @@ function TagAssignmentPage() {
               >
                 Klicken Sie auf "Scannen", um ein RFID-Armband zu scannen
               </p>
-              
+
               {/* Scanner Status Display */}
               {scannerStatus && (
                 <div
@@ -388,26 +383,39 @@ function TagAssignmentPage() {
                   <p style={{ margin: 0, marginBottom: theme.spacing.xs }}>
                     <strong>Scanner:</strong> {scannerStatus.platform}
                   </p>
-                  <p style={{ margin: 0, marginBottom: theme.spacing.xs, color: scannerStatus.is_available ? theme.colors.success : theme.colors.error }}>
+                  <p
+                    style={{
+                      margin: 0,
+                      marginBottom: theme.spacing.xs,
+                      color: scannerStatus.is_available ? theme.colors.success : theme.colors.error,
+                    }}
+                  >
                     Status: {scannerStatus.is_available ? 'Verfügbar' : 'Nicht verfügbar'}
                   </p>
                   <p style={{ margin: 0, fontSize: theme.fonts.size.small, fontStyle: 'italic' }}>
-                    Mode: {import.meta.env.VITE_ENABLE_RFID === 'true' ? 'Hardware RFID' : 'Mock Development'}
+                    Mode:{' '}
+                    {import.meta.env.VITE_ENABLE_RFID === 'true'
+                      ? 'Hardware RFID'
+                      : 'Mock Development'}
                   </p>
                   {scannerStatus.last_error && (
-                    <p style={{ margin: 0, marginTop: theme.spacing.xs, color: theme.colors.error }}>
+                    <p
+                      style={{ margin: 0, marginTop: theme.spacing.xs, color: theme.colors.error }}
+                    >
                       {scannerStatus.last_error}
                     </p>
                   )}
                 </div>
               )}
-              
+
               <Button
                 onClick={handleStartScanning}
                 disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
                 style={{ marginBottom: theme.spacing.lg }}
               >
-                {scannerStatus?.platform.includes('Development') ? 'Mock Scannen' : 'Scannen starten'}
+                {scannerStatus?.platform.includes('Development')
+                  ? 'Mock Scannen'
+                  : 'Scannen starten'}
               </Button>
             </div>
           )}
@@ -415,9 +423,7 @@ function TagAssignmentPage() {
           {/* Loading State */}
           {isLoading && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
-                ⏳
-              </div>
+              <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>⏳</div>
               <p
                 style={{
                   fontSize: theme.fonts.size.large,
@@ -433,9 +439,7 @@ function TagAssignmentPage() {
           {scannedTag && tagAssignment && !isLoading && !success && (
             <div>
               <div style={{ textAlign: 'center', marginBottom: theme.spacing.xl }}>
-                <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
-                  📋
-                </div>
+                <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>📋</div>
                 <h2
                   style={{
                     fontSize: theme.fonts.size.xl,
@@ -446,7 +450,7 @@ function TagAssignmentPage() {
                 >
                   Tag: {scannedTag}
                 </h2>
-                
+
                 {/* Current Assignment Status */}
                 {tagAssignment.assigned && tagAssignment.student ? (
                   <div
@@ -460,10 +464,20 @@ function TagAssignmentPage() {
                     <p style={{ fontSize: theme.fonts.size.base, marginBottom: theme.spacing.sm }}>
                       <strong>Aktuell zugewiesen an:</strong>
                     </p>
-                    <p style={{ fontSize: theme.fonts.size.large, fontWeight: theme.fonts.weight.bold }}>
+                    <p
+                      style={{
+                        fontSize: theme.fonts.size.large,
+                        fontWeight: theme.fonts.weight.bold,
+                      }}
+                    >
                       {tagAssignment.student.name}
                     </p>
-                    <p style={{ fontSize: theme.fonts.size.base, color: theme.colors.text.secondary }}>
+                    <p
+                      style={{
+                        fontSize: theme.fonts.size.base,
+                        color: theme.colors.text.secondary,
+                      }}
+                    >
                       {tagAssignment.student.group}
                     </p>
                   </div>
@@ -476,7 +490,12 @@ function TagAssignmentPage() {
                       marginBottom: theme.spacing.xl,
                     }}
                   >
-                    <p style={{ fontSize: theme.fonts.size.large, color: theme.colors.text.secondary }}>
+                    <p
+                      style={{
+                        fontSize: theme.fonts.size.large,
+                        color: theme.colors.text.secondary,
+                      }}
+                    >
                       Tag ist nicht zugewiesen
                     </p>
                   </div>
@@ -498,7 +517,7 @@ function TagAssignmentPage() {
                 </label>
                 <select
                   value={selectedStudentId ?? ''}
-                  onChange={(e) => setSelectedStudentId(Number(e.target.value) || null)}
+                  onChange={e => setSelectedStudentId(Number(e.target.value) || null)}
                   style={{
                     width: '100%',
                     padding: theme.spacing.md,
@@ -509,7 +528,7 @@ function TagAssignmentPage() {
                   }}
                 >
                   <option value="">Schüler auswählen...</option>
-                  {students.map((student) => (
+                  {students.map(student => (
                     <option key={student.student_id} value={student.student_id}>
                       {student.first_name} {student.last_name} ({student.school_class ?? ''})
                     </option>
@@ -525,16 +544,10 @@ function TagAssignmentPage() {
                   justifyContent: 'center',
                 }}
               >
-                <Button
-                  onClick={handleAssignTag}
-                  disabled={!selectedStudentId || isLoading}
-                >
+                <Button onClick={handleAssignTag} disabled={!selectedStudentId || isLoading}>
                   {tagAssignment.assigned ? 'Neu zuweisen' : 'Zuweisen'}
                 </Button>
-                <Button
-                  onClick={handleScanAnother}
-                  variant="secondary"
-                >
+                <Button onClick={handleScanAnother} variant="secondary">
                   Neuer Scan
                 </Button>
               </div>
@@ -544,9 +557,7 @@ function TagAssignmentPage() {
           {/* Success State */}
           {success && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>
-                ✅
-              </div>
+              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>✅</div>
               <h2
                 style={{
                   fontSize: theme.fonts.size.xl,
@@ -573,15 +584,8 @@ function TagAssignmentPage() {
                   justifyContent: 'center',
                 }}
               >
-                <Button
-                  onClick={handleScanAnother}
-                >
-                  Weiteres Armband scannen
-                </Button>
-                <Button
-                  onClick={handleBack}
-                  variant="secondary"
-                >
+                <Button onClick={handleScanAnother}>Weiteres Armband scannen</Button>
+                <Button onClick={handleBack} variant="secondary">
                   Zurück
                 </Button>
               </div>
@@ -614,10 +618,7 @@ function TagAssignmentPage() {
         {/* Back Button */}
         {!showScanner && (
           <div style={{ textAlign: 'center', marginTop: theme.spacing.xl }}>
-            <Button
-              onClick={handleBack}
-              variant="secondary"
-            >
+            <Button onClick={handleBack} variant="secondary">
               Zurück zur Startseite
             </Button>
           </div>
