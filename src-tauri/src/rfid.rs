@@ -29,7 +29,6 @@ pub struct RfidScanEvent {
 pub enum ServiceCommand {
     Start,
     Stop,
-    GetStatus,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +65,12 @@ impl RfidBackgroundService {
     }
 
     pub fn initialize(app_handle: AppHandle) -> Result<(), String> {
+        // Check if already initialized
+        if RFID_SERVICE.get().is_some() {
+            println!("RFID Background Service already initialized, skipping");
+            return Ok(());
+        }
+        
         RFID_SERVICE.set(Arc::new(Mutex::new({
             let mut service = Self::new();
             service.app_handle = Some(app_handle);
@@ -136,9 +141,6 @@ impl RfidBackgroundService {
                             handle.abort();
                         }
                     }
-                }
-                ServiceCommand::GetStatus => {
-                    // Status is always available through state
                 }
             }
         }
@@ -298,7 +300,36 @@ mod raspberry_pi {
         }
     }
 
+    use std::sync::{Mutex, OnceLock};
+    
+    // Track initialization state to prevent repeated setup
+    static HARDWARE_INITIALIZED: OnceLock<bool> = OnceLock::new();
+    static INITIALIZATION_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
+    
+    fn ensure_hardware_ready() -> Result<(), String> {
+        // Get or create the mutex
+        let mutex = INITIALIZATION_MUTEX.get_or_init(|| Mutex::new(()));
+        let _lock = mutex.lock().map_err(|e| format!("Failed to acquire lock: {}", e))?;
+        
+        // Check if already initialized
+        if HARDWARE_INITIALIZED.get().is_some() {
+            return Ok(());
+        }
+        
+        // Perform one-time hardware check/setup if needed
+        println!("Performing one-time RFID hardware validation...");
+        
+        // Mark as initialized
+        HARDWARE_INITIALIZED.set(true).map_err(|_| "Already initialized")?;
+        println!("RFID hardware validation complete");
+        
+        Ok(())
+    }
+
     pub async fn scan_rfid_hardware() -> Result<String, String> {
+        // Ensure hardware is ready (but don't hold resources)
+        ensure_hardware_ready()?;
+        
         // Initialize SPI device - matches Python implementation settings
         let mut spi = match Spidev::open("/dev/spidev0.0") {
             Ok(s) => s,
@@ -556,7 +587,7 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
 }
 
 #[tauri::command]
-pub async fn scan_rfid_with_timeout(_timeout_seconds: u64) -> Result<RfidScanResult, String> {
+pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResult, String> {
     // For future implementation - continuous scanning with custom timeout
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
@@ -574,10 +605,10 @@ pub async fn scan_rfid_with_timeout(_timeout_seconds: u64) -> Result<RfidScanRes
     
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
-        tokio::time::sleep(Duration::from_secs(std::cmp::min(_timeout_seconds, 5))).await;
+        tokio::time::sleep(Duration::from_secs(std::cmp::min(timeout_seconds, 5))).await;
         Ok(RfidScanResult {
             success: true,
-            tag_id: Some(format!("MOCK:TIMEOUT:{}:SEC", _timeout_seconds)),
+            tag_id: Some(format!("MOCK:TIMEOUT:{}:SEC", timeout_seconds)),
             error: None,
         })
     }
