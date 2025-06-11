@@ -47,56 +47,32 @@ const ActivityScanningPage: React.FC = () => {
     }
   }, [showModal, currentScan]);
 
+  // Track student count based on check-ins
+  const [studentCount, setStudentCount] = useState(0);
+
   // Start scanning when component mounts
   useEffect(() => {
     logger.info('Activity Scanning Page mounted, starting RFID scanning');
-    startScanning();
+    void startScanning(); // Handle async function
     
     // Cleanup: stop scanning when component unmounts
     return () => {
       logger.info('Activity Scanning Page unmounting, stopping RFID scanning');
-      stopScanning();
+      void stopScanning(); // Handle async function
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run on mount/unmount
 
-  // Guard clause - if data is missing, show loading or error state
-  if (!selectedActivity || !selectedRoom || !authenticatedUser) {
-    return (
-      <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-lg text-gray-600">Keine Aktivität ausgewählt</p>
-          <button
-            onClick={() => navigate('/home')}
-            className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
-          >
-            Zurück zur Startseite
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const handleAnmelden = () => {
-    // Stop scanning temporarily
-    stopScanning();
-    // Navigate to PIN page for teacher access
-    void navigate('/pin');
-  };
-
-  // Track student count based on check-ins
-  const [studentCount, setStudentCount] = useState(0);
-  
   // Function to fetch current session info
   const fetchSessionInfo = async () => {
     if (!authenticatedUser?.pin) return;
     
     try {
       const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
-      logger.debug('Session info received:', sessionInfo || {});
+      logger.debug('Session info received:', sessionInfo ?? {});
       
       if (sessionInfo) {
-        const count = sessionInfo.active_students || 0;
+        const count = sessionInfo.active_students ?? 0;
         logger.info(`Setting student count to: ${count}`);
         setStudentCount(count);
       } else {
@@ -132,6 +108,40 @@ const ActivityScanningPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // fetchSessionInfo is stable within this component lifecycle
+
+  // Auto-close modal after delay
+  useEffect(() => {
+    if (showModal) {
+      const timer = setTimeout(() => {
+        // Modal will auto-close through the hook
+      }, rfid.modalDisplayTime);
+      return () => clearTimeout(timer);
+    }
+  }, [showModal, rfid.modalDisplayTime]);
+
+  // Guard clause - if data is missing, show loading or error state
+  if (!selectedActivity || !selectedRoom || !authenticatedUser) {
+    return (
+      <div className="min-h-screen bg-gray-100 p-4 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-gray-600">Keine Aktivität ausgewählt</p>
+          <button
+            onClick={() => navigate('/home')}
+            className="mt-4 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded"
+          >
+            Zurück zur Startseite
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const handleAnmelden = () => {
+    // Stop scanning temporarily
+    void stopScanning(); // Handle async function
+    // Navigate to PIN page for teacher access
+    void navigate('/pin');
+  };
 
   return (
     <>
@@ -176,7 +186,7 @@ const ActivityScanningPage: React.FC = () => {
                   color: theme.colors.primary,
                 }}
               >
-                <span>{studentCount !== null && studentCount !== undefined ? studentCount : 0}</span>
+                <span>{studentCount ?? 0}</span>
                 <span> Schüler anwesend</span>
               </div>
             </div>
@@ -219,34 +229,67 @@ const ActivityScanningPage: React.FC = () => {
       </ContentBox>
 
       {/* Check-in/Check-out Modal */}
-      <Modal
-        isOpen={showModal}
-        onClose={() => { /* Auto-close handled by autoCloseDelay */ }}
-        autoCloseDelay={rfid.modalDisplayTime}
-        type={currentScan?.action === 'checked_in' ? 'success' : 'info'}
-      >
-        {currentScan && (
-          <div className="text-center py-8">
-            <div className="text-8xl mb-8">
+      {showModal && currentScan && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: theme.colors.background.light,
+              borderRadius: theme.borders.radius.lg,
+              padding: theme.spacing.xxl,
+              maxWidth: '500px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: theme.shadows.lg,
+            }}
+          >
+            <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
               {currentScan.action === 'checked_in' ? '✅' : '👋'}
             </div>
-            <h3 className="text-4xl font-bold mb-4">
-              {currentScan.message || 
+            
+            <h2
+              style={{
+                fontSize: theme.fonts.size.xl,
+                fontWeight: theme.fonts.weight.bold,
+                marginBottom: theme.spacing.lg,
+                color: theme.colors.text.primary,
+              }}
+            >
+              {currentScan.message ?? 
                 (currentScan.action === 'checked_in' 
                   ? `Hallo, ${currentScan.student_name}!` 
                   : `Tschüss, ${currentScan.student_name}!`
                 )
               }
-            </h3>
-            <p className="text-2xl text-gray-600">
+            </h2>
+            
+            <div
+              style={{
+                fontSize: theme.fonts.size.large,
+                color: theme.colors.text.secondary,
+                marginBottom: theme.spacing.xl,
+              }}
+            >
               {currentScan.action === 'checked_in' 
                 ? 'Du bist jetzt angemeldet' 
                 : 'Du bist jetzt abgemeldet'
               }
-            </p>
+            </div>
           </div>
-        )}
-      </Modal>
+        </div>
+      )}
     </>
   );
 };
