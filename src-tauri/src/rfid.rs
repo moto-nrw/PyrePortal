@@ -539,7 +539,7 @@ pub async fn get_rfid_scanner_status() -> Result<RfidScannerStatus, String> {
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
         println!("Using mock platform (not ARM64 Linux)");
-        return Ok(mock_platform::check_rfid_hardware());
+        Ok(mock_platform::check_rfid_hardware())
     }
 }
 
