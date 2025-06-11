@@ -18,8 +18,12 @@ pub fn run() {
             logging::read_log_file,
             logging::clear_log_file,
             logging::cleanup_old_logs,
-            rfid::scan_rfid_single,
+            rfid::initialize_rfid_service,
+            rfid::start_rfid_service,
+            rfid::stop_rfid_service,
+            rfid::get_rfid_service_status,
             rfid::get_rfid_scanner_status,
+            rfid::scan_rfid_single,
             rfid::scan_rfid_with_timeout
         ])
         .run(tauri::generate_context!())

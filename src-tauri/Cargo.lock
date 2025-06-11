@@ -2889,6 +2889,7 @@ dependencies = [
  "embedded-hal",
  "linux-embedded-hal",
  "mfrc522",
+ "rand 0.8.5",
  "rppal",
  "serde",
  "serde_json",
