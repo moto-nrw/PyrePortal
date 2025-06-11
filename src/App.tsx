@@ -14,7 +14,7 @@ import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { selectedUser, authenticatedUser, selectedRoom, selectedActivity, activities } = useUserStore();
+  const { selectedUser, authenticatedUser, selectedRoom, selectedActivity } = useUserStore();
   const appLogger = createLogger('App');
 
   // Initialize logger with runtime config

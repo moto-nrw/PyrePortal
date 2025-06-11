@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button, ContentBox, Modal } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import { useUserStore } from '../store/userStore';
+import theme from '../styles/theme';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
@@ -73,12 +74,6 @@ const ActivityScanningPage: React.FC = () => {
     void navigate('/pin');
   };
 
-  const handleEndActivity = () => {
-    stopScanning();
-    // TODO: Call API to end session
-    void navigate('/');
-  };
-
   // Track student count based on check-ins
   const [studentCount, setStudentCount] = useState(selectedActivity?.enrollment_count || 0);
   
@@ -94,61 +89,91 @@ const ActivityScanningPage: React.FC = () => {
   }, [currentScan, studentCount]);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4">
-      {/* Header */}
-      <div className="flex justify-between items-start mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            {selectedActivity.name}
-          </h1>
-          <p className="text-lg text-gray-600">
-            Raum: {selectedRoom.name}
-          </p>
-        </div>
-        
-        <div className="flex items-center gap-4">
-          <div className="text-center">
-            <div className="text-3xl font-bold text-blue-600">
-              {studentCount}
+    <>
+      <ContentBox centered shadow="md" rounded="lg">
+        <div style={{ width: '100%', maxWidth: '800px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+          {/* Fixed Header */}
+          <div style={{ flexShrink: 0 }}>
+            {/* Navigation buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: theme.spacing.lg }}>
+              <Button onClick={() => navigate('/home')} variant="outline" size="medium">
+                ← Zurück
+              </Button>
+              <Button onClick={handleAnmelden} variant="outline" size="small">
+                Anmelden
+              </Button>
             </div>
-            <div className="text-sm text-gray-600">
-              Schüler
+            
+            {/* Title and info */}
+            <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
+              <h1
+                style={{
+                  fontSize: theme.fonts.size.xxl,
+                  fontWeight: theme.fonts.weight.bold,
+                  marginBottom: theme.spacing.md,
+                  color: theme.colors.text.primary,
+                }}
+              >
+                {selectedActivity.name}
+              </h1>
+              
+              <p
+                style={{
+                  fontSize: theme.fonts.size.large,
+                  color: theme.colors.text.secondary,
+                  marginBottom: theme.spacing.sm,
+                }}
+              >
+                Raum: {selectedRoom.name}
+              </p>
+              
+              <div
+                style={{
+                  fontSize: theme.fonts.size.xxl,
+                  fontWeight: theme.fonts.weight.bold,
+                  color: theme.colors.primary,
+                }}
+              >
+                {studentCount} Schüler anwesend
+              </div>
             </div>
           </div>
-          
-          <Button
-            onClick={handleAnmelden}
-            className="bg-blue-500 hover:bg-blue-600 text-white"
-          >
-            Anmelden
-          </Button>
-        </div>
-      </div>
 
-      {/* Main scanning area */}
-      <ContentBox className="flex flex-col items-center justify-center min-h-[400px] mb-8">
-        <div className="text-center">
-          <div className="text-6xl mb-4">
-            {isScanning ? '📡' : '⏸️'}
+          {/* Scrollable Content Area */}
+          <div style={{ 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '300px',
+          }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '5rem', marginBottom: theme.spacing.lg }}>
+                {isScanning ? '📡' : '⏸️'}
+              </div>
+              <h2
+                style={{
+                  fontSize: theme.fonts.size.xl,
+                  fontWeight: theme.fonts.weight.semibold,
+                  marginBottom: theme.spacing.md,
+                  color: theme.colors.text.primary,
+                }}
+              >
+                {isScanning ? 'RFID Scanner Aktiv' : 'Scanner Pausiert'}
+              </h2>
+              <p
+                style={{
+                  fontSize: theme.fonts.size.large,
+                  color: theme.colors.text.secondary,
+                }}
+              >
+                {isScanning ? 'Schülerkarte hier scannen' : 'Scanner ist pausiert'}
+              </p>
+            </div>
           </div>
-          <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-            {isScanning ? 'RFID Scanner Aktiv' : 'Scanner Pausiert'}
-          </h2>
-          <p className="text-lg text-gray-600">
-            {isScanning ? 'Schülerkarte hier scannen' : 'Scanner ist pausiert'}
-          </p>
         </div>
       </ContentBox>
-
-      {/* End activity button */}
-      <div className="flex justify-center">
-        <Button
-          onClick={handleEndActivity}
-          className="bg-red-500 hover:bg-red-600 text-white px-8 py-3"
-        >
-          Aktivität Beenden
-        </Button>
-      </div>
 
       {/* Check-in/Check-out Modal */}
       <Modal
@@ -173,7 +198,7 @@ const ActivityScanningPage: React.FC = () => {
           </div>
         )}
       </Modal>
-    </div>
+    </>
   );
 };
 
