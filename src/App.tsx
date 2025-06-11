@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
+import ActivityScanningPage from './pages/ActivityScanningPage';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
 import LoginPage from './pages/LoginPage';
-import ActivityScanningPage from './pages/ActivityScanningPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';

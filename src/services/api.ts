@@ -185,7 +185,7 @@ export const api = {
       console.log('✅ PIN validation successful');
       
       // Check if response has the expected structure
-      if (!response.data || !response.data.device || !response.data.person || !response.data.staff) {
+      if (!response.data?.device || !response.data.person || !response.data.staff) {
         console.error('❌ Unexpected response structure:', response);
         return {
           success: false,
@@ -315,7 +315,7 @@ export const api = {
       });
       
       // Check if we have valid session data
-      if (!response.data || !response.data.active_group_id || !response.data.activity_id) {
+      if (!response.data?.active_group_id || !response.data.activity_id) {
         return null;
       }
       

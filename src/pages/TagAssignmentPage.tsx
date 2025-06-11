@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { Button, ContentBox } from '../components/ui';
-import { useUserStore } from '../store/userStore';
 import { api, type Student, type TagAssignmentCheck } from '../services/api';
+import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { logNavigation, logUserAction, logError } from '../utils/logger';
 import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
