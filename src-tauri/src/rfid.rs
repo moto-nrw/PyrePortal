@@ -347,7 +347,7 @@ mod raspberry_pi {
         
         // Initialize the MFRC522 (this transitions to the Initialized state)
         println!("Attempting to initialize MFRC522...");
-        let mfrc522 = match mfrc522.init() {
+        let mut mfrc522 = match mfrc522.init() {
             Ok(m) => {
                 println!("MFRC522 initialized successfully");
                 m
