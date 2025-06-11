@@ -485,6 +485,7 @@ export const api = {
         },
       });
       
+      console.log('getCurrentSessionInfo response:', response);
       return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

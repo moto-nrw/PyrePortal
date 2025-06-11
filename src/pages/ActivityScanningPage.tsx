@@ -84,8 +84,15 @@ const ActivityScanningPage: React.FC = () => {
     
     try {
       const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
+      logger.debug('Session info received:', sessionInfo || {});
+      
       if (sessionInfo) {
-        setStudentCount(sessionInfo.active_students);
+        const count = sessionInfo.active_students || 0;
+        logger.info(`Setting student count to: ${count}`);
+        setStudentCount(count);
+      } else {
+        logger.warn('No session info received');
+        setStudentCount(0);
       }
     } catch (error) {
       logger.error('Failed to fetch session info', { error });
@@ -160,7 +167,8 @@ const ActivityScanningPage: React.FC = () => {
                   color: theme.colors.primary,
                 }}
               >
-                {studentCount} Schüler anwesend
+                <span>{studentCount !== null && studentCount !== undefined ? studentCount : 0}</span>
+                <span> Schüler anwesend</span>
               </div>
             </div>
           </div>
@@ -209,11 +217,11 @@ const ActivityScanningPage: React.FC = () => {
         type={currentScan?.action === 'checked_in' ? 'success' : 'info'}
       >
         {currentScan && (
-          <div className="text-center">
-            <div className="text-4xl mb-4">
+          <div className="text-center py-8">
+            <div className="text-8xl mb-8">
               {currentScan.action === 'checked_in' ? '✅' : '👋'}
             </div>
-            <h3 className="text-2xl font-bold mb-2">
+            <h3 className="text-4xl font-bold mb-4">
               {currentScan.message || 
                 (currentScan.action === 'checked_in' 
                   ? `Hallo, ${currentScan.student_name}!` 
@@ -221,6 +229,12 @@ const ActivityScanningPage: React.FC = () => {
                 )
               }
             </h3>
+            <p className="text-2xl text-gray-600">
+              {currentScan.action === 'checked_in' 
+                ? 'Du bist jetzt angemeldet' 
+                : 'Du bist jetzt abgemeldet'
+              }
+            </p>
           </div>
         )}
       </Modal>
