@@ -591,7 +591,8 @@ pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResu
     // For future implementation - continuous scanning with custom timeout
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
-        // TODO: Implement timeout-based scanning
+        // Use the timeout parameter for future implementation
+        let _timeout = timeout_seconds; // Acknowledge parameter usage
         raspberry_pi::scan_rfid_hardware().await.map(|tag_id| RfidScanResult {
             success: true,
             tag_id: Some(tag_id),
