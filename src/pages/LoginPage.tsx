@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -74,6 +75,17 @@ function LoginPage() {
     setLocalSelectedUser(value);
   };
 
+  // Handle application quit
+  const handleQuit = async () => {
+    try {
+      logger.info('User requested application quit');
+      logUserAction('quit_app');
+      await invoke('quit_app');
+    } catch (error) {
+      logError(error instanceof Error ? error : new Error(String(error)), 'LoginPage.handleQuit');
+    }
+  };
+
   return (
     <ContentBox centered shadow="md" rounded="lg">
       <h1
@@ -147,6 +159,23 @@ function LoginPage() {
           disabled={isLoading || !localSelectedUser}
         >
           {isLoading ? 'Lädt...' : 'Anmelden'}
+        </Button>
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          marginTop: theme.spacing.xxl,
+        }}
+      >
+        <Button
+          type="button"
+          onClick={handleQuit}
+          variant="outline"
+          size="medium"
+        >
+          Beenden
         </Button>
       </div>
     </ContentBox>
