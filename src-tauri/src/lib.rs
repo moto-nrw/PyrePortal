@@ -41,6 +41,7 @@ pub fn run() {
             // Create the main window with dynamic fullscreen setting
             let _window = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("pyreportal")
+                .inner_size(1280.0, 720.0)
                 .resizable(true)
                 .fullscreen(fullscreen)
                 .center()
