@@ -806,6 +806,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "dotenvy"
+version = "0.15.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1aaf95b3e5c8f23aa320147307562d361db0ae0d51242340f558153b4eb2439b"
+
+[[package]]
 name = "dpi"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2886,6 +2892,7 @@ name = "pyreportal"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dotenvy",
  "embedded-hal",
  "linux-embedded-hal",
  "mfrc522",
