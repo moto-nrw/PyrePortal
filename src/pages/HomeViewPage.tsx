@@ -73,7 +73,7 @@ function HomeViewPage() {
       backgroundColor: disabled ? '#f3f4f6' : theme.colors.background.light,
       borderRadius: theme.borders.radius.lg,
       boxShadow: theme.shadows.md,
-      padding: theme.spacing.xxl,
+      padding: theme.spacing.xl,
       cursor: disabled ? 'not-allowed' : 'pointer',
       transition: theme.animation.transition.fast,
       border: `1px solid ${theme.colors.border.light}`,
@@ -81,7 +81,7 @@ function HomeViewPage() {
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
-      height: '200px',
+      height: '180px',
       opacity: disabled ? 0.6 : 1,
     };
 
@@ -91,13 +91,14 @@ function HomeViewPage() {
         style={cardStyles}
         className={disabled ? '' : 'hover:bg-gray-100 hover:shadow-lg active:bg-gray-200'}
       >
-        <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>{icon}</div>
+        <div style={{ fontSize: '3.5rem', marginBottom: theme.spacing.lg }}>{icon}</div>
         <div
           style={{
             fontSize: theme.fonts.size.xl,
             fontWeight: theme.fonts.weight.bold,
             color: disabled ? theme.colors.text.secondary : theme.colors.text.primary,
             textAlign: 'center',
+            lineHeight: 1.2,
           }}
         >
           {title}
@@ -107,15 +108,15 @@ function HomeViewPage() {
   };
 
   return (
-    <ContentBox centered shadow="md" rounded="lg">
+    <ContentBox centered shadow="md" rounded="lg" padding={theme.spacing.xl}>
       <div style={{ width: '100%', maxWidth: '600px' }}>
         {/* User info section */}
-        <div style={{ textAlign: 'center', marginBottom: theme.spacing.xxl }}>
+        <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
           <h1
             style={{
-              fontSize: theme.fonts.size.xxl,
+              fontSize: theme.fonts.size.xl,
               fontWeight: theme.fonts.weight.bold,
-              marginBottom: theme.spacing.lg,
+              marginBottom: theme.spacing.md,
               color: theme.colors.text.primary,
             }}
           >
@@ -123,7 +124,7 @@ function HomeViewPage() {
           </h1>
           <p
             style={{
-              fontSize: theme.fonts.size.large,
+              fontSize: theme.fonts.size.base,
               color: theme.colors.text.secondary,
               marginBottom: theme.spacing.sm,
             }}
@@ -137,7 +138,7 @@ function HomeViewPage() {
           style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: theme.spacing.xl,
+            gap: theme.spacing.lg,
             width: '100%',
           }}
         >
