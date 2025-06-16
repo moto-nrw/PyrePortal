@@ -8,6 +8,9 @@ import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 // Tauri event listening
 let eventListener: (() => void) | null = null;
 
+// Mock scanning interval for development
+let mockScanInterval: ReturnType<typeof setInterval> | null = null;
+
 const logger = createLogger('useRfidScanning');
 
 export const useRfidScanning = () => {
@@ -144,16 +147,57 @@ export const useRfidScanning = () => {
   }, [isTagBlocked, processScan]);
 
   const startScanning = useCallback(async () => {
-    if (!isRfidEnabled()) {
-      logger.debug('RFID not enabled, skipping');
-      return;
-    }
-
     if (isServiceStartedRef.current) {
       logger.debug('Service already started, skipping');
       return;
     }
 
+    // Check if RFID is enabled
+    if (!isRfidEnabled()) {
+      logger.info('RFID not enabled, starting mock scanning mode');
+      
+      // Start mock scanning interval
+      if (!mockScanInterval) {
+        startRfidScanning(); // Update store state
+        
+        // Generate mock scans every 3-5 seconds
+        mockScanInterval = setInterval(() => {
+          // Get mock tags from environment variable or use defaults
+          const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
+          const mockStudentTags: string[] = envTags 
+            ? envTags.split(',').map((tag) => tag.trim())
+            : [
+                // Default realistic hardware format tags
+                '04:D6:94:82:97:6A:80',
+                '04:A7:B3:C2:D1:E0:F5',
+                '04:12:34:56:78:9A:BC',
+                '04:FE:DC:BA:98:76:54',
+                '04:11:22:33:44:55:66'
+              ];
+          
+          // Pick a random tag from the list
+          const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
+          
+          logger.info('Mock RFID scan generated', {
+            tagId: mockTagId,
+            platform: 'Development Mock'
+          });
+          
+          // Check if tag is blocked before processing
+          if (!isTagBlocked(mockTagId)) {
+            void processScan(mockTagId);
+          } else {
+            logger.debug(`Mock tag ${mockTagId} is blocked, skipping`);
+          }
+        }, 3000 + Math.random() * 2000); // Random interval between 3-5 seconds
+        
+        isServiceStartedRef.current = true;
+        logger.info('Mock RFID scanning started');
+      }
+      return;
+    }
+
+    // Real RFID scanning
     try {
       logger.info('Starting RFID background service');
       await safeInvoke('start_rfid_service');
@@ -163,7 +207,7 @@ export const useRfidScanning = () => {
     } catch (error) {
       logger.error('Failed to start RFID service', { error });
     }
-  }, [startRfidScanning]);
+  }, [startRfidScanning, isTagBlocked, processScan]);
 
   const stopScanning = useCallback(async () => {
     if (!isServiceStartedRef.current) {
@@ -172,11 +216,20 @@ export const useRfidScanning = () => {
     }
 
     try {
-      logger.info('Stopping RFID background service');
-      await safeInvoke('stop_rfid_service');
+      if (isRfidEnabled()) {
+        logger.info('Stopping RFID background service');
+        await safeInvoke('stop_rfid_service');
+      } else {
+        // Stop mock scanning
+        if (mockScanInterval) {
+          clearInterval(mockScanInterval);
+          mockScanInterval = null;
+          logger.info('Mock RFID scanning stopped');
+        }
+      }
       isServiceStartedRef.current = false;
       stopRfidScanning(); // Update store state
-      logger.info('RFID background service stopped');
+      logger.info('RFID service stopped');
     } catch (error) {
       logger.error('Failed to stop RFID service', { error });
     }
@@ -202,6 +255,10 @@ export const useRfidScanning = () => {
       if (eventListener) {
         eventListener();
         eventListener = null;
+      }
+      if (mockScanInterval) {
+        clearInterval(mockScanInterval);
+        mockScanInterval = null;
       }
       if (isServiceStartedRef.current) {
         void stopScanning();
