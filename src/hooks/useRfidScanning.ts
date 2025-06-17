@@ -70,12 +70,17 @@ export const useRfidScanning = () => {
         // Debug: Log the complete result to see what server returned
         logger.debug('Complete RFID scan result', {
           action: result.action,
+          actionType: typeof result.action,
+          actionLength: result.action?.length,
+          actionCharCodes: result.action ? Array.from(result.action).map(c => c.charCodeAt(0)) : [],
+          isCheckedIn: result.action === 'checked_in',
+          isCheckedOut: result.action === 'checked_out',
           student_name: result.student_name,
           student_id: result.student_id,
           visit_id: result.visit_id,
           message: result.message,
           status: result.status,
-          fullResult: result,
+          fullResult: JSON.stringify(result),
         });
 
         // Update store with scan result and show modal

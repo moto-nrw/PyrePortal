@@ -262,7 +262,14 @@ const ActivityScanningPage: React.FC = () => {
             }}
           >
             <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
-              {currentScan.action === 'checked_in' ? '✅' : '👋'}
+              {(() => {
+                logger.debug('Modal icon logic:', {
+                  action: currentScan.action,
+                  isCheckedIn: currentScan.action === 'checked_in',
+                  typeOfAction: typeof currentScan.action,
+                });
+                return currentScan.action === 'checked_in' ? '✅' : '👋';
+              })()}
             </div>
 
             <h2
@@ -286,9 +293,16 @@ const ActivityScanningPage: React.FC = () => {
                 marginBottom: theme.spacing.xl,
               }}
             >
-              {currentScan.action === 'checked_in'
-                ? 'Du bist jetzt angemeldet'
-                : 'Du bist jetzt abgemeldet'}
+              {(() => {
+                logger.debug('Modal message logic:', {
+                  action: currentScan.action,
+                  isCheckedIn: currentScan.action === 'checked_in',
+                  message: currentScan.action === 'checked_in' ? 'Du bist jetzt angemeldet' : 'Du bist jetzt abgemeldet',
+                });
+                return currentScan.action === 'checked_in'
+                  ? 'Du bist jetzt angemeldet'
+                  : 'Du bist jetzt abgemeldet';
+              })()}
             </div>
           </div>
         </div>

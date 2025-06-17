@@ -445,7 +445,11 @@ export const api = {
     },
     pin: string
   ): Promise<RfidScanResult> {
-    const response = await apiCall<RfidScanResult>('/api/iot/checkin', {
+    const response = await apiCall<{
+      data: RfidScanResult;
+      message: string;
+      status: string;
+    }>('/api/iot/checkin', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
@@ -454,7 +458,8 @@ export const api = {
       body: JSON.stringify(scanData),
     });
 
-    return response;
+    // Extract the actual data from the nested response
+    return response.data;
   },
 
   /**
