@@ -10,9 +10,11 @@ const logger = createLogger('API');
 // Environment configuration
 const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
-const DEVICE_API_KEY: string =
-  (import.meta.env.VITE_DEVICE_API_KEY as string) ??
-  'dev_bc17223f4417bd2251742e659efc5a7d14671f714154d3cc207fe8ee0feedeaa';
+const DEVICE_API_KEY: string = import.meta.env.VITE_DEVICE_API_KEY as string;
+
+if (!DEVICE_API_KEY) {
+  throw new Error('VITE_DEVICE_API_KEY environment variable is required');
+}
 
 /**
  * Generic API call function with error handling
@@ -29,7 +31,19 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status} - ${response.statusText}`);
+    // Try to get error details from response body
+    let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
+    try {
+      const errorData = await response.json() as { message?: string; error?: string };
+      if (errorData.message) {
+        errorMessage = errorData.message;
+      } else if (errorData.error) {
+        errorMessage = errorData.error;
+      }
+    } catch {
+      // If JSON parsing fails, use the default error message
+    }
+    throw new Error(errorMessage);
   }
 
   return response.json() as Promise<T>;
@@ -118,7 +132,8 @@ interface RoomsResponse {
  */
 export interface SessionStartRequest {
   activity_id: number;
-  force?: boolean;
+  room_id?: number; // Optional: Override the activity's planned room
+  force?: boolean; // Optional: Force start even if conflicts exist
 }
 
 /**
@@ -126,10 +141,11 @@ export interface SessionStartRequest {
  */
 export interface SessionStartResponse {
   active_group_id: number;
+  activity_id: number;
+  device_id: number;
+  start_time: string;
   status: string;
-  session_id: number;
-  activity_name: string;
-  room_name: string;
+  message: string;
 }
 
 /**
@@ -145,6 +161,7 @@ export interface CurrentSession {
   start_time: string;
   duration: string;
   is_active?: boolean;
+  active_students?: number;
 }
 
 /**
@@ -294,6 +311,8 @@ export const api = {
    * Endpoint: POST /api/iot/session/start
    */
   async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
+    logger.info('Starting session with request:', { ...request });
+    
     const response = await apiCall<SessionStartResponse>('/api/iot/session/start', {
       method: 'POST',
       headers: {
@@ -314,21 +333,41 @@ export const api = {
     try {
       const response = await apiCall<{
         status: string;
-        data: CurrentSession;
-        message: string;
+        has_session: boolean;
+        session?: {
+          id: number;
+          room_id: number;
+          room_name: string;
+          group_id: number;
+          group_name: string;
+          start_time: string;
+          student_count: number;
+        };
+        message?: string;
       }>('/api/iot/session/current', {
         headers: {
-          Authorization: `Bearer ${DEVICE_API_KEY}`,
+          'X-Device-Key': DEVICE_API_KEY,
           'X-Staff-PIN': pin,
         },
       });
 
-      // Check if we have valid session data
-      if (!response.data?.active_group_id || !response.data.activity_id) {
+      // Check if we have an active session
+      if (!response.has_session || !response.session) {
         return null;
       }
 
-      return response.data;
+      // Map to our CurrentSession interface
+      return {
+        active_group_id: response.session.id,
+        activity_id: response.session.group_id,
+        room_id: response.session.room_id,
+        room_name: response.session.room_name,
+        active_students: response.session.student_count,
+        device_id: 0, // Not provided by the API
+        start_time: response.session.start_time,
+        duration: '0', // Not provided by the API
+        is_active: true,
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means no current session, which is fine
@@ -557,9 +596,11 @@ export interface TagAssignmentResult {
 export interface RfidScanResult {
   student_id: number;
   student_name: string;
-  action: 'checked_in' | 'checked_out';
+  action: 'checked_in' | 'checked_out' | 'transferred';
+  greeting?: string;
   visit_id?: number;
   room_name?: string;
+  previous_room?: string;
   processed_at?: string;
   message?: string;
   status?: string;

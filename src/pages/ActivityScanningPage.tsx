@@ -180,7 +180,7 @@ const ActivityScanningPage: React.FC = () => {
                   marginBottom: theme.spacing.sm,
                 }}
               >
-                Raum: {selectedRoom.name}
+                Raum: {selectedRoom?.name || 'Unbekannt'}
               </p>
 
               <div
@@ -268,7 +268,8 @@ const ActivityScanningPage: React.FC = () => {
                   isCheckedIn: currentScan.action === 'checked_in',
                   typeOfAction: typeof currentScan.action,
                 });
-                return currentScan.action === 'checked_in' ? '✅' : '👋';
+                // Show checkmark for both check-in and transfer (since transfer includes a check-in)
+                return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? '✅' : '👋';
               })()}
             </div>
 
@@ -299,7 +300,8 @@ const ActivityScanningPage: React.FC = () => {
                   isCheckedIn: currentScan.action === 'checked_in',
                   message: currentScan.action === 'checked_in' ? 'Du bist jetzt angemeldet' : 'Du bist jetzt abgemeldet',
                 });
-                return currentScan.action === 'checked_in'
+                // Show "logged in" message for both check-in and transfer
+                return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
                   ? 'Du bist jetzt angemeldet'
                   : 'Du bist jetzt abgemeldet';
               })()}
