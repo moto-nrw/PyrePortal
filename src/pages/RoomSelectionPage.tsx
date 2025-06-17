@@ -386,16 +386,19 @@ function RoomSelectionPage() {
       );
 
       // Handle 409 Conflict - show conflict modal
+      logger.debug('Checking for conflict error', { errorMessage, includes409: errorMessage.includes('409'), includesConflict: errorMessage.includes('Conflict') });
+      
       if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
+        logger.info('Showing conflict modal due to 409 error');
         setShowConflictModal(true);
+        setIsStartingSession(false);
         return; // Don't close the confirm modal yet, show conflict modal instead
       } else {
         alert(`Fehler beim Starten der Aktivität: ${errorMessage}`);
+        setIsStartingSession(false);
+        setShowConfirmModal(false);
+        setSelectedRoom(null);
       }
-    } finally {
-      setIsStartingSession(false);
-      setShowConfirmModal(false);
-      setSelectedRoom(null);
     }
   };
 

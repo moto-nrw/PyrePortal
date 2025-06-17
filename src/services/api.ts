@@ -33,16 +33,23 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!response.ok) {
     // Try to get error details from response body
     let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
+    let detailMessage = '';
     try {
       const errorData = await response.json() as { message?: string; error?: string };
       if (errorData.message) {
-        errorMessage = errorData.message;
+        detailMessage = errorData.message;
       } else if (errorData.error) {
-        errorMessage = errorData.error;
+        detailMessage = errorData.error;
       }
     } catch {
       // If JSON parsing fails, use the default error message
     }
+    
+    // Include both status code and detail message for better error handling
+    if (detailMessage) {
+      errorMessage = `${errorMessage}: ${detailMessage}`;
+    }
+    
     throw new Error(errorMessage);
   }
 
@@ -313,7 +320,11 @@ export const api = {
   async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
     logger.info('Starting session with request:', { ...request });
     
-    const response = await apiCall<SessionStartResponse>('/api/iot/session/start', {
+    const response = await apiCall<{
+      status: string;
+      data: SessionStartResponse;
+      message?: string;
+    }>('/api/iot/session/start', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
@@ -322,7 +333,7 @@ export const api = {
       body: JSON.stringify(request),
     });
 
-    return response;
+    return response.data;
   },
 
   /**
@@ -333,41 +344,22 @@ export const api = {
     try {
       const response = await apiCall<{
         status: string;
-        has_session: boolean;
-        session?: {
-          id: number;
-          room_id: number;
-          room_name: string;
-          group_id: number;
-          group_name: string;
-          start_time: string;
-          student_count: number;
-        };
+        data: CurrentSession | { device_id: number; is_active: false };
         message?: string;
       }>('/api/iot/session/current', {
         headers: {
-          'X-Device-Key': DEVICE_API_KEY,
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
         },
       });
 
       // Check if we have an active session
-      if (!response.has_session || !response.session) {
+      if ('is_active' in response.data && response.data.is_active === false) {
         return null;
       }
 
-      // Map to our CurrentSession interface
-      return {
-        active_group_id: response.session.id,
-        activity_id: response.session.group_id,
-        room_id: response.session.room_id,
-        room_name: response.session.room_name,
-        active_students: response.session.student_count,
-        device_id: 0, // Not provided by the API
-        start_time: response.session.start_time,
-        duration: '0', // Not provided by the API
-        is_active: true,
-      };
+      // The server returns the session data directly in the data field
+      return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means no current session, which is fine
@@ -529,12 +521,7 @@ export const api = {
     try {
       const response = await apiCall<{
         status: string;
-        data: {
-          activity_name: string;
-          room_name: string;
-          active_students: number;
-          last_activity: string;
-        };
+        data: CurrentSession | { device_id: number; is_active: false };
         message: string;
       }>('/api/iot/session/current', {
         headers: {
@@ -544,7 +531,19 @@ export const api = {
       });
 
       logger.debug('getCurrentSessionInfo response', { response });
-      return response.data;
+      
+      // Check if we have an active session
+      if ('is_active' in response.data && response.data.is_active === false) {
+        return null;
+      }
+      
+      // Map the CurrentSession to the simplified format expected by the UI
+      const session = response.data;
+      return {
+        activity_name: session.activity_name ?? 'Unknown Activity',
+        room_name: session.room_name ?? 'Unknown Room',
+        active_students: session.active_students ?? 0,
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means no current session

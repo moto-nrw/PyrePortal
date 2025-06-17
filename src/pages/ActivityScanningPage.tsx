@@ -298,12 +298,19 @@ const ActivityScanningPage: React.FC = () => {
                 logger.debug('Modal message logic:', {
                   action: currentScan.action,
                   isCheckedIn: currentScan.action === 'checked_in',
-                  message: currentScan.action === 'checked_in' ? 'Du bist jetzt angemeldet' : 'Du bist jetzt abgemeldet',
                 });
-                // Show "logged in" message for both check-in and transfer
-                return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
-                  ? 'Du bist jetzt angemeldet'
-                  : 'Du bist jetzt abgemeldet';
+                // Show appropriate message based on action
+                switch (currentScan.action) {
+                  case 'checked_in':
+                    return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
+                  case 'checked_out':
+                    return 'Du bist jetzt ausgecheckt';
+                  case 'transferred':
+                    // For transfers, the greeting already contains the transfer info
+                    return 'Raumwechsel erfolgreich';
+                  default:
+                    return '';
+                }
               })()}
             </div>
           </div>
