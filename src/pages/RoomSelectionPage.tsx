@@ -636,21 +636,11 @@ function RoomSelectionPage() {
 
             <p
               style={{
-                fontSize: theme.fonts.size.large,
-                color: theme.colors.text.secondary,
-                marginBottom: theme.spacing.sm,
-              }}
-            >
-              für: {selectedActivity.name}
-            </p>
-
-            <p
-              style={{
                 fontSize: theme.fonts.size.base,
                 color: theme.colors.text.secondary,
               }}
             >
-              {authenticatedUser.staffName} • {authenticatedUser.deviceName}
+              {authenticatedUser.staffName} • {authenticatedUser.deviceName} • {selectedActivity.name}
             </p>
           </div>
         </div>

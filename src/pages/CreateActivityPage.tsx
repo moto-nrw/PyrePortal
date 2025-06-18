@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox } from '../components/ui';
+import { Button, ContentBox, BackButton } from '../components/ui';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -301,9 +301,7 @@ function CreateActivityPage() {
               marginBottom: theme.spacing.lg,
             }}
           >
-            <Button onClick={handleBack} variant="outline" size="medium">
-              ← Zurück
-            </Button>
+            <BackButton onClick={handleBack} />
             <Button onClick={handleLogout} variant="outline" size="small">
               Abmelden
             </Button>

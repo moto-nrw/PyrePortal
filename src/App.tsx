@@ -83,6 +83,10 @@ function App() {
                 )
               }
             />
+            <Route
+              path="/log-off-student"
+              element={isFullyAuthenticated ? <div>Log Off Student Page</div> : <Navigate to="/" replace />}
+            />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

@@ -41,9 +41,9 @@ function HomeViewPage() {
     }
   };
 
-  const handleSettings = () => {
-    // Skip for MVP according to documentation
-    logUserAction('Settings clicked (MVP - skipped)');
+  const handleGoHome = () => {
+    logNavigation('Home View', '/log-off-student');
+    void navigate('/log-off-student');
   };
 
   // Redirect to login if no authenticated user and fetch current session
@@ -114,7 +114,7 @@ function HomeViewPage() {
         <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
           <h1
             style={{
-              fontSize: theme.fonts.size.xl,
+              fontSize: '2.5rem',
               fontWeight: theme.fonts.weight.bold,
               marginBottom: theme.spacing.md,
               color: theme.colors.text.primary,
@@ -124,7 +124,7 @@ function HomeViewPage() {
           </h1>
           <p
             style={{
-              fontSize: theme.fonts.size.base,
+              fontSize: '1.5rem',
               color: theme.colors.text.secondary,
               marginBottom: theme.spacing.sm,
             }}
@@ -156,7 +156,7 @@ function HomeViewPage() {
           ) : (
             <ActionCard onClick={handleStartActivity} title="Aktivität starten" icon="🎯" />
           )}
-          <ActionCard onClick={handleSettings} title="Einstellungen" icon="⚙️" disabled={true} />
+          <ActionCard onClick={handleGoHome} title="Nach Hause" icon="🏠" />
           <ActionCard onClick={handleLogout} title="Abmelden" icon="🚪" />
         </div>
       </div>
