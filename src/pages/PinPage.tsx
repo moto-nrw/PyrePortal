@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox } from '../components/ui';
+import { Button, ContentBox, ErrorModal } from '../components/ui';
 import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -10,8 +10,9 @@ import { createLogger, logNavigation, logUserAction, logError } from '../utils/l
 function PinPage() {
   const { selectedUser, setAuthenticatedUser } = useUserStore();
   const [pin, setPin] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const navigate = useNavigate();
 
   // Create logger instance for this component
@@ -34,12 +35,20 @@ function PinPage() {
   // Maximum PIN length
   const maxPinLength = 4;
 
+  // Auto-submit when PIN is complete
+  useEffect(() => {
+    if (pin.length === maxPinLength && !isLoading) {
+      logger.info('Auto-submitting PIN', { user: selectedUser });
+      void handleSubmit();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin]); // Only watch pin changes
+
   // Handle numpad button click
   const handleNumpadClick = (num: number | string) => {
     try {
       if (pin.length < maxPinLength) {
         setPin(prev => prev + num);
-        setError(null);
 
         // Log pin entry progress (without revealing the full pin)
         logger.debug('PIN digit entered', {
@@ -69,7 +78,6 @@ function PinPage() {
     try {
       if (pin.length > 0) {
         setPin(prev => prev.slice(0, -1));
-        setError(null);
         logger.debug('PIN digit deleted', { remainingLength: pin.length - 1 });
       } else {
         logger.debug('Attempted to delete from empty PIN');
@@ -83,7 +91,6 @@ function PinPage() {
   const handleClear = () => {
     try {
       setPin('');
-      setError(null);
       logger.debug('PIN cleared');
       logUserAction('pin_cleared', { user: selectedUser });
     } catch (error) {
@@ -108,7 +115,9 @@ function PinPage() {
       // Check PIN length first
       if (pin.length !== maxPinLength) {
         const errorMsg = 'Bitte geben Sie einen 4-stelligen PIN ein';
-        setError(errorMsg);
+        setErrorMessage(errorMsg);
+        setIsErrorModalOpen(true);
+        setPin(''); // Clear PIN
         logger.warn('PIN verification failed', {
           reason: 'incomplete_pin',
           pinLength: pin.length,
@@ -124,7 +133,6 @@ function PinPage() {
       // Performance marking for PIN verification flow
       performance.mark('pin-verification-start');
       setIsLoading(true);
-      setError(null);
 
       // Validate PIN with real API
       const result: PinValidationResult = await api.validateTeacherPin(pin);
@@ -164,7 +172,10 @@ function PinPage() {
 
         void navigate('/home');
       } else {
-        setError(result.error ?? 'Ungültiger PIN. Bitte versuchen Sie es erneut.');
+        const errorMsg = result.error ?? 'Ungültiger PIN. Bitte versuchen Sie es erneut.';
+        setErrorMessage(errorMsg);
+        setIsErrorModalOpen(true);
+        setPin(''); // Clear PIN
         logger.warn('PIN verification failed', {
           reason: result.isLocked ? 'account_locked' : 'invalid_pin',
           user: selectedUser,
@@ -177,7 +188,9 @@ function PinPage() {
       }
     } catch (error) {
       const errorMsg = 'Fehler bei der PIN-Überprüfung. Bitte versuchen Sie es erneut.';
-      setError(errorMsg);
+      setErrorMessage(errorMsg);
+      setIsErrorModalOpen(true);
+      setPin(''); // Clear PIN
       logger.error('PIN verification error', { error, user: selectedUser });
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleSubmit');
     } finally {
@@ -192,13 +205,13 @@ function PinPage() {
     children: React.ReactNode;
   }> = ({ onClick, isAction = false, children }) => {
     const baseStyles: React.CSSProperties = {
-      width: '90px',
-      height: '73px',
+      width: '87px',
+      height: '67px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: theme.borders.radius.md,
-      fontSize: isAction ? theme.fonts.size.large : '2.2rem',
+      fontSize: isAction ? theme.fonts.size.large : '2.1rem',
       fontWeight: theme.fonts.weight.bold,
       backgroundColor: theme.colors.background.light,
       color: isAction ? theme.colors.text.secondary : theme.colors.text.primary,
@@ -234,7 +247,7 @@ function PinPage() {
         style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: theme.spacing.md,
+          gap: theme.spacing.sm,
           maxWidth: '340px',
           margin: '0 auto',
           justifyItems: 'center',
@@ -266,109 +279,112 @@ function PinPage() {
   };
 
   return (
-    <ContentBox centered shadow="md" rounded="lg">
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '450px',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        {/* User name display */}
-        <h1
-          style={{
-            fontSize: theme.fonts.size.xxl,
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: theme.spacing.xl,
-            textAlign: 'center',
-            color: theme.colors.text.primary,
-          }}
-        >
-          {selectedUser}
-        </h1>
-
-        {/* PIN display */}
+    <>
+      <ContentBox centered shadow="md" rounded="lg">
         <div
           style={{
+            width: '100%',
+            maxWidth: '450px',
             display: 'flex',
-            justifyContent: 'center',
-            gap: theme.spacing.lg,
-            marginBottom: theme.spacing.xl,
+            flexDirection: 'column',
+            alignItems: 'center',
           }}
         >
-          {Array.from({ length: maxPinLength }).map((_, i) => (
-            <div
-              key={i}
-              style={{
-                width: '60px',
-                height: '60px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: theme.borders.radius.lg,
-                fontSize: '2rem',
-                fontWeight: theme.fonts.weight.bold,
-                transition: 'all 0.1s ease',
-                border: `3px solid ${i < pin.length ? theme.colors.primary : theme.colors.border.light}`,
-                backgroundColor:
-                  i < pin.length ? theme.colors.primary : theme.colors.background.light,
-                color: i < pin.length ? theme.colors.text.light : 'transparent',
-                boxShadow: i < pin.length ? theme.shadows.md : theme.shadows.sm,
-              }}
-            >
-              •
-            </div>
-          ))}
-        </div>
-
-        {/* Error message */}
-        {error && (
-          <div
+          {/* User name display */}
+          <h1
             style={{
-              color: '#dc2626',
-              fontSize: theme.fonts.size.base,
-              textAlign: 'center',
+              fontSize: theme.fonts.size.xxl,
+              fontWeight: theme.fonts.weight.bold,
               marginBottom: theme.spacing.lg,
-              padding: theme.spacing.md,
-              backgroundColor: '#fef2f2',
-              border: '1px solid #fecaca',
-              borderRadius: theme.borders.radius.md,
-              width: '100%',
+              textAlign: 'center',
+              color: theme.colors.text.primary,
             }}
           >
-            {error}
-          </div>
-        )}
+            {selectedUser}
+          </h1>
 
-        {/* Numpad */}
-        <div style={{ width: '100%', marginBottom: theme.spacing.xl }}>{numpadGrid()}</div>
-
-        {/* Action buttons */}
-        <div
-          style={{
-            display: 'flex',
-            width: '100%',
-            justifyContent: 'space-between',
-            gap: theme.spacing.lg,
-          }}
-        >
-          <Button onClick={handleBack} variant="outline" size="medium">
-            Zurück
-          </Button>
-
-          <Button
-            onClick={handleSubmit}
-            variant="primary"
-            size="medium"
-            disabled={pin.length < maxPinLength || isLoading}
+          {/* PIN display */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: theme.spacing.sm,
+              marginBottom: theme.spacing.md,
+            }}
           >
-            {isLoading ? 'Überprüfung...' : 'Bestätigen'}
-          </Button>
+            {Array.from({ length: maxPinLength }).map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: theme.borders.radius.lg,
+                  fontSize: '1.3rem',
+                  fontWeight: theme.fonts.weight.bold,
+                  transition: 'all 0.1s ease',
+                  border: `3px solid ${i < pin.length ? theme.colors.primary : theme.colors.border.light}`,
+                  backgroundColor:
+                    i < pin.length ? theme.colors.primary : theme.colors.background.light,
+                  color: i < pin.length ? theme.colors.text.light : 'transparent',
+                  boxShadow: i < pin.length ? theme.shadows.md : theme.shadows.sm,
+                }}
+              >
+                •
+              </div>
+            ))}
+          </div>
+
+
+          {/* Numpad */}
+          <div style={{ width: '100%', marginBottom: theme.spacing.md }}>{numpadGrid()}</div>
+
+          {/* Action buttons */}
+          <div
+            style={{
+              display: 'flex',
+              width: '100%',
+              justifyContent: 'space-between',
+              gap: theme.spacing.lg,
+            }}
+          >
+            <Button
+              onClick={handleBack}
+              variant="outline"
+              style={{
+                padding: '12px 24px',
+                fontSize: '16px',
+                minWidth: '160px'
+              }}
+            >
+              Zurück
+            </Button>
+
+            <Button
+              onClick={handleSubmit}
+              variant="primary"
+              disabled={pin.length < maxPinLength || isLoading}
+              style={{
+                padding: '12px 24px',
+                fontSize: '16px',
+                minWidth: '160px'
+              }}
+            >
+              {isLoading ? 'Überprüfung...' : 'Bestätigen'}
+            </Button>
+          </div>
         </div>
-      </div>
-    </ContentBox>
+      </ContentBox>
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={isErrorModalOpen}
+        onClose={() => setIsErrorModalOpen(false)}
+        message={errorMessage}
+      />
+    </>
   );
 }
 

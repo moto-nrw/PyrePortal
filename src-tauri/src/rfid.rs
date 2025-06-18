@@ -332,6 +332,14 @@ mod raspberry_pi {
     }
 
     pub async fn scan_rfid_hardware() -> Result<String, String> {
+        scan_rfid_hardware_with_timeout(Duration::from_millis(500)).await
+    }
+
+    pub async fn scan_rfid_hardware_single() -> Result<String, String> {
+        scan_rfid_hardware_with_timeout(Duration::from_secs(5)).await
+    }
+
+    async fn scan_rfid_hardware_with_timeout(timeout: Duration) -> Result<String, String> {
         // Ensure hardware is ready (but don't hold resources)
         ensure_hardware_ready()?;
 
@@ -412,9 +420,8 @@ mod raspberry_pi {
             }
         };
 
-        // Scan for cards with timeout (shorter timeout for background service)
+        // Scan for cards with timeout
         let start_time = std::time::Instant::now();
-        let timeout = Duration::from_millis(500); // Shorter timeout for responsive background service
 
         loop {
             // Check for timeout
@@ -474,25 +481,68 @@ mod raspberry_pi {
 #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
 mod mock_platform {
     use super::*;
+    use std::sync::Mutex;
+    
+    // Track last scan for duplicate prevention (mimics real hardware behavior)
+    static LAST_SCAN: Mutex<Option<(String, std::time::Instant)>> = Mutex::new(None);
 
     pub async fn scan_rfid_hardware() -> Result<String, String> {
-        // Simulate scanning delay - shorter for background service
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        // Simulate variable scan time (200-500ms) like real hardware
+        let scan_time = 200 + (rand::random::<u64>() % 300);
+        tokio::time::sleep(Duration::from_millis(scan_time)).await;
+        scan_rfid_mock_internal().await
+    }
 
-        // Simulate occasional "no card" timeouts to mimic real hardware
-        if rand::random::<u8>() % 10 == 0 {
+    pub async fn scan_rfid_hardware_single() -> Result<String, String> {
+        // For single scans, simulate user placing tag (2-3 seconds)
+        let scan_time = 2000 + (rand::random::<u64>() % 1000);
+        tokio::time::sleep(Duration::from_millis(scan_time)).await;
+        scan_rfid_mock_internal().await
+    }
+
+    async fn scan_rfid_mock_internal() -> Result<String, String> {
+        
+        // Check for duplicate read (2-second cooldown like real hardware)
+        let mut last_scan = LAST_SCAN.lock().unwrap();
+        if let Some((last_tag, last_time)) = &*last_scan {
+            if last_time.elapsed() < Duration::from_secs(2) {
+                // 90% chance return same tag (card still present), 10% card was removed
+                if rand::random::<u8>() % 10 != 0 {
+                    return Ok(last_tag.clone());
+                }
+            }
+        }
+        
+        // 5% error rate (more realistic than 10%)
+        if rand::random::<u8>() % 20 == 0 {
             return Err("Scan timeout - no card detected".to_string());
         }
-
-        // Return mock tag ID with random variation
-        let random_id = rand::random::<u16>();
-        Ok(format!("MOCK:{:04X}:ABCD:EF01", random_id))
+        
+        // Use realistic hardware format tags
+        let mock_tags = [
+            "04:D6:94:82:97:6A:80",
+            "04:A7:B3:C2:D1:E0:F5",
+            "04:12:34:56:78:9A:BC",
+            "04:FE:DC:BA:98:76:54",
+            "04:11:22:33:44:55:66",
+        ];
+        
+        // Pick a random tag from the list
+        let tag_index = (rand::random::<u8>() as usize) % mock_tags.len();
+        let tag = mock_tags[tag_index].to_string();
+        
+        // Update last scan state
+        *last_scan = Some((tag.clone(), std::time::Instant::now()));
+        Ok(tag)
     }
 
     pub fn check_rfid_hardware() -> RfidScannerStatus {
+        // Log that we're using mock implementation
+        println!("[RFID] Using mock implementation with hardware format (XX:XX:XX:XX:XX:XX:XX)");
+        
         RfidScannerStatus {
             is_available: true, // Mock is always "available"
-            platform: format!("Development Platform ({})", std::env::consts::ARCH),
+            platform: format!("Development Platform ({}) - MOCK Hardware Format", std::env::consts::ARCH),
             last_error: None,
         }
     }
@@ -570,7 +620,7 @@ pub async fn initialize_rfid_service(app_handle: tauri::AppHandle) -> Result<Str
 pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
-        match raspberry_pi::scan_rfid_hardware().await {
+        match raspberry_pi::scan_rfid_hardware_single().await {
             Ok(tag_id) => Ok(RfidScanResult {
                 success: true,
                 tag_id: Some(tag_id),
@@ -586,7 +636,7 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
 
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
-        match mock_platform::scan_rfid_hardware().await {
+        match mock_platform::scan_rfid_hardware_single().await {
             Ok(tag_id) => Ok(RfidScanResult {
                 success: true,
                 tag_id: Some(tag_id),

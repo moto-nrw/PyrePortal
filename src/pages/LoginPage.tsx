@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -68,14 +69,80 @@ function LoginPage() {
     label: user.name,
   }));
 
-  // Log user selection changes
+  // Log user selection changes and auto-submit
   const handleUserChange = (value: string) => {
     logger.debug('User selection changed', { selectedUser: value });
     setLocalSelectedUser(value);
+    
+    // Auto-submit when user is selected
+    if (value) {
+      logger.info('Auto-submitting login after user selection', {
+        username: value,
+        timestamp: new Date().toISOString(),
+      });
+      
+      // Directly navigate with the selected value
+      setTimeout(() => {
+        logger.info('User attempting login', {
+          username: value,
+          timestamp: new Date().toISOString(),
+        });
+
+        // Performance marking for login flow
+        performance.mark('login-start');
+
+        setSelectedUser(value);
+
+        // Log user action and navigation events
+        logUserAction('login', { username: value });
+        logNavigation('LoginPage', 'PinPage');
+
+        // Performance measurement
+        performance.mark('login-end');
+        performance.measure('login-process', 'login-start', 'login-end');
+        const measure = performance.getEntriesByName('login-process')[0];
+        logger.debug('Login process performance', { duration_ms: measure.duration });
+
+        void navigate('/pin');
+      }, 100);
+    }
+  };
+
+  // Handle application quit
+  const handleQuit = () => {
+    logger.info('User requested application quit');
+    logUserAction('quit_app');
+    
+    invoke('quit_app', {})
+      .then(() => {
+        logger.debug('Application quit command sent successfully');
+      })
+      .catch((error) => {
+        logError(error instanceof Error ? error : new Error(String(error)), 'LoginPage.handleQuit');
+      });
   };
 
   return (
     <ContentBox centered shadow="md" rounded="lg">
+      {/* Navigation buttons - positioned absolutely */}
+      <div
+        style={{
+          position: 'absolute',
+          top: theme.spacing.lg,
+          right: theme.spacing.lg,
+          zIndex: 10,
+        }}
+      >
+        <Button
+          type="button"
+          onClick={handleQuit}
+          variant="outline"
+          size="small"
+        >
+          Beenden
+        </Button>
+      </div>
+
       <h1
         style={{
           fontSize: theme.fonts.size.xxl,
@@ -149,6 +216,7 @@ function LoginPage() {
           {isLoading ? 'Lädt...' : 'Anmelden'}
         </Button>
       </div>
+
     </ContentBox>
   );
 }

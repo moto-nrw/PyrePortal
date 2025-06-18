@@ -336,7 +336,7 @@ function RoomSelectionPage() {
 
       const sessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
-        force: false,
+        room_id: selectedRoom.id, // Manual room selection
       };
 
       const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
@@ -346,8 +346,9 @@ function RoomSelectionPage() {
       const measure = performance.getEntriesByName('session-start-duration')[0];
 
       logger.info('Session started successfully', {
-        sessionId: sessionResponse.session_id,
-        activeGroupId: sessionResponse.active_group_id,
+        sessionId: sessionResponse.active_group_id,
+        activityId: sessionResponse.activity_id,
+        deviceId: sessionResponse.device_id,
         duration_ms: measure.duration,
       });
 
@@ -355,7 +356,7 @@ function RoomSelectionPage() {
       selectRoom(selectedRoom.id);
 
       logUserAction('session_started', {
-        sessionId: sessionResponse.session_id,
+        sessionId: sessionResponse.active_group_id,
         activityId: selectedActivity.id,
         activityName: selectedActivity.name,
         roomId: selectedRoom.id,
@@ -364,7 +365,7 @@ function RoomSelectionPage() {
 
       // Navigate to NFC scanning page
       logNavigation('RoomSelectionPage', 'NFC-Scanning', {
-        sessionId: sessionResponse.session_id,
+        sessionId: sessionResponse.active_group_id,
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
       });
@@ -385,16 +386,19 @@ function RoomSelectionPage() {
       );
 
       // Handle 409 Conflict - show conflict modal
+      logger.debug('Checking for conflict error', { errorMessage, includes409: errorMessage.includes('409'), includesConflict: errorMessage.includes('Conflict') });
+      
       if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
+        logger.info('Showing conflict modal due to 409 error');
         setShowConflictModal(true);
+        setIsStartingSession(false);
         return; // Don't close the confirm modal yet, show conflict modal instead
       } else {
         alert(`Fehler beim Starten der Aktivität: ${errorMessage}`);
+        setIsStartingSession(false);
+        setShowConfirmModal(false);
+        setSelectedRoom(null);
       }
-    } finally {
-      setIsStartingSession(false);
-      setShowConfirmModal(false);
-      setSelectedRoom(null);
     }
   };
 
@@ -411,21 +415,23 @@ function RoomSelectionPage() {
 
       const forceSessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
-        force: true,
+        room_id: selectedRoom.id, // Manual room selection
+        force: true, // Force override any conflicts
       };
 
       const sessionResponse = await api.startSession(authenticatedUser.pin, forceSessionRequest);
 
       logger.info('Session started successfully with force override', {
-        sessionId: sessionResponse.session_id,
-        activeGroupId: sessionResponse.active_group_id,
+        sessionId: sessionResponse.active_group_id,
+        activityId: sessionResponse.activity_id,
+        deviceId: sessionResponse.device_id,
       });
 
       // Store the selected room
       selectRoom(selectedRoom.id);
 
       logUserAction('session_started_force', {
-        sessionId: sessionResponse.session_id,
+        sessionId: sessionResponse.active_group_id,
         activityId: selectedActivity.id,
         activityName: selectedActivity.name,
         roomId: selectedRoom.id,
@@ -434,7 +440,7 @@ function RoomSelectionPage() {
 
       // Navigate to NFC scanning page
       logNavigation('RoomSelectionPage', 'NFC-Scanning', {
-        sessionId: sessionResponse.session_id,
+        sessionId: sessionResponse.active_group_id,
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
       });
@@ -630,21 +636,11 @@ function RoomSelectionPage() {
 
             <p
               style={{
-                fontSize: theme.fonts.size.large,
-                color: theme.colors.text.secondary,
-                marginBottom: theme.spacing.sm,
-              }}
-            >
-              für: {selectedActivity.name}
-            </p>
-
-            <p
-              style={{
                 fontSize: theme.fonts.size.base,
                 color: theme.colors.text.secondary,
               }}
             >
-              {authenticatedUser.staffName} • {authenticatedUser.deviceName}
+              {authenticatedUser.staffName} • {authenticatedUser.deviceName} • {selectedActivity.name}
             </p>
           </div>
         </div>

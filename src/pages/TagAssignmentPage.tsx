@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox } from '../components/ui';
+import { Button, ContentBox, ErrorModal, BackButton } from '../components/ui';
 import { api, type Student, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -46,6 +46,7 @@ function TagAssignmentPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
 
@@ -134,12 +135,14 @@ function TagAssignmentPage() {
         const errorMessage = result.error ?? 'Unknown scanning error';
         logError(new Error(errorMessage), 'RFID scanning failed');
         setError(`Scan-Fehler: ${errorMessage}`);
+        setShowErrorModal(true);
         setShowScanner(false);
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
       setError(`Scanner-Fehler: ${error.message}`);
+      setShowErrorModal(true);
       setShowScanner(false);
     } finally {
       setIsLoading(false);
@@ -167,6 +170,7 @@ function TagAssignmentPage() {
       const errorMessage = error.message;
       logError(error, 'Failed to process scanned tag');
       setError(`Fehler beim Verarbeiten des Tags: ${errorMessage}`);
+      setShowErrorModal(true);
     } finally {
       setIsLoading(false);
     }
@@ -194,6 +198,7 @@ function TagAssignmentPage() {
   const handleAssignTag = async () => {
     if (!scannedTag || !selectedStudentId || !authenticatedUser?.pin) {
       setError('Ungültige Auswahl. Bitte versuchen Sie es erneut.');
+      setShowErrorModal(true);
       return;
     }
 
@@ -238,6 +243,7 @@ function TagAssignmentPage() {
       const errorMessage = error.message;
       logError(error, 'Tag assignment failed');
       setError(`Fehler bei der Tag-Zuweisung: ${errorMessage}`);
+      setShowErrorModal(true);
     } finally {
       setIsLoading(false);
     }
@@ -263,10 +269,25 @@ function TagAssignmentPage() {
   }
 
   return (
-    <ContentBox centered shadow="md" rounded="lg">
-      <div style={{ width: '100%', maxWidth: '600px' }}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: theme.spacing.xxl }}>
+    <>
+      <ContentBox centered shadow="md" rounded="lg">
+      <div style={{ width: '100%', maxWidth: '800px', height: '100%', display: 'flex', flexDirection: 'column' }}>
+        {/* Fixed Header */}
+        <div style={{ flexShrink: 0 }}>
+          {/* Navigation buttons */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-start',
+              alignItems: 'center',
+              marginBottom: theme.spacing.lg,
+            }}
+          >
+            <BackButton onClick={handleBack} />
+          </div>
+          
+          {/* Title */}
+          <div style={{ textAlign: 'center', marginBottom: theme.spacing.xxl }}>
           <h1
             style={{
               fontSize: theme.fonts.size.xxl,
@@ -277,15 +298,7 @@ function TagAssignmentPage() {
           >
             Armband scannen
           </h1>
-          <p
-            style={{
-              fontSize: theme.fonts.size.large,
-              color: theme.colors.text.secondary,
-              marginBottom: theme.spacing.sm,
-            }}
-          >
-            {authenticatedUser.staffName}
-          </p>
+          </div>
         </div>
 
         {/* Scanner Modal Overlay */}
@@ -313,7 +326,7 @@ function TagAssignmentPage() {
                 minWidth: '300px',
               }}
             >
-              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📱</div>
+              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📡</div>
               <h2
                 style={{
                   fontSize: theme.fonts.size.xl,
@@ -357,7 +370,6 @@ function TagAssignmentPage() {
           {/* Initial State - Start Scanning */}
           {!scannedTag && !isLoading && (
             <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.xl }}>📱</div>
               <p
                 style={{
                   fontSize: theme.fonts.size.large,
@@ -544,10 +556,10 @@ function TagAssignmentPage() {
                   justifyContent: 'center',
                 }}
               >
-                <Button onClick={handleAssignTag} disabled={!selectedStudentId || isLoading}>
+                <Button onClick={handleAssignTag} disabled={!selectedStudentId || isLoading} size="small">
                   {tagAssignment.assigned ? 'Neu zuweisen' : 'Zuweisen'}
                 </Button>
-                <Button onClick={handleScanAnother} variant="secondary">
+                <Button onClick={handleScanAnother} variant="secondary" size="small">
                   Neuer Scan
                 </Button>
               </div>
@@ -592,39 +604,18 @@ function TagAssignmentPage() {
             </div>
           )}
 
-          {/* Error Display */}
-          {error && (
-            <div
-              style={{
-                backgroundColor: theme.colors.error + '20',
-                borderLeft: `4px solid ${theme.colors.error}`,
-                padding: theme.spacing.lg,
-                marginBottom: theme.spacing.xl,
-              }}
-            >
-              <p
-                style={{
-                  color: theme.colors.error,
-                  fontSize: theme.fonts.size.base,
-                  margin: 0,
-                }}
-              >
-                {error}
-              </p>
-            </div>
-          )}
         </div>
-
-        {/* Back Button */}
-        {!showScanner && (
-          <div style={{ textAlign: 'center', marginTop: theme.spacing.xl }}>
-            <Button onClick={handleBack} variant="secondary">
-              Zurück zur Startseite
-            </Button>
-          </div>
-        )}
       </div>
-    </ContentBox>
+      </ContentBox>
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        message={error ?? ''}
+        autoCloseDelay={3000}
+      />
+    </>
   );
 }
 

@@ -10,9 +10,11 @@ const logger = createLogger('API');
 // Environment configuration
 const API_BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
-const DEVICE_API_KEY: string =
-  (import.meta.env.VITE_DEVICE_API_KEY as string) ??
-  'dev_bc17223f4417bd2251742e659efc5a7d14671f714154d3cc207fe8ee0feedeaa';
+const DEVICE_API_KEY: string = import.meta.env.VITE_DEVICE_API_KEY as string;
+
+if (!DEVICE_API_KEY) {
+  throw new Error('VITE_DEVICE_API_KEY environment variable is required');
+}
 
 /**
  * Generic API call function with error handling
@@ -29,7 +31,26 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   });
 
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status} - ${response.statusText}`);
+    // Try to get error details from response body
+    let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
+    let detailMessage = '';
+    try {
+      const errorData = await response.json() as { message?: string; error?: string };
+      if (errorData.message) {
+        detailMessage = errorData.message;
+      } else if (errorData.error) {
+        detailMessage = errorData.error;
+      }
+    } catch {
+      // If JSON parsing fails, use the default error message
+    }
+    
+    // Include both status code and detail message for better error handling
+    if (detailMessage) {
+      errorMessage = `${errorMessage}: ${detailMessage}`;
+    }
+    
+    throw new Error(errorMessage);
   }
 
   return response.json() as Promise<T>;
@@ -118,7 +139,8 @@ interface RoomsResponse {
  */
 export interface SessionStartRequest {
   activity_id: number;
-  force?: boolean;
+  room_id?: number; // Optional: Override the activity's planned room
+  force?: boolean; // Optional: Force start even if conflicts exist
 }
 
 /**
@@ -126,10 +148,11 @@ export interface SessionStartRequest {
  */
 export interface SessionStartResponse {
   active_group_id: number;
+  activity_id: number;
+  device_id: number;
+  start_time: string;
   status: string;
-  session_id: number;
-  activity_name: string;
-  room_name: string;
+  message: string;
 }
 
 /**
@@ -145,6 +168,7 @@ export interface CurrentSession {
   start_time: string;
   duration: string;
   is_active?: boolean;
+  active_students?: number;
 }
 
 /**
@@ -294,7 +318,13 @@ export const api = {
    * Endpoint: POST /api/iot/session/start
    */
   async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
-    const response = await apiCall<SessionStartResponse>('/api/iot/session/start', {
+    logger.info('Starting session with request:', { ...request });
+    
+    const response = await apiCall<{
+      status: string;
+      data: SessionStartResponse;
+      message?: string;
+    }>('/api/iot/session/start', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
@@ -303,7 +333,7 @@ export const api = {
       body: JSON.stringify(request),
     });
 
-    return response;
+    return response.data;
   },
 
   /**
@@ -314,8 +344,8 @@ export const api = {
     try {
       const response = await apiCall<{
         status: string;
-        data: CurrentSession;
-        message: string;
+        data: CurrentSession | { device_id: number; is_active: false };
+        message?: string;
       }>('/api/iot/session/current', {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
@@ -323,11 +353,12 @@ export const api = {
         },
       });
 
-      // Check if we have valid session data
-      if (!response.data?.active_group_id || !response.data.activity_id) {
+      // Check if we have an active session
+      if ('is_active' in response.data && response.data.is_active === false) {
         return null;
       }
 
+      // The server returns the session data directly in the data field
       return response.data;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -445,7 +476,11 @@ export const api = {
     },
     pin: string
   ): Promise<RfidScanResult> {
-    const response = await apiCall<RfidScanResult>('/api/iot/checkin', {
+    const response = await apiCall<{
+      data: RfidScanResult;
+      message: string;
+      status: string;
+    }>('/api/iot/checkin', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
@@ -454,7 +489,8 @@ export const api = {
       body: JSON.stringify(scanData),
     });
 
-    return response;
+    // Extract the actual data from the nested response
+    return response.data;
   },
 
   /**
@@ -485,12 +521,7 @@ export const api = {
     try {
       const response = await apiCall<{
         status: string;
-        data: {
-          activity_name: string;
-          room_name: string;
-          active_students: number;
-          last_activity: string;
-        };
+        data: CurrentSession | { device_id: number; is_active: false };
         message: string;
       }>('/api/iot/session/current', {
         headers: {
@@ -500,7 +531,19 @@ export const api = {
       });
 
       logger.debug('getCurrentSessionInfo response', { response });
-      return response.data;
+      
+      // Check if we have an active session
+      if ('is_active' in response.data && response.data.is_active === false) {
+        return null;
+      }
+      
+      // Map the CurrentSession to the simplified format expected by the UI
+      const session = response.data;
+      return {
+        activity_name: session.activity_name ?? 'Unknown Activity',
+        room_name: session.room_name ?? 'Unknown Room',
+        active_students: session.active_students ?? 0,
+      };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means no current session
@@ -552,9 +595,11 @@ export interface TagAssignmentResult {
 export interface RfidScanResult {
   student_id: number;
   student_name: string;
-  action: 'checked_in' | 'checked_out';
+  action: 'checked_in' | 'checked_out' | 'transferred';
+  greeting?: string;
   visit_id?: number;
   room_name?: string;
+  previous_room?: string;
   processed_at?: string;
   message?: string;
   status?: string;

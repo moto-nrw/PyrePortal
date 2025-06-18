@@ -8,6 +8,9 @@ import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 // Tauri event listening
 let eventListener: (() => void) | null = null;
 
+// Mock scanning interval for development
+let mockScanInterval: ReturnType<typeof setInterval> | null = null;
+
 const logger = createLogger('useRfidScanning');
 
 export const useRfidScanning = () => {
@@ -26,6 +29,7 @@ export const useRfidScanning = () => {
 
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
+  const processingTagRef = useRef<string | null>(null);
 
   // Initialize RFID service on mount
   const initializeService = useCallback(async () => {
@@ -49,7 +53,14 @@ export const useRfidScanning = () => {
         return;
       }
 
+      // Prevent duplicate processing of the same tag
+      if (processingTagRef.current === tagId) {
+        logger.debug(`Tag ${tagId} is already being processed, skipping duplicate`);
+        return;
+      }
+
       try {
+        processingTagRef.current = tagId;
         logger.info(`Processing RFID scan for tag: ${tagId}`);
 
         // Call the API to process the scan
@@ -67,12 +78,17 @@ export const useRfidScanning = () => {
         // Debug: Log the complete result to see what server returned
         logger.debug('Complete RFID scan result', {
           action: result.action,
+          actionType: typeof result.action,
+          actionLength: result.action?.length,
+          actionCharCodes: result.action ? Array.from(result.action).map(c => c.charCodeAt(0)) : [],
+          isCheckedIn: result.action === 'checked_in',
+          isCheckedOut: result.action === 'checked_out',
           student_name: result.student_name,
           student_id: result.student_id,
           visit_id: result.visit_id,
           message: result.message,
           status: result.status,
-          fullResult: result,
+          fullResult: JSON.stringify(result),
         });
 
         // Update store with scan result and show modal
@@ -93,9 +109,13 @@ export const useRfidScanning = () => {
         // Hide modal after display time
         setTimeout(() => {
           hideScanModal();
+          // Clear processing ref after modal hides
+          processingTagRef.current = null;
         }, rfid.modalDisplayTime);
       } catch (error) {
         logger.error('Failed to process RFID scan', { error });
+        // Clear processing ref on error
+        processingTagRef.current = null;
         // Could show error modal here
       }
     },
@@ -144,16 +164,59 @@ export const useRfidScanning = () => {
   }, [isTagBlocked, processScan]);
 
   const startScanning = useCallback(async () => {
-    if (!isRfidEnabled()) {
-      logger.debug('RFID not enabled, skipping');
-      return;
-    }
-
     if (isServiceStartedRef.current) {
-      logger.debug('Service already started, skipping');
+      logger.debug('Service already started, ensuring store state is synchronized');
+      // Always update store state to reflect actual service state
+      startRfidScanning();
       return;
     }
 
+    // Check if RFID is enabled
+    if (!isRfidEnabled()) {
+      logger.info('RFID not enabled, starting mock scanning mode');
+      
+      // Start mock scanning interval
+      if (!mockScanInterval) {
+        startRfidScanning(); // Update store state
+        
+        // Generate mock scans every 3-5 seconds
+        mockScanInterval = setInterval(() => {
+          // Get mock tags from environment variable or use defaults
+          const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
+          const mockStudentTags: string[] = envTags 
+            ? envTags.split(',').map((tag) => tag.trim())
+            : [
+                // Default realistic hardware format tags
+                '04:D6:94:82:97:6A:80',
+                '04:A7:B3:C2:D1:E0:F5',
+                '04:12:34:56:78:9A:BC',
+                '04:FE:DC:BA:98:76:54',
+                '04:11:22:33:44:55:66'
+              ];
+          
+          // Pick a random tag from the list
+          const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
+          
+          logger.info('Mock RFID scan generated', {
+            tagId: mockTagId,
+            platform: 'Development Mock'
+          });
+          
+          // Check if tag is blocked before processing
+          if (!isTagBlocked(mockTagId)) {
+            void processScan(mockTagId);
+          } else {
+            logger.debug(`Mock tag ${mockTagId} is blocked, skipping`);
+          }
+        }, 3000 + Math.random() * 2000); // Random interval between 3-5 seconds
+        
+        isServiceStartedRef.current = true;
+        logger.info('Mock RFID scanning started');
+      }
+      return;
+    }
+
+    // Real RFID scanning
     try {
       logger.info('Starting RFID background service');
       await safeInvoke('start_rfid_service');
@@ -163,30 +226,61 @@ export const useRfidScanning = () => {
     } catch (error) {
       logger.error('Failed to start RFID service', { error });
     }
-  }, [startRfidScanning]);
+  }, [startRfidScanning, isTagBlocked, processScan]);
 
   const stopScanning = useCallback(async () => {
     if (!isServiceStartedRef.current) {
-      logger.debug('Service not running, skipping');
+      logger.debug('Service not running, but ensuring store state is synchronized');
+      // Even if service is not tracked as running, update store state
+      stopRfidScanning();
       return;
     }
 
     try {
-      logger.info('Stopping RFID background service');
-      await safeInvoke('stop_rfid_service');
+      if (isRfidEnabled()) {
+        logger.info('Stopping RFID background service');
+        await safeInvoke('stop_rfid_service');
+      } else {
+        // Stop mock scanning
+        if (mockScanInterval) {
+          clearInterval(mockScanInterval);
+          mockScanInterval = null;
+          logger.info('Mock RFID scanning stopped');
+        }
+      }
       isServiceStartedRef.current = false;
       stopRfidScanning(); // Update store state
-      logger.info('RFID background service stopped');
+      logger.info('RFID service stopped');
     } catch (error) {
       logger.error('Failed to stop RFID service', { error });
+      // Even on error, update the ref and store state
+      isServiceStartedRef.current = false;
+      stopRfidScanning();
     }
   }, [stopRfidScanning]);
+
+  // Check actual service state from backend
+  const syncServiceState = useCallback(async () => {
+    if (!isRfidEnabled()) return;
+    
+    try {
+      const serviceStatus = await safeInvoke<{ is_running: boolean }>('get_rfid_service_status');
+      if (serviceStatus?.is_running) {
+        logger.info('RFID service is already running, synchronizing state');
+        isServiceStartedRef.current = true;
+        startRfidScanning(); // Update store state
+      }
+    } catch (error) {
+      logger.debug('Could not get RFID service status', { error });
+    }
+  }, [startRfidScanning]);
 
   // Initialize service and setup event listener on mount
   useEffect(() => {
     void initializeService();
     void setupEventListener();
-  }, [initializeService, setupEventListener]);
+    void syncServiceState();
+  }, [initializeService, setupEventListener, syncServiceState]);
 
   // Auto-restart scanning after modal hides
   useEffect(() => {
@@ -202,6 +296,10 @@ export const useRfidScanning = () => {
       if (eventListener) {
         eventListener();
         eventListener = null;
+      }
+      if (mockScanInterval) {
+        clearInterval(mockScanInterval);
+        mockScanInterval = null;
       }
       if (isServiceStartedRef.current) {
         void stopScanning();

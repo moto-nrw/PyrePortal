@@ -78,25 +78,33 @@ const ActivityScanningPage: React.FC = () => {
     // Initial fetch
     void fetchSessionInfo();
 
-    // Set up periodic updates every 5 seconds
+    // Set up periodic updates every 30 seconds (just for sync)
     const interval = setInterval(() => {
       void fetchSessionInfo();
-    }, 5000);
+    }, 30000);
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticatedUser?.pin]); // fetchSessionInfo is stable within this component lifecycle
 
-  // Also update immediately after a scan
+  // Update student count based on scan result
   useEffect(() => {
     if (currentScan && showModal) {
-      // Delay slightly to ensure server has processed the scan
-      setTimeout(() => {
-        void fetchSessionInfo();
-      }, 500);
+      // Instead of fetching, update count based on scan action
+      logger.debug('Updating student count based on scan', { 
+        action: currentScan.action,
+        currentCount: studentCount 
+      });
+      
+      if (currentScan.action === 'checked_in') {
+        setStudentCount(prev => prev + 1);
+      } else if (currentScan.action === 'checked_out') {
+        setStudentCount(prev => Math.max(0, prev - 1));
+      }
+      // Note: 'transferred' action doesn't change count (checkout + checkin)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentScan, showModal]); // fetchSessionInfo is stable within this component lifecycle
+  }, [currentScan, showModal]); // Only update when scan modal shows
 
   // Auto-close modal after delay
   useEffect(() => {
@@ -180,7 +188,7 @@ const ActivityScanningPage: React.FC = () => {
                   marginBottom: theme.spacing.sm,
                 }}
               >
-                Raum: {selectedRoom.name}
+                Raum: {selectedRoom?.name || 'Unbekannt'}
               </p>
 
               <div
@@ -262,7 +270,15 @@ const ActivityScanningPage: React.FC = () => {
             }}
           >
             <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
-              {currentScan.action === 'checked_in' ? '✅' : '👋'}
+              {(() => {
+                logger.debug('Modal icon logic:', {
+                  action: currentScan.action,
+                  isCheckedIn: currentScan.action === 'checked_in',
+                  typeOfAction: typeof currentScan.action,
+                });
+                // Show checkmark for both check-in and transfer (since transfer includes a check-in)
+                return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? '✅' : '👋';
+              })()}
             </div>
 
             <h2
@@ -286,9 +302,24 @@ const ActivityScanningPage: React.FC = () => {
                 marginBottom: theme.spacing.xl,
               }}
             >
-              {currentScan.action === 'checked_in'
-                ? 'Du bist jetzt angemeldet'
-                : 'Du bist jetzt abgemeldet'}
+              {(() => {
+                logger.debug('Modal message logic:', {
+                  action: currentScan.action,
+                  isCheckedIn: currentScan.action === 'checked_in',
+                });
+                // Show appropriate message based on action
+                switch (currentScan.action) {
+                  case 'checked_in':
+                    return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
+                  case 'checked_out':
+                    return 'Du bist jetzt ausgecheckt';
+                  case 'transferred':
+                    // For transfers, the greeting already contains the transfer info
+                    return 'Raumwechsel erfolgreich';
+                  default:
+                    return '';
+                }
+              })()}
             </div>
           </div>
         </div>
