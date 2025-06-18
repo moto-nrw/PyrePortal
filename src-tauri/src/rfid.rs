@@ -332,6 +332,14 @@ mod raspberry_pi {
     }
 
     pub async fn scan_rfid_hardware() -> Result<String, String> {
+        scan_rfid_hardware_with_timeout(Duration::from_millis(500)).await
+    }
+
+    pub async fn scan_rfid_hardware_single() -> Result<String, String> {
+        scan_rfid_hardware_with_timeout(Duration::from_secs(5)).await
+    }
+
+    async fn scan_rfid_hardware_with_timeout(timeout: Duration) -> Result<String, String> {
         // Ensure hardware is ready (but don't hold resources)
         ensure_hardware_ready()?;
 
@@ -412,9 +420,8 @@ mod raspberry_pi {
             }
         };
 
-        // Scan for cards with timeout (shorter timeout for background service)
+        // Scan for cards with timeout
         let start_time = std::time::Instant::now();
-        let timeout = Duration::from_millis(500); // Shorter timeout for responsive background service
 
         loop {
             // Check for timeout
@@ -483,6 +490,17 @@ mod mock_platform {
         // Simulate variable scan time (200-500ms) like real hardware
         let scan_time = 200 + (rand::random::<u64>() % 300);
         tokio::time::sleep(Duration::from_millis(scan_time)).await;
+        scan_rfid_mock_internal().await
+    }
+
+    pub async fn scan_rfid_hardware_single() -> Result<String, String> {
+        // For single scans, simulate user placing tag (2-3 seconds)
+        let scan_time = 2000 + (rand::random::<u64>() % 1000);
+        tokio::time::sleep(Duration::from_millis(scan_time)).await;
+        scan_rfid_mock_internal().await
+    }
+
+    async fn scan_rfid_mock_internal() -> Result<String, String> {
         
         // Check for duplicate read (2-second cooldown like real hardware)
         let mut last_scan = LAST_SCAN.lock().unwrap();
@@ -602,7 +620,7 @@ pub async fn initialize_rfid_service(app_handle: tauri::AppHandle) -> Result<Str
 pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
-        match raspberry_pi::scan_rfid_hardware().await {
+        match raspberry_pi::scan_rfid_hardware_single().await {
             Ok(tag_id) => Ok(RfidScanResult {
                 success: true,
                 tag_id: Some(tag_id),
@@ -618,7 +636,7 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
 
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     {
-        match mock_platform::scan_rfid_hardware().await {
+        match mock_platform::scan_rfid_hardware_single().await {
             Ok(tag_id) => Ok(RfidScanResult {
                 success: true,
                 tag_id: Some(tag_id),

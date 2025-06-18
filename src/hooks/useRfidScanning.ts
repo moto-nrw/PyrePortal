@@ -29,6 +29,7 @@ export const useRfidScanning = () => {
 
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
+  const processingTagRef = useRef<string | null>(null);
 
   // Initialize RFID service on mount
   const initializeService = useCallback(async () => {
@@ -52,7 +53,14 @@ export const useRfidScanning = () => {
         return;
       }
 
+      // Prevent duplicate processing of the same tag
+      if (processingTagRef.current === tagId) {
+        logger.debug(`Tag ${tagId} is already being processed, skipping duplicate`);
+        return;
+      }
+
       try {
+        processingTagRef.current = tagId;
         logger.info(`Processing RFID scan for tag: ${tagId}`);
 
         // Call the API to process the scan
@@ -101,9 +109,13 @@ export const useRfidScanning = () => {
         // Hide modal after display time
         setTimeout(() => {
           hideScanModal();
+          // Clear processing ref after modal hides
+          processingTagRef.current = null;
         }, rfid.modalDisplayTime);
       } catch (error) {
         logger.error('Failed to process RFID scan', { error });
+        // Clear processing ref on error
+        processingTagRef.current = null;
         // Could show error modal here
       }
     },
@@ -153,7 +165,9 @@ export const useRfidScanning = () => {
 
   const startScanning = useCallback(async () => {
     if (isServiceStartedRef.current) {
-      logger.debug('Service already started, skipping');
+      logger.debug('Service already started, ensuring store state is synchronized');
+      // Always update store state to reflect actual service state
+      startRfidScanning();
       return;
     }
 
@@ -216,7 +230,9 @@ export const useRfidScanning = () => {
 
   const stopScanning = useCallback(async () => {
     if (!isServiceStartedRef.current) {
-      logger.debug('Service not running, skipping');
+      logger.debug('Service not running, but ensuring store state is synchronized');
+      // Even if service is not tracked as running, update store state
+      stopRfidScanning();
       return;
     }
 
@@ -237,14 +253,34 @@ export const useRfidScanning = () => {
       logger.info('RFID service stopped');
     } catch (error) {
       logger.error('Failed to stop RFID service', { error });
+      // Even on error, update the ref and store state
+      isServiceStartedRef.current = false;
+      stopRfidScanning();
     }
   }, [stopRfidScanning]);
+
+  // Check actual service state from backend
+  const syncServiceState = useCallback(async () => {
+    if (!isRfidEnabled()) return;
+    
+    try {
+      const serviceStatus = await safeInvoke<{ is_running: boolean }>('get_rfid_service_status');
+      if (serviceStatus?.is_running) {
+        logger.info('RFID service is already running, synchronizing state');
+        isServiceStartedRef.current = true;
+        startRfidScanning(); // Update store state
+      }
+    } catch (error) {
+      logger.debug('Could not get RFID service status', { error });
+    }
+  }, [startRfidScanning]);
 
   // Initialize service and setup event listener on mount
   useEffect(() => {
     void initializeService();
     void setupEventListener();
-  }, [initializeService, setupEventListener]);
+    void syncServiceState();
+  }, [initializeService, setupEventListener, syncServiceState]);
 
   // Auto-restart scanning after modal hides
   useEffect(() => {

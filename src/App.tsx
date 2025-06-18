@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
+import { RfidServiceInitializer } from './components/RfidServiceInitializer';
 import ActivityScanningPage from './pages/ActivityScanningPage';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
@@ -39,6 +40,7 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <RfidServiceInitializer />
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">
         <BrowserRouter>
           <Routes>
