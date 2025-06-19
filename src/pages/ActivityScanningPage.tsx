@@ -100,8 +100,18 @@ const ActivityScanningPage: React.FC = () => {
         setStudentCount(prev => prev + 1);
       } else if (currentScan.action === 'checked_out') {
         setStudentCount(prev => Math.max(0, prev - 1));
+      } else if (currentScan.action === 'transferred') {
+        // For transfers, check if student is coming to or leaving our room
+        const currentRoomName = selectedRoom?.name;
+        if (currentScan.room_name === currentRoomName) {
+          // Student transferred TO our room from another room
+          setStudentCount(prev => prev + 1);
+        } else if (currentScan.previous_room === currentRoomName) {
+          // Student transferred FROM our room to another room
+          setStudentCount(prev => Math.max(0, prev - 1));
+        }
+        // If neither matches, don't change count (shouldn't happen)
       }
-      // Note: 'transferred' action doesn't change count (checkout + checkin)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
