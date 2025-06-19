@@ -57,7 +57,7 @@ const ActivityScanningPage: React.FC = () => {
     if (!authenticatedUser?.pin) return;
 
     try {
-      const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
+      const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin, authenticatedUser.staffId);
       logger.debug('Session info received:', sessionInfo ?? {});
 
       if (sessionInfo) {
