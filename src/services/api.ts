@@ -529,7 +529,8 @@ export const api = {
    * Endpoint: GET /api/iot/session/current
    */
   async getCurrentSessionInfo(
-    pin: string
+    pin: string,
+    staffId: number
   ): Promise<{ activity_name: string; room_name: string; active_students: number } | null> {
     try {
       const response = await apiCall<{
@@ -540,6 +541,7 @@ export const api = {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
+          'X-Staff-ID': staffId.toString(),
         },
       });
 
