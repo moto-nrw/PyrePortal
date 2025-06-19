@@ -267,7 +267,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         staffName: authenticatedUser.staffName,
       });
 
-      const rooms = await api.getRooms(authenticatedUser.pin);
+      const rooms = await api.getRooms(authenticatedUser.pin, authenticatedUser.staffId);
 
       storeLogger.debug('Available rooms fetched successfully', { count: rooms.length });
       set({ rooms, isLoading: false });
@@ -301,7 +301,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
     try {
       storeLogger.info('Fetching current session for device');
-      const session = await api.getCurrentSession(authenticatedUser.pin);
+      const session = await api.getCurrentSession(authenticatedUser.pin, authenticatedUser.staffId);
 
       if (session) {
         storeLogger.info('Active session found', {
@@ -366,7 +366,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           activityId: currentSession.activity_id,
         });
 
-        await api.endSession(authenticatedUser.pin);
+        await api.endSession(authenticatedUser.pin, authenticatedUser.staffId);
         storeLogger.info('Session ended successfully');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -537,7 +537,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
             staffName: authenticatedUser.staffName,
           });
 
-          const activitiesData = await api.getActivities(authenticatedUser.pin);
+          const activitiesData = await api.getActivities(authenticatedUser.pin, authenticatedUser.staffId);
 
           storeLogger.info('Activities loaded successfully', {
             count: activitiesData.length,

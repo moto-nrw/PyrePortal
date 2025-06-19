@@ -339,7 +339,7 @@ function RoomSelectionPage() {
         room_id: selectedRoom.id, // Manual room selection
       };
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
+      const sessionResponse = await api.startSession(authenticatedUser.pin, authenticatedUser.staffId, sessionRequest);
 
       performance.mark('session-start-end');
       performance.measure('session-start-duration', 'session-start-begin', 'session-start-end');
@@ -419,7 +419,7 @@ function RoomSelectionPage() {
         force: true, // Force override any conflicts
       };
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, forceSessionRequest);
+      const sessionResponse = await api.startSession(authenticatedUser.pin, authenticatedUser.staffId, forceSessionRequest);
 
       logger.info('Session started successfully with force override', {
         sessionId: sessionResponse.active_group_id,
