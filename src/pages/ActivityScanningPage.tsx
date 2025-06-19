@@ -38,11 +38,20 @@ const ActivityScanningPage: React.FC = () => {
 
   // Track student count based on check-ins
   const [studentCount, setStudentCount] = useState(0);
+  // Add initial loading state to prevent emoji flicker
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Start scanning when component mounts
   useEffect(() => {
     logger.info('Activity Scanning Page mounted, starting RFID scanning');
-    void startScanning(); // Handle async function
+    
+    // Start scanning and clear initializing state
+    const initializeScanning = async () => {
+      await startScanning();
+      setIsInitializing(false);
+    };
+    
+    void initializeScanning();
 
     // Cleanup: stop scanning when component unmounts
     return () => {
@@ -227,7 +236,7 @@ const ActivityScanningPage: React.FC = () => {
           >
             <div style={{ textAlign: 'center' }}>
               <div style={{ fontSize: '5rem', marginBottom: theme.spacing.lg }}>
-                {isScanning ? '📡' : '⏸️'}
+                {isInitializing ? '📡' : (isScanning ? '📡' : '⏸️')}
               </div>
               <h2
                 style={{
@@ -237,7 +246,7 @@ const ActivityScanningPage: React.FC = () => {
                   color: theme.colors.text.primary,
                 }}
               >
-                {isScanning ? 'RFID Scanner Aktiv' : 'Scanner Pausiert'}
+                {isInitializing ? 'Scanner wird gestartet...' : (isScanning ? 'RFID Scanner Aktiv' : 'Scanner Pausiert')}
               </h2>
               <p
                 style={{
@@ -245,7 +254,7 @@ const ActivityScanningPage: React.FC = () => {
                   color: theme.colors.text.secondary,
                 }}
               >
-                {isScanning ? 'Schülerkarte hier scannen' : 'Scanner ist pausiert'}
+                {isInitializing ? 'Bitte warten...' : (isScanning ? 'Schülerkarte hier scannen' : 'Scanner ist pausiert')}
               </p>
             </div>
           </div>
