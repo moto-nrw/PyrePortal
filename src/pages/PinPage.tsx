@@ -8,7 +8,7 @@ import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function PinPage() {
-  const { selectedUser, setAuthenticatedUser } = useUserStore();
+  const { selectedUser, selectedUserId, setAuthenticatedUser } = useUserStore();
   const [pin, setPin] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState<boolean>(false);
@@ -23,14 +23,14 @@ function PinPage() {
     logger.debug('PinPage component mounted', { user: selectedUser });
 
     // If no user is selected, log an error
-    if (!selectedUser) {
-      logger.warn('PinPage accessed without selected user');
+    if (!selectedUser || !selectedUserId) {
+      logger.warn('PinPage accessed without selected user or ID', { selectedUser, selectedUserId });
     }
 
     return () => {
       logger.debug('PinPage component unmounted');
     };
-  }, [selectedUser, logger]);
+  }, [selectedUser, selectedUserId, logger]);
 
   // Maximum PIN length
   const maxPinLength = 4;
@@ -134,8 +134,18 @@ function PinPage() {
       performance.mark('pin-verification-start');
       setIsLoading(true);
 
+      // Check if we have selected user ID
+      if (!selectedUserId) {
+        const errorMsg = 'Kein Benutzer ausgewählt. Bitte gehen Sie zurück und wählen Sie einen Benutzer aus.';
+        setErrorMessage(errorMsg);
+        setIsErrorModalOpen(true);
+        setPin('');
+        logger.error('No user ID selected for PIN validation');
+        return;
+      }
+
       // Validate PIN with real API
-      const result: PinValidationResult = await api.validateTeacherPin(pin);
+      const result: PinValidationResult = await api.validateTeacherPin(pin, selectedUserId);
 
       if (result.success && result.userData) {
         // Store authenticated user context with PIN

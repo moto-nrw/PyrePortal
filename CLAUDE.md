@@ -294,4 +294,3 @@ await invoke('write_log', { entry: logData });
 - Offline mode with sync
 - Biometric authentication
 - Advanced reporting
-- Raspberry Pi deployment scripts

@@ -193,7 +193,7 @@ export const api = {
    * Validate teacher PIN with enhanced error handling
    * Endpoint: GET /api/iot/status
    */
-  async validateTeacherPin(pin: string): Promise<PinValidationResult> {
+  async validateTeacherPin(pin: string, staffId: number): Promise<PinValidationResult> {
     try {
       logger.debug('Starting PIN validation');
 
@@ -210,6 +210,7 @@ export const api = {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
+          'X-Staff-ID': staffId.toString(),
         },
       });
 
