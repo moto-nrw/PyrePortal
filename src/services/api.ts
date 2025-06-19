@@ -267,11 +267,12 @@ export const api = {
    * Get teacher's activities for today
    * Endpoint: GET /api/iot/activities
    */
-  async getActivities(pin: string): Promise<ActivityResponse[]> {
+  async getActivities(pin: string, staffId: number): Promise<ActivityResponse[]> {
     const response = await apiCall<ActivitiesResponse>('/api/iot/activities', {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
     });
 
@@ -282,12 +283,13 @@ export const api = {
    * Device health ping
    * Endpoint: POST /api/iot/ping
    */
-  async pingDevice(pin: string): Promise<void> {
+  async pingDevice(pin: string, staffId: number): Promise<void> {
     await apiCall('/api/iot/ping', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
     });
   },
@@ -296,7 +298,7 @@ export const api = {
    * Get available rooms (device authenticated)
    * Endpoint: GET /api/iot/rooms/available
    */
-  async getRooms(pin: string, capacity?: number): Promise<Room[]> {
+  async getRooms(pin: string, staffId: number, capacity?: number): Promise<Room[]> {
     const params = new URLSearchParams();
     if (capacity) {
       params.append('capacity', capacity.toString());
@@ -308,6 +310,7 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
     });
 
@@ -318,7 +321,7 @@ export const api = {
    * Start activity session
    * Endpoint: POST /api/iot/session/start
    */
-  async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
+  async startSession(pin: string, staffId: number, request: SessionStartRequest): Promise<SessionStartResponse> {
     logger.info('Starting session with request:', { ...request });
     
     const response = await apiCall<{
@@ -330,6 +333,7 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
       body: JSON.stringify(request),
     });
@@ -341,7 +345,7 @@ export const api = {
    * Get current session for device
    * Endpoint: GET /api/iot/session/current
    */
-  async getCurrentSession(pin: string): Promise<CurrentSession | null> {
+  async getCurrentSession(pin: string, staffId: number): Promise<CurrentSession | null> {
     try {
       const response = await apiCall<{
         status: string;
@@ -351,6 +355,7 @@ export const api = {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
+          'X-Staff-ID': staffId.toString(),
         },
       });
 
@@ -375,12 +380,13 @@ export const api = {
    * End current session
    * Endpoint: POST /api/iot/session/end
    */
-  async endSession(pin: string): Promise<void> {
+  async endSession(pin: string, staffId: number): Promise<void> {
     await apiCall('/api/iot/session/end', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
     });
   },
@@ -389,7 +395,7 @@ export const api = {
    * Get teacher's students for tag assignment
    * Endpoint: GET /api/iot/students
    */
-  async getStudents(pin: string): Promise<Student[]> {
+  async getStudents(pin: string, staffId: number): Promise<Student[]> {
     const response = await apiCall<{
       status: string;
       data: Student[];
@@ -398,6 +404,7 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
     });
 
@@ -408,7 +415,7 @@ export const api = {
    * Check RFID tag assignment status
    * Endpoint: GET /api/iot/rfid/{tagId}
    */
-  async checkTagAssignment(pin: string, tagId: string): Promise<TagAssignmentCheck> {
+  async checkTagAssignment(pin: string, staffId: number, tagId: string): Promise<TagAssignmentCheck> {
     try {
       const response = await apiCall<{
         status: string;
@@ -418,6 +425,7 @@ export const api = {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
+          'X-Staff-ID': staffId.toString(),
         },
       });
 
@@ -436,7 +444,7 @@ export const api = {
    * Assign RFID tag to student
    * Endpoint: POST /api/students/{studentId}/rfid
    */
-  async assignTag(pin: string, studentId: number, tagId: string): Promise<TagAssignmentResult> {
+  async assignTag(pin: string, staffId: number, studentId: number, tagId: string): Promise<TagAssignmentResult> {
     const response = await apiCall<{
       status: string;
       data?: {
@@ -451,6 +459,7 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
       body: JSON.stringify({
         rfid_tag: tagId,
@@ -475,7 +484,8 @@ export const api = {
       action: 'checkin' | 'checkout';
       room_id: number;
     },
-    pin: string
+    pin: string,
+    staffId: number
   ): Promise<RfidScanResult> {
     const response = await apiCall<{
       data: RfidScanResult;
@@ -486,6 +496,7 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
       body: JSON.stringify(scanData),
     });
@@ -498,12 +509,13 @@ export const api = {
    * Update session activity to prevent timeout
    * Endpoint: POST /api/iot/session/activity
    */
-  async updateSessionActivity(pin: string): Promise<void> {
+  async updateSessionActivity(pin: string, staffId: number): Promise<void> {
     await apiCall('/api/iot/session/activity', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
       },
       body: JSON.stringify({
         activity_type: 'rfid_scan', // Changed from 'student_scan' to 'rfid_scan'

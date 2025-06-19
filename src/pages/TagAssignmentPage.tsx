@@ -182,7 +182,7 @@ function TagAssignmentPage() {
       throw new Error('Keine Authentifizierung verfügbar');
     }
 
-    return await api.checkTagAssignment(authenticatedUser.pin, tagId);
+    return await api.checkTagAssignment(authenticatedUser.pin, authenticatedUser.staffId, tagId);
   };
 
   // Fetch teacher's students
@@ -191,7 +191,7 @@ function TagAssignmentPage() {
       throw new Error('Keine Authentifizierung verfügbar');
     }
 
-    return await api.getStudents(authenticatedUser.pin);
+    return await api.getStudents(authenticatedUser.pin, authenticatedUser.staffId);
   };
 
   // Assign tag to selected student
@@ -218,7 +218,7 @@ function TagAssignmentPage() {
       });
 
       // Call the actual API endpoint
-      const result = await api.assignTag(authenticatedUser.pin, selectedStudentId, scannedTag);
+      const result = await api.assignTag(authenticatedUser.pin, authenticatedUser.staffId, selectedStudentId, scannedTag);
 
       if (result.success) {
         const studentName = `${selectedStudent.first_name} ${selectedStudent.last_name}`;

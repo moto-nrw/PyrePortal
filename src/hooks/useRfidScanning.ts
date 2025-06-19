@@ -70,7 +70,8 @@ export const useRfidScanning = () => {
             action: 'checkin',
             room_id: selectedRoom.id,
           },
-          authenticatedUser.pin
+          authenticatedUser.pin,
+          authenticatedUser.staffId
         );
 
         logger.info(`Scan result: ${result.action} for ${result.student_name}`);
@@ -100,7 +101,7 @@ export const useRfidScanning = () => {
 
         // Update session activity to prevent timeout
         try {
-          await api.updateSessionActivity(authenticatedUser.pin);
+          await api.updateSessionActivity(authenticatedUser.pin, authenticatedUser.staffId);
           logger.debug('Session activity updated');
         } catch (error) {
           logger.warn('Failed to update session activity', { error });
