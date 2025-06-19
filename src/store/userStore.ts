@@ -86,6 +86,7 @@ interface UserState {
   // State
   users: User[];
   selectedUser: string;
+  selectedUserId: number | null;
   authenticatedUser: AuthenticatedUser | null;
   rooms: Room[];
   selectedRoom: Room | null;
@@ -101,7 +102,7 @@ interface UserState {
   rfid: RfidState;
 
   // Actions
-  setSelectedUser: (user: string) => void;
+  setSelectedUser: (userName: string, userId: number | null) => void;
   setAuthenticatedUser: (userData: {
     staffId: number;
     staffName: string;
@@ -172,6 +173,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   // Initial state
   users: [] as User[],
   selectedUser: '',
+  selectedUserId: null,
   authenticatedUser: null,
   rooms: [] as Room[],
   selectedRoom: null,
@@ -194,7 +196,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   // Actions
-  setSelectedUser: (user: string) => set({ selectedUser: user }),
+  setSelectedUser: (userName: string, userId: number | null) => set({ selectedUser: userName, selectedUserId: userId }),
 
   setAuthenticatedUser: (userData: {
     staffId: number;
@@ -375,6 +377,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
     set({
       selectedUser: '',
+      selectedUserId: null,
       authenticatedUser: null,
       selectedRoom: null,
       selectedActivity: null,

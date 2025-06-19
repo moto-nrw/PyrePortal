@@ -40,7 +40,9 @@ function LoginPage() {
         // Performance marking for login flow
         performance.mark('login-start');
 
-        setSelectedUser(localSelectedUser);
+        // Find the user ID for the selected user
+        const selectedUserObj = users.find(u => u.name === localSelectedUser);
+        setSelectedUser(localSelectedUser, selectedUserObj?.id ?? null);
 
         // Log user action and navigation events
         logUserAction('login', { username: localSelectedUser });
@@ -91,7 +93,9 @@ function LoginPage() {
         // Performance marking for login flow
         performance.mark('login-start');
 
-        setSelectedUser(value);
+        // Find the user ID for the selected user
+        const selectedUserObj = users.find(u => u.name === value);
+        setSelectedUser(value, selectedUserObj?.id ?? null);
 
         // Log user action and navigation events
         logUserAction('login', { username: value });
