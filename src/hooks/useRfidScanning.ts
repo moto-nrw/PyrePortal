@@ -30,6 +30,8 @@ export const useRfidScanning = () => {
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
   const processingTagRef = useRef<string | null>(null);
+  const lastProcessedTag = useRef<{ tagId: string; timestamp: number } | null>(null);
+  const isProcessingRequest = useRef<boolean>(false);
 
   // Initialize RFID service on mount
   const initializeService = useCallback(async () => {
@@ -53,14 +55,35 @@ export const useRfidScanning = () => {
         return;
       }
 
+      // Check if this exact tag was processed very recently (within 500ms)
+      const now = Date.now();
+      if (lastProcessedTag.current && 
+          lastProcessedTag.current.tagId === tagId && 
+          (now - lastProcessedTag.current.timestamp) < 500) {
+        logger.debug(`Tag ${tagId} was just processed ${now - lastProcessedTag.current.timestamp}ms ago, skipping duplicate`);
+        return;
+      }
+
       // Prevent duplicate processing of the same tag
       if (processingTagRef.current === tagId) {
         logger.debug(`Tag ${tagId} is already being processed, skipping duplicate`);
         return;
       }
 
+      // Prevent concurrent API requests
+      if (isProcessingRequest.current) {
+        logger.warn(`Another RFID request is in progress, skipping tag ${tagId}`);
+        return;
+      }
+
       try {
         processingTagRef.current = tagId;
+        isProcessingRequest.current = true;
+        lastProcessedTag.current = { tagId, timestamp: now };
+        
+        // Block the tag immediately to prevent duplicate scans
+        blockTag(tagId, rfid.scanTimeout);
+        
         logger.info(`Processing RFID scan for tag: ${tagId}`);
 
         // Call the API to process the scan
@@ -96,9 +119,6 @@ export const useRfidScanning = () => {
         setScanResult(result);
         showScanModal();
 
-        // Block the tag for the configured timeout
-        blockTag(tagId, rfid.scanTimeout);
-
         // Update session activity to prevent timeout
         try {
           await api.updateSessionActivity(authenticatedUser.pin, authenticatedUser.staffId);
@@ -113,10 +133,21 @@ export const useRfidScanning = () => {
           // Clear processing ref after modal hides
           processingTagRef.current = null;
         }, rfid.modalDisplayTime);
+        
+        // Clear the request processing flag immediately after success
+        isProcessingRequest.current = false;
       } catch (error) {
         logger.error('Failed to process RFID scan', { error });
-        // Clear processing ref on error
+        
+        // Check if it's a "student already has active visit" error
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('already has an active visit')) {
+          logger.info('Duplicate request detected - student already has active visit, treating as success');
+        }
+        
+        // Clear all processing refs on error
         processingTagRef.current = null;
+        isProcessingRequest.current = false;
         // Could show error modal here
       }
     },
