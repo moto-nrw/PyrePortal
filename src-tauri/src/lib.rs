@@ -4,6 +4,30 @@ mod rfid;
 
 use std::env;
 use tauri::{WebviewUrl, WebviewWindowBuilder};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Serialize, Deserialize)]
+struct ApiConfig {
+    api_base_url: String,
+    device_api_key: String,
+}
+
+#[tauri::command]
+fn get_api_config() -> Result<ApiConfig, String> {
+    // Try to read from runtime env first, fallback to VITE_ prefixed for compatibility
+    let api_base_url = env::var("API_BASE_URL")
+        .or_else(|_| env::var("VITE_API_BASE_URL"))
+        .unwrap_or_else(|_| "http://localhost:8080".to_string());
+    
+    let device_api_key = env::var("DEVICE_API_KEY")
+        .or_else(|_| env::var("VITE_DEVICE_API_KEY"))
+        .map_err(|_| "API key not found. Please set DEVICE_API_KEY or VITE_DEVICE_API_KEY environment variable")?;
+    
+    Ok(ApiConfig {
+        api_base_url,
+        device_api_key,
+    })
+}
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -28,6 +52,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
+            get_api_config,
             greet,
             quit_app,
             logging::write_log,
