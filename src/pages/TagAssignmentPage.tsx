@@ -115,7 +115,21 @@ function TagAssignmentPage() {
       if (!isRfidEnabled()) {
         // Development mock behavior
         setTimeout(() => {
-          const mockTagId = `DEV_TAG_${Date.now().toString().slice(-6)}`;
+          // Get mock tags from environment variable or use defaults
+          const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
+          const mockStudentTags: string[] = envTags 
+            ? envTags.split(',').map((tag) => tag.trim())
+            : [
+                // Default realistic hardware format tags
+                '04:D6:94:82:97:6A:80',
+                '04:A7:B3:C2:D1:E0:F5',
+                '04:12:34:56:78:9A:BC',
+                '04:FE:DC:BA:98:76:54',
+                '04:11:22:33:44:55:66'
+              ];
+          
+          // Pick a random tag from the list
+          const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
           logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
           void handleTagScanned(mockTagId);
         }, 2000);
@@ -286,19 +300,21 @@ function TagAssignmentPage() {
             <BackButton onClick={handleBack} />
           </div>
           
-          {/* Title */}
-          <div style={{ textAlign: 'center', marginBottom: theme.spacing.xxl }}>
-          <h1
-            style={{
-              fontSize: theme.fonts.size.xxl,
-              fontWeight: theme.fonts.weight.bold,
-              marginBottom: theme.spacing.lg,
-              color: theme.colors.text.primary,
-            }}
-          >
-            Armband scannen
-          </h1>
-          </div>
+          {/* Title - Only show when no tag is scanned */}
+          {!scannedTag && (
+            <div style={{ textAlign: 'center', marginBottom: theme.spacing.xxl }}>
+            <h1
+              style={{
+                fontSize: theme.fonts.size.xxl,
+                fontWeight: theme.fonts.weight.bold,
+                marginBottom: theme.spacing.lg,
+                color: theme.colors.text.primary,
+              }}
+            >
+              Armband scannen
+            </h1>
+            </div>
+          )}
         </div>
 
         {/* Scanner Modal Overlay */}
@@ -380,8 +396,8 @@ function TagAssignmentPage() {
                 Klicken Sie auf "Scannen", um ein RFID-Armband zu scannen
               </p>
 
-              {/* Scanner Status Display */}
-              {scannerStatus && (
+              {/* Scanner Status Display - Only show in mock mode */}
+              {scannerStatus && import.meta.env.VITE_ENABLE_RFID !== 'true' && (
                 <div
                   style={{
                     backgroundColor: theme.colors.background.muted,
@@ -405,10 +421,7 @@ function TagAssignmentPage() {
                     Status: {scannerStatus.is_available ? 'Verfügbar' : 'Nicht verfügbar'}
                   </p>
                   <p style={{ margin: 0, fontSize: theme.fonts.size.small, fontStyle: 'italic' }}>
-                    Mode:{' '}
-                    {import.meta.env.VITE_ENABLE_RFID === 'true'
-                      ? 'Hardware RFID'
-                      : 'Mock Development'}
+                    Mode: Mock Development
                   </p>
                   {scannerStatus.last_error && (
                     <p
@@ -451,7 +464,6 @@ function TagAssignmentPage() {
           {scannedTag && tagAssignment && !isLoading && !success && (
             <div>
               <div style={{ textAlign: 'center', marginBottom: theme.spacing.xl }}>
-                <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>📋</div>
                 <h2
                   style={{
                     fontSize: theme.fonts.size.xl,
@@ -556,10 +568,10 @@ function TagAssignmentPage() {
                   justifyContent: 'center',
                 }}
               >
-                <Button onClick={handleAssignTag} disabled={!selectedStudentId || isLoading} size="small">
+                <Button onClick={handleAssignTag} disabled={!selectedStudentId || isLoading} size="medium">
                   {tagAssignment.assigned ? 'Neu zuweisen' : 'Zuweisen'}
                 </Button>
-                <Button onClick={handleScanAnother} variant="secondary" size="small">
+                <Button onClick={handleScanAnother} variant="secondary" size="medium">
                   Neuer Scan
                 </Button>
               </div>
