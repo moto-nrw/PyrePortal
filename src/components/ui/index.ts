@@ -6,3 +6,4 @@ export { default as ActionButton } from './ActionButton';
 export { Modal } from './Modal';
 export { ErrorModal } from './ErrorModal';
 export { default as BackButton } from './BackButton';
+export { default as Dropdown } from './Dropdown';
