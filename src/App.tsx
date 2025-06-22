@@ -9,6 +9,7 @@ import LoginPage from './pages/LoginPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
+import { initializeApi } from './services/api';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
 import { createLogger, logger } from './utils/logger';
@@ -18,14 +19,28 @@ function App() {
   const { selectedUser, authenticatedUser, selectedRoom, selectedActivity } = useUserStore();
   const appLogger = createLogger('App');
 
-  // Initialize logger with runtime config
+  // Initialize logger with runtime config and API
   useEffect(() => {
-    const config = getRuntimeConfig();
-    logger.updateConfig(config);
-    appLogger.info('Application initialized', {
-      version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
-      environment: import.meta.env.MODE,
-    });
+    const initApp = async () => {
+      // Initialize logger
+      const config = getRuntimeConfig();
+      logger.updateConfig(config);
+      
+      // Initialize API configuration
+      try {
+        await initializeApi();
+        appLogger.info('API configuration loaded successfully');
+      } catch (error) {
+        appLogger.error('Failed to initialize API configuration', { error });
+      }
+      
+      appLogger.info('Application initialized', {
+        version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
+        environment: import.meta.env.MODE,
+      });
+    };
+    
+    void initApp();
   }, [appLogger]); // Include appLogger in dependency array
 
   // Auth states
