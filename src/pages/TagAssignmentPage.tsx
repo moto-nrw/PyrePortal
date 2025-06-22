@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox, ErrorModal, BackButton, Dropdown } from '../components/ui';
+import { Button, ContentBox, ErrorModal, BackButton } from '../components/ui';
 import { api, type Student, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -539,17 +539,25 @@ function TagAssignmentPage() {
                 >
                   {tagAssignment.assigned ? 'Neuen Schüler zuweisen:' : 'Schüler auswählen:'}
                 </label>
-                <Dropdown
-                  options={students.map(student => ({
-                    value: student.student_id,
-                    label: `${student.first_name} ${student.last_name}`,
-                    subLabel: student.school_class ?? undefined,
-                  }))}
-                  value={selectedStudentId}
-                  onChange={value => setSelectedStudentId(value as number | null)}
-                  placeholder="Schüler auswählen..."
-                  width="100%"
-                />
+                <select
+                  value={selectedStudentId ?? ''}
+                  onChange={e => setSelectedStudentId(Number(e.target.value) || null)}
+                  style={{
+                    width: '100%',
+                    padding: theme.spacing.md,
+                    fontSize: theme.fonts.size.base,
+                    borderRadius: theme.borders.radius.md,
+                    border: `1px solid ${theme.colors.border.light}`,
+                    backgroundColor: theme.colors.background.light,
+                  }}
+                >
+                  <option value="">Schüler auswählen...</option>
+                  {students.map(student => (
+                    <option key={student.student_id} value={student.student_id}>
+                      {student.first_name} {student.last_name} ({student.school_class ?? ''})
+                    </option>
+                  ))}
+                </select>
               </div>
 
               {/* Action Buttons */}

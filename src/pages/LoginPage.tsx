@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, Dropdown, ContentBox } from '../components/ui';
+import { Button, Select, ContentBox } from '../components/ui';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
@@ -64,6 +64,12 @@ function LoginPage() {
       logError(error instanceof Error ? error : new Error(String(error)), 'LoginPage.handleLogin');
     }
   };
+
+  // Transform users data for the Select component
+  const userOptions = users.map(user => ({
+    value: user.name,
+    label: user.name,
+  }));
 
   // Log user selection changes and auto-submit
   const handleUserChange = (value: string) => {
@@ -195,13 +201,11 @@ function LoginPage() {
           marginTop: theme.spacing.xxl,
         }}
       >
-        <Dropdown
-          options={users.map(user => ({
-            value: user.name,
-            label: user.name,
-          }))}
-          value={localSelectedUser || null}
-          onChange={value => handleUserChange(value as string)}
+        <Select
+          id="user-select"
+          options={userOptions}
+          value={localSelectedUser}
+          onChange={handleUserChange}
           placeholder={isLoading ? 'Lade Lehrer...' : 'Benutzer auswählen...'}
           width="350px"
           disabled={isLoading}
