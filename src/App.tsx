@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { RfidServiceInitializer } from './components/RfidServiceInitializer';
 import ActivityScanningPage from './pages/ActivityScanningPage';
+import AttendancePage from './pages/AttendancePage';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
 import LoginPage from './pages/LoginPage';
@@ -101,8 +102,8 @@ function App() {
               }
             />
             <Route
-              path="/log-off-student"
-              element={isFullyAuthenticated ? <div>Log Off Student Page</div> : <Navigate to="/" replace />}
+              path="/attendance"
+              element={isFullyAuthenticated ? <AttendancePage /> : <Navigate to="/" replace />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

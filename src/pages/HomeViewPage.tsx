@@ -41,9 +41,9 @@ function HomeViewPage() {
     }
   };
 
-  const handleGoHome = () => {
-    logNavigation('Home View', '/log-off-student');
-    void navigate('/log-off-student');
+  const handleAttendance = () => {
+    logNavigation('Home View', '/attendance');
+    void navigate('/attendance');
   };
 
   // Redirect to login if no authenticated user and fetch current session
@@ -156,7 +156,7 @@ function HomeViewPage() {
           ) : (
             <ActionCard onClick={handleStartActivity} title="Aktivität starten" icon="🎯" />
           )}
-          <ActionCard onClick={handleGoHome} title="Nach Hause" icon="🏠" />
+          <ActionCard onClick={handleAttendance} title="Anwesenheit" icon="🏠" />
           <ActionCard onClick={handleLogout} title="Abmelden" icon="🚪" />
         </div>
       </div>
