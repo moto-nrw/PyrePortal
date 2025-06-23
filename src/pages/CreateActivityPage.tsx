@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { invoke } from '@tauri-apps/api/core';
+
 
 import { ContentBox } from '../components/ui';
 import type { ActivityResponse } from '../services/api';
@@ -180,19 +180,6 @@ function CreateActivityPage() {
     }
   };
 
-  // Handle application quit
-  const handleQuit = () => {
-    logger.info('User requested application quit from create activity page');
-    logUserAction('quit_app');
-    
-    invoke('quit_app', {})
-      .then(() => {
-        logger.debug('Application quit command sent successfully');
-      })
-      .catch((error) => {
-        logError(error instanceof Error ? error : new Error(String(error)), 'CreateActivityPage.handleQuit');
-      });
-  };
 
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
@@ -252,26 +239,29 @@ function CreateActivityPage() {
               justifyContent: 'center',
               gap: '8px',
               padding: '0 16px',
-              backgroundColor: '#FFFFFF',
-              border: 'none',
-              borderRadius: '12px',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              borderRadius: '22px',
               cursor: 'pointer',
               transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
               position: 'relative',
               overflow: 'hidden',
+              backdropFilter: 'blur(8px)',
             }}
             onTouchStart={(e) => {
               e.currentTarget.style.transform = 'scale(0.95)';
-              e.currentTarget.style.backgroundColor = '#F3F4F6';
+              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
             }}
             onTouchEnd={(e) => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = '#FFFFFF';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
                 }
               }, 150);
             }}
@@ -281,7 +271,7 @@ function CreateActivityPage() {
               height="20"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#1F2937"
+              stroke="#374151"
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -293,7 +283,7 @@ function CreateActivityPage() {
               style={{
                 fontSize: '16px',
                 fontWeight: 600,
-                color: '#1F2937',
+                color: '#374151',
               }}
             >
               Zurück
@@ -594,7 +584,7 @@ function CreateActivityPage() {
                     boxShadow: 'none',
                   }}
                 >
-                  ← Zurück
+                  ← Vorherige
                 </button>
 
                 <span
