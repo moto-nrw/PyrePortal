@@ -615,6 +615,70 @@ export const api = {
       throw error;
     }
   },
+
+  /**
+   * Get student attendance status
+   * Endpoint: GET /api/iot/attendance/status/{rfid}
+   */
+  async getAttendanceStatus(pin: string, staffId: number, rfid: string): Promise<AttendanceStatusResponse> {
+    try {
+      const response = await apiCall<AttendanceStatusResponse>(`/api/iot/attendance/status/${rfid}`, {
+        headers: {
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+          'X-Staff-ID': staffId.toString(),
+        },
+      });
+
+      return response;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('404')) {
+        throw new Error('Schüler nicht gefunden oder keine Anwesenheitsdaten verfügbar');
+      }
+      if (errorMessage.includes('403')) {
+        throw new Error('Keine Berechtigung für diesen Schüler');
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Toggle student attendance (check-in/check-out)
+   * Endpoint: POST /api/iot/attendance/toggle
+   */
+  async toggleAttendance(
+    pin: string,
+    staffId: number,
+    rfid: string,
+    action: 'confirm' | 'cancel'
+  ): Promise<AttendanceToggleResponse> {
+    try {
+      const response = await apiCall<AttendanceToggleResponse>('/api/iot/attendance/toggle', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+          'X-Staff-ID': staffId.toString(),
+        },
+        body: JSON.stringify({
+          rfid,
+          action,
+        }),
+      });
+
+      return response;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('404')) {
+        throw new Error('Schüler nicht gefunden');
+      }
+      if (errorMessage.includes('403')) {
+        throw new Error('Keine Berechtigung für diesen Schüler');
+      }
+      throw error;
+    }
+  },
 };
 
 /**
@@ -665,6 +729,70 @@ export interface RfidScanResult {
   processed_at?: string;
   message?: string;
   status?: string;
+}
+
+/**
+ * Attendance status response from GET /api/iot/attendance/status/{rfid}
+ */
+export interface AttendanceStatusResponse {
+  status: string;
+  data: {
+    student: {
+      id: number;
+      first_name: string;
+      last_name: string;
+      group: {
+        id: number;
+        name: string;
+      };
+    };
+    attendance: {
+      status: 'checked_in' | 'checked_out' | 'not_checked_in';
+      date: string;
+      check_in_time: string | null;
+      check_out_time: string | null;
+      checked_in_by: string;
+      checked_out_by: string;
+    };
+  };
+  message: string;
+}
+
+/**
+ * Attendance toggle request for POST /api/iot/attendance/toggle
+ */
+export interface AttendanceToggleRequest {
+  rfid: string;
+  action: 'confirm' | 'cancel';
+}
+
+/**
+ * Attendance toggle response from POST /api/iot/attendance/toggle
+ */
+export interface AttendanceToggleResponse {
+  status: string;
+  data: {
+    action: 'checked_in' | 'checked_out' | 'cancelled';
+    student: {
+      id: number;
+      first_name: string;
+      last_name: string;
+      group: {
+        id: number;
+        name: string;
+      };
+    };
+    attendance: {
+      status: 'checked_in' | 'checked_out' | '';
+      date: string;
+      check_in_time: string | null;
+      check_out_time: string | null;
+      checked_in_by: string;
+      checked_out_by: string;
+    };
+    message: string;
+  };
+  message: string;
 }
 
 /**
