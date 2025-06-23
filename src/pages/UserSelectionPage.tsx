@@ -202,7 +202,7 @@ function UserSelectionPage() {
               alignContent: 'start',
             }}
           >
-            {paginatedUsers.map((user, index) => {
+            {paginatedUsers.map((user) => {
               return (
                 <button
                   key={user.id}
