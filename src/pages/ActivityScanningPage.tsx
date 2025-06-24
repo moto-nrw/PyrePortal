@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox } from '../components/ui';
+import { ContentBox } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import theme from '../styles/theme';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
@@ -15,6 +14,18 @@ const ActivityScanningPage: React.FC = () => {
   const { selectedActivity, selectedRoom, authenticatedUser, rfid } = useUserStore();
 
   const { isScanning, currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
+  
+  // Debug logging for selectedActivity
+  useEffect(() => {
+    if (selectedActivity) {
+      logger.debug('Selected activity data:', {
+        id: selectedActivity.id,
+        name: selectedActivity.name,
+        max_participants: selectedActivity.max_participants,
+        enrollment_count: selectedActivity.enrollment_count,
+      });
+    }
+  }, [selectedActivity]);
 
   // Debug logging for modal state
   useEffect(() => {
@@ -125,15 +136,169 @@ const ActivityScanningPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
 
-  // Auto-close modal after delay
+  // Launch confetti animation
+  const launchConfetti = useCallback(() => {
+    const container = document.getElementById('confetti-container');
+    if (!container) return;
+
+    // Clear any existing confetti
+    container.innerHTML = '';
+    
+    // Colors for the confetti - vibrant and varied
+    const colors = ['#FF3130', '#f87C10', '#83cd2d', '#5080D8', '#FFD700', '#FF69B4', '#00CED1', '#9370DB'];
+    
+    // Create 200 confetti pieces for intense effect
+    for (let i = 0; i < 200; i++) {
+      setTimeout(() => {
+        const confetti = document.createElement('div');
+        const color = colors[Math.floor(Math.random() * colors.length)];
+        const size = Math.random() * 12 + 4;
+        
+        // Random shapes - squares, rectangles, and circles
+        const isCircle = Math.random() > 0.6;
+        const aspectRatio = isCircle ? 1 : 0.4 + Math.random() * 0.8;
+        
+        // Style the confetti
+        confetti.style.position = 'fixed';
+        confetti.style.width = `${size}px`;
+        confetti.style.height = `${size * aspectRatio}px`;
+        confetti.style.backgroundColor = color;
+        confetti.style.borderRadius = isCircle ? '50%' : '0';
+        confetti.style.left = '50%';
+        confetti.style.top = '50%';
+        confetti.style.transform = 'translate(-50%, -50%)';
+        confetti.style.pointerEvents = 'none';
+        confetti.style.zIndex = '1001';
+        confetti.style.boxShadow = `0 0 ${size/2}px ${color}40`;
+        
+        container.appendChild(confetti);
+        
+        // More chaotic angles for explosive effect
+        const angle = Math.random() * Math.PI * 2;
+        const velocity = 300 + Math.random() * 400; // Faster initial velocity
+        const rotationSpeed = Math.random() * 1080 - 540; // More rotation
+        
+        // Add some pieces that go more horizontal
+        const horizontalBias = Math.random() > 0.5 ? 1.5 : 1;
+        const verticalBias = Math.random() > 0.7 ? 0.5 : 1;
+        
+        // Animate with more dramatic motion
+        const animation = confetti.animate([
+          {
+            transform: 'translate(-50%, -50%) scale(0) rotate(0deg)',
+            opacity: 1,
+          },
+          {
+            transform: `translate(calc(-50% + ${Math.cos(angle) * velocity * 0.4 * horizontalBias}px), calc(-50% + ${Math.sin(angle) * velocity * 0.3 * verticalBias}px)) scale(1.2) rotate(${rotationSpeed * 0.3}deg)`,
+            opacity: 1,
+          },
+          {
+            transform: `translate(calc(-50% + ${Math.cos(angle) * velocity * horizontalBias}px), calc(-50% + ${Math.sin(angle) * velocity * verticalBias + 150}px)) scale(0.3) rotate(${rotationSpeed}deg)`,
+            opacity: 0,
+          }
+        ], {
+          duration: 2500 + Math.random() * 500, // Varied duration
+          easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        });
+        
+        animation.onfinish = () => confetti.remove();
+      }, i * 5); // Faster spawn rate for burst effect
+    }
+  }, []);
+
+  // Launch bubble animation for check-out
+  const launchBubbles = useCallback(() => {
+    const container = document.getElementById('confetti-container');
+    if (!container) return;
+
+    // Clear any existing elements
+    container.innerHTML = '';
+    
+    // Create 30 bubbles
+    for (let i = 0; i < 30; i++) {
+      setTimeout(() => {
+        const bubble = document.createElement('div');
+        const size = Math.random() * 40 + 20; // 20-60px bubbles
+        
+        // Style the bubble
+        bubble.style.position = 'fixed';
+        bubble.style.width = `${size}px`;
+        bubble.style.height = `${size}px`;
+        bubble.style.borderRadius = '50%';
+        bubble.style.background = 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4))';
+        bubble.style.border = '2px solid rgba(255, 255, 255, 0.6)';
+        bubble.style.boxShadow = 'inset -10px -10px 20px rgba(255, 255, 255, 0.3), 0 0 20px rgba(248, 124, 16, 0.3)';
+        bubble.style.pointerEvents = 'none';
+        bubble.style.zIndex = '1001';
+        
+        // Random starting position at bottom of screen
+        const startX = Math.random() * window.innerWidth;
+        bubble.style.left = `${startX}px`;
+        bubble.style.bottom = '-100px';
+        
+        container.appendChild(bubble);
+        
+        // Create floating path
+        const swayAmount = (Math.random() - 0.5) * 200; // -100 to 100px horizontal drift
+        const floatDuration = 3000 + Math.random() * 2000; // 3-5 seconds
+        
+        // Animate bubble floating up
+        const animation = bubble.animate([
+          {
+            transform: 'translateY(0) translateX(0) scale(0.5)',
+            opacity: 0.7,
+          },
+          {
+            transform: `translateY(-${window.innerHeight * 0.4}px) translateX(${swayAmount * 0.5}px) scale(1)`,
+            opacity: 0.8,
+          },
+          {
+            transform: `translateY(-${window.innerHeight * 0.7}px) translateX(${swayAmount * 0.8}px) scale(1.1)`,
+            opacity: 0.6,
+          },
+          {
+            transform: `translateY(-${window.innerHeight + 100}px) translateX(${swayAmount}px) scale(0.8)`,
+            opacity: 0,
+          }
+        ], {
+          duration: floatDuration,
+          easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
+        });
+        
+        // Add shimmer effect
+        const shimmer = document.createElement('div');
+        shimmer.style.position = 'absolute';
+        shimmer.style.width = '40%';
+        shimmer.style.height = '40%';
+        shimmer.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, transparent 70%)';
+        shimmer.style.top = '15%';
+        shimmer.style.left = '20%';
+        shimmer.style.borderRadius = '50%';
+        shimmer.style.animation = 'shimmer 2s infinite';
+        bubble.appendChild(shimmer);
+        
+        animation.onfinish = () => bubble.remove();
+      }, i * 100); // Staggered release
+    }
+  }, []);
+
+  // Auto-close modal after delay and trigger animations
   useEffect(() => {
-    if (showModal) {
+    if (showModal && currentScan) {
+      // Launch confetti for check-ins
+      if (currentScan.action === 'checked_in' || currentScan.action === 'transferred') {
+        launchConfetti();
+      } else if (currentScan.action === 'checked_out') {
+        // Launch bubbles for check-outs
+        launchBubbles();
+      }
+      
       const timer = setTimeout(() => {
         // Modal will auto-close through the hook
       }, rfid.modalDisplayTime);
       return () => clearTimeout(timer);
     }
-  }, [showModal, rfid.modalDisplayTime]);
+  }, [showModal, currentScan, rfid.modalDisplayTime, launchConfetti, launchBubbles]);
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -162,101 +327,158 @@ const ActivityScanningPage: React.FC = () => {
   return (
     <>
       <ContentBox centered shadow="md" rounded="lg">
+        {/* Anmelden Button - Top Right of ContentBox */}
+        <button
+          onClick={handleAnmelden}
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            padding: '0 28px',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: '28px',
+            cursor: 'pointer',
+            transition: 'all 200ms',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            backdropFilter: 'blur(8px)',
+            fontSize: '18px',
+            fontWeight: 600,
+            color: '#374151',
+            zIndex: 10,
+          }}
+          onTouchStart={(e) => {
+            e.currentTarget.style.transform = 'scale(0.95)';
+            e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+          }}
+          onTouchEnd={(e) => {
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              }
+            }, 150);
+          }}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          Anmelden
+        </button>
+
         <div
           style={{
             width: '100%',
-            maxWidth: '800px',
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
+            position: 'relative',
+            padding: '24px',
           }}
         >
-          {/* Fixed Header */}
-          <div style={{ flexShrink: 0 }}>
-            {/* Navigation buttons */}
-            <div
+
+          {/* Header Section */}
+          <div style={{ textAlign: 'center', marginTop: '-40px', marginBottom: '48px' }}>
+            <h1
               style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                marginBottom: theme.spacing.lg,
+                fontSize: '56px',
+                fontWeight: 700,
+                color: '#1F2937',
+                margin: '0 0 20px 0',
+                lineHeight: 1.2,
               }}
             >
-              <Button onClick={handleAnmelden} variant="outline" size="small">
-                Anmelden
-              </Button>
-            </div>
-
-            {/* Title and info */}
-            <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
-              <h1
-                style={{
-                  fontSize: theme.fonts.size.xxl,
-                  fontWeight: theme.fonts.weight.bold,
-                  marginBottom: theme.spacing.md,
-                  color: theme.colors.text.primary,
-                }}
-              >
-                {selectedActivity.name}
-              </h1>
-
-              <p
-                style={{
-                  fontSize: theme.fonts.size.large,
-                  color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.sm,
-                }}
-              >
-                Raum: {selectedRoom?.name || 'Unbekannt'}
-              </p>
-
-              <div
-                style={{
-                  fontSize: theme.fonts.size.xxl,
-                  fontWeight: theme.fonts.weight.bold,
-                  color: theme.colors.primary,
-                }}
-              >
-                <span>{studentCount ?? 0}</span>
-                <span> Schüler anwesend</span>
-              </div>
-            </div>
+              {selectedActivity.name}
+            </h1>
+            <p
+              style={{
+                fontSize: '32px',
+                color: '#6B7280',
+                margin: 0,
+                fontWeight: 500,
+              }}
+            >
+              {selectedRoom?.name || 'Unbekannt'}
+            </p>
           </div>
 
-          {/* Scrollable Content Area */}
+          {/* Main Student Count Display */}
           <div
             style={{
               flex: 1,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              minHeight: '300px',
+              textAlign: 'center',
             }}
           >
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '5rem', marginBottom: theme.spacing.lg }}>
-                {isInitializing ? '📡' : (isScanning ? '📡' : '⏸️')}
+            <div>
+              <div
+                style={{
+                  fontSize: '160px',
+                  fontWeight: 800,
+                  color: '#83cd2d',
+                  lineHeight: 1,
+                  marginBottom: '20px',
+                }}
+              >
+                {studentCount ?? 0}
               </div>
-              <h2
+              <div
                 style={{
-                  fontSize: theme.fonts.size.xl,
-                  fontWeight: theme.fonts.weight.semibold,
-                  marginBottom: theme.spacing.md,
-                  color: theme.colors.text.primary,
+                  fontSize: '28px',
+                  color: '#6B7280',
+                  marginBottom: '12px',
+                  fontWeight: 600,
                 }}
               >
-                {isInitializing ? 'Scanner wird gestartet...' : (isScanning ? 'RFID Scanner Aktiv' : 'Scanner Pausiert')}
-              </h2>
-              <p
+                von {selectedActivity.max_participants} Schülern
+              </div>
+              <div
                 style={{
-                  fontSize: theme.fonts.size.large,
-                  color: theme.colors.text.secondary,
+                  fontSize: '18px',
+                  color: '#9CA3AF',
+                  fontWeight: 500,
                 }}
               >
-                {isInitializing ? 'Bitte warten...' : (isScanning ? 'Schülerkarte hier scannen' : 'Scanner ist pausiert')}
-              </p>
+                eingecheckt
+              </div>
             </div>
+          </div>
+
+          {/* Bottom Info Text */}
+          <div
+            style={{
+              textAlign: 'center',
+              paddingTop: '48px',
+              paddingBottom: '0',
+            }}
+          >
+            <p
+              style={{
+                fontSize: '18px',
+                color: '#6B7280',
+                margin: 0,
+                fontWeight: 500,
+              }}
+            >
+              {isInitializing 
+                ? 'Bitte warten, während der Scanner initialisiert wird...' 
+                : isScanning 
+                ? 'Halte dein Armband auf das bunte Scannersymbol'
+                : 'Scanner ist pausiert'
+              }
+            </p>
           </div>
         </div>
       </ContentBox>
@@ -270,7 +492,7 @@ const ActivityScanningPage: React.FC = () => {
             left: 0,
             right: 0,
             bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -279,33 +501,71 @@ const ActivityScanningPage: React.FC = () => {
         >
           <div
             style={{
-              backgroundColor: theme.colors.background.light,
-              borderRadius: theme.borders.radius.lg,
-              padding: theme.spacing.xxl,
-              maxWidth: '500px',
+              backgroundColor: currentScan.action === 'checked_in' || currentScan.action === 'transferred' 
+                ? '#83cd2d' 
+                : '#f87C10',
+              borderRadius: '32px',
+              padding: '64px',
+              maxWidth: '700px',
               width: '90%',
               textAlign: 'center',
-              boxShadow: theme.shadows.lg,
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
+              position: 'relative',
+              overflow: 'hidden',
+              transform: 'scale(1)',
+              animation: 'modalPop 0.3s ease-out',
             }}
           >
-            <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
-              {(() => {
-                logger.debug('Modal icon logic:', {
-                  action: currentScan.action,
-                  isCheckedIn: currentScan.action === 'checked_in',
-                  typeOfAction: typeof currentScan.action,
-                });
-                // Show checkmark for both check-in and transfer (since transfer includes a check-in)
-                return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? '✅' : '👋';
-              })()}
+            {/* Background pattern for visual interest */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                pointerEvents: 'none',
+              }}
+            />
+            
+            {/* Icon container with background circle */}
+            <div
+              style={{
+                width: '120px',
+                height: '120px',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 32px',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              {currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5"/>
+                </svg>
+              ) : (
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                  <polyline points="16 17 21 12 16 7"/>
+                  <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+              )}
             </div>
 
             <h2
               style={{
-                fontSize: theme.fonts.size.xl,
-                fontWeight: theme.fonts.weight.bold,
-                marginBottom: theme.spacing.lg,
-                color: theme.colors.text.primary,
+                fontSize: '48px',
+                fontWeight: 800,
+                marginBottom: '24px',
+                color: '#FFFFFF',
+                lineHeight: 1.2,
+                position: 'relative',
+                zIndex: 2,
               }}
             >
               {currentScan.message ??
@@ -316,24 +576,20 @@ const ActivityScanningPage: React.FC = () => {
 
             <div
               style={{
-                fontSize: theme.fonts.size.large,
-                color: theme.colors.text.secondary,
-                marginBottom: theme.spacing.xl,
+                fontSize: '28px',
+                color: 'rgba(255, 255, 255, 0.95)',
+                fontWeight: 600,
+                position: 'relative',
+                zIndex: 2,
               }}
             >
               {(() => {
-                logger.debug('Modal message logic:', {
-                  action: currentScan.action,
-                  isCheckedIn: currentScan.action === 'checked_in',
-                });
-                // Show appropriate message based on action
                 switch (currentScan.action) {
                   case 'checked_in':
                     return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
                   case 'checked_out':
                     return 'Du bist jetzt ausgecheckt';
                   case 'transferred':
-                    // For transfers, the greeting already contains the transfer info
                     return 'Raumwechsel erfolgreich';
                   default:
                     return '';
@@ -341,8 +597,45 @@ const ActivityScanningPage: React.FC = () => {
               })()}
             </div>
           </div>
+
+          {/* Confetti container */}
+          <div id="confetti-container" />
         </div>
       )}
+
+      {/* Add animation keyframes */}
+      <style>
+        {`
+          @keyframes modalPop {
+            0% {
+              transform: scale(0.8);
+              opacity: 0;
+            }
+            50% {
+              transform: scale(1.05);
+            }
+            100% {
+              transform: scale(1);
+              opacity: 1;
+            }
+          }
+          
+          @keyframes shimmer {
+            0% {
+              transform: translate(-5px, -5px) scale(1);
+              opacity: 0.9;
+            }
+            50% {
+              transform: translate(5px, 5px) scale(0.8);
+              opacity: 0.6;
+            }
+            100% {
+              transform: translate(-5px, -5px) scale(1);
+              opacity: 0.9;
+            }
+          }
+        `}
+      </style>
     </>
   );
 };

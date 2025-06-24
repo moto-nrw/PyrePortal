@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox, ErrorModal, BackButton } from '../components/ui';
+import { ContentBox, ErrorModal } from '../components/ui';
 import { api, type AttendanceStatusResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -298,299 +298,664 @@ function AttendancePage() {
 
   return (
     <>
-      <ContentBox centered shadow="md" rounded="lg">
-      <div style={{ width: '100%', maxWidth: '800px', height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* Fixed Header */}
-        <div style={{ flexShrink: 0 }}>
-          {/* Navigation buttons */}
+      <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+        <div style={{ 
+          width: '100%', 
+          height: '100%',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}>
+          {/* Modern back button - positioned absolutely like TagAssignmentPage */}
           <div
             style={{
-              display: 'flex',
-              justifyContent: 'flex-start',
-              alignItems: 'center',
-              marginBottom: theme.spacing.lg,
+              position: 'absolute',
+              top: '20px',
+              left: '20px',
+              zIndex: 10,
             }}
           >
-            <BackButton onClick={handleBack} />
-          </div>
-          
-          {/* Title - Only show when no tag is scanned */}
-          {!scannedTag && (
-            <div style={{ textAlign: 'center', marginBottom: theme.spacing.xxl }}>
-            <h1
+            <button
+              type="button"
+              onClick={handleBack}
               style={{
-                fontSize: theme.fonts.size.xxl,
-                fontWeight: theme.fonts.weight.bold,
-                marginBottom: theme.spacing.lg,
-                color: theme.colors.text.primary,
+                height: '56px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                padding: '0 28px',
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                border: '1px solid rgba(0, 0, 0, 0.1)',
+                borderRadius: '28px',
+                cursor: 'pointer',
+                transition: 'all 200ms',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                position: 'relative',
+                overflow: 'hidden',
+                backdropFilter: 'blur(8px)',
+              }}
+              onTouchStart={(e) => {
+                e.currentTarget.style.transform = 'scale(0.95)';
+                e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+              }}
+              onTouchEnd={(e) => {
+                setTimeout(() => {
+                  if (e.currentTarget) {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  }
+                }, 150);
               }}
             >
-              Anwesenheit
-            </h1>
-            </div>
-          )}
-        </div>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#374151"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M19 12H5"/>
+                <path d="M12 19l-7-7 7-7"/>
+              </svg>
+              <span
+                style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  color: '#374151',
+                }}
+              >
+                Zurück
+              </span>
+            </button>
+          </div>
 
-        {/* Scanner Modal Overlay */}
-        {showScanner && (
-          <div
+          {/* Title - Dynamic based on state */}
+          <h1
             style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.8)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
+              fontSize: '36px',
+              fontWeight: theme.fonts.weight.bold,
+              marginBottom: '48px',
+              textAlign: 'center',
+              color: theme.colors.text.primary,
             }}
           >
+            {scannedTag && !success ? 'Anwesenheit verwalten' : 'Anwesenheit scannen'}
+          </h1>
+
+          {/* Scanner Modal Overlay - matching TagAssignmentPage style */}
+          {showScanner && (
             <div
               style={{
-                backgroundColor: theme.colors.background.light,
-                borderRadius: theme.borders.radius.lg,
-                padding: theme.spacing.xxl,
-                textAlign: 'center',
-                minWidth: '300px',
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
               }}
             >
-              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📡</div>
-              <h2
+              <div
                 style={{
-                  fontSize: theme.fonts.size.xl,
-                  fontWeight: theme.fonts.weight.bold,
-                  marginBottom: theme.spacing.lg,
-                  color: theme.colors.text.primary,
+                  backgroundColor: '#5080D8',
+                  borderRadius: '32px',
+                  padding: '64px',
+                  maxWidth: '600px',
+                  width: '90%',
+                  textAlign: 'center',
+                  boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  transform: 'scale(1)',
+                  animation: 'modalPop 0.3s ease-out',
                 }}
               >
-                RFID Tag scannen...
-              </h2>
-              <p
-                style={{
-                  fontSize: theme.fonts.size.base,
-                  color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.md,
-                }}
-              >
-                {scannerStatus?.platform.includes('Development')
-                  ? 'Simuliere Scan-Vorgang...'
-                  : 'Halten Sie das Armband an den Scanner'}
-              </p>
-              <p
-                style={{
-                  fontSize: theme.fonts.size.small,
-                  color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.xl,
-                  fontStyle: 'italic',
-                }}
-              >
-                Platform: {scannerStatus?.platform}
-              </p>
-              <Button onClick={() => setShowScanner(false)} variant="secondary">
-                Abbrechen
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* Main Content */}
-        <div style={{ padding: theme.spacing.lg }}>
-          {/* Initial State - Start Scanning */}
-          {!scannedTag && !isLoading && (
-            <div style={{ textAlign: 'center' }}>
-              <p
-                style={{
-                  fontSize: theme.fonts.size.large,
-                  color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.lg,
-                }}
-              >
-                Klicken Sie auf "Scannen", um die Anwesenheit zu verwalten
-              </p>
-
-              {/* Scanner Status Display - Only show in mock mode */}
-              {scannerStatus && import.meta.env.VITE_ENABLE_RFID !== 'true' && (
+                {/* Background pattern */}
                 <div
                   style={{
-                    backgroundColor: theme.colors.background.muted,
-                    borderRadius: theme.borders.radius.md,
-                    padding: theme.spacing.md,
-                    marginBottom: theme.spacing.xl,
-                    fontSize: theme.fonts.size.small,
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background: 'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                    pointerEvents: 'none',
+                  }}
+                />
+                
+                {/* Icon container */}
+                <div
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 32px',
+                    position: 'relative',
+                    zIndex: 2,
+                    animation: 'pulse 2s infinite',
+                  }}
+                >
+                  <svg width="70" height="70" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {/* Standard NFC/Contactless payment symbol */}
+                    <path d="M2 12h3.5" />
+                    <path d="M5.5 6a6 6 0 0 1 0 12" />
+                    <path d="M8.5 3a9 9 0 0 1 0 18" />
+                    <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
+                  </svg>
+                </div>
+                
+                <h2
+                  style={{
+                    fontSize: '36px',
+                    fontWeight: 700,
+                    marginBottom: '16px',
+                    color: '#FFFFFF',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  RFID Tag scannen...
+                </h2>
+                <p
+                  style={{
+                    fontSize: '20px',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    marginBottom: '32px',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  {scannerStatus?.platform.includes('Development')
+                    ? 'Simuliere Scan-Vorgang...'
+                    : 'Halten Sie das Armband an den Scanner'}
+                </p>
+                
+                <button
+                  onClick={() => setShowScanner(false)}
+                  style={{
+                    padding: '12px 32px',
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '24px',
+                    cursor: 'pointer',
+                    transition: 'all 200ms',
+                    outline: 'none',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Main Content - Centered */}
+          <div style={{ 
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            {/* Initial State - Start Scanning */}
+            {!scannedTag && !isLoading && (
+              <div style={{ textAlign: 'center' }}>
+                <div
+                  style={{
+                    width: '140px',
+                    height: '140px',
+                    backgroundColor: '#E6EFFF',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 40px',
+                  }}
+                >
+                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#5080D8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    {/* Standard NFC/Contactless payment symbol */}
+                    <path d="M2 12h3.5" />
+                    <path d="M5.5 6a6 6 0 0 1 0 12" />
+                    <path d="M8.5 3a9 9 0 0 1 0 18" />
+                    <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
+                  </svg>
+                </div>
+                
+                <p
+                  style={{
+                    fontSize: '24px',
                     color: theme.colors.text.secondary,
+                    marginBottom: '40px',
+                    lineHeight: '1.4',
                   }}
                 >
-                  <p style={{ margin: 0, marginBottom: theme.spacing.xs }}>
-                    <strong>Scanner:</strong> {scannerStatus.platform}
-                  </p>
-                  <p
-                    style={{
-                      margin: 0,
-                      marginBottom: theme.spacing.xs,
-                      color: scannerStatus.is_available ? theme.colors.success : theme.colors.error,
-                    }}
-                  >
-                    Status: {scannerStatus.is_available ? 'Verfügbar' : 'Nicht verfügbar'}
-                  </p>
-                  <p style={{ margin: 0, fontSize: theme.fonts.size.small, fontStyle: 'italic' }}>
-                    Mode: Mock Development
-                  </p>
-                  {scannerStatus.last_error && (
-                    <p
-                      style={{ margin: 0, marginTop: theme.spacing.xs, color: theme.colors.error }}
-                    >
-                      {scannerStatus.last_error}
-                    </p>
-                  )}
-                </div>
-              )}
+                  Klicken Sie auf "Scannen", um die<br />Anwesenheit zu prüfen
+                </p>
 
-              <Button
-                onClick={handleStartScanning}
-                disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
-                style={{ marginBottom: theme.spacing.lg }}
-              >
-                {scannerStatus?.platform.includes('Development')
-                  ? 'Mock Scannen'
-                  : 'Scannen starten'}
-              </Button>
-            </div>
-          )}
-
-          {/* Loading State */}
-          {isLoading && (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>⏳</div>
-              <p
-                style={{
-                  fontSize: theme.fonts.size.large,
-                  color: theme.colors.text.secondary,
-                }}
-              >
-                Verarbeite...
-              </p>
-            </div>
-          )}
-
-          {/* Tag Scanned - Show Student Status */}
-          {scannedTag && attendanceStatus && !isLoading && !success && (
-            <div>
-              <div style={{ textAlign: 'center', marginBottom: theme.spacing.xl }}>
-                <h1
+                <button
+                  onClick={handleStartScanning}
+                  disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
                   style={{
-                    fontSize: '2.5rem',
-                    fontWeight: theme.fonts.weight.bold,
-                    marginBottom: theme.spacing.lg,
-                    color: theme.colors.text.primary,
+                    height: '60px',
+                    padding: '0 48px',
+                    fontSize: '20px',
+                    fontWeight: 600,
+                    backgroundColor: '#5080D8',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '30px',
+                    cursor: 'pointer',
+                    transition: 'all 200ms',
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
+                    opacity: (isLoading || (!scannerStatus?.is_available && isTauriContext())) ? 0.5 : 1,
+                  }}
+                  onTouchStart={(e) => {
+                    if (!e.currentTarget.disabled) {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                      e.currentTarget.style.boxShadow = '0 3px 10px rgba(80, 128, 216, 0.4)';
+                    }
+                  }}
+                  onTouchEnd={(e) => {
+                    setTimeout(() => {
+                      if (e.currentTarget && !e.currentTarget.disabled) {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(80, 128, 216, 0.3)';
+                      }
+                    }, 150);
                   }}
                 >
-                  Anwesenheit
-                </h1>
+                  {scannerStatus?.platform.includes('Development')
+                    ? 'Mock Scannen'
+                    : 'Scannen starten'}
+                </button>
+              </div>
+            )}
 
-                {/* Student Info */}
+            {/* Loading State */}
+            {isLoading && !showScanner && (
+              <div style={{ textAlign: 'center' }}>
                 <div
                   style={{
-                    backgroundColor: theme.colors.background.muted,
-                    borderRadius: theme.borders.radius.md,
-                    padding: theme.spacing.lg,
-                    marginBottom: theme.spacing.xl,
+                    width: '80px',
+                    height: '80px',
+                    border: '4px solid #E5E7EB',
+                    borderTopColor: '#5080D8',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    margin: '0 auto 32px',
+                  }}
+                />
+                <p
+                  style={{
+                    fontSize: '24px',
+                    color: theme.colors.text.secondary,
+                    fontWeight: 500,
                   }}
                 >
-                  <p style={{ fontSize: theme.fonts.size.base, marginBottom: theme.spacing.sm }}>
-                    <strong>Schüler:</strong> {attendanceStatus.data.student.first_name} {attendanceStatus.data.student.last_name}
-                  </p>
-                  <p style={{ fontSize: theme.fonts.size.base, marginBottom: theme.spacing.sm }}>
-                    <strong>Gruppe:</strong> {attendanceStatus.data.student.group.name}
-                  </p>
-                  <p
+                  Verarbeite...
+                </p>
+              </div>
+            )}
+
+            {/* Tag Scanned - Show Student Status */}
+            {scannedTag && attendanceStatus && !isLoading && !success && (
+              <div style={{ width: '100%', maxWidth: '600px' }}>
+                {/* Student Status Card */}
+                <div
+                  style={{
+                    background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
+                    borderRadius: '24px',
+                    padding: '3px',
+                    marginBottom: '32px',
+                  }}
+                >
+                  <div
                     style={{
-                      fontSize: theme.fonts.size.large,
-                      fontWeight: theme.fonts.weight.bold,
-                      color: getStatusDisplay().color,
-                      marginBottom: theme.spacing.sm,
+                      backgroundColor: '#FFFFFF',
+                      borderRadius: '21px',
+                      padding: '32px',
+                      textAlign: 'center',
                     }}
                   >
-                    Status: {getStatusDisplay().text}
-                  </p>
-
-                  {/* Show time details if available */}
-                  {attendanceStatus.data.attendance.check_in_time && (
-                    <div style={{ marginTop: theme.spacing.md, fontSize: theme.fonts.size.small }}>
-                      <p style={{ margin: 0, marginBottom: theme.spacing.xs }}>
-                        <strong>Angemeldet:</strong> {new Date(attendanceStatus.data.attendance.check_in_time).toLocaleTimeString('de-DE')}
-                        {attendanceStatus.data.attendance.checked_in_by && ` von ${attendanceStatus.data.attendance.checked_in_by}`}
-                      </p>
-                      {attendanceStatus.data.attendance.check_out_time && (
-                        <p style={{ margin: 0 }}>
-                          <strong>Abgemeldet:</strong> {new Date(attendanceStatus.data.attendance.check_out_time).toLocaleTimeString('de-DE')}
-                          {attendanceStatus.data.attendance.checked_out_by && ` von ${attendanceStatus.data.attendance.checked_out_by}`}
-                        </p>
+                    <h2 style={{ 
+                      fontSize: '24px', 
+                      fontWeight: 700,
+                      marginBottom: '16px',
+                      color: '#1F2937'
+                    }}>
+                      {attendanceStatus.data.student.first_name} {attendanceStatus.data.student.last_name}
+                    </h2>
+                    <p style={{ 
+                      fontSize: '18px', 
+                      color: '#6B7280',
+                      marginBottom: '24px'
+                    }}>
+                      {attendanceStatus.data.student.group.name}
+                    </p>
+                    
+                    {/* Status Badge */}
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        padding: '12px 24px',
+                        backgroundColor: getStatusDisplay().color === theme.colors.success 
+                          ? '#E7F7DF' 
+                          : '#F3F4F6',
+                        borderRadius: '24px',
+                        marginBottom: attendanceStatus.data.attendance.check_in_time ? '20px' : '0',
+                      }}
+                    >
+                      {getStatusDisplay().color === theme.colors.success ? (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 6L9 17l-5-5"/>
+                        </svg>
+                      ) : (
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10"/>
+                          <line x1="15" y1="9" x2="9" y2="15"/>
+                          <line x1="9" y1="9" x2="15" y2="15"/>
+                        </svg>
                       )}
+                      <span style={{ 
+                        fontSize: '18px', 
+                        fontWeight: 600, 
+                        color: getStatusDisplay().color 
+                      }}>
+                        {getStatusDisplay().text}
+                      </span>
                     </div>
-                  )}
+
+                    {/* Time details */}
+                    {attendanceStatus.data.attendance.check_in_time && (
+                      <div style={{ fontSize: '14px', color: '#6B7280', lineHeight: 1.6 }}>
+                        <p style={{ margin: 0, marginBottom: '4px' }}>
+                          <strong>Angemeldet:</strong> {new Date(attendanceStatus.data.attendance.check_in_time).toLocaleTimeString('de-DE')}
+                          {attendanceStatus.data.attendance.checked_in_by && ` von ${attendanceStatus.data.attendance.checked_in_by}`}
+                        </p>
+                        {attendanceStatus.data.attendance.check_out_time && (
+                          <p style={{ margin: 0 }}>
+                            <strong>Abgemeldet:</strong> {new Date(attendanceStatus.data.attendance.check_out_time).toLocaleTimeString('de-DE')}
+                            {attendanceStatus.data.attendance.checked_out_by && ` von ${attendanceStatus.data.attendance.checked_out_by}`}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '16px',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <button
+                    onClick={handleToggleAttendance}
+                    disabled={isLoading}
+                    style={{
+                      flex: 1,
+                      height: '56px',
+                      fontSize: '18px',
+                      fontWeight: 600,
+                      backgroundColor: getActionText() === 'Anmelden' ? '#83cd2d' : '#f87C10',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '28px',
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
+                      transition: 'all 200ms',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      boxShadow: getActionText() === 'Anmelden' 
+                        ? '0 4px 16px rgba(131, 205, 45, 0.3)'
+                        : '0 4px 16px rgba(248, 124, 16, 0.3)',
+                      opacity: isLoading ? 0.5 : 1,
+                    }}
+                    onTouchStart={(e) => {
+                      if (!e.currentTarget.disabled) {
+                        e.currentTarget.style.transform = 'scale(0.95)';
+                      }
+                    }}
+                    onTouchEnd={(e) => {
+                      setTimeout(() => {
+                        if (e.currentTarget && !e.currentTarget.disabled) {
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }
+                      }, 150);
+                    }}
+                  >
+                    {getActionText()}
+                  </button>
+                  <button
+                    onClick={handleScanAnother}
+                    style={{
+                      flex: 1,
+                      height: '56px',
+                      fontSize: '18px',
+                      fontWeight: 600,
+                      backgroundColor: 'white',
+                      color: '#374151',
+                      border: '2px solid #E5E7EB',
+                      borderRadius: '28px',
+                      cursor: 'pointer',
+                      transition: 'all 200ms',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                    onTouchStart={(e) => {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                      e.currentTarget.style.backgroundColor = '#F9FAFB';
+                    }}
+                    onTouchEnd={(e) => {
+                      setTimeout(() => {
+                        if (e.currentTarget) {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.backgroundColor = 'white';
+                        }
+                      }, 150);
+                    }}
+                  >
+                    Neuer Scan
+                  </button>
                 </div>
               </div>
+            )}
 
-              {/* Action Buttons */}
-              <div
-                style={{
-                  display: 'flex',
-                  gap: theme.spacing.md,
-                  justifyContent: 'center',
-                }}
-              >
-                <Button onClick={handleToggleAttendance} disabled={isLoading} size="medium">
-                  {getActionText()}
-                </Button>
-                <Button onClick={handleScanAnother} variant="secondary" size="medium">
-                  Neuer Scan
-                </Button>
+            {/* Success State */}
+            {success && (
+              <div style={{ textAlign: 'center', width: '100%', maxWidth: '500px' }}>
+                <div
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    backgroundColor: '#E7F7DF',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 32px',
+                    animation: 'successPop 0.5s ease-out',
+                  }}
+                >
+                  <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                </div>
+                <h2
+                  style={{
+                    fontSize: '32px',
+                    fontWeight: 700,
+                    marginBottom: '16px',
+                    color: '#83cd2d',
+                  }}
+                >
+                  Erfolgreich!
+                </h2>
+                <p
+                  style={{
+                    fontSize: '20px',
+                    color: '#6B7280',
+                    marginBottom: '48px',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {success}
+                </p>
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '16px',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <button
+                    onClick={handleScanAnother}
+                    style={{
+                      height: '56px',
+                      padding: '0 32px',
+                      fontSize: '18px',
+                      fontWeight: 600,
+                      backgroundColor: '#5080D8',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '28px',
+                      cursor: 'pointer',
+                      transition: 'all 200ms',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
+                    }}
+                    onTouchStart={(e) => {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                    }}
+                    onTouchEnd={(e) => {
+                      setTimeout(() => {
+                        if (e.currentTarget) {
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }
+                      }, 150);
+                    }}
+                  >
+                    Weiteren Schüler scannen
+                  </button>
+                  <button
+                    onClick={handleBack}
+                    style={{
+                      height: '56px',
+                      padding: '0 32px',
+                      fontSize: '18px',
+                      fontWeight: 600,
+                      backgroundColor: 'white',
+                      color: '#374151',
+                      border: '2px solid #E5E7EB',
+                      borderRadius: '28px',
+                      cursor: 'pointer',
+                      transition: 'all 200ms',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                    }}
+                    onTouchStart={(e) => {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                      e.currentTarget.style.backgroundColor = '#F9FAFB';
+                    }}
+                    onTouchEnd={(e) => {
+                      setTimeout(() => {
+                        if (e.currentTarget) {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.backgroundColor = 'white';
+                        }
+                      }, 150);
+                    }}
+                  >
+                    Zurück
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Success State */}
-          {success && (
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>✅</div>
-              <h2
-                style={{
-                  fontSize: theme.fonts.size.xl,
-                  fontWeight: theme.fonts.weight.bold,
-                  marginBottom: theme.spacing.lg,
-                  color: theme.colors.success,
-                }}
-              >
-                Erfolgreich!
-              </h2>
-              <p
-                style={{
-                  fontSize: theme.fonts.size.large,
-                  color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.xxl,
-                }}
-              >
-                {success}
-              </p>
-              <div
-                style={{
-                  display: 'flex',
-                  gap: theme.spacing.md,
-                  justifyContent: 'center',
-                }}
-              >
-                <Button onClick={handleScanAnother}>Weiteren Schüler scannen</Button>
-                <Button onClick={handleBack} variant="secondary">
-                  Zurück
-                </Button>
-              </div>
-            </div>
-          )}
-
+          </div>
         </div>
-      </div>
+
+        {/* Add animation keyframes */}
+        <style>
+          {`
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+            
+            @keyframes modalPop {
+              0% {
+                transform: scale(0.8);
+                opacity: 0;
+              }
+              50% {
+                transform: scale(1.05);
+              }
+              100% {
+                transform: scale(1);
+                opacity: 1;
+              }
+            }
+            
+            @keyframes pulse {
+              0% {
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
+              }
+              70% {
+                box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+              }
+              100% {
+                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+              }
+            }
+            
+            @keyframes successPop {
+              0% {
+                transform: scale(0);
+                opacity: 0;
+              }
+              50% {
+                transform: scale(1.2);
+              }
+              100% {
+                transform: scale(1);
+                opacity: 1;
+              }
+            }
+          `}
+        </style>
       </ContentBox>
 
       {/* Error Modal */}

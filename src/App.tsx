@@ -6,10 +6,11 @@ import ActivityScanningPage from './pages/ActivityScanningPage';
 import AttendancePage from './pages/AttendancePage';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
-import LoginPage from './pages/LoginPage';
+import LandingPage from './pages/LandingPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
+import UserSelectionPage from './pages/UserSelectionPage';
 import { initializeApi } from './services/api';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
@@ -60,10 +61,11 @@ function App() {
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">
         <BrowserRouter>
           <Routes>
-            <Route path="/" element={<LoginPage />} />
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/user-selection" element={<UserSelectionPage />} />
             <Route
               path="/pin"
-              element={hasSelectedUser ? <PinPage /> : <Navigate to="/" replace />}
+              element={hasSelectedUser ? <PinPage /> : <Navigate to="/user-selection" replace />}
             />
             <Route
               path="/home"

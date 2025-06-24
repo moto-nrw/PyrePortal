@@ -1,11 +1,14 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox, BackButton } from '../components/ui';
+
+import { ContentBox } from '../components/ui';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+
+const ACTIVITIES_PER_PAGE = 10; // 5x2 grid to match UserSelectionPage
 
 function CreateActivityPage() {
   const { authenticatedUser, isLoading, error, logout, fetchActivities, setSelectedActivity } =
@@ -13,13 +16,31 @@ function CreateActivityPage() {
 
   const [activities, setActivities] = useState<ActivityResponse[]>([]);
   const [isFetching, setIsFetching] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
   const mountedRef = useRef(false);
   const fetchedRef = useRef(false);
 
   const navigate = useNavigate();
 
   // Create logger instance for this component
-  const logger = createLogger('ActivitySelectionPage');
+  const logger = createLogger('CreateActivityPage');
+
+  // Calculate pagination
+  const totalPages = Math.ceil(activities.length / ACTIVITIES_PER_PAGE);
+  const paginatedActivities = React.useMemo(() => {
+    const start = currentPage * ACTIVITIES_PER_PAGE;
+    const end = start + ACTIVITIES_PER_PAGE;
+    return activities.slice(start, end);
+  }, [activities, currentPage]);
+
+  // Calculate empty slots to maintain grid layout
+  const emptySlots = React.useMemo(() => {
+    const activitiesOnPage = paginatedActivities.length;
+    if (activitiesOnPage < ACTIVITIES_PER_PAGE) {
+      return ACTIVITIES_PER_PAGE - activitiesOnPage;
+    }
+    return 0;
+  }, [paginatedActivities]);
 
   // Fetch activities data with useCallback to prevent recreation
   const fetchActivitiesData = useCallback(async () => {
@@ -72,7 +93,7 @@ function CreateActivityPage() {
       logger.error('Failed to fetch activities', { error });
       logError(
         error instanceof Error ? error : new Error(String(error)),
-        'ActivitySelectionPage.fetchActivitiesData'
+        'CreateActivityPage.fetchActivitiesData'
       );
     } finally {
       setIsFetching(false);
@@ -85,14 +106,14 @@ function CreateActivityPage() {
     if (mountedRef.current) return;
     mountedRef.current = true;
 
-    logger.debug('ActivitySelectionPage component mounted', {
+    logger.debug('CreateActivityPage component mounted', {
       user: authenticatedUser?.staffName,
       isAuthenticated: !!authenticatedUser,
     });
 
     // Check authentication
     if (!authenticatedUser) {
-      logger.warn('Unauthenticated access to ActivitySelectionPage');
+      logger.warn('Unauthenticated access to CreateActivityPage');
       void navigate('/');
       return;
     }
@@ -104,7 +125,7 @@ function CreateActivityPage() {
     }
 
     return () => {
-      logger.debug('ActivitySelectionPage component unmounted');
+      logger.debug('CreateActivityPage component unmounted');
       mountedRef.current = false;
     };
   }, [authenticatedUser, navigate, logger, fetchActivitiesData]);
@@ -130,7 +151,7 @@ function CreateActivityPage() {
       setSelectedActivity(activity);
 
       // Navigate to room selection with selected activity
-      logNavigation('ActivitySelectionPage', 'RoomSelectionPage', {
+      logNavigation('CreateActivityPage', 'RoomSelectionPage', {
         reason: 'activity_selected',
         activityId: activity.id,
       });
@@ -138,7 +159,7 @@ function CreateActivityPage() {
     } catch (error) {
       logError(
         error instanceof Error ? error : new Error(String(error)),
-        'ActivitySelectionPage.handleActivitySelect'
+        'CreateActivityPage.handleActivitySelect'
       );
     }
   };
@@ -149,129 +170,40 @@ function CreateActivityPage() {
       logger.info('User navigating back to home from activity selection');
 
       logUserAction('activity_selection_back');
-      logNavigation('ActivitySelectionPage', 'HomeViewPage', { reason: 'user_back' });
+      logNavigation('CreateActivityPage', 'HomeViewPage', { reason: 'user_back' });
       void navigate('/home');
     } catch (error) {
       logError(
         error instanceof Error ? error : new Error(String(error)),
-        'ActivitySelectionPage.handleBack'
+        'CreateActivityPage.handleBack'
       );
     }
   };
 
-  // Handle logout
-  const handleLogout = () => {
-    try {
-      logger.info('User logging out from activity selection', {
-        user: authenticatedUser?.staffName,
-      });
 
-      logUserAction('logout_from_activity_selection', {
-        username: authenticatedUser?.staffName,
-      });
-
-      void logout();
-
-      logNavigation('ActivitySelectionPage', 'LoginPage');
-      void navigate('/');
-    } catch (error) {
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'ActivitySelectionPage.handleLogout'
-      );
+  const handleNextPage = () => {
+    if (currentPage < totalPages - 1) {
+      setCurrentPage(currentPage + 1);
+      logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
     }
   };
 
-  // Activity card component (similar to HomeViewPage ActionCard)
-  const ActivityCard: React.FC<{
-    activity: ActivityResponse;
-    onClick: (activity: ActivityResponse) => void;
-  }> = ({ activity, onClick }) => {
-    const cardStyles: React.CSSProperties = {
-      backgroundColor: theme.colors.background.light,
-      borderRadius: theme.borders.radius.lg,
-      boxShadow: theme.shadows.md,
-      padding: theme.spacing.xl,
-      cursor: 'pointer',
-      transition: theme.animation.transition.fast,
-      border: `1px solid ${theme.colors.border.light}`,
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-      height: '200px',
-      position: 'relative',
-    };
+  const handlePrevPage = () => {
+    if (currentPage > 0) {
+      setCurrentPage(currentPage - 1);
+      logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
+    }
+  };
 
-    const getCategoryIcon = (category: string) => {
-      switch (category.toLowerCase()) {
-        case 'sport':
-          return '⚽';
-        case 'kunst':
-          return '🎨';
-        case 'musik':
-          return '🎵';
-        case 'wissenschaft':
-          return '🔬';
-        case 'literatur':
-          return '📚';
-        case 'spiele':
-          return '🎲';
-        default:
-          return '🎯';
-      }
-    };
-
+  // Get general activity icon - single universal icon for all activities
+  const getCategoryIcon = () => {
     return (
-      <div
-        onClick={() => onClick(activity)}
-        style={cardStyles}
-        className="hover:bg-gray-100 hover:shadow-lg active:bg-gray-200"
-      >
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '3rem', marginBottom: theme.spacing.md }}>
-            {getCategoryIcon(activity.category_name)}
-          </div>
-          <div
-            style={{
-              fontSize: theme.fonts.size.large,
-              fontWeight: theme.fonts.weight.bold,
-              color: theme.colors.text.primary,
-              marginBottom: theme.spacing.sm,
-            }}
-          >
-            {activity.name}
-          </div>
-        </div>
-        <div>
-          <div
-            style={{
-              fontSize: theme.fonts.size.base,
-              color: theme.colors.text.secondary,
-              marginBottom: theme.spacing.xs,
-            }}
-          >
-            📍 {activity.room_name}
-          </div>
-          <div
-            style={{
-              fontSize: theme.fonts.size.base,
-              color: theme.colors.text.secondary,
-              marginBottom: theme.spacing.xs,
-            }}
-          >
-            👥 {activity.enrollment_count}/{activity.max_participants}
-          </div>
-          <div
-            style={{
-              fontSize: theme.fonts.size.small,
-              color: activity.has_spots ? '#16a34a' : '#dc2626',
-              fontWeight: theme.fonts.weight.medium,
-            }}
-          >
-            {activity.has_spots ? '✅ Verfügbar' : '❌ Voll'}
-          </div>
-        </div>
-      </div>
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/>
+        <line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
     );
   };
 
@@ -280,129 +212,428 @@ function CreateActivityPage() {
   }
 
   return (
-    <ContentBox centered shadow="md" rounded="lg">
-      <div
-        style={{
-          width: '100%',
-          maxWidth: '800px',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Fixed Header */}
-        <div style={{ flexShrink: 0 }}>
-          {/* Navigation buttons */}
+    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+      <div style={{ 
+        width: '100%', 
+        height: '100%',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Modern back button following tablet/mobile conventions */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '20px',
+            zIndex: 10,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleBack}
+            style={{
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '0 28px',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              borderRadius: '28px',
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              position: 'relative',
+              overflow: 'hidden',
+              backdropFilter: 'blur(8px)',
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+            }}
+            onTouchEnd={(e) => {
+              setTimeout(() => {
+                if (e.currentTarget) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                }
+              }, 150);
+            }}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#374151"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 12H5"/>
+              <path d="M12 19l-7-7 7-7"/>
+            </svg>
+            <span
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#374151',
+              }}
+            >
+              Zurück
+            </span>
+          </button>
+        </div>
+
+        <h1
+          style={{
+            fontSize: '36px',
+            fontWeight: theme.fonts.weight.bold,
+            marginBottom: '48px',
+            textAlign: 'center',
+            color: theme.colors.text.primary,
+          }}
+        >
+          Aktivität auswählen
+        </h1>
+
+        {error && (
+          <div
+            style={{
+              backgroundColor: '#FEE2E2',
+              color: '#DC2626',
+              padding: theme.spacing.md,
+              borderRadius: theme.borders.radius.md,
+              marginBottom: theme.spacing.lg,
+              textAlign: 'center',
+              fontSize: '16px',
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {isLoading || isFetching ? (
           <div
             style={{
               display: 'flex',
-              justifyContent: 'space-between',
+              justifyContent: 'center',
               alignItems: 'center',
-              marginBottom: theme.spacing.lg,
+              minHeight: '400px',
             }}
           >
-            <BackButton onClick={handleBack} />
-            <Button onClick={handleLogout} variant="outline" size="small">
-              Abmelden
-            </Button>
-          </div>
-
-          {/* Title and info */}
-          <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
-            <h1
-              style={{
-                fontSize: theme.fonts.size.xxl,
-                fontWeight: theme.fonts.weight.bold,
-                marginBottom: theme.spacing.lg,
-                color: theme.colors.text.primary,
-              }}
-            >
-              Aktivität auswählen
-            </h1>
-
-            <p
-              style={{
-                fontSize: theme.fonts.size.base,
-                color: theme.colors.text.secondary,
-              }}
-            >
-              {authenticatedUser.staffName} • {authenticatedUser.deviceName}
-            </p>
-          </div>
-        </div>
-
-        {/* Scrollable Content Area */}
-        <div style={{ flex: 1, overflowY: 'auto', paddingRight: theme.spacing.sm }}>
-          {/* Loading state */}
-          {isLoading && (
-            <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
-              <div style={{ fontSize: theme.fonts.size.large, color: theme.colors.text.secondary }}>
-                Lade Aktivitäten...
-              </div>
-            </div>
-          )}
-
-          {/* Error state */}
-          {error && !isLoading && (
             <div
               style={{
-                backgroundColor: '#fef2f2',
-                border: '1px solid #fecaca',
-                borderRadius: theme.borders.radius.md,
-                padding: theme.spacing.md,
-                marginBottom: theme.spacing.lg,
-                textAlign: 'center',
-                color: '#dc2626',
+                width: '48px',
+                height: '48px',
+                border: '3px solid #E5E7EB',
+                borderTopColor: '#5080D8',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite',
               }}
-            >
-              {error}
-            </div>
-          )}
-
-          {/* Activities grid */}
-          {!isLoading && !error && activities.length > 0 && (
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                gap: theme.spacing.lg,
-                width: '100%',
-              }}
-            >
-              {activities.map(activity => (
-                <ActivityCard
-                  key={activity.id}
-                  activity={activity}
-                  onClick={handleActivitySelect}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* No activities state */}
-          {!isLoading && !error && activities.length === 0 && (
-            <div style={{ textAlign: 'center', padding: theme.spacing.xxl }}>
-              <div style={{ fontSize: '4rem', marginBottom: theme.spacing.lg }}>📅</div>
+            />
+          </div>
+        ) : (
+          <>
+            {/* No activities state */}
+            {activities.length === 0 && (
               <div
                 style={{
-                  fontSize: theme.fonts.size.large,
-                  color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.md,
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  minHeight: '400px',
+                  flexDirection: 'column',
+                  gap: '16px',
                 }}
               >
-                Keine Aktivitäten verfügbar
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+                <div
+                  style={{
+                    fontSize: '24px',
+                    color: '#6B7280',
+                    fontWeight: 600,
+                    textAlign: 'center',
+                  }}
+                >
+                  Keine Aktivitäten verfügbar
+                </div>
+                <div
+                  style={{
+                    fontSize: '16px',
+                    color: '#9CA3AF',
+                    textAlign: 'center',
+                  }}
+                >
+                  Sie haben derzeit keine zugewiesenen Aktivitäten.
+                </div>
               </div>
+            )}
+
+            {/* Activities Grid */}
+            {activities.length > 0 && (
               <div
                 style={{
-                  fontSize: theme.fonts.size.base,
-                  color: theme.colors.text.secondary,
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(5, 1fr)',
+                  gap: '14px',
+                  marginBottom: '12px',
+                  flex: 1,
+                  alignContent: 'start',
                 }}
               >
-                Sie haben derzeit keine zugewiesenen Aktivitäten.
+                {paginatedActivities.map((activity) => {
+                  return (
+                    <button
+                      key={activity.id}
+                      onClick={() => handleActivitySelect(activity)}
+                      style={{
+                        height: '160px',
+                        padding: '16px',
+                        backgroundColor: 'transparent',
+                        border: 'none',
+                        borderRadius: '12px',
+                        fontSize: '18px',
+                        fontWeight: 600,
+                        color: '#1F2937',
+                        cursor: 'pointer',
+                        transition: 'all 200ms',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        textAlign: 'center',
+                        outline: 'none',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        minWidth: '0',
+                        gap: '12px',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                      onTouchStart={(e) => {
+                        e.currentTarget.style.transform = 'scale(0.98)';
+                        e.currentTarget.style.backgroundColor = '#E6EFFF';
+                      }}
+                      onTouchEnd={(e) => {
+                        setTimeout(() => {
+                          if (e.currentTarget) {
+                            e.currentTarget.style.transform = 'scale(1)';
+                            e.currentTarget.style.backgroundColor = 'transparent';
+                          }
+                        }, 150);
+                      }}
+                    >
+                      {/* Gradient border wrapper - Blue for activities */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          borderRadius: '12px',
+                          background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
+                          zIndex: 0,
+                        }}
+                      />
+                      
+                      {/* Inner content wrapper for border effect */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          inset: '2px',
+                          borderRadius: '10px',
+                          background: 'linear-gradient(to bottom, #FFFFFF, #F0F4FF)',
+                          zIndex: 1,
+                        }}
+                      />
+                      
+                      {/* Activity Icon */}
+                      <div
+                        style={{
+                          color: '#5080D8',
+                          position: 'relative',
+                          zIndex: 2,
+                        }}
+                      >
+                        {getCategoryIcon()}
+                      </div>
+                      
+                      {/* Activity Name */}
+                      <span
+                        style={{
+                          fontSize: '18px',
+                          fontWeight: 600,
+                          lineHeight: '1.2',
+                          maxWidth: '100%',
+                          wordBreak: 'break-word',
+                          color: '#1F2937',
+                          position: 'relative',
+                          zIndex: 2,
+                        }}
+                      >
+                        {activity.name}
+                      </span>
+
+                      {/* Enrollment info */}
+                      <div
+                        style={{
+                          fontSize: '12px',
+                          color: '#6B7280',
+                          position: 'relative',
+                          zIndex: 2,
+                        }}
+                      >
+                        {activity.enrollment_count}/{activity.max_participants}
+                      </div>
+                    </button>
+                  );
+                })}
+                
+                {/* Empty placeholder slots */}
+                {emptySlots > 0 && Array.from({ length: emptySlots }).map((_, index) => (
+                  <div
+                    key={`empty-${index}`}
+                    style={{
+                      height: '160px',
+                      backgroundColor: '#FAFAFA',
+                      border: '2px dashed #E5E7EB',
+                      borderRadius: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '8px',
+                        opacity: 0.4,
+                      }}
+                    >
+                      <svg
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#9CA3AF"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                        <line x1="16" y1="2" x2="16" y2="6"/>
+                        <line x1="8" y1="2" x2="8" y2="6"/>
+                        <line x1="3" y1="10" x2="21" y2="10"/>
+                      </svg>
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          color: '#9CA3AF',
+                          fontWeight: 400,
+                        }}
+                      >
+                        Leer
+                      </span>
+                    </div>
+                  </div>
+                ))}
               </div>
-            </div>
-          )}
-        </div>
+            )}
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginTop: '12px',
+                }}
+              >
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 0}
+                  style={{
+                    height: 'auto',
+                    width: 'auto',
+                    fontSize: '18px',
+                    fontWeight: 500,
+                    padding: '8px 16px',
+                    background: 'transparent',
+                    color: currentPage === 0 ? '#9CA3AF' : '#3B82F6',
+                    border: 'none',
+                    borderRadius: '0',
+                    cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
+                    opacity: currentPage === 0 ? 0.5 : 1,
+                    transition: 'all 200ms',
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    boxShadow: 'none',
+                  }}
+                >
+                  ← Vorherige
+                </button>
+
+                <span
+                  style={{
+                    fontSize: '18px',
+                    color: theme.colors.text.secondary,
+                    fontWeight: 500,
+                  }}
+                >
+                  Seite {currentPage + 1} von {totalPages}
+                </span>
+
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages - 1}
+                  style={{
+                    height: 'auto',
+                    width: 'auto',
+                    fontSize: '18px',
+                    fontWeight: 500,
+                    padding: '8px 16px',
+                    background: 'transparent',
+                    color: currentPage === totalPages - 1 ? '#9CA3AF' : '#3B82F6',
+                    border: 'none',
+                    borderRadius: '0',
+                    cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
+                    opacity: currentPage === totalPages - 1 ? 0.5 : 1,
+                    transition: 'all 200ms',
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    boxShadow: 'none',
+                  }}
+                >
+                  Nächste →
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Add animation keyframes */}
+        <style>
+          {`
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+          `}
+        </style>
       </div>
     </ContentBox>
   );

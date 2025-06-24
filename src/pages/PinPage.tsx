@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox, ErrorModal } from '../components/ui';
+import { ContentBox, ErrorModal } from '../components/ui';
 import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -101,9 +101,9 @@ function PinPage() {
   // Handle back button click
   const handleBack = () => {
     try {
-      logger.info('User navigating back to login', { user: selectedUser });
-      logNavigation('PinPage', 'LoginPage');
-      void navigate('/');
+      logger.info('User navigating back to user selection', { user: selectedUser });
+      logNavigation('PinPage', 'UserSelectionPage');
+      void navigate('/user-selection');
     } catch (error) {
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleBack');
     }
@@ -208,185 +208,336 @@ function PinPage() {
     }
   };
 
-  // Custom numpad button component
+  // Custom numpad button component with modern styling matching other pages
   const NumpadButton: React.FC<{
     onClick: () => void;
     isAction?: boolean;
     children: React.ReactNode;
   }> = ({ onClick, isAction = false, children }) => {
-    const baseStyles: React.CSSProperties = {
-      width: '87px',
-      height: '67px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: theme.borders.radius.md,
-      fontSize: isAction ? theme.fonts.size.large : '2.1rem',
-      fontWeight: theme.fonts.weight.bold,
-      backgroundColor: theme.colors.background.light,
-      color: isAction ? theme.colors.text.secondary : theme.colors.text.primary,
-      border: `2px solid ${theme.colors.border.light}`,
-      boxShadow: theme.shadows.sm,
-      transition: 'all 0.1s ease',
-      cursor: 'pointer',
-      outline: 'none',
-    };
-
     return (
       <button
         onClick={onClick}
-        style={baseStyles}
-        className="hover:bg-gray-50 hover:shadow-md active:scale-95 active:bg-gray-100"
+        style={{
+          position: 'relative',
+          width: '80px',
+          height: '60px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: 'transparent',
+          border: 'none',
+          borderRadius: '12px',
+          fontSize: isAction ? '24px' : '28px',
+          fontWeight: 700,
+          cursor: 'pointer',
+          transition: 'all 200ms',
+          outline: 'none',
+          overflow: 'hidden',
+          WebkitTapHighlightColor: 'transparent',
+        }}
+        onTouchStart={(e) => {
+          e.currentTarget.style.transform = 'scale(0.95)';
+        }}
+        onTouchEnd={(e) => {
+          setTimeout(() => {
+            if (e.currentTarget) {
+              e.currentTarget.style.transform = 'scale(1)';
+            }
+          }, 150);
+        }}
       >
-        {children}
+        {/* Gradient border */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '12px',
+            background: isAction 
+              ? 'linear-gradient(135deg, #6B7280, #4B5563)' 
+              : 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+            zIndex: 0,
+          }}
+        />
+        
+        {/* Inner content */}
+        <div
+          style={{
+            position: 'absolute',
+            inset: '3px',
+            borderRadius: '9px',
+            background: 'linear-gradient(to bottom, #FFFFFF, #F8FAFC)',
+            zIndex: 1,
+          }}
+        />
+        
+        <span 
+          style={{ 
+            position: 'relative', 
+            zIndex: 2,
+            color: isAction ? '#6B7280' : '#1F2937',
+          }}
+        >
+          {children}
+        </span>
       </button>
     );
   };
 
-  // Create numpad grid (1-9, then special buttons and 0)
-  const numpadGrid = () => {
-    const numpadLayout = [
-      [1, 2, 3],
-      [4, 5, 6],
-      [7, 8, 9],
-      ['clear', 0, 'delete'],
-    ];
-
-    return (
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gap: theme.spacing.sm,
-          maxWidth: '340px',
-          margin: '0 auto',
-          justifyItems: 'center',
-        }}
-      >
-        {numpadLayout.flat().map((item, _index) => {
-          if (item === 'clear') {
-            return (
-              <NumpadButton key="clear" onClick={handleClear} isAction>
-                C
-              </NumpadButton>
-            );
-          } else if (item === 'delete') {
-            return (
-              <NumpadButton key="delete" onClick={handleDelete} isAction>
-                ←
-              </NumpadButton>
-            );
-          } else {
-            return (
-              <NumpadButton key={item} onClick={() => handleNumpadClick(item)}>
-                {item}
-              </NumpadButton>
-            );
-          }
-        })}
-      </div>
-    );
-  };
-
   return (
-    <>
-      <ContentBox centered shadow="md" rounded="lg">
+    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+      <div style={{ 
+        width: '100%', 
+        height: '100%',
+        padding: '16px',
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {/* Modern back button - positioned absolutely like other pages */}
         <div
           style={{
-            width: '100%',
-            maxWidth: '450px',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            position: 'absolute',
+            top: '20px',
+            left: '20px',
+            zIndex: 10,
           }}
         >
-          {/* User name display */}
+          <button
+            type="button"
+            onClick={handleBack}
+            style={{
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '0 28px',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              borderRadius: '28px',
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              position: 'relative',
+              overflow: 'hidden',
+              backdropFilter: 'blur(8px)',
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+            }}
+            onTouchEnd={(e) => {
+              setTimeout(() => {
+                if (e.currentTarget) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                }
+              }, 150);
+            }}
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#374151"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 12H5"/>
+              <path d="M12 19l-7-7 7-7"/>
+            </svg>
+            <span
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#374151',
+              }}
+            >
+              Zurück
+            </span>
+          </button>
+        </div>
+
+        {/* Welcome Header with User Info - Extra compact sizing */}
+        <div style={{ 
+          textAlign: 'center',
+          marginBottom: '12px',
+        }}>
+          <div
+            style={{
+              width: '56px',
+              height: '56px',
+              background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 10px',
+              boxShadow: '0 4px 12px rgba(80, 128, 216, 0.3)',
+            }}
+          >
+            <svg
+              width="32"
+              height="32"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#FFFFFF"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </div>
+          
           <h1
             style={{
-              fontSize: theme.fonts.size.xxl,
+              fontSize: '34px',
               fontWeight: theme.fonts.weight.bold,
-              marginBottom: theme.spacing.lg,
-              textAlign: 'center',
+              margin: 0,
               color: theme.colors.text.primary,
+              lineHeight: 1.1,
             }}
           >
             {selectedUser}
           </h1>
-
-          {/* PIN display */}
-          <div
+          <p
             style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: theme.spacing.sm,
-              marginBottom: theme.spacing.md,
+              fontSize: '17px',
+              color: theme.colors.text.secondary,
+              margin: '2px 0 0 0',
+              fontWeight: 500,
             }}
           >
-            {Array.from({ length: maxPinLength }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  width: '42px',
-                  height: '42px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderRadius: theme.borders.radius.lg,
-                  fontSize: '1.3rem',
-                  fontWeight: theme.fonts.weight.bold,
-                  transition: 'all 0.1s ease',
-                  border: `3px solid ${i < pin.length ? theme.colors.primary : theme.colors.border.light}`,
-                  backgroundColor:
-                    i < pin.length ? theme.colors.primary : theme.colors.background.light,
-                  color: i < pin.length ? theme.colors.text.light : 'transparent',
-                  boxShadow: i < pin.length ? theme.shadows.md : theme.shadows.sm,
-                }}
-              >
-                •
+            Bitte geben Sie Ihren PIN ein
+          </p>
+        </div>
+
+        {/* Main Content - Centered */}
+        <div style={{ 
+          flex: 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <div style={{ width: '100%', maxWidth: '400px' }}>
+            
+            {/* PIN display dots with modern styling - compact */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                gap: '10px',
+                marginBottom: '20px',
+                padding: '12px',
+                backgroundColor: 'rgba(255, 255, 255, 0.6)',
+                borderRadius: '10px',
+                boxShadow: '0 3px 12px rgba(0, 0, 0, 0.08)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              {Array.from({ length: maxPinLength }).map((_, i) => (
+                <div
+                  key={i}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    transition: 'all 300ms ease',
+                    background: i < pin.length 
+                      ? 'linear-gradient(135deg, #5080D8, #3f6bc4)'
+                      : '#E5E7EB',
+                    boxShadow: i < pin.length 
+                      ? '0 2px 6px rgba(80, 128, 216, 0.4)'
+                      : 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
+                    transform: i < pin.length ? 'scale(1.1)' : 'scale(1)',
+                  }}
+                />
+              ))}
+            </div>
+
+            {/* Numpad with modern grid layout - compact */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, 1fr)',
+                gap: '10px',
+                maxWidth: '270px',
+                margin: '0 auto',
+              }}
+            >
+              {/* Numbers 1-9 */}
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+                <NumpadButton key={num} onClick={() => handleNumpadClick(num)}>
+                  {num}
+                </NumpadButton>
+              ))}
+              
+              {/* Bottom row: Clear, 0, Delete */}
+              <NumpadButton onClick={handleClear} isAction>
+                C
+              </NumpadButton>
+              
+              <NumpadButton onClick={() => handleNumpadClick(0)}>
+                0
+              </NumpadButton>
+              
+              <NumpadButton onClick={handleDelete} isAction>
+                ⌫
+              </NumpadButton>
+            </div>
+
+            {/* Loading state */}
+            {isLoading && (
+              <div style={{ 
+                textAlign: 'center', 
+                marginTop: '24px',
+              }}>
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    border: '3px solid #E5E7EB',
+                    borderTopColor: '#5080D8',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    margin: '0 auto 12px',
+                  }}
+                />
+                <p
+                  style={{
+                    fontSize: '16px',
+                    color: theme.colors.text.secondary,
+                    fontWeight: 500,
+                  }}
+                >
+                  PIN wird überprüft...
+                </p>
               </div>
-            ))}
-          </div>
-
-
-          {/* Numpad */}
-          <div style={{ width: '100%', marginBottom: theme.spacing.md }}>{numpadGrid()}</div>
-
-          {/* Action buttons */}
-          <div
-            style={{
-              display: 'flex',
-              width: '100%',
-              justifyContent: 'space-between',
-              gap: theme.spacing.lg,
-            }}
-          >
-            <Button
-              onClick={handleBack}
-              variant="outline"
-              style={{
-                padding: '12px 24px',
-                fontSize: '16px',
-                minWidth: '160px'
-              }}
-            >
-              Zurück
-            </Button>
-
-            <Button
-              onClick={handleSubmit}
-              variant="primary"
-              disabled={pin.length < maxPinLength || isLoading}
-              style={{
-                padding: '12px 24px',
-                fontSize: '16px',
-                minWidth: '160px'
-              }}
-            >
-              {isLoading ? 'Überprüfung...' : 'Bestätigen'}
-            </Button>
+            )}
           </div>
         </div>
-      </ContentBox>
+      </div>
+
+      {/* Add animation keyframes */}
+      <style>
+        {`
+          @keyframes spin {
+            0% {
+              transform: rotate(0deg);
+            }
+            100% {
+              transform: rotate(360deg);
+            }
+          }
+        `}
+      </style>
 
       {/* Error Modal */}
       <ErrorModal
@@ -394,7 +545,7 @@ function PinPage() {
         onClose={() => setIsErrorModalOpen(false)}
         message={errorMessage}
       />
-    </>
+    </ContentBox>
   );
 }
 
