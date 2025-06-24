@@ -1,3 +1,5 @@
+import { faWifi } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -436,13 +438,11 @@ function TagAssignmentPage() {
                   animation: 'pulse 2s infinite',
                 }}
               >
-                <svg width="70" height="70" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {/* Standard NFC/Contactless payment symbol */}
-                  <path d="M2 12h3.5" />
-                  <path d="M5.5 6a6 6 0 0 1 0 12" />
-                  <path d="M8.5 3a9 9 0 0 1 0 18" />
-                  <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
-                </svg>
+                <FontAwesomeIcon 
+                  icon={faWifi} 
+                  size="4x"
+                  style={{ color: 'white', transform: 'rotate(90deg)' }}
+                />
               </div>
               
               <h2
@@ -524,13 +524,11 @@ function TagAssignmentPage() {
                     margin: '0 auto 40px',
                   }}
                 >
-                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#5080D8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    {/* Standard NFC/Contactless payment symbol */}
-                    <path d="M2 12h3.5" />
-                    <path d="M5.5 6a6 6 0 0 1 0 12" />
-                    <path d="M8.5 3a9 9 0 0 1 0 18" />
-                    <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
-                  </svg>
+                  <FontAwesomeIcon 
+                    icon={faWifi} 
+                    size="5x"
+                    style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
+                  />
                 </div>
                 
                 <p
