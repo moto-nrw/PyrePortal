@@ -325,18 +325,57 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           if (currentSelectedActivity && currentSelectedActivity.id === session.activity_id) {
             sessionActivity = currentSelectedActivity;
           } else {
-            sessionActivity = {
-              id: session.activity_id,
-              name: session.activity_name,
-              category_name: '',
-              category_color: '',
-              room_name: session.room_name ?? '',
-              enrollment_count: 0,
-              max_participants: 0,
-              has_spots: true,
-              supervisor_name: authenticatedUser.staffName,
-              is_active: session.is_active ?? true,
-            };
+            // Fetch complete activity data to get accurate max_participants and other fields
+            try {
+              storeLogger.debug('Fetching activities to restore complete session activity data', { activityId: session.activity_id });
+              const activities = await api.getActivities(authenticatedUser.pin, authenticatedUser.staffId);
+              const matchingActivity = activities.find(activity => activity.id === session.activity_id);
+              
+              if (matchingActivity) {
+                sessionActivity = matchingActivity;
+                storeLogger.info('Session activity restored from API with complete data', { 
+                  activityId: session.activity_id, 
+                  maxParticipants: matchingActivity.max_participants,
+                  enrollmentCount: matchingActivity.enrollment_count
+                });
+              } else {
+                // Fallback to minimal activity object if activity not found in API response
+                sessionActivity = {
+                  id: session.activity_id,
+                  name: session.activity_name,
+                  category_name: '',
+                  category_color: '',
+                  room_name: session.room_name ?? '',
+                  enrollment_count: 0,
+                  max_participants: 0,
+                  has_spots: true,
+                  supervisor_name: authenticatedUser.staffName,
+                  is_active: session.is_active ?? true,
+                };
+                storeLogger.warn('Activity not found in API response during session restoration, using fallback with limited data', { 
+                  activityId: session.activity_id,
+                  availableActivityIds: activities.map(a => a.id)
+                });
+              }
+            } catch (error) {
+              // If API call fails, use minimal activity object as fallback
+              sessionActivity = {
+                id: session.activity_id,
+                name: session.activity_name,
+                category_name: '',
+                category_color: '',
+                room_name: session.room_name ?? '',
+                enrollment_count: 0,
+                max_participants: 0,
+                has_spots: true,
+                supervisor_name: authenticatedUser.staffName,
+                is_active: session.is_active ?? true,
+              };
+              storeLogger.error('Failed to fetch activities during session restoration, using fallback', { 
+                error: error instanceof Error ? error.message : 'Unknown error',
+                activityId: session.activity_id
+              });
+            }
           }
         }
 
