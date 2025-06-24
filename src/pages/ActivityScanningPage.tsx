@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { Button, ContentBox } from '../components/ui';
+import { ContentBox } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import theme from '../styles/theme';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
@@ -15,6 +14,18 @@ const ActivityScanningPage: React.FC = () => {
   const { selectedActivity, selectedRoom, authenticatedUser, rfid } = useUserStore();
 
   const { isScanning, currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
+  
+  // Debug logging for selectedActivity
+  useEffect(() => {
+    if (selectedActivity) {
+      logger.debug('Selected activity data:', {
+        id: selectedActivity.id,
+        name: selectedActivity.name,
+        max_participants: selectedActivity.max_participants,
+        enrollment_count: selectedActivity.enrollment_count,
+      });
+    }
+  }, [selectedActivity]);
 
   // Debug logging for modal state
   useEffect(() => {
@@ -162,101 +173,158 @@ const ActivityScanningPage: React.FC = () => {
   return (
     <>
       <ContentBox centered shadow="md" rounded="lg">
+        {/* Anmelden Button - Top Right of ContentBox */}
+        <button
+          onClick={handleAnmelden}
+          style={{
+            position: 'absolute',
+            top: '20px',
+            right: '20px',
+            height: '44px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '8px',
+            padding: '0 20px',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: '22px',
+            cursor: 'pointer',
+            transition: 'all 200ms',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            backdropFilter: 'blur(8px)',
+            fontSize: '16px',
+            fontWeight: 600,
+            color: '#374151',
+            zIndex: 10,
+          }}
+          onTouchStart={(e) => {
+            e.currentTarget.style.transform = 'scale(0.95)';
+            e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+          }}
+          onTouchEnd={(e) => {
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              }
+            }, 150);
+          }}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+          Anmelden
+        </button>
+
         <div
           style={{
             width: '100%',
-            maxWidth: '800px',
             height: '100%',
             display: 'flex',
             flexDirection: 'column',
+            position: 'relative',
+            padding: '24px',
           }}
         >
-          {/* Fixed Header */}
-          <div style={{ flexShrink: 0 }}>
-            {/* Navigation buttons */}
-            <div
+
+          {/* Header Section */}
+          <div style={{ textAlign: 'center', marginTop: '-40px', marginBottom: '48px' }}>
+            <h1
               style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                alignItems: 'center',
-                marginBottom: theme.spacing.lg,
+                fontSize: '56px',
+                fontWeight: 700,
+                color: '#1F2937',
+                margin: '0 0 20px 0',
+                lineHeight: 1.2,
               }}
             >
-              <Button onClick={handleAnmelden} variant="outline" size="small">
-                Anmelden
-              </Button>
-            </div>
-
-            {/* Title and info */}
-            <div style={{ textAlign: 'center', marginBottom: theme.spacing.lg }}>
-              <h1
-                style={{
-                  fontSize: theme.fonts.size.xxl,
-                  fontWeight: theme.fonts.weight.bold,
-                  marginBottom: theme.spacing.md,
-                  color: theme.colors.text.primary,
-                }}
-              >
-                {selectedActivity.name}
-              </h1>
-
-              <p
-                style={{
-                  fontSize: theme.fonts.size.large,
-                  color: theme.colors.text.secondary,
-                  marginBottom: theme.spacing.sm,
-                }}
-              >
-                Raum: {selectedRoom?.name || 'Unbekannt'}
-              </p>
-
-              <div
-                style={{
-                  fontSize: theme.fonts.size.xxl,
-                  fontWeight: theme.fonts.weight.bold,
-                  color: theme.colors.primary,
-                }}
-              >
-                <span>{studentCount ?? 0}</span>
-                <span> Schüler anwesend</span>
-              </div>
-            </div>
+              {selectedActivity.name}
+            </h1>
+            <p
+              style={{
+                fontSize: '32px',
+                color: '#6B7280',
+                margin: 0,
+                fontWeight: 500,
+              }}
+            >
+              {selectedRoom?.name || 'Unbekannt'}
+            </p>
           </div>
 
-          {/* Scrollable Content Area */}
+          {/* Main Student Count Display */}
           <div
             style={{
               flex: 1,
               display: 'flex',
-              flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              minHeight: '300px',
+              textAlign: 'center',
             }}
           >
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '5rem', marginBottom: theme.spacing.lg }}>
-                {isInitializing ? '📡' : (isScanning ? '📡' : '⏸️')}
+            <div>
+              <div
+                style={{
+                  fontSize: '160px',
+                  fontWeight: 800,
+                  color: '#83cd2d',
+                  lineHeight: 1,
+                  marginBottom: '20px',
+                }}
+              >
+                {studentCount ?? 0}
               </div>
-              <h2
+              <div
                 style={{
-                  fontSize: theme.fonts.size.xl,
-                  fontWeight: theme.fonts.weight.semibold,
-                  marginBottom: theme.spacing.md,
-                  color: theme.colors.text.primary,
+                  fontSize: '28px',
+                  color: '#6B7280',
+                  marginBottom: '12px',
+                  fontWeight: 600,
                 }}
               >
-                {isInitializing ? 'Scanner wird gestartet...' : (isScanning ? 'RFID Scanner Aktiv' : 'Scanner Pausiert')}
-              </h2>
-              <p
+                von {selectedActivity.max_participants} Schülern
+              </div>
+              <div
                 style={{
-                  fontSize: theme.fonts.size.large,
-                  color: theme.colors.text.secondary,
+                  fontSize: '18px',
+                  color: '#9CA3AF',
+                  fontWeight: 500,
                 }}
               >
-                {isInitializing ? 'Bitte warten...' : (isScanning ? 'Schülerkarte hier scannen' : 'Scanner ist pausiert')}
-              </p>
+                eingecheckt
+              </div>
             </div>
+          </div>
+
+          {/* Bottom Info Text */}
+          <div
+            style={{
+              textAlign: 'center',
+              paddingTop: '48px',
+              paddingBottom: '0',
+            }}
+          >
+            <p
+              style={{
+                fontSize: '18px',
+                color: '#6B7280',
+                margin: 0,
+                fontWeight: 500,
+              }}
+            >
+              {isInitializing 
+                ? 'Bitte warten, während der Scanner initialisiert wird...' 
+                : isScanning 
+                ? 'Halte dein Armband auf das bunte Scannersymbol'
+                : 'Scanner ist pausiert'
+              }
+            </p>
           </div>
         </div>
       </ContentBox>
@@ -279,16 +347,16 @@ const ActivityScanningPage: React.FC = () => {
         >
           <div
             style={{
-              backgroundColor: theme.colors.background.light,
-              borderRadius: theme.borders.radius.lg,
-              padding: theme.spacing.xxl,
+              backgroundColor: '#FFFFFF',
+              borderRadius: '16px',
+              padding: '32px',
               maxWidth: '500px',
               width: '90%',
               textAlign: 'center',
-              boxShadow: theme.shadows.lg,
+              boxShadow: '0 10px 25px rgba(0, 0, 0, 0.2)',
             }}
           >
-            <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
+            <div style={{ fontSize: '48px', marginBottom: '24px' }}>
               {(() => {
                 logger.debug('Modal icon logic:', {
                   action: currentScan.action,
@@ -302,10 +370,10 @@ const ActivityScanningPage: React.FC = () => {
 
             <h2
               style={{
-                fontSize: theme.fonts.size.xl,
-                fontWeight: theme.fonts.weight.bold,
-                marginBottom: theme.spacing.lg,
-                color: theme.colors.text.primary,
+                fontSize: '24px',
+                fontWeight: 700,
+                marginBottom: '16px',
+                color: '#1F2937',
               }}
             >
               {currentScan.message ??
@@ -316,9 +384,9 @@ const ActivityScanningPage: React.FC = () => {
 
             <div
               style={{
-                fontSize: theme.fonts.size.large,
-                color: theme.colors.text.secondary,
-                marginBottom: theme.spacing.xl,
+                fontSize: '18px',
+                color: '#6B7280',
+                marginBottom: '32px',
               }}
             >
               {(() => {

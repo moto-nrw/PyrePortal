@@ -317,19 +317,27 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         let sessionActivity: ActivityResponse | null = null;
         let sessionRoom: Room | null = null;
 
+        // Get the current selectedActivity to preserve its data
+        const currentSelectedActivity = get().selectedActivity;
+
         if (session.activity_name) {
-          sessionActivity = {
-            id: session.activity_id,
-            name: session.activity_name,
-            category_name: '',
-            category_color: '',
-            room_name: session.room_name ?? '',
-            enrollment_count: 0,
-            max_participants: 0,
-            has_spots: true,
-            supervisor_name: authenticatedUser.staffName,
-            is_active: session.is_active ?? true,
-          };
+          // If we already have a selectedActivity with the same ID, preserve its data
+          if (currentSelectedActivity && currentSelectedActivity.id === session.activity_id) {
+            sessionActivity = currentSelectedActivity;
+          } else {
+            sessionActivity = {
+              id: session.activity_id,
+              name: session.activity_name,
+              category_name: '',
+              category_color: '',
+              room_name: session.room_name ?? '',
+              enrollment_count: 0,
+              max_participants: 0,
+              has_spots: true,
+              supervisor_name: authenticatedUser.staffName,
+              is_active: session.is_active ?? true,
+            };
+          }
         }
 
         if (session.room_id && session.room_name) {

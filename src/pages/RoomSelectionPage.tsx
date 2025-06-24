@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { invoke } from '@tauri-apps/api/core';
 
-import { ContentBox } from '../components/ui';
+import { ContentBox, Button } from '../components/ui';
 import { api, type Room, type SessionStartRequest, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -46,84 +45,219 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
+        backdropFilter: 'blur(4px)',
       }}
     >
       <div
         style={{
-          backgroundColor: theme.colors.background.light,
-          borderRadius: theme.borders.radius.lg,
-          padding: theme.spacing.xxl,
-          maxWidth: '500px',
+          backgroundColor: '#FFFFFF',
+          borderRadius: '24px',
+          padding: '32px',
+          maxWidth: '480px',
           width: '90%',
           textAlign: 'center',
-          boxShadow: theme.shadows.lg,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>🎯</div>
+        {/* Header Icon */}
+        <div
+          style={{
+            width: '64px',
+            height: '64px',
+            background: 'linear-gradient(to right, #83cd2d, #6ba529)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px auto',
+            boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
+          }}
+        >
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9 12l2 2 4-4"/>
+          </svg>
+        </div>
 
         <h2
           style={{
-            fontSize: theme.fonts.size.xl,
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: theme.spacing.lg,
-            color: theme.colors.text.primary,
+            fontSize: '28px',
+            fontWeight: 700,
+            marginBottom: '16px',
+            color: '#1F2937',
+            lineHeight: 1.2,
           }}
         >
           Aktivität starten?
         </h2>
 
-        <div style={{ marginBottom: theme.spacing.xl }}>
+        <p
+          style={{
+            fontSize: '16px',
+            color: '#6B7280',
+            marginBottom: '32px',
+            lineHeight: 1.5,
+          }}
+        >
+          Sie sind dabei, eine neue Aktivitätssession zu starten.
+        </p>
+
+        {/* Activity Details Card */}
+        <div
+          style={{
+            backgroundColor: '#F8FAFC',
+            borderRadius: '16px',
+            padding: '24px',
+            marginBottom: '32px',
+            border: '1px solid #E2E8F0',
+          }}
+        >
           <div
             style={{
-              fontSize: theme.fonts.size.large,
-              marginBottom: theme.spacing.sm,
-              color: theme.colors.text.primary,
+              fontSize: '20px',
+              fontWeight: 600,
+              marginBottom: '12px',
+              color: '#1F2937',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
             }}
           >
-            📚 {activity?.name}
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            {activity?.name}
           </div>
+          
           <div
             style={{
-              fontSize: theme.fonts.size.base,
-              color: theme.colors.text.secondary,
+              fontSize: '16px',
+              color: '#64748B',
+              marginBottom: '8px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
             }}
           >
-            📍 {room.name}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87C10" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
+              <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2"/>
+              <circle cx="11" cy="12" r="1"/>
+            </svg>
+            {room.name}
           </div>
+          
           {room.room_type && (
             <div
               style={{
-                fontSize: theme.fonts.size.base,
-                color: theme.colors.text.secondary,
+                fontSize: '14px',
+                color: '#9CA3AF',
+                marginBottom: '4px',
               }}
             >
-              🏷️ {room.room_type}
+              Typ: {room.room_type}
             </div>
           )}
+          
           {room.capacity && (
             <div
               style={{
-                fontSize: theme.fonts.size.base,
-                color: theme.colors.text.secondary,
+                fontSize: '14px',
+                color: '#9CA3AF',
               }}
             >
-              👥 Kapazität: {room.capacity}
+              Kapazität: {room.capacity} Plätze
             </div>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: theme.spacing.md, justifyContent: 'center' }}>
-          <Button onClick={onCancel} variant="outline" size="large" disabled={isLoading}>
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={onCancel}
+            disabled={isLoading}
+            style={{
+              flex: 1,
+              height: '52px',
+              fontSize: '16px',
+              fontWeight: 600,
+              color: '#6B7280',
+              backgroundColor: 'transparent',
+              border: '2px solid #E5E7EB',
+              borderRadius: '16px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              opacity: isLoading ? 0.6 : 1,
+            }}
+            onTouchStart={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.backgroundColor = '#F9FAFB';
+                e.currentTarget.style.borderColor = '#D1D5DB';
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.borderColor = '#E5E7EB';
+              }
+            }}
+          >
             Abbrechen
-          </Button>
-          <Button onClick={onConfirm} variant="primary" size="large" disabled={isLoading}>
+          </button>
+          
+          <button
+            onClick={onConfirm}
+            disabled={isLoading}
+            style={{
+              flex: 1,
+              height: '52px',
+              fontSize: '16px',
+              fontWeight: 600,
+              color: '#FFFFFF',
+              background: isLoading 
+                ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                : 'linear-gradient(to right, #83cd2d, #6ba529)',
+              border: 'none',
+              borderRadius: '16px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              boxShadow: isLoading 
+                ? 'none' 
+                : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
+              opacity: isLoading ? 0.6 : 1,
+            }}
+            onTouchStart={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.transform = 'scale(0.98)';
+                e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(131, 205, 45, 0.5)';
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(131, 205, 45, 0.4)';
+              }
+            }}
+          >
             {isLoading ? 'Starte...' : 'Aktivität starten'}
-          </Button>
+          </button>
         </div>
       </div>
     </div>
@@ -148,106 +282,231 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(0, 0, 0, 0.6)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
+        backdropFilter: 'blur(4px)',
       }}
     >
       <div
         style={{
-          backgroundColor: theme.colors.background.light,
-          borderRadius: theme.borders.radius.lg,
-          padding: theme.spacing.xxl,
-          maxWidth: '500px',
+          backgroundColor: '#FFFFFF',
+          borderRadius: '24px',
+          padding: '32px',
+          maxWidth: '480px',
           width: '90%',
           textAlign: 'center',
-          boxShadow: theme.shadows.lg,
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.2)',
+          position: 'relative',
+          overflow: 'hidden',
         }}
       >
-        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>⚠️</div>
+        {/* Warning Icon */}
+        <div
+          style={{
+            width: '64px',
+            height: '64px',
+            background: 'linear-gradient(to right, #F59E0B, #EAB308)',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 24px auto',
+            boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
+          }}
+        >
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+            <line x1="12" y1="9" x2="12" y2="13"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </div>
 
         <h2
           style={{
-            fontSize: theme.fonts.size.xl,
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: theme.spacing.lg,
-            color: theme.colors.text.primary,
+            fontSize: '28px',
+            fontWeight: 700,
+            marginBottom: '16px',
+            color: '#1F2937',
+            lineHeight: 1.2,
           }}
         >
           Session Konflikt
         </h2>
 
-        <div style={{ marginBottom: theme.spacing.xl }}>
-          <div
-            style={{
-              fontSize: theme.fonts.size.base,
-              marginBottom: theme.spacing.md,
-              color: theme.colors.text.secondary,
-              lineHeight: '1.5',
-            }}
-          >
-            Es läuft bereits eine Session für diese Aktivität oder diesen Raum.
-          </div>
+        <p
+          style={{
+            fontSize: '16px',
+            color: '#6B7280',
+            marginBottom: '32px',
+            lineHeight: 1.5,
+          }}
+        >
+          Es läuft bereits eine Session für diese Aktivität oder diesen Raum. Möchten Sie die bestehende Session beenden und eine neue starten?
+        </p>
 
+        {/* Activity Details Card */}
+        <div
+          style={{
+            backgroundColor: '#FEF3C7',
+            borderRadius: '16px',
+            padding: '24px',
+            marginBottom: '32px',
+            border: '1px solid #FCD34D',
+          }}
+        >
           <div
             style={{
-              fontSize: theme.fonts.size.base,
-              marginBottom: theme.spacing.lg,
-              color: theme.colors.text.secondary,
-              lineHeight: '1.5',
+              fontSize: '14px',
+              color: '#92400E',
+              marginBottom: '8px',
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
             }}
           >
-            Möchten Sie die bestehende Session beenden und eine neue starten?
+            Neue Session
           </div>
-
+          
           <div
             style={{
-              backgroundColor: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: theme.borders.radius.md,
-              padding: theme.spacing.md,
-              marginBottom: theme.spacing.lg,
+              fontSize: '20px',
+              fontWeight: 600,
+              marginBottom: '12px',
+              color: '#1F2937',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
             }}
           >
-            <div
-              style={{
-                fontSize: theme.fonts.size.small,
-                color: theme.colors.text.secondary,
-                marginBottom: theme.spacing.xs,
-              }}
-            >
-              Neue Session:
-            </div>
-            <div
-              style={{
-                fontSize: theme.fonts.size.base,
-                fontWeight: theme.fonts.weight.medium,
-                color: theme.colors.text.primary,
-              }}
-            >
-              📚 {activity?.name} in 📍 {room.name}
-            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+            </svg>
+            {activity?.name}
+          </div>
+          
+          <div
+            style={{
+              fontSize: '16px',
+              color: '#64748B',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87C10" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
+              <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2"/>
+              <circle cx="11" cy="12" r="1"/>
+            </svg>
+            {room.name}
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: theme.spacing.md, justifyContent: 'center' }}>
-          <Button onClick={onCancel} variant="outline" size="large" disabled={isLoading}>
-            Abbrechen
-          </Button>
-          <Button
-            onClick={onForceStart}
-            variant="primary"
-            size="large"
+        {/* Warning Message */}
+        <div
+          style={{
+            backgroundColor: '#FEF2F2',
+            border: '1px solid #FECACA',
+            borderRadius: '12px',
+            padding: '16px',
+            marginBottom: '32px',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '14px',
+              color: '#DC2626',
+              fontWeight: 600,
+              textAlign: 'center',
+            }}
+          >
+            Diese Aktion beendet die aktuelle Session
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={onCancel}
             disabled={isLoading}
             style={{
-              backgroundColor: '#dc2626',
-              borderColor: '#dc2626',
+              flex: 1,
+              height: '52px',
+              fontSize: '16px',
+              fontWeight: 600,
+              color: '#6B7280',
+              backgroundColor: 'transparent',
+              border: '2px solid #E5E7EB',
+              borderRadius: '16px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              opacity: isLoading ? 0.6 : 1,
+            }}
+            onTouchStart={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.backgroundColor = '#F9FAFB';
+                e.currentTarget.style.borderColor = '#D1D5DB';
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.backgroundColor = 'transparent';
+                e.currentTarget.style.borderColor = '#E5E7EB';
+              }
+            }}
+          >
+            Abbrechen
+          </button>
+          
+          <button
+            onClick={onForceStart}
+            disabled={isLoading}
+            style={{
+              flex: 1,
+              height: '52px',
+              fontSize: '16px',
+              fontWeight: 600,
+              color: '#FFFFFF',
+              background: isLoading 
+                ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                : 'linear-gradient(to right, #DC2626, #B91C1C)',
+              border: 'none',
+              borderRadius: '16px',
+              cursor: isLoading ? 'not-allowed' : 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              boxShadow: isLoading 
+                ? 'none' 
+                : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
+              opacity: isLoading ? 0.6 : 1,
+            }}
+            onTouchStart={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.transform = 'scale(0.98)';
+                e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(220, 38, 38, 0.5)';
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (!isLoading) {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(220, 38, 38, 0.4)';
+              }
             }}
           >
             {isLoading ? 'Überschreibe...' : 'Session überschreiben'}
-          </Button>
+          </button>
         </div>
       </div>
     </div>
@@ -263,7 +522,7 @@ function RoomSelectionPage() {
     error,
     fetchRooms,
     selectRoom,
-    logout,
+    fetchCurrentSession,
   } = useUserStore();
 
   const [isStartingSession, setIsStartingSession] = useState(false);
@@ -272,7 +531,6 @@ function RoomSelectionPage() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const navigate = useNavigate();
-  const mountedRef = useRef(false);
   const fetchedRef = useRef(false);
 
   // Create logger instance for this component
@@ -377,6 +635,9 @@ function RoomSelectionPage() {
       // Store the selected room
       selectRoom(selectedRoom.id);
 
+      // Fetch and update current session to ensure state consistency
+      await fetchCurrentSession();
+
       logUserAction('session_started', {
         sessionId: sessionResponse.active_group_id,
         activityId: selectedActivity.id,
@@ -384,6 +645,11 @@ function RoomSelectionPage() {
         roomId: selectedRoom.id,
         roomName: selectedRoom.name,
       });
+
+      // Close modals before navigation
+      setShowConfirmModal(false);
+      setIsStartingSession(false);
+      setSelectedRoom(null); // Clear local component state only
 
       // Navigate to NFC scanning page
       logNavigation('RoomSelectionPage', 'NFC-Scanning', {
@@ -452,6 +718,9 @@ function RoomSelectionPage() {
       // Store the selected room
       selectRoom(selectedRoom.id);
 
+      // Fetch and update current session to ensure state consistency
+      await fetchCurrentSession();
+
       logUserAction('session_started_force', {
         sessionId: sessionResponse.active_group_id,
         activityId: selectedActivity.id,
@@ -459,6 +728,12 @@ function RoomSelectionPage() {
         roomId: selectedRoom.id,
         roomName: selectedRoom.name,
       });
+
+      // Close modals before navigation
+      setShowConfirmModal(false);
+      setShowConflictModal(false);
+      setIsStartingSession(false);
+      setSelectedRoom(null); // Clear local component state only
 
       // Navigate to NFC scanning page
       logNavigation('RoomSelectionPage', 'NFC-Scanning', {
@@ -478,7 +753,7 @@ function RoomSelectionPage() {
       });
       // Could add another error modal here, but for now use alert for force errors
       alert(`Fehler beim Überschreiben der Session: ${forceErrorMessage}`);
-    } finally {
+      // Clean up modal state only on error
       setIsStartingSession(false);
       setShowConfirmModal(false);
       setShowConflictModal(false);
@@ -501,19 +776,6 @@ function RoomSelectionPage() {
     void navigate('/activity-selection');
   };
 
-  // Handle application quit
-  const handleQuit = () => {
-    logger.info('User requested application quit from room selection page');
-    logUserAction('quit_app');
-    
-    invoke('quit_app', {})
-      .then(() => {
-        logger.debug('Application quit command sent successfully');
-      })
-      .catch((error) => {
-        logError(error instanceof Error ? error : new Error(String(error)), 'RoomSelectionPage.handleQuit');
-      });
-  };
 
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
@@ -666,7 +928,7 @@ function RoomSelectionPage() {
                 width: '48px',
                 height: '48px',
                 border: '3px solid #E5E7EB',
-                borderTopColor: '#F59E0B',
+                borderTopColor: '#f87C10',
                 borderRadius: '50%',
                 animation: 'spin 1s linear infinite',
               }}
@@ -755,7 +1017,7 @@ function RoomSelectionPage() {
                       }}
                       onTouchStart={(e) => {
                         e.currentTarget.style.transform = 'scale(0.98)';
-                        e.currentTarget.style.backgroundColor = '#FEF3C7';
+                        e.currentTarget.style.backgroundColor = '#FEF3E2';
                       }}
                       onTouchEnd={(e) => {
                         setTimeout(() => {
@@ -766,13 +1028,13 @@ function RoomSelectionPage() {
                         }, 150);
                       }}
                     >
-                      {/* Gradient border wrapper - Orange/Yellow for rooms */}
+                      {/* Gradient border wrapper - Orange for rooms */}
                       <div
                         style={{
                           position: 'absolute',
                           inset: 0,
                           borderRadius: '12px',
-                          background: 'linear-gradient(to right, #F59E0B, #F97316)',
+                          background: 'linear-gradient(to right, #f87C10, #e06c0a)',
                           zIndex: 0,
                         }}
                       />
@@ -783,7 +1045,7 @@ function RoomSelectionPage() {
                           position: 'absolute',
                           inset: '2px',
                           borderRadius: '10px',
-                          background: 'linear-gradient(to bottom, #FFFFFF, #FFFBEB)',
+                          background: 'linear-gradient(to bottom, #FFFFFF, #FEF7ED)',
                           zIndex: 1,
                         }}
                       />
@@ -791,7 +1053,7 @@ function RoomSelectionPage() {
                       {/* Room Icon */}
                       <div
                         style={{
-                          color: '#F59E0B',
+                          color: '#f87C10',
                           position: 'relative',
                           zIndex: 2,
                         }}

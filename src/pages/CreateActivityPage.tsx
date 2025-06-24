@@ -286,7 +286,7 @@ function CreateActivityPage() {
                 color: '#374151',
               }}
             >
-              Zurück
+              Vorherige
             </span>
           </button>
         </div>
@@ -333,7 +333,7 @@ function CreateActivityPage() {
                 width: '48px',
                 height: '48px',
                 border: '3px solid #E5E7EB',
-                borderTopColor: '#14B8A6',
+                borderTopColor: '#5080D8',
                 borderRadius: '50%',
                 animation: 'spin 1s linear infinite',
               }}
@@ -423,7 +423,7 @@ function CreateActivityPage() {
                       }}
                       onTouchStart={(e) => {
                         e.currentTarget.style.transform = 'scale(0.98)';
-                        e.currentTarget.style.backgroundColor = '#F0FDFA';
+                        e.currentTarget.style.backgroundColor = '#E6EFFF';
                       }}
                       onTouchEnd={(e) => {
                         setTimeout(() => {
@@ -434,13 +434,13 @@ function CreateActivityPage() {
                         }, 150);
                       }}
                     >
-                      {/* Gradient border wrapper */}
+                      {/* Gradient border wrapper - Blue for activities */}
                       <div
                         style={{
                           position: 'absolute',
                           inset: 0,
                           borderRadius: '12px',
-                          background: 'linear-gradient(to right, #14B8A6, #3B82F6)',
+                          background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
                           zIndex: 0,
                         }}
                       />
@@ -451,7 +451,7 @@ function CreateActivityPage() {
                           position: 'absolute',
                           inset: '2px',
                           borderRadius: '10px',
-                          background: 'linear-gradient(to bottom, #FFFFFF, #F8FCFF)',
+                          background: 'linear-gradient(to bottom, #FFFFFF, #F0F4FF)',
                           zIndex: 1,
                         }}
                       />
@@ -459,7 +459,7 @@ function CreateActivityPage() {
                       {/* Activity Icon */}
                       <div
                         style={{
-                          color: '#14B8A6',
+                          color: '#5080D8',
                           position: 'relative',
                           zIndex: 2,
                         }}

@@ -71,7 +71,7 @@ function HomeViewPage() {
     subtitle?: string;
     icon: React.ReactNode;
     disabled?: boolean;
-    variant?: 'primary' | 'continue';
+    variant?: 'primary' | 'continue' | 'activity';
   }> = ({ onClick, title, subtitle, icon, disabled = false, variant = 'primary' }) => {
     return (
       <button
@@ -122,6 +122,8 @@ function HomeViewPage() {
             borderRadius: '16px',
             background: variant === 'continue'
               ? 'linear-gradient(to right, #10B981, #059669)'
+              : variant === 'activity'
+              ? 'linear-gradient(to right, #83cd2d, #6ba529)'
               : 'linear-gradient(to right, #14B8A6, #3B82F6)',
             zIndex: 0,
           }}
@@ -135,6 +137,8 @@ function HomeViewPage() {
             borderRadius: '13px',
             background: variant === 'continue'
               ? 'linear-gradient(to bottom, #FFFFFF, #F7FDF9)'
+              : variant === 'activity'
+              ? 'linear-gradient(to bottom, #FFFFFF, #F0FDF4)'
               : 'linear-gradient(to bottom, #FFFFFF, #F8FCFF)',
             zIndex: 1,
           }}
@@ -153,7 +157,11 @@ function HomeViewPage() {
         >
           <div
             style={{
-              color: variant === 'continue' ? '#10B981' : '#14B8A6',
+              color: variant === 'continue' 
+                ? '#10B981' 
+                : variant === 'activity'
+                ? '#83cd2d'
+                : '#14B8A6',
             }}
           >
             {icon}
@@ -394,6 +402,7 @@ function HomeViewPage() {
                 title="Neue Aktivität"
                 subtitle="Aktivität starten"
                 icon={<ActivityStartIcon />}
+                variant="activity"
               />
             )}
             
