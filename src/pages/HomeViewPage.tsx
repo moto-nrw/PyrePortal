@@ -1,3 +1,5 @@
+import { faWifi } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -372,13 +374,11 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#5080D8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      {/* Standard NFC/Contactless payment symbol */}
-                      <path d="M2 12h3.5" />
-                      <path d="M5.5 6a6 6 0 0 1 0 12" />
-                      <path d="M8.5 3a9 9 0 0 1 0 18" />
-                      <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
-                    </svg>
+                    <FontAwesomeIcon 
+                      icon={faWifi} 
+                      size="3x"
+                      style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
+                    />
                   </div>
                   
                   <h3
