@@ -42,10 +42,6 @@ function HomeViewPage() {
     }
   };
 
-  const handleAttendance = () => {
-    logNavigation('Home View', '/attendance');
-    void navigate('/attendance');
-  };
 
   // Redirect to login if no authenticated user and fetch current session
   useEffect(() => {
@@ -410,58 +406,6 @@ function HomeViewPage() {
               </button>
             </div>
 
-            {/* Attendance Button - Full Width */}
-            <button
-              onClick={handleAttendance}
-              style={{
-                height: '56px',
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px',
-                padding: '0 24px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                border: '2px solid #E5E7EB',
-                borderRadius: '28px',
-                cursor: 'pointer',
-                transition: 'all 200ms',
-                outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                backdropFilter: 'blur(8px)',
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#374151',
-              }}
-              onTouchStart={(e) => {
-                e.currentTarget.style.transform = 'scale(0.98)';
-                e.currentTarget.style.backgroundColor = '#F9FAFB';
-                e.currentTarget.style.boxShadow = '0 1px 4px rgba(0, 0, 0, 0.12)';
-              }}
-              onTouchEnd={(e) => {
-                setTimeout(() => {
-                  if (e.currentTarget) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
-                  }
-                }, 150);
-              }}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-                <path d="M8 14h.01"/>
-                <path d="M12 14h.01"/>
-                <path d="M16 14h.01"/>
-                <path d="M8 18h.01"/>
-                <path d="M12 18h.01"/>
-              </svg>
-              Anwesenheit verwalten
-            </button>
           </div>
         </div>
       </div>
