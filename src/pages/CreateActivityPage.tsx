@@ -286,7 +286,7 @@ function CreateActivityPage() {
                 color: '#374151',
               }}
             >
-              Vorherige
+              Zurück
             </span>
           </button>
         </div>

@@ -257,11 +257,12 @@ function HomeViewPage() {
 
   // Icon components with better semantic meaning
   const NFCScanIcon = () => (
-    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      {/* Three NFC lines */}
-      <path d="M9 12a3 3 0 1 1 6 0"/>
-      <path d="M6 12a6 6 0 1 1 12 0"/>
-      <path d="M3 12a9 9 0 1 1 18 0"/>
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      {/* Standard NFC/Contactless payment symbol */}
+      <path d="M2 12h3.5" />
+      <path d="M5.5 6a6 6 0 0 1 0 12" />
+      <path d="M8.5 3a9 9 0 0 1 0 18" />
+      <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
     </svg>
   );
 
