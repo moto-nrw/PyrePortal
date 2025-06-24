@@ -66,8 +66,8 @@ function HomeViewPage() {
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{ 
-        width: '100%', 
+      <div style={{
+        width: '100%',
         height: '100%',
         padding: '16px',
         display: 'flex',
@@ -127,9 +127,9 @@ function HomeViewPage() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
             <span
               style={{
@@ -144,7 +144,7 @@ function HomeViewPage() {
         </div>
 
         {/* Welcome Header */}
-        <div style={{ 
+        <div style={{
           textAlign: 'center',
           marginBottom: '32px',
         }}>
@@ -175,7 +175,7 @@ function HomeViewPage() {
               <circle cx="12" cy="7" r="4" />
             </svg>
           </div>
-          
+
           <h1
             style={{
               fontSize: '48px',
@@ -187,26 +187,16 @@ function HomeViewPage() {
           >
             Hallo, {firstName}!
           </h1>
-          <p
-            style={{
-              fontSize: '20px',
-              color: theme.colors.text.secondary,
-              margin: '8px 0 0 0',
-              fontWeight: 500,
-            }}
-          >
-            Was möchten Sie heute tun?
-          </p>
         </div>
 
         {/* Main Content - Centered */}
-        <div style={{ 
+        <div style={{
           flex: 1,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-          <div style={{ width: '100%', maxWidth: '600px' }}>
+          <div style={{ width: '100%', maxWidth: '720px' }}>
             {/* Primary Actions Grid */}
             <div
               style={{
@@ -231,7 +221,7 @@ function HomeViewPage() {
                   transition: 'all 200ms',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '200px',
+                  minHeight: '300px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -250,7 +240,7 @@ function HomeViewPage() {
                     zIndex: 0,
                   }}
                 />
-                
+
                 {/* Inner content */}
                 <div
                   style={{
@@ -278,18 +268,18 @@ function HomeViewPage() {
                   >
                     {currentSession ? (
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polygon points="10,8 16,12 10,16" fill="#83cd2d"/>
+                        <circle cx="12" cy="12" r="10" />
+                        <polygon points="10,8 16,12 10,16" fill="#83cd2d" />
                       </svg>
                     ) : (
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="12" y1="8" x2="12" y2="16"/>
-                        <line x1="8" y1="12" x2="16" y2="12"/>
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="16" />
+                        <line x1="8" y1="12" x2="16" y2="12" />
                       </svg>
                     )}
                   </div>
-                  
+
                   <h3
                     style={{
                       fontSize: '24px',
@@ -348,7 +338,7 @@ function HomeViewPage() {
                     zIndex: 0,
                   }}
                 />
-                
+
                 {/* Inner content */}
                 <div
                   style={{
@@ -374,13 +364,13 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    <FontAwesomeIcon 
-                      icon={faWifi} 
+                    <FontAwesomeIcon
+                      icon={faWifi}
                       size="3x"
                       style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
                     />
                   </div>
-                  
+
                   <h3
                     style={{
                       fontSize: '24px',
