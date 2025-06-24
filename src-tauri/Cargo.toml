@@ -29,7 +29,7 @@ dotenvy = "0.15"
 
 # RFID scanner dependencies - only for Raspberry Pi (ARM/ARM64 Linux)
 [target.'cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))'.dependencies]
-mfrc522 = "0.8.0"
+mfrc522 = { version = "0.8.0", features = ["eh02"] }
 rppal = "0.14.1"
 embedded-hal = "0.2.7"
 linux-embedded-hal = "0.3.2"
