@@ -219,8 +219,8 @@ function PinPage() {
         onClick={onClick}
         style={{
           position: 'relative',
-          width: '80px',
-          height: '60px',
+          width: '120px',
+          height: '72px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -252,13 +252,13 @@ function PinPage() {
             position: 'absolute',
             inset: 0,
             borderRadius: '12px',
-            background: isAction 
-              ? 'linear-gradient(135deg, #6B7280, #4B5563)' 
+            background: isAction
+              ? 'linear-gradient(135deg, #6B7280, #4B5563)'
               : 'linear-gradient(135deg, #5080D8, #3f6bc4)',
             zIndex: 0,
           }}
         />
-        
+
         {/* Inner content */}
         <div
           style={{
@@ -269,10 +269,10 @@ function PinPage() {
             zIndex: 1,
           }}
         />
-        
-        <span 
-          style={{ 
-            position: 'relative', 
+
+        <span
+          style={{
+            position: 'relative',
             zIndex: 2,
             color: isAction ? '#6B7280' : '#1F2937',
           }}
@@ -285,8 +285,8 @@ function PinPage() {
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{ 
-        width: '100%', 
+      <div style={{
+        width: '100%',
         height: '100%',
         padding: '16px',
         display: 'flex',
@@ -348,8 +348,8 @@ function PinPage() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M19 12H5"/>
-              <path d="M12 19l-7-7 7-7"/>
+              <path d="M19 12H5" />
+              <path d="M12 19l-7-7 7-7" />
             </svg>
             <span
               style={{
@@ -364,9 +364,9 @@ function PinPage() {
         </div>
 
         {/* Welcome Header with User Info - Extra compact sizing */}
-        <div style={{ 
+        <div style={{
           textAlign: 'center',
-          marginBottom: '12px',
+          marginBottom: '0',
         }}>
           <div
             style={{
@@ -395,7 +395,7 @@ function PinPage() {
               <circle cx="12" cy="7" r="4" />
             </svg>
           </div>
-          
+
           <h1
             style={{
               fontSize: '34px',
@@ -415,26 +415,24 @@ function PinPage() {
               fontWeight: 500,
             }}
           >
-            Bitte geben Sie Ihren PIN ein
           </p>
         </div>
 
         {/* Main Content - Centered */}
-        <div style={{ 
-          flex: 1,
+        <div style={{
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'center',
         }}>
-          <div style={{ width: '100%', maxWidth: '400px' }}>
-            
+          <div style={{ width: '100%', maxWidth: '400px', marginTop: '12px' }}>
+
             {/* PIN display dots with modern styling - compact */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'center',
                 gap: '10px',
-                marginBottom: '20px',
+                marginBottom: '12px',
                 padding: '12px',
                 backgroundColor: 'rgba(255, 255, 255, 0.6)',
                 borderRadius: '10px',
@@ -450,10 +448,10 @@ function PinPage() {
                     height: '18px',
                     borderRadius: '50%',
                     transition: 'all 300ms ease',
-                    background: i < pin.length 
+                    background: i < pin.length
                       ? 'linear-gradient(135deg, #5080D8, #3f6bc4)'
                       : '#E5E7EB',
-                    boxShadow: i < pin.length 
+                    boxShadow: i < pin.length
                       ? '0 2px 6px rgba(80, 128, 216, 0.4)'
                       : 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
                     transform: i < pin.length ? 'scale(1.1)' : 'scale(1)',
@@ -468,7 +466,7 @@ function PinPage() {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: '10px',
-                maxWidth: '270px',
+                maxWidth: '400px',
                 margin: '0 auto',
               }}
             >
@@ -478,16 +476,16 @@ function PinPage() {
                   {num}
                 </NumpadButton>
               ))}
-              
+
               {/* Bottom row: Clear, 0, Delete */}
               <NumpadButton onClick={handleClear} isAction>
                 C
               </NumpadButton>
-              
+
               <NumpadButton onClick={() => handleNumpadClick(0)}>
                 0
               </NumpadButton>
-              
+
               <NumpadButton onClick={handleDelete} isAction>
                 ⌫
               </NumpadButton>
@@ -495,8 +493,8 @@ function PinPage() {
 
             {/* Loading state */}
             {isLoading && (
-              <div style={{ 
-                textAlign: 'center', 
+              <div style={{
+                textAlign: 'center',
                 marginTop: '24px',
               }}>
                 <div
