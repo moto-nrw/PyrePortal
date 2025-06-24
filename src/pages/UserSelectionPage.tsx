@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ContentBox } from '../components/ui';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
-import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+import { createLogger, logNavigation, logUserAction } from '../utils/logger';
 
 const USERS_PER_PAGE = 10; // 5x2 grid to use full width
 
