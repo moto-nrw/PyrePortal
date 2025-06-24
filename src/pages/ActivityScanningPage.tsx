@@ -14,7 +14,7 @@ const ActivityScanningPage: React.FC = () => {
   const { selectedActivity, selectedRoom, authenticatedUser, rfid } = useUserStore();
 
   const { isScanning, currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
-  
+
   // Debug logging for selectedActivity
   useEffect(() => {
     if (selectedActivity) {
@@ -55,13 +55,13 @@ const ActivityScanningPage: React.FC = () => {
   // Start scanning when component mounts
   useEffect(() => {
     logger.info('Activity Scanning Page mounted, starting RFID scanning');
-    
+
     // Start scanning and clear initializing state
     const initializeScanning = async () => {
       await startScanning();
       setIsInitializing(false);
     };
-    
+
     void initializeScanning();
 
     // Cleanup: stop scanning when component unmounts
@@ -111,11 +111,11 @@ const ActivityScanningPage: React.FC = () => {
   useEffect(() => {
     if (currentScan && showModal) {
       // Instead of fetching, update count based on scan action
-      logger.debug('Updating student count based on scan', { 
+      logger.debug('Updating student count based on scan', {
         action: currentScan.action,
-        currentCount: studentCount 
+        currentCount: studentCount
       });
-      
+
       if (currentScan.action === 'checked_in') {
         setStudentCount(prev => prev + 1);
       } else if (currentScan.action === 'checked_out') {
@@ -143,21 +143,21 @@ const ActivityScanningPage: React.FC = () => {
 
     // Clear any existing confetti
     container.innerHTML = '';
-    
+
     // Colors for the confetti - vibrant and varied
     const colors = ['#FF3130', '#f87C10', '#83cd2d', '#5080D8', '#FFD700', '#FF69B4', '#00CED1', '#9370DB'];
-    
-    // Create 200 confetti pieces for intense effect
-    for (let i = 0; i < 200; i++) {
+
+    // Create 50 confetti pieces for intense effect
+    for (let i = 0; i < 50; i++) {
       setTimeout(() => {
         const confetti = document.createElement('div');
         const color = colors[Math.floor(Math.random() * colors.length)];
         const size = Math.random() * 12 + 4;
-        
+
         // Random shapes - squares, rectangles, and circles
         const isCircle = Math.random() > 0.6;
         const aspectRatio = isCircle ? 1 : 0.4 + Math.random() * 0.8;
-        
+
         // Style the confetti
         confetti.style.position = 'fixed';
         confetti.style.width = `${size}px`;
@@ -169,19 +169,19 @@ const ActivityScanningPage: React.FC = () => {
         confetti.style.transform = 'translate(-50%, -50%)';
         confetti.style.pointerEvents = 'none';
         confetti.style.zIndex = '1001';
-        confetti.style.boxShadow = `0 0 ${size/2}px ${color}40`;
-        
+        confetti.style.boxShadow = `0 0 ${size / 2}px ${color}40`;
+
         container.appendChild(confetti);
-        
+
         // More chaotic angles for explosive effect
         const angle = Math.random() * Math.PI * 2;
         const velocity = 300 + Math.random() * 400; // Faster initial velocity
         const rotationSpeed = Math.random() * 1080 - 540; // More rotation
-        
+
         // Add some pieces that go more horizontal
         const horizontalBias = Math.random() > 0.5 ? 1.5 : 1;
         const verticalBias = Math.random() > 0.7 ? 0.5 : 1;
-        
+
         // Animate with more dramatic motion
         const animation = confetti.animate([
           {
@@ -200,7 +200,7 @@ const ActivityScanningPage: React.FC = () => {
           duration: 2500 + Math.random() * 500, // Varied duration
           easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
         });
-        
+
         animation.onfinish = () => confetti.remove();
       }, i * 5); // Faster spawn rate for burst effect
     }
@@ -213,13 +213,13 @@ const ActivityScanningPage: React.FC = () => {
 
     // Clear any existing elements
     container.innerHTML = '';
-    
+
     // Create 30 bubbles
     for (let i = 0; i < 30; i++) {
       setTimeout(() => {
         const bubble = document.createElement('div');
         const size = Math.random() * 40 + 20; // 20-60px bubbles
-        
+
         // Style the bubble
         bubble.style.position = 'fixed';
         bubble.style.width = `${size}px`;
@@ -230,18 +230,18 @@ const ActivityScanningPage: React.FC = () => {
         bubble.style.boxShadow = 'inset -10px -10px 20px rgba(255, 255, 255, 0.3), 0 0 20px rgba(248, 124, 16, 0.3)';
         bubble.style.pointerEvents = 'none';
         bubble.style.zIndex = '1001';
-        
+
         // Random starting position at bottom of screen
         const startX = Math.random() * window.innerWidth;
         bubble.style.left = `${startX}px`;
         bubble.style.bottom = '-100px';
-        
+
         container.appendChild(bubble);
-        
+
         // Create floating path
         const swayAmount = (Math.random() - 0.5) * 200; // -100 to 100px horizontal drift
         const floatDuration = 3000 + Math.random() * 2000; // 3-5 seconds
-        
+
         // Animate bubble floating up
         const animation = bubble.animate([
           {
@@ -264,7 +264,7 @@ const ActivityScanningPage: React.FC = () => {
           duration: floatDuration,
           easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
         });
-        
+
         // Add shimmer effect
         const shimmer = document.createElement('div');
         shimmer.style.position = 'absolute';
@@ -276,7 +276,7 @@ const ActivityScanningPage: React.FC = () => {
         shimmer.style.borderRadius = '50%';
         shimmer.style.animation = 'shimmer 2s infinite';
         bubble.appendChild(shimmer);
-        
+
         animation.onfinish = () => bubble.remove();
       }, i * 100); // Staggered release
     }
@@ -292,7 +292,7 @@ const ActivityScanningPage: React.FC = () => {
         // Launch bubbles for check-outs
         launchBubbles();
       }
-      
+
       const timer = setTimeout(() => {
         // Modal will auto-close through the hook
       }, rfid.modalDisplayTime);
@@ -370,8 +370,8 @@ const ActivityScanningPage: React.FC = () => {
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
           </svg>
           Anmelden
         </button>
@@ -472,11 +472,11 @@ const ActivityScanningPage: React.FC = () => {
                 fontWeight: 500,
               }}
             >
-              {isInitializing 
-                ? 'Bitte warten, während der Scanner initialisiert wird...' 
-                : isScanning 
-                ? 'Halte dein Armband auf das bunte Scannersymbol'
-                : 'Scanner ist pausiert'
+              {isInitializing
+                ? 'Bitte warten, während der Scanner initialisiert wird...'
+                : isScanning
+                  ? 'Halte dein Armband auf das bunte Scannersymbol'
+                  : 'Scanner ist pausiert'
               }
             </p>
           </div>
@@ -501,8 +501,8 @@ const ActivityScanningPage: React.FC = () => {
         >
           <div
             style={{
-              backgroundColor: currentScan.action === 'checked_in' || currentScan.action === 'transferred' 
-                ? '#83cd2d' 
+              backgroundColor: currentScan.action === 'checked_in' || currentScan.action === 'transferred'
+                ? '#83cd2d'
                 : '#f87C10',
               borderRadius: '32px',
               padding: '64px',
@@ -528,7 +528,7 @@ const ActivityScanningPage: React.FC = () => {
                 pointerEvents: 'none',
               }}
             />
-            
+
             {/* Icon container with background circle */}
             <div
               style={{
@@ -546,13 +546,13 @@ const ActivityScanningPage: React.FC = () => {
             >
               {currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6L9 17l-5-5"/>
+                  <path d="M20 6L9 17l-5-5" />
                 </svg>
               ) : (
                 <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                  <polyline points="16 17 21 12 16 7"/>
-                  <line x1="21" y1="12" x2="9" y2="12"/>
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
                 </svg>
               )}
             </div>
@@ -619,7 +619,7 @@ const ActivityScanningPage: React.FC = () => {
               opacity: 1;
             }
           }
-          
+
           @keyframes shimmer {
             0% {
               transform: translate(-5px, -5px) scale(1);
