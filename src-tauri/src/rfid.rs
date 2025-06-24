@@ -261,7 +261,7 @@ mod raspberry_pi {
         spidev::{SpiModeFlags, SpidevOptions},
         Spidev,
     };
-    use mfrc522::{comm::eh02::spi::SpiInterface, Mfrc522};
+    use mfrc522::{comm::eh02::spi::SpiInterface, Mfrc522, RxGain};
     use rppal::gpio::Gpio;
     use std::{error::Error, fmt, thread};
 
@@ -419,6 +419,16 @@ mod raspberry_pi {
                 return Err(format!("Failed to read MFRC522 version: {:?}", e));
             }
         };
+
+        // Set antenna gain to maximum for better reading sensitivity
+        println!("Setting antenna gain to maximum (48dB) for improved range...");
+        
+        if let Err(e) = mfrc522.set_antenna_gain(RxGain::DB48) {
+            println!("Warning: Failed to set antenna gain: {:?}", e);
+            println!("RFID will continue with default gain settings");
+        } else {
+            println!("Successfully configured antenna gain to 48dB maximum");
+        }
 
         // Scan for cards with timeout
         let start_time = std::time::Instant::now();
