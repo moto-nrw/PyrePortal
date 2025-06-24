@@ -2080,6 +2080,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "543f2c392f438e427aa9009338710434884b0dc95d0c39110f456846be0aa352"
 dependencies = [
+ "embedded-hal 0.2.7",
  "embedded-hal 1.0.0",
  "heapless",
 ]
