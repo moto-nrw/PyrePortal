@@ -191,7 +191,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     currentScan: null,
     blockedTags: new Map<string, number>(),
     scanTimeout: 3000, // 3 seconds
-    modalDisplayTime: 1250, // 1.25 seconds
+    modalDisplayTime: 2000, // 2 seconds - balanced for animation viewing
     showModal: false,
   },
 
