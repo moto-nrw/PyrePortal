@@ -192,8 +192,8 @@ impl RfidBackgroundService {
                         println!("Emitted RFID scan event: {}", tag_id);
                     }
 
-                    // Wait longer after successful scan to avoid duplicate reads
-                    tokio::time::sleep(Duration::from_millis(2000)).await;
+                    // Short wait after successful scan to avoid duplicate reads
+                    tokio::time::sleep(Duration::from_millis(200)).await;
                 }
                 Err(error) => {
                     // Only log and update state for non-timeout errors
@@ -455,8 +455,8 @@ mod raspberry_pi {
                 }
             }
 
-            // Sleep a bit before next check (like Python)
-            thread::sleep(Duration::from_millis(50)); // Faster polling for responsiveness
+            // Sleep a bit before next check (optimized for responsiveness)
+            thread::sleep(Duration::from_millis(20)); // Faster polling for better UX
         }
     }
 

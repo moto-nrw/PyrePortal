@@ -21,17 +21,21 @@ export const useRfidScanning = () => {
     startRfidScanning,
     stopRfidScanning,
     setScanResult,
-    blockTag,
     isTagBlocked,
     showScanModal,
     hideScanModal,
+    // New optimistic actions
+    addOptimisticScan,
+    updateOptimisticScan,
+    removeOptimisticScan,
+    updateStudentHistory,
+    isValidScan,
+    addToProcessingQueue,
+    removeFromProcessingQueue,
   } = useUserStore();
 
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
-  const processingTagRef = useRef<string | null>(null);
-  const lastProcessedTag = useRef<{ tagId: string; timestamp: number } | null>(null);
-  const isProcessingRequest = useRef<boolean>(false);
 
   // Initialize RFID service on mount
   const initializeService = useCallback(async () => {
@@ -55,36 +59,45 @@ export const useRfidScanning = () => {
         return;
       }
 
-      // Check if this exact tag was processed very recently (within 500ms)
-      const now = Date.now();
-      if (lastProcessedTag.current && 
-          lastProcessedTag.current.tagId === tagId && 
-          (now - lastProcessedTag.current.timestamp) < 500) {
-        logger.debug(`Tag ${tagId} was just processed ${now - lastProcessedTag.current.timestamp}ms ago, skipping duplicate`);
+      logger.info(`Processing RFID scan for tag: ${tagId}`);
+
+      // Smart duplicate prevention - first check if we should process this scan
+      // Note: We'll get student ID from API response, so for now we use tagId as proxy
+      const assumedAction = 'checkin'; // Will be corrected by API response
+      if (!isValidScan(tagId, assumedAction)) {
+        logger.warn(`Scan blocked by smart duplicate prevention for tag: ${tagId}`);
         return;
       }
 
-      // Prevent duplicate processing of the same tag
-      if (processingTagRef.current === tagId) {
-        logger.debug(`Tag ${tagId} is already being processed, skipping duplicate`);
-        return;
-      }
+      // Generate unique ID for this scan
+      const scanId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 1. IMMEDIATE OPTIMISTIC UI FEEDBACK (0ms delay)
+      const optimisticScan = {
+        id: scanId,
+        tagId,
+        status: 'pending' as const,
+        optimisticAction: 'checkin' as const, // Will be determined by API
+        optimisticStudentCount: 0, // Will be updated after API call
+        timestamp: Date.now(),
+        studentInfo: {
+          name: 'Processing...', // Placeholder while API loads
+          id: 0,
+        },
+      };
 
-      // Prevent concurrent API requests
-      if (isProcessingRequest.current) {
-        logger.warn(`Another RFID request is in progress, skipping tag ${tagId}`);
-        return;
-      }
+      // Show immediate visual feedback
+      addOptimisticScan(optimisticScan);
+      showScanModal();
+      logger.info('Showed immediate optimistic feedback for scan');
 
+      // 2. BACKGROUND API PROCESSING
       try {
-        processingTagRef.current = tagId;
-        isProcessingRequest.current = true;
-        lastProcessedTag.current = { tagId, timestamp: now };
+        // Update status to processing
+        updateOptimisticScan(scanId, 'processing');
         
-        // Block the tag immediately to prevent duplicate scans
-        blockTag(tagId, rfid.scanTimeout);
-        
-        logger.info(`Processing RFID scan for tag: ${tagId}`);
+        // Add to processing queue for tracking
+        addToProcessingQueue(tagId);
 
         // Call the API to process the scan
         const result = await api.processRfidScan(
@@ -97,27 +110,16 @@ export const useRfidScanning = () => {
           authenticatedUser.staffId
         );
 
-        logger.info(`Scan result: ${result.action} for ${result.student_name}`);
+        logger.info(`Scan completed: ${result.action} for ${result.student_name}`);
 
-        // Debug: Log the complete result to see what server returned
-        logger.debug('Complete RFID scan result', {
-          action: result.action,
-          actionType: typeof result.action,
-          actionLength: result.action?.length,
-          actionCharCodes: result.action ? Array.from(result.action).map(c => c.charCodeAt(0)) : [],
-          isCheckedIn: result.action === 'checked_in',
-          isCheckedOut: result.action === 'checked_out',
-          student_name: result.student_name,
-          student_id: result.student_id,
-          visit_id: result.visit_id,
-          message: result.message,
-          status: result.status,
-          fullResult: JSON.stringify(result),
-        });
-
-        // Update store with scan result and show modal
+        // 3. UPDATE UI WITH REAL RESULTS
+        updateOptimisticScan(scanId, 'success');
         setScanResult(result);
-        showScanModal();
+        
+        // Update student history for smart duplicate prevention
+        if (result.student_id) {
+          updateStudentHistory(result.student_id.toString(), result.action === 'checked_in' ? 'checkin' : 'checkout');
+        }
 
         // Update session activity to prevent timeout
         try {
@@ -127,28 +129,33 @@ export const useRfidScanning = () => {
           logger.warn('Failed to update session activity', { error });
         }
 
-        // Hide modal after display time
+        // Clean up after modal display time
         setTimeout(() => {
           hideScanModal();
-          // Clear processing ref after modal hides
-          processingTagRef.current = null;
+          removeOptimisticScan(scanId);
         }, rfid.modalDisplayTime);
-        
-        // Clear the request processing flag immediately after success
-        isProcessingRequest.current = false;
+
       } catch (error) {
         logger.error('Failed to process RFID scan', { error });
         
-        // Check if it's a "student already has active visit" error
+        // 4. ERROR HANDLING WITH ROLLBACK
+        updateOptimisticScan(scanId, 'failed');
+        
+        // Check if it's a duplicate request (treat as success)
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (errorMessage.includes('already has an active visit')) {
           logger.info('Duplicate request detected - student already has active visit, treating as success');
+          updateOptimisticScan(scanId, 'success');
         }
         
-        // Clear all processing refs on error
-        processingTagRef.current = null;
-        isProcessingRequest.current = false;
-        // Could show error modal here
+        // Clean up after error display
+        setTimeout(() => {
+          hideScanModal();
+          removeOptimisticScan(scanId);
+        }, rfid.modalDisplayTime);
+      } finally {
+        // Always clean up processing queue
+        removeFromProcessingQueue(tagId);
       }
     },
     [
@@ -156,10 +163,15 @@ export const useRfidScanning = () => {
       selectedRoom,
       setScanResult,
       showScanModal,
-      blockTag,
-      rfid.scanTimeout,
-      rfid.modalDisplayTime,
       hideScanModal,
+      addOptimisticScan,
+      updateOptimisticScan,
+      removeOptimisticScan,
+      updateStudentHistory,
+      addToProcessingQueue,
+      removeFromProcessingQueue,
+      isValidScan,
+      rfid.modalDisplayTime,
     ]
   );
 

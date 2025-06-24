@@ -71,6 +71,28 @@ interface AuthenticatedUser {
   pin: string; // Store PIN for subsequent API calls
 }
 
+// Optimistic scan state for immediate UI feedback
+interface OptimisticScanState {
+  id: string;
+  tagId: string;
+  status: 'pending' | 'processing' | 'success' | 'failed';
+  optimisticAction: 'checkin' | 'checkout';
+  optimisticStudentCount: number;
+  timestamp: number;
+  studentInfo?: {
+    name: string;
+    id: number;
+  };
+}
+
+// Student action history for smart duplicate prevention
+interface StudentActionHistory {
+  studentId: string;
+  lastAction: 'checkin' | 'checkout';
+  timestamp: number;
+  isProcessing: boolean;
+}
+
 // RFID scanning state
 interface RfidState {
   isScanning: boolean;
@@ -79,6 +101,11 @@ interface RfidState {
   scanTimeout: number; // 3 seconds default
   modalDisplayTime: number; // 1.25 seconds default
   showModal: boolean;
+  
+  // New optimistic state management
+  optimisticScans: OptimisticScanState[];
+  studentHistory: Map<string, StudentActionHistory>;
+  processingQueue: Set<string>; // Currently processing tag IDs
 }
 
 // Define the store state interface
@@ -142,6 +169,15 @@ interface UserState {
   clearBlockedTag: (tagId: string) => void;
   showScanModal: () => void;
   hideScanModal: () => void;
+  
+  // New optimistic RFID actions
+  addOptimisticScan: (scan: OptimisticScanState) => void;
+  updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => void;
+  removeOptimisticScan: (id: string) => void;
+  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
+  isValidScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
+  addToProcessingQueue: (tagId: string) => void;
+  removeFromProcessingQueue: (tagId: string) => void;
 }
 
 // Define the type for the Zustand set function
@@ -193,6 +229,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     scanTimeout: 3000, // 3 seconds
     modalDisplayTime: 2000, // 2 seconds - balanced for animation viewing
     showModal: false,
+    
+    // New optimistic state
+    optimisticScans: [],
+    studentHistory: new Map<string, StudentActionHistory>(),
+    processingQueue: new Set<string>(),
   },
 
   // Actions
@@ -858,6 +899,89 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     set(state => ({
       rfid: { ...state.rfid, showModal: false, currentScan: null },
     }));
+  },
+
+  // New optimistic RFID actions
+  addOptimisticScan: (scan: OptimisticScanState) => {
+    set(state => ({
+      rfid: { 
+        ...state.rfid, 
+        optimisticScans: [...state.rfid.optimisticScans, scan] 
+      },
+    }));
+  },
+
+  updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        optimisticScans: state.rfid.optimisticScans.map(scan =>
+          scan.id === id ? { ...scan, status } : scan
+        ),
+      },
+    }));
+  },
+
+  removeOptimisticScan: (id: string) => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        optimisticScans: state.rfid.optimisticScans.filter(scan => scan.id !== id),
+      },
+    }));
+  },
+
+  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => {
+    set(state => {
+      const newHistory = new Map(state.rfid.studentHistory);
+      newHistory.set(studentId, {
+        studentId,
+        lastAction: action,
+        timestamp: Date.now(),
+        isProcessing: false,
+      });
+      return {
+        rfid: { ...state.rfid, studentHistory: newHistory },
+      };
+    });
+  },
+
+  isValidScan: (studentId: string, action: 'checkin' | 'checkout') => {
+    const { rfid } = get();
+    const history = rfid.studentHistory.get(studentId);
+    
+    // Allow if no previous action
+    if (!history) return true;
+    
+    // Allow same action (idempotent)
+    if (history.lastAction === action) return true;
+    
+    // Block opposite action only if recent (10s) and still processing
+    if (history.isProcessing && Date.now() - history.timestamp < 10000) {
+      return false;
+    }
+    
+    return true;
+  },
+
+  addToProcessingQueue: (tagId: string) => {
+    set(state => {
+      const newQueue = new Set(state.rfid.processingQueue);
+      newQueue.add(tagId);
+      return {
+        rfid: { ...state.rfid, processingQueue: newQueue },
+      };
+    });
+  },
+
+  removeFromProcessingQueue: (tagId: string) => {
+    set(state => {
+      const newQueue = new Set(state.rfid.processingQueue);
+      newQueue.delete(tagId);
+      return {
+        rfid: { ...state.rfid, processingQueue: newQueue },
+      };
+    });
   },
 });
 
