@@ -248,9 +248,7 @@ function HomeViewPage() {
                     position: 'absolute',
                     inset: 0,
                     borderRadius: '20px',
-                    background: currentSession 
-                      ? 'linear-gradient(135deg, #10B981, #059669)'
-                      : 'linear-gradient(135deg, #83cd2d, #6ba529)',
+                    background: 'linear-gradient(135deg, #83cd2d, #6ba529)',
                     zIndex: 0,
                   }}
                 />
@@ -261,9 +259,7 @@ function HomeViewPage() {
                     position: 'absolute',
                     inset: '3px',
                     borderRadius: '17px',
-                    background: currentSession
-                      ? 'linear-gradient(to bottom, #FFFFFF, #F0FDF4)'
-                      : 'linear-gradient(to bottom, #FFFFFF, #F7FEF1)',
+                    background: 'linear-gradient(to bottom, #FFFFFF, #F7FEF1)',
                     zIndex: 1,
                   }}
                 />
@@ -274,7 +270,7 @@ function HomeViewPage() {
                     style={{
                       width: '80px',
                       height: '80px',
-                      backgroundColor: currentSession ? '#E6F5F0' : '#EFF9E5',
+                      backgroundColor: '#EFF9E5',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -283,9 +279,9 @@ function HomeViewPage() {
                     }}
                   >
                     {currentSession ? (
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5">
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">
                         <circle cx="12" cy="12" r="10"/>
-                        <polygon points="10,8 16,12 10,16" fill="#10B981"/>
+                        <polygon points="10,8 16,12 10,16" fill="#83cd2d"/>
                       </svg>
                     ) : (
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">

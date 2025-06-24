@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox, Button } from '../components/ui';
+import { ContentBox } from '../components/ui';
 import { api, type Room, type SessionStartRequest, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -828,15 +828,15 @@ function RoomSelectionPage() {
             type="button"
             onClick={handleGoBack}
             style={{
-              height: '44px',
+              height: '56px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px',
-              padding: '0 16px',
+              gap: '10px',
+              padding: '0 28px',
               backgroundColor: 'rgba(255, 255, 255, 0.9)',
               border: '1px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: '22px',
+              borderRadius: '28px',
               cursor: 'pointer',
               transition: 'all 200ms',
               outline: 'none',
@@ -862,8 +862,8 @@ function RoomSelectionPage() {
             }}
           >
             <svg
-              width="20"
-              height="20"
+              width="24"
+              height="24"
               viewBox="0 0 24 24"
               fill="none"
               stroke="#374151"
@@ -876,7 +876,7 @@ function RoomSelectionPage() {
             </svg>
             <span
               style={{
-                fontSize: '16px',
+                fontSize: '18px',
                 fontWeight: 600,
                 color: '#374151',
               }}

@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -87,18 +86,12 @@ function UserSelectionPage() {
     }
   };
 
-  // Handle application quit
-  const handleQuit = () => {
-    logger.info('User requested application quit');
-    logUserAction('quit_app');
-    
-    invoke('quit_app', {})
-      .then(() => {
-        logger.debug('Application quit command sent successfully');
-      })
-      .catch((error) => {
-        logError(error instanceof Error ? error : new Error(String(error)), 'UserSelectionPage.handleQuit');
-      });
+  // Handle back navigation
+  const handleBack = () => {
+    logger.info('User navigating back to landing page');
+    logUserAction('user_selection_back');
+    logNavigation('UserSelectionPage', 'LandingPage', { reason: 'user_back' });
+    void navigate('/');
   };
 
   return (
@@ -110,34 +103,74 @@ function UserSelectionPage() {
         display: 'flex',
         flexDirection: 'column',
       }}>
-        {/* Navigation buttons - positioned absolutely */}
+        {/* Back button - positioned absolutely */}
         <div
           style={{
             position: 'absolute',
-            top: theme.spacing.lg,
-            right: theme.spacing.lg,
+            top: '20px',
+            left: '20px',
             zIndex: 10,
           }}
         >
           <button
             type="button"
-            onClick={handleQuit}
+            onClick={handleBack}
             style={{
-              padding: '8px 16px',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: '#FF3130',
-              backgroundColor: 'transparent',
-              border: '1px solid #FF3130',
-              borderRadius: '8px',
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '0 28px',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              borderRadius: '28px',
               cursor: 'pointer',
               transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              position: 'relative',
+              overflow: 'hidden',
+              backdropFilter: 'blur(8px)',
+            }}
+            onTouchStart={(e) => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+            }}
+            onTouchEnd={(e) => {
+              setTimeout(() => {
+                if (e.currentTarget) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                }
+              }, 150);
             }}
           >
-            Beenden
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#374151"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M19 12H5"/>
+              <path d="M12 19l-7-7 7-7"/>
+            </svg>
+            <span
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#374151',
+              }}
+            >
+              Zurück
+            </span>
           </button>
         </div>
 
@@ -156,16 +189,50 @@ function UserSelectionPage() {
       {error && (
         <div
           style={{
-            backgroundColor: '#FEE2E2',
-            color: '#DC2626',
-            padding: theme.spacing.md,
-            borderRadius: theme.borders.radius.md,
-            marginBottom: theme.spacing.lg,
-            textAlign: 'center',
-            fontSize: '16px',
+            background: 'linear-gradient(to right, #EF4444, #DC2626)',
+            borderRadius: '16px',
+            padding: '3px',
+            marginBottom: '24px',
+            animation: 'modalPop 300ms ease-out',
           }}
         >
-          {error}
+          <div
+            style={{
+              backgroundColor: '#FEF2F2',
+              borderRadius: '13px',
+              padding: '20px',
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                width: '48px',
+                height: '48px',
+                backgroundColor: '#FEE2E2',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 12px',
+              }}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="15" y1="9" x2="9" y2="15"/>
+                <line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+            </div>
+            <p
+              style={{
+                color: '#DC2626',
+                fontSize: '16px',
+                fontWeight: 600,
+                margin: 0,
+              }}
+            >
+              {error}
+            </p>
+          </div>
         </div>
       )}
 
@@ -173,21 +240,51 @@ function UserSelectionPage() {
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             justifyContent: 'center',
             alignItems: 'center',
             minHeight: '400px',
+            gap: '20px',
           }}
         >
           <div
             style={{
-              width: '48px',
-              height: '48px',
-              border: '3px solid #E5E7EB',
-              borderTopColor: '#14B8A6',
-              borderRadius: '50%',
-              animation: 'spin 1s linear infinite',
+              background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
+              borderRadius: '20px',
+              padding: '3px',
             }}
-          />
+          >
+            <div
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: '17px',
+                padding: '32px',
+                textAlign: 'center',
+              }}
+            >
+              <div
+                style={{
+                  width: '60px',
+                  height: '60px',
+                  border: '4px solid #E5E7EB',
+                  borderTopColor: '#5080D8',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                  margin: '0 auto 16px',
+                }}
+              />
+              <p
+                style={{
+                  fontSize: '18px',
+                  color: '#6B7280',
+                  fontWeight: 600,
+                  margin: 0,
+                }}
+              >
+                Benutzer werden geladen...
+              </p>
+            </div>
+          </div>
         </div>
       ) : (
         <>
@@ -204,118 +301,111 @@ function UserSelectionPage() {
           >
             {paginatedUsers.map((user) => {
               return (
-                <button
+                <div
                   key={user.id}
-                  onClick={() => handleUserSelect(user.name, user.id)}
                   style={{
-                    height: '160px',
-                    padding: '16px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderRadius: '12px',
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: '#1F2937',
+                    background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+                    borderRadius: '20px',
+                    padding: '3px',
                     cursor: 'pointer',
                     transition: 'all 200ms',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    textAlign: 'center',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05)',
-                    WebkitTapHighlightColor: 'transparent',
-                    outline: 'none',
-                    position: 'relative',
-                    overflow: 'hidden',
-                    minWidth: '0',
-                    gap: '12px',
+                    boxShadow: '0 8px 25px rgba(80, 128, 216, 0.15)',
                   }}
                   onTouchStart={(e) => {
-                    // Visual feedback for touch
                     e.currentTarget.style.transform = 'scale(0.95)';
-                    e.currentTarget.style.backgroundColor = '#F0FDFA';
-                    e.currentTarget.style.boxShadow = '0 2px 4px -1px rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.03)';
+                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(80, 128, 216, 0.25)';
                   }}
                   onTouchEnd={(e) => {
-                    // Reset visual feedback
                     setTimeout(() => {
                       if (e.currentTarget) {
                         e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.backgroundColor = '#FFFFFF';
-                        e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05)';
+                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(80, 128, 216, 0.15)';
                       }
                     }, 150);
                   }}
                 >
-                  {/* Gradient border wrapper */}
-                  <div
+                  <button
+                    onClick={() => handleUserSelect(user.name, user.id)}
                     style={{
-                      position: 'absolute',
-                      inset: 0,
-                      borderRadius: '12px',
-                      background: 'linear-gradient(to right, #14B8A6, #3B82F6)',
-                      zIndex: 0,
-                    }}
-                  />
-                  
-                  {/* Inner content wrapper for border effect */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: '2px',
-                      borderRadius: '10px',
-                      background: 'linear-gradient(to bottom, #FFFFFF, #FAFAFA)',
-                      zIndex: 1,
-                    }}
-                  />
-                  
-                  {/* User Icon */}
-                  <div
-                    style={{
-                      width: '48px',
-                      height: '48px',
-                      background: 'linear-gradient(to right, #14B8A6, #3B82F6)',
-                      borderRadius: '50%',
+                      width: '100%',
+                      height: '160px',
+                      backgroundColor: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '17px',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
                       display: 'flex',
+                      flexDirection: 'column',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                      position: 'relative',
-                      zIndex: 2,
+                      gap: '16px',
+                      background: 'linear-gradient(to bottom, #FFFFFF, #F8FAFC)',
+                      backdropFilter: 'blur(8px)',
                     }}
                   >
-                    <svg
-                      width="28"
-                      height="28"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#FFFFFF"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+                    {/* User Icon with modern glass effect */}
+                    <div
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}
                     >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  </div>
-                  
-                  {/* User Name */}
-                  <span
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      lineHeight: '1.2',
-                      maxWidth: '100%',
-                      wordBreak: 'break-word',
-                      color: '#1F2937',
-                      position: 'relative',
-                      zIndex: 2,
-                    }}
-                  >
-                    {user.name}
-                  </span>
-                </button>
+                      {/* Glass shine effect */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '-50%',
+                          left: '-50%',
+                          width: '200%',
+                          height: '200%',
+                          background: 'linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%)',
+                          animation: 'shine 2s ease-in-out infinite',
+                        }}
+                      />
+                      <svg
+                        width="36"
+                        height="36"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#FFFFFF"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ position: 'relative', zIndex: 1 }}
+                      >
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+                    
+                    {/* User Name with gradient text */}
+                    <span
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        lineHeight: '1.2',
+                        maxWidth: '100%',
+                        wordBreak: 'break-word',
+                        textAlign: 'center',
+                        background: 'linear-gradient(135deg, #1F2937, #374151)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                      }}
+                    >
+                      {user.name}
+                    </span>
+                  </button>
+                </div>
               );
             })}
             
@@ -327,7 +417,7 @@ function UserSelectionPage() {
                   height: '160px',
                   backgroundColor: '#FAFAFA',
                   border: '2px dashed #E5E7EB',
-                  borderRadius: '12px',
+                  borderRadius: '20px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -450,6 +540,32 @@ function UserSelectionPage() {
           @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
+          }
+          
+          @keyframes shine {
+            0% {
+              transform: translateX(-100%) translateY(-100%) rotate(45deg);
+            }
+            50% {
+              transform: translateX(0%) translateY(0%) rotate(45deg);
+            }
+            100% {
+              transform: translateX(100%) translateY(100%) rotate(45deg);
+            }
+          }
+          
+          @keyframes modalPop {
+            0% {
+              transform: scale(0.8);
+              opacity: 0;
+            }
+            50% {
+              transform: scale(1.05);
+            }
+            100% {
+              transform: scale(1);
+              opacity: 1;
+            }
           }
         `}
       </style>

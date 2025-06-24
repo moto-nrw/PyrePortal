@@ -45,29 +45,59 @@ function LandingPage() {
           type="button"
           onClick={handleQuit}
           style={{
-            padding: '8px 16px',
-            fontSize: '14px',
-            fontWeight: 500,
-            color: '#FF3130',
-            backgroundColor: 'transparent',
-            border: '1px solid #FF3130',
-            borderRadius: '8px',
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            padding: '0 28px',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            border: '1px solid rgba(255, 49, 48, 0.2)',
+            borderRadius: '28px',
             cursor: 'pointer',
             transition: 'all 200ms',
             outline: 'none',
             WebkitTapHighlightColor: 'transparent',
-            boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            backdropFilter: 'blur(8px)',
           }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.backgroundColor = '#FF313010';
-            e.currentTarget.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1)';
+          onTouchStart={(e) => {
+            e.currentTarget.style.transform = 'scale(0.95)';
+            e.currentTarget.style.backgroundColor = 'rgba(255, 49, 48, 0.1)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
           }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.boxShadow = '0 1px 2px 0 rgba(0, 0, 0, 0.05)';
+          onTouchEnd={(e) => {
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              }
+            }, 150);
           }}
         >
-          Beenden
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#FF3130"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M18 6L6 18"/>
+            <path d="M6 6l12 12"/>
+          </svg>
+          <span
+            style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#FF3130',
+            }}
+          >
+            Beenden
+          </span>
         </button>
       </div>
 
@@ -119,7 +149,7 @@ function LandingPage() {
             lineHeight: 1.2,
           }}
         >
-          Willkommen bei moto
+          Willkommen bei moto!
         </h1>
 
         {/* Login Button */}
