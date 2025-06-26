@@ -123,13 +123,7 @@ export const useRfidScanning = () => {
         },
       };
 
-      // Show immediate visual feedback with "Processing..." message
-      setScanResult({
-        student_name: 'Processing...',
-        student_id: 0,
-        action: 'checked_in',
-        message: 'Reading card...',
-      } as RfidScanResult);
+      // Show immediate visual feedback
       addOptimisticScan(optimisticScan);
       showScanModal();
       logger.info('Showed immediate optimistic feedback for scan');
