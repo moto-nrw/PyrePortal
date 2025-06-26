@@ -14,7 +14,7 @@ fn main() {
     use std::{thread, time::Duration};
 
     // Configuration constants
-    const ANTENNA_GAIN: RxGain = RxGain::DB43; // Reduced from DB48 for better NTAG216 stability
+    const ANTENNA_GAIN: RxGain = RxGain::DB48; // Maximum gain
     const SCAN_INTERVAL_MS: u64 = 20; // Reduced from 50ms for faster scanning
     const RETRY_DELAY_MS: u64 = 5; // Delay before retry on IncompleteFrame
 
