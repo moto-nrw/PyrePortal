@@ -1,77 +1,36 @@
-use linux_embedded_hal::{
-    spidev::{SpiModeFlags, SpidevOptions},
-    Spidev,
-};
-use mfrc522::{comm::eh02::spi::SpiInterface, Mfrc522, RxGain};
-use rppal::gpio::Gpio;
-use std::{thread, time::{Duration, Instant}};
-
+#[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
 fn main() {
+    println!("This test can only run on Raspberry Pi (ARM Linux)");
+    println!("Please run on your Raspberry Pi with:");
+    println!("  cd src-tauri && ./test_rfid_persistent.sh");
+}
+
+#[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
+fn main() {
+    use linux_embedded_hal::{
+        spidev::{SpiModeFlags, SpidevOptions},
+        Spidev,
+    };
+    use mfrc522::{comm::eh02::spi::SpiInterface, Mfrc522, RxGain};
+    use rppal::gpio::Gpio;
+    use std::{thread, time::Duration};
+
     println!("\n=== RFID Persistent Hardware Test ===");
     println!("Hardware initialized ONCE, then continuous scanning");
     println!("Press Ctrl+C to stop\n");
 
     // Initialize hardware ONCE
-    match initialize_hardware() {
-        Ok(mut mfrc522) => {
-            println!("✅ Hardware initialized successfully!\n");
-            println!("Starting continuous scanning...\n");
-            
-            let mut scan_count = 0;
-            let mut success_count = 0;
-            let mut last_tag = String::new();
-            
-            // Continuous scanning loop
-            loop {
-                scan_count += 1;
-                
-                match scan_card(&mut mfrc522) {
-                    Ok(tag_id) => {
-                        success_count += 1;
-                        
-                        // Only print if different tag or first scan
-                        if tag_id != last_tag {
-                            println!("\n✅ TAG DETECTED: {}", tag_id);
-                            println!("   UID Length: {} bytes", tag_id.split(':').count());
-                            println!("   Success rate: {:.1}% ({}/{})", 
-                                     (success_count as f32 / scan_count as f32) * 100.0,
-                                     success_count, scan_count);
-                            last_tag = tag_id;
-                        }
-                        
-                        // Small delay to avoid duplicate reads
-                        thread::sleep(Duration::from_millis(200));
-                    }
-                    Err(e) => {
-                        if !e.contains("No card") {
-                            println!("❌ ERROR: {}", e);
-                        }
-                        // Print stats every 10 failed attempts
-                        if scan_count % 10 == 0 {
-                            println!("   Stats: {}/{} successful scans ({:.1}%)", 
-                                     success_count, scan_count,
-                                     (success_count as f32 / scan_count as f32) * 100.0);
-                        }
-                    }
-                }
-                
-                // Small delay between scan attempts
-                thread::sleep(Duration::from_millis(50));
-            }
-        }
-        Err(e) => {
-            println!("❌ Failed to initialize hardware: {}", e);
-        }
-    }
-}
-
-fn initialize_hardware() -> Result<Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>, String> {
     println!("🔧 One-time hardware initialization...");
     
     // Initialize SPI
     println!("  📡 Opening SPI device /dev/spidev0.0");
-    let mut spi = Spidev::open("/dev/spidev0.0")
-        .map_err(|e| format!("Failed to open SPI: {:?}", e))?;
+    let mut spi = match Spidev::open("/dev/spidev0.0") {
+        Ok(s) => s,
+        Err(e) => {
+            println!("❌ Failed to open SPI: {:?}", e);
+            return;
+        }
+    };
     
     // Configure SPI
     println!("  ⚙️  Configuring SPI: 1MHz, 8-bit, MODE_0");
@@ -81,17 +40,28 @@ fn initialize_hardware() -> Result<Mfrc522<SpiInterface<Spidev>, mfrc522::Initia
         .mode(SpiModeFlags::SPI_MODE_0)
         .build();
     
-    spi.configure(&options)
-        .map_err(|e| format!("Failed to configure SPI: {:?}", e))?;
+    if let Err(e) = spi.configure(&options) {
+        println!("❌ Failed to configure SPI: {:?}", e);
+        return;
+    }
     
     // Setup GPIO
     println!("  🔌 Initializing GPIO");
-    let gpio = Gpio::new()
-        .map_err(|e| format!("Failed to init GPIO: {:?}", e))?;
+    let gpio = match Gpio::new() {
+        Ok(g) => g,
+        Err(e) => {
+            println!("❌ Failed to init GPIO: {:?}", e);
+            return;
+        }
+    };
     
-    let mut reset_pin = gpio.get(22)
-        .map_err(|e| format!("Failed to get GPIO 22: {:?}", e))?
-        .into_output();
+    let mut reset_pin = match gpio.get(22) {
+        Ok(pin) => pin.into_output(),
+        Err(e) => {
+            println!("❌ Failed to get GPIO 22: {:?}", e);
+            return;
+        }
+    };
     
     // Hardware reset
     println!("  🔄 Performing hardware reset");
@@ -105,8 +75,13 @@ fn initialize_hardware() -> Result<Mfrc522<SpiInterface<Spidev>, mfrc522::Initia
     println!("  📟 Initializing MFRC522");
     let spi_interface = SpiInterface::new(spi);
     let mfrc522 = Mfrc522::new(spi_interface);
-    let mut mfrc522 = mfrc522.init()
-        .map_err(|e| format!("Failed to init MFRC522: {:?}", e))?;
+    let mut mfrc522 = match mfrc522.init() {
+        Ok(m) => m,
+        Err(e) => {
+            println!("❌ Failed to init MFRC522: {:?}", e);
+            return;
+        }
+    };
     
     // Read version
     match mfrc522.version() {
@@ -125,32 +100,61 @@ fn initialize_hardware() -> Result<Mfrc522<SpiInterface<Spidev>, mfrc522::Initia
     thread::sleep(Duration::from_millis(100));
     
     println!("  ✅ Hardware ready!\n");
-    Ok(mfrc522)
-}
-
-fn scan_card(mfrc522: &mut Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>) -> Result<String, String> {
-    // Quick scan - no timeout, just try once
+    println!("Starting continuous scanning...\n");
     
-    // Try WUPA for better NTAG compatibility
-    if let Ok(atqa) = mfrc522.wupa() {
-        // Card detected, try to read UID
-        match mfrc522.select(&atqa) {
-            Ok(uid) => {
-                let uid_bytes = uid.as_bytes();
-                let uid_hex: Vec<String> = 
-                    uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
-                
-                // Halt the card
-                let _ = mfrc522.hlta();
-                
-                return Ok(uid_hex.join(":"));
+    let mut scan_count = 0;
+    let mut success_count = 0;
+    let mut last_tag = String::new();
+    
+    // Continuous scanning loop
+    loop {
+        scan_count += 1;
+        
+        // Try WUPA for better NTAG compatibility
+        if let Ok(atqa) = mfrc522.wupa() {
+            // Card detected, try to read UID
+            match mfrc522.select(&atqa) {
+                Ok(uid) => {
+                    success_count += 1;
+                    
+                    let uid_bytes = uid.as_bytes();
+                    let uid_hex: Vec<String> = 
+                        uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
+                    let tag_id = uid_hex.join(":");
+                    
+                    // Only print if different tag or first scan
+                    if tag_id != last_tag {
+                        println!("\n✅ TAG DETECTED: {}", tag_id);
+                        println!("   UID Length: {} bytes", uid_hex.len());
+                        println!("   Success rate: {:.1}% ({}/{})", 
+                                 (success_count as f32 / scan_count as f32) * 100.0,
+                                 success_count, scan_count);
+                        last_tag = tag_id;
+                    }
+                    
+                    // Halt the card
+                    let _ = mfrc522.hlta();
+                    
+                    // Small delay to avoid duplicate reads
+                    thread::sleep(Duration::from_millis(200));
+                }
+                Err(_) => {
+                    // Selection failed
+                    println!("❌ Card detected but selection failed");
+                    let _ = mfrc522.hlta();
+                }
             }
-            Err(_) => {
-                // Selection failed
-                return Err("Card detected but selection failed".to_string());
+        } else {
+            // No card detected
+            // Print stats every 10 failed attempts
+            if scan_count % 10 == 0 {
+                println!("   Stats: {}/{} successful scans ({:.1}%)", 
+                         success_count, scan_count,
+                         (success_count as f32 / scan_count as f32) * 100.0);
             }
         }
+        
+        // Small delay between scan attempts
+        thread::sleep(Duration::from_millis(50));
     }
-    
-    Err("No card detected".to_string())
 }
