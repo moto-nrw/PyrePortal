@@ -444,24 +444,34 @@ mod raspberry_pi {
                 return Err("Scan timeout - no card detected".to_string());
             }
 
-            // Request card - WUPA works better for NTAG
-            if let Ok(atqa) = mfrc522.wupa() {
+            // Try both WUPA and REQA for maximum compatibility
+            let atqa_result = mfrc522.wupa().or_else(|_| mfrc522.reqa());
+            
+            if let Ok(atqa) = atqa_result {
                 // Select card
-                if let Ok(uid) = mfrc522.select(&atqa) {
-                    // Convert UID bytes to hex string
-                    let uid_bytes = uid.as_bytes();
-                    let uid_hex: Vec<String> =
-                        uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
+                match mfrc522.select(&atqa) {
+                    Ok(uid) => {
+                        // Convert UID bytes to hex string
+                        let uid_bytes = uid.as_bytes();
+                        let uid_hex: Vec<String> =
+                            uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
 
-                    // Go back to idle state
-                    let _ = mfrc522.hlta();
+                        // Go back to idle state
+                        let _ = mfrc522.hlta();
 
-                    return Ok(uid_hex.join(":"));
+                        return Ok(uid_hex.join(":"));
+                    }
+                    Err(_) => {
+                        // Select failed, ensure card is halted before retry
+                        let _ = mfrc522.hlta();
+                        // Give the card time to reset
+                        thread::sleep(Duration::from_millis(50));
+                    }
                 }
+            } else {
+                // No card detected, use shorter sleep
+                thread::sleep(Duration::from_millis(20));
             }
-
-            // Sleep a bit before next check (optimized for maximum responsiveness)
-            thread::sleep(Duration::from_millis(10)); // Fast polling for instant detection
         }
     }
 
