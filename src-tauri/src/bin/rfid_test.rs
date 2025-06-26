@@ -197,7 +197,7 @@ fn scan_rfid_hardware_single() -> Result<String, String> {
         // Request card
         match mfrc522.reqa() {
             Ok(atqa) => {
-                println!("  [SCAN] 📡 Card detected! ATQA: {:?}", atqa);
+                println!("  [SCAN] 📡 Card detected!");
                 
                 // Select card
                 match mfrc522.select(&atqa) {
