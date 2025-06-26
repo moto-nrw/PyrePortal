@@ -99,31 +99,43 @@ fn main() {
                     let error_str = format!("{:?}", e);
                     if error_str.contains("IncompleteFrame") {
                         incomplete_frames += 1;
-                        println!("[{}] ⚠️  IncompleteFrame - retrying...", scan_num);
+                        println!("[{}] ⚠️  IncompleteFrame - retrying up to 5 times...", scan_num);
                         
-                        // Short delay before retry
-                        thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+                        // Try up to 5 retries
+                        let mut retry_count = 0;
+                        let mut retry_success = false;
                         
-                        // Retry select without new WUPA
-                        match mfrc522.select(&atqa) {
-                            Ok(uid) => {
-                                successes += 1;
-                                let uid_bytes = uid.as_bytes();
-                                let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
-                                let uid_len = uid_bytes.len();
-                                println!("[{}] ✅ RETRY SUCCESS: {} ({} bytes)", scan_num, uid_hex.join(":"), uid_len);
-                                if uid_len == 4 {
-                                    println!("     → 4-byte UID (your RC522 card)");
-                                } else if uid_len == 7 {
-                                    println!("     → 7-byte UID (your NTAG216 wristband)");
+                        while retry_count < 5 && !retry_success {
+                            // Delay between retries
+                            thread::sleep(Duration::from_millis(10));
+                            retry_count += 1;
+                            
+                            match mfrc522.select(&atqa) {
+                                Ok(uid) => {
+                                    successes += 1;
+                                    retry_success = true;
+                                    let uid_bytes = uid.as_bytes();
+                                    let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
+                                    let uid_len = uid_bytes.len();
+                                    println!("[{}] ✅ RETRY {} SUCCESS: {} ({} bytes)", scan_num, retry_count, uid_hex.join(":"), uid_len);
+                                    if uid_len == 4 {
+                                        println!("     → 4-byte UID (your RC522 card)");
+                                    } else if uid_len == 7 {
+                                        println!("     → 7-byte UID (your NTAG216 wristband)");
+                                    }
+                                    let _ = mfrc522.hlta();
+                                    thread::sleep(Duration::from_millis(500));
                                 }
-                                let _ = mfrc522.hlta();
-                                thread::sleep(Duration::from_millis(500));
+                                Err(e) => {
+                                    if retry_count == 5 {
+                                        println!("[{}] ❌ All 5 retries failed. Last error: {:?}", scan_num, e);
+                                    }
+                                }
                             }
-                            Err(e) => {
-                                println!("[{}] ❌ Retry also failed: {:?}", scan_num, e);
-                                let _ = mfrc522.hlta();
-                            }
+                        }
+                        
+                        if !retry_success {
+                            let _ = mfrc522.hlta();
                         }
                     } else {
                         println!("[{}] ❌ Select failed: {:?}", scan_num, e);
