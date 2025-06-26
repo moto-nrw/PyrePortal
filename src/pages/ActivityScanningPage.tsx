@@ -116,21 +116,27 @@ const ActivityScanningPage: React.FC = () => {
         currentCount: studentCount
       });
 
-      if (currentScan.action === 'checked_in') {
-        setStudentCount(prev => prev + 1);
-      } else if (currentScan.action === 'checked_out') {
-        setStudentCount(prev => Math.max(0, prev - 1));
-      } else if (currentScan.action === 'transferred') {
-        // For transfers, check if student is coming to or leaving our room
-        const currentRoomName = selectedRoom?.name;
-        if (currentScan.room_name === currentRoomName) {
-          // Student transferred TO our room from another room
+      // Only update count for successful actions (not errors or info states)
+      const isError = Boolean((currentScan as { showAsError?: boolean }).showAsError);
+      const isInfo = Boolean((currentScan as { isInfo?: boolean }).isInfo);
+      
+      if (!isError && !isInfo) {
+        if (currentScan.action === 'checked_in') {
           setStudentCount(prev => prev + 1);
-        } else if (currentScan.previous_room === currentRoomName) {
-          // Student transferred FROM our room to another room
+        } else if (currentScan.action === 'checked_out') {
           setStudentCount(prev => Math.max(0, prev - 1));
+        } else if (currentScan.action === 'transferred') {
+          // For transfers, check if student is coming to or leaving our room
+          const currentRoomName = selectedRoom?.name;
+          if (currentScan.room_name === currentRoomName) {
+            // Student transferred TO our room from another room
+            setStudentCount(prev => prev + 1);
+          } else if (currentScan.previous_room === currentRoomName) {
+            // Student transferred FROM our room to another room
+            setStudentCount(prev => Math.max(0, prev - 1));
+          }
+          // If neither matches, don't change count (shouldn't happen)
         }
-        // If neither matches, don't change count (shouldn't happen)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -501,9 +507,15 @@ const ActivityScanningPage: React.FC = () => {
         >
           <div
             style={{
-              backgroundColor: currentScan.action === 'checked_in' || currentScan.action === 'transferred'
-                ? '#83cd2d'
-                : '#f87C10',
+              backgroundColor: (() => {
+                // Check for error or info states
+                if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
+                if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
+                // Original logic for success states
+                return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
+                  ? '#83cd2d'
+                  : '#f87C10';
+              })(),
               borderRadius: '32px',
               padding: '64px',
               maxWidth: '700px',
@@ -544,17 +556,39 @@ const ActivityScanningPage: React.FC = () => {
                 zIndex: 2,
               }}
             >
-              {currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-              ) : (
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-              )}
+              {(() => {
+                // Error state - X icon
+                if ((currentScan as { showAsError?: boolean }).showAsError) {
+                  return (
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  );
+                }
+                // Info state - Info icon
+                if ((currentScan as { isInfo?: boolean }).isInfo) {
+                  return (
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" x2="12" y2="12"></line>
+                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                  );
+                }
+                // Success states
+                return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
+                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                ) : (
+                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                );
+              })()}
             </div>
 
             <h2
@@ -568,10 +602,20 @@ const ActivityScanningPage: React.FC = () => {
                 zIndex: 2,
               }}
             >
-              {currentScan.message ??
-                (currentScan.action === 'checked_in'
+              {(() => {
+                // Show custom message if available
+                if (currentScan.message) return currentScan.message;
+                
+                // Error/Info states use student_name as the title
+                if ((currentScan as { showAsError?: boolean }).showAsError || (currentScan as { isInfo?: boolean }).isInfo) {
+                  return currentScan.student_name;
+                }
+                
+                // Normal greeting
+                return currentScan.action === 'checked_in'
                   ? `Hallo, ${currentScan.student_name}!`
-                  : `Tschüss, ${currentScan.student_name}!`)}
+                  : `Tschüss, ${currentScan.student_name}!`;
+              })()}
             </h2>
 
             <div

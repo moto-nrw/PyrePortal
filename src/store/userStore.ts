@@ -93,6 +93,13 @@ interface StudentActionHistory {
   isProcessing: boolean;
 }
 
+// Recent tag scan tracking
+interface RecentTagScan {
+  timestamp: number;
+  studentId?: string;
+  result?: RfidScanResult;
+}
+
 // RFID scanning state
 interface RfidState {
   isScanning: boolean;
@@ -106,6 +113,10 @@ interface RfidState {
   optimisticScans: OptimisticScanState[];
   studentHistory: Map<string, StudentActionHistory>;
   processingQueue: Set<string>; // Currently processing tag IDs
+  
+  // New additions for proper duplicate prevention
+  recentTagScans: Map<string, RecentTagScan>; // Track recent scans by tagId
+  tagToStudentMap: Map<string, string>; // Cache tagId -> studentId mappings
 }
 
 // Define the store state interface
@@ -178,6 +189,14 @@ interface UserState {
   isValidScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
   addToProcessingQueue: (tagId: string) => void;
   removeFromProcessingQueue: (tagId: string) => void;
+  
+  // Enhanced duplicate prevention actions
+  canProcessTag: (tagId: string) => boolean;
+  recordTagScan: (tagId: string, scan: RecentTagScan) => void;
+  mapTagToStudent: (tagId: string, studentId: string) => void;
+  getCachedStudentId: (tagId: string) => string | undefined;
+  clearOldTagScans: () => void;
+  isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
 }
 
 // Define the type for the Zustand set function
@@ -234,6 +253,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     optimisticScans: [],
     studentHistory: new Map<string, StudentActionHistory>(),
     processingQueue: new Set<string>(),
+    
+    // New duplicate prevention state
+    recentTagScans: new Map<string, RecentTagScan>(),
+    tagToStudentMap: new Map<string, string>(),
   },
 
   // Actions
@@ -982,6 +1005,92 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         rfid: { ...state.rfid, processingQueue: newQueue },
       };
     });
+  },
+
+  // Enhanced duplicate prevention functions
+  canProcessTag: (tagId: string) => {
+    const { rfid } = get();
+    
+    // Layer 1: Check if tag is currently being processed
+    if (rfid.processingQueue.has(tagId)) {
+      return false;
+    }
+    
+    // Layer 2: Check recent tag scans (within 2 seconds)
+    const recentScan = rfid.recentTagScans.get(tagId);
+    if (recentScan && Date.now() - recentScan.timestamp < 2000) {
+      return false;
+    }
+    
+    // Layer 3: If we know the studentId, check student history
+    const studentId = rfid.tagToStudentMap.get(tagId);
+    if (studentId) {
+      return get().isValidStudentScan(studentId, 'checkin');
+    }
+    
+    return true;
+  },
+
+  recordTagScan: (tagId: string, scan: RecentTagScan) => {
+    set(state => {
+      const newScans = new Map(state.rfid.recentTagScans);
+      newScans.set(tagId, scan);
+      return {
+        rfid: { ...state.rfid, recentTagScans: newScans },
+      };
+    });
+  },
+
+  mapTagToStudent: (tagId: string, studentId: string) => {
+    set(state => {
+      const newMap = new Map(state.rfid.tagToStudentMap);
+      newMap.set(tagId, studentId);
+      return {
+        rfid: { ...state.rfid, tagToStudentMap: newMap },
+      };
+    });
+  },
+
+  getCachedStudentId: (tagId: string) => {
+    const { rfid } = get();
+    return rfid.tagToStudentMap.get(tagId);
+  },
+
+  clearOldTagScans: () => {
+    set(state => {
+      const now = Date.now();
+      const newScans = new Map<string, RecentTagScan>();
+      
+      // Keep only scans from last 2 seconds
+      state.rfid.recentTagScans.forEach((scan, tagId) => {
+        if (now - scan.timestamp < 2000) {
+          newScans.set(tagId, scan);
+        }
+      });
+      
+      return {
+        rfid: { ...state.rfid, recentTagScans: newScans },
+      };
+    });
+  },
+
+  // Rename isValidScan to isValidStudentScan for clarity
+  isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => {
+    const { rfid } = get();
+    const history = rfid.studentHistory.get(studentId);
+    
+    // Allow if no previous action
+    if (!history) return true;
+    
+    // Allow same action (idempotent)
+    if (history.lastAction === action) return true;
+    
+    // Block opposite action only if recent (10s) and still processing
+    if (history.isProcessing && Date.now() - history.timestamp < 10000) {
+      return false;
+    }
+    
+    return true;
   },
 });
 

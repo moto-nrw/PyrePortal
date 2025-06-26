@@ -1,9 +1,26 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 import { api } from '../services/api';
+import type { RfidScanResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
+
+// Extended type for error and info states
+interface ExtendedRfidScanResult {
+  student_name: string;
+  student_id: number;
+  action: 'checked_in' | 'checked_out' | 'transferred' | 'already_in' | 'error';
+  message?: string;
+  isInfo?: boolean;
+  showAsError?: boolean;
+  greeting?: string;
+  visit_id?: number;
+  room_name?: string;
+  previous_room?: string;
+  processed_at?: string;
+  status?: string;
+}
 
 // Tauri event listening
 let eventListener: (() => void) | null = null;
@@ -29,9 +46,13 @@ export const useRfidScanning = () => {
     updateOptimisticScan,
     removeOptimisticScan,
     updateStudentHistory,
-    isValidScan,
     addToProcessingQueue,
     removeFromProcessingQueue,
+    // Enhanced duplicate prevention
+    canProcessTag,
+    recordTagScan,
+    mapTagToStudent,
+    clearOldTagScans,
   } = useUserStore();
 
   const isInitializedRef = useRef<boolean>(false);
@@ -61,13 +82,29 @@ export const useRfidScanning = () => {
 
       logger.info(`Processing RFID scan for tag: ${tagId}`);
 
-      // Smart duplicate prevention - first check if we should process this scan
-      // Note: We'll get student ID from API response, so for now we use tagId as proxy
-      const assumedAction = 'checkin'; // Will be corrected by API response
-      if (!isValidScan(tagId, assumedAction)) {
-        logger.warn(`Scan blocked by smart duplicate prevention for tag: ${tagId}`);
+      // Enhanced duplicate prevention - check all layers
+      if (!canProcessTag(tagId)) {
+        logger.info(`Tag ${tagId} blocked by duplicate prevention`);
+        
+        // Check if we have a recent cached result to show
+        const recentScan = rfid.recentTagScans.get(tagId);
+        if (recentScan?.result && Date.now() - recentScan.timestamp < 2000) {
+          // Show the cached result instead of making a new API call
+          setScanResult(recentScan.result);
+          showScanModal();
+          setTimeout(() => {
+            hideScanModal();
+          }, rfid.modalDisplayTime);
+        } else {
+          // Just show a quick message that scan is processing
+          logger.debug('Scan already in progress, please wait');
+        }
         return;
       }
+      
+      // Add to processing queue immediately
+      addToProcessingQueue(tagId);
+      recordTagScan(tagId, { timestamp: Date.now() });
 
       // Generate unique ID for this scan
       const scanId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -116,9 +153,23 @@ export const useRfidScanning = () => {
         updateOptimisticScan(scanId, 'success');
         setScanResult(result);
         
-        // Update student history for smart duplicate prevention
+        // Update all tracking mechanisms
         if (result.student_id) {
-          updateStudentHistory(result.student_id.toString(), result.action === 'checked_in' ? 'checkin' : 'checkout');
+          const studentId = result.student_id.toString();
+          const action = result.action === 'checked_in' ? 'checkin' : 'checkout';
+          
+          // Map tag to student for future lookups
+          mapTagToStudent(tagId, studentId);
+          
+          // Update student history
+          updateStudentHistory(studentId, action);
+          
+          // Cache the scan result for 2 seconds
+          recordTagScan(tagId, {
+            timestamp: Date.now(),
+            studentId,
+            result,
+          });
         }
 
         // Update session activity to prevent timeout
@@ -138,17 +189,42 @@ export const useRfidScanning = () => {
       } catch (error) {
         logger.error('Failed to process RFID scan', { error });
         
-        // 4. ERROR HANDLING WITH ROLLBACK
-        updateOptimisticScan(scanId, 'failed');
-        
-        // Check if it's a duplicate request (treat as success)
+        // 4. ERROR HANDLING - Show real errors to users
         const errorMessage = error instanceof Error ? error.message : String(error);
+        
         if (errorMessage.includes('already has an active visit')) {
-          logger.info('Duplicate request detected - student already has active visit, treating as success');
-          updateOptimisticScan(scanId, 'success');
+          // This is an info state, not an error - student is already checked in
+          logger.info('Student already has active visit - showing info to user');
+          updateOptimisticScan(scanId, 'failed');
+          
+          // Show informative message (not success!)
+          const infoResult: ExtendedRfidScanResult = {
+            student_name: "Already Checked In",
+            student_id: 0,
+            action: 'already_in',
+            message: "This student is already checked into this room",
+            isInfo: true,
+          };
+          setScanResult(infoResult as RfidScanResult);
+          
+          // Don't update student count or history for info states!
+        } else {
+          // Real error
+          updateOptimisticScan(scanId, 'failed');
+          const errorResult: ExtendedRfidScanResult = {
+            student_name: "Scan Failed",
+            student_id: 0,
+            action: 'error',
+            message: errorMessage || 'Please try again',
+            showAsError: true,
+          };
+          setScanResult(errorResult as RfidScanResult);
         }
         
-        // Clean up after error display
+        // Show modal with error/info state
+        showScanModal();
+        
+        // Clean up after display
         setTimeout(() => {
           hideScanModal();
           removeOptimisticScan(scanId);
@@ -170,8 +246,11 @@ export const useRfidScanning = () => {
       updateStudentHistory,
       addToProcessingQueue,
       removeFromProcessingQueue,
-      isValidScan,
+      canProcessTag,
+      recordTagScan,
+      mapTagToStudent,
       rfid.modalDisplayTime,
+      rfid.recentTagScans,
     ]
   );
 
@@ -333,6 +412,17 @@ export const useRfidScanning = () => {
       void startScanning();
     }
   }, [rfid.showModal, rfid.isScanning, startScanning]);
+
+  // Cleanup old tag scans periodically
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      clearOldTagScans();
+    }, 2000); // Clean up every 2 seconds
+
+    return () => {
+      clearInterval(cleanupInterval);
+    };
+  }, [clearOldTagScans]);
 
   // Cleanup on unmount
   useEffect(() => {
