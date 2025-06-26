@@ -13,7 +13,12 @@ fn main() {
     use rppal::gpio::Gpio;
     use std::{thread, time::Duration};
 
-    println!("\n=== RFID Persistent Scanner ===");
+    // Configuration constants
+    const ANTENNA_GAIN: RxGain = RxGain::DB48; // Try DB43 if having issues
+    const SCAN_INTERVAL_MS: u64 = 20; // Reduced from 50ms for faster scanning
+    const RETRY_DELAY_MS: u64 = 5; // Delay before retry on IncompleteFrame
+
+    println!("\n=== RFID Persistent Scanner (Optimized for NTAG216) ===");
     println!("Initialize hardware ONCE, then scan forever\n");
 
     // Initialize hardware ONCE
@@ -48,25 +53,67 @@ fn main() {
         println!("✓ Version: 0x{:02X}", v);
     }
     
-    mfrc522.set_antenna_gain(RxGain::DB48).ok();
-    println!("✓ Antenna gain: 48dB\n");
+    // Set antenna gain
+    mfrc522.set_antenna_gain(ANTENNA_GAIN).ok();
+    println!("✓ Antenna gain: {:?}", ANTENNA_GAIN);
     
-    println!("Starting continuous scan...\n");
+    // Configure timer for NTAG compatibility
+    println!("⚙️  Configuring NTAG-specific timers...");
+    // TModeReg (0x2A) - TAuto=1, prescaler starts automatically
+    if let Err(e) = mfrc522.write_register(0x2A, 0x80) {
+        println!("  ⚠️  Failed to set TModeReg: {:?}", e);
+    }
+    // TPrescalerReg (0x2B) - Set prescaler
+    if let Err(e) = mfrc522.write_register(0x2B, 0xA9) {
+        println!("  ⚠️  Failed to set TPrescalerReg: {:?}", e);
+    }
+    // TReloadReg (0x2C-0x2D) - Timer reload value
+    if let Err(e) = mfrc522.write_register(0x2C, 0x03) {
+        println!("  ⚠️  Failed to set TReloadRegH: {:?}", e);
+    }
+    if let Err(e) = mfrc522.write_register(0x2D, 0xE8) {
+        println!("  ⚠️  Failed to set TReloadRegL: {:?}", e);
+    }
+    
+    // ModWidthReg (0x24) - Modulation width
+    if let Err(e) = mfrc522.write_register(0x24, 0x26) {
+        println!("  ⚠️  Failed to set ModWidthReg: {:?}", e);
+    } else {
+        println!("✓ NTAG-specific registers configured");
+    }
+    
+    println!("\nStarting continuous scan ({}ms interval)...\n", SCAN_INTERVAL_MS);
     
     // Scan forever
     let mut scan_num = 0;
+    let mut incomplete_frames = 0;
+    let mut successes = 0;
+    
     loop {
         scan_num += 1;
+        
+        // Clear collision bits before scan
+        let _ = mfrc522.clear_register_bit_mask(0x0D, 0x80);
         
         // Try WUPA
         if let Ok(atqa) = mfrc522.wupa() {
             println!("[{}] WUPA success!", scan_num);
             
+            // First select attempt
             match mfrc522.select(&atqa) {
                 Ok(uid) => {
+                    successes += 1;
                     let uid_bytes = uid.as_bytes();
                     let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
-                    println!("[{}] ✅ TAG: {}", scan_num, uid_hex.join(":"));
+                    let uid_len = uid_bytes.len();
+                    println!("[{}] ✅ TAG: {} ({} bytes)", scan_num, uid_hex.join(":"), uid_len);
+                    
+                    // Identify card type
+                    if uid_len == 4 {
+                        println!("     → Likely NTAG216 wristband");
+                    } else if uid_len == 7 {
+                        println!("     → Likely RC522/Classic card");
+                    }
                     
                     // ALWAYS halt the card
                     let _ = mfrc522.hlta();
@@ -74,6 +121,29 @@ fn main() {
                     
                     // Wait a bit for card to be removed
                     thread::sleep(Duration::from_millis(500));
+                }
+                Err(mfrc522::Error::IncompleteFrame) => {
+                    incomplete_frames += 1;
+                    println!("[{}] ⚠️  IncompleteFrame - retrying...", scan_num);
+                    
+                    // Short delay before retry
+                    thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+                    
+                    // Retry select without new WUPA
+                    match mfrc522.select(&atqa) {
+                        Ok(uid) => {
+                            successes += 1;
+                            let uid_bytes = uid.as_bytes();
+                            let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
+                            println!("[{}] ✅ RETRY SUCCESS: {}", scan_num, uid_hex.join(":"));
+                            let _ = mfrc522.hlta();
+                            thread::sleep(Duration::from_millis(500));
+                        }
+                        Err(e) => {
+                            println!("[{}] ❌ Retry also failed: {:?}", scan_num, e);
+                            let _ = mfrc522.hlta();
+                        }
+                    }
                 }
                 Err(e) => {
                     println!("[{}] ❌ Select failed: {:?}", scan_num, e);
@@ -84,10 +154,11 @@ fn main() {
         } else {
             // Only print every 10th scan to reduce noise
             if scan_num % 10 == 0 {
-                println!("[{}] No card", scan_num);
+                println!("[{}] No card (Success: {}, IncFrames: {})", 
+                         scan_num, successes, incomplete_frames);
             }
         }
         
-        thread::sleep(Duration::from_millis(50));
+        thread::sleep(Duration::from_millis(SCAN_INTERVAL_MS));
     }
 }
