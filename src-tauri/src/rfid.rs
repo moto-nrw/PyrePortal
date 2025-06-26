@@ -192,8 +192,8 @@ impl RfidBackgroundService {
                         println!("Emitted RFID scan event: {}", tag_id);
                     }
 
-                    // Short wait after successful scan to avoid duplicate reads
-                    tokio::time::sleep(Duration::from_millis(50)).await;
+                    // Minimal wait after successful scan - frontend handles duplicate prevention
+                    tokio::time::sleep(Duration::from_millis(30)).await;
                 }
                 Err(error) => {
                     // Only log and update state for non-timeout errors
@@ -351,10 +351,10 @@ mod raspberry_pi {
             }
         };
 
-        // SPI configuration - 4MHz for faster scanning
+        // SPI configuration - 1MHz for maximum detection range
         let options = SpidevOptions::new()
             .bits_per_word(8)
-            .max_speed_hz(4_000_000)  // 4x faster than before!
+            .max_speed_hz(1_000_000)  // 1MHz - best range, matches original Python implementation
             .mode(SpiModeFlags::SPI_MODE_0)
             .build();
 
@@ -455,8 +455,8 @@ mod raspberry_pi {
                 }
             }
 
-            // Sleep a bit before next check (optimized for responsiveness)
-            thread::sleep(Duration::from_millis(20)); // Faster polling for better UX
+            // Sleep a bit before next check (optimized for maximum responsiveness)
+            thread::sleep(Duration::from_millis(15)); // Even faster polling for instant detection
         }
     }
 
