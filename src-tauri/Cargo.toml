@@ -34,3 +34,7 @@ rppal = "0.14.1"
 embedded-hal = "0.2.7"
 linux-embedded-hal = "0.3.2"
 
+[[bin]]
+name = "rfid_test"
+path = "src/bin/rfid_test.rs"
+

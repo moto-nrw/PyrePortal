@@ -351,10 +351,10 @@ mod raspberry_pi {
             }
         };
 
-        // SPI configuration - match Python speed of 1MHz
+        // SPI configuration - 4MHz for faster scanning
         let options = SpidevOptions::new()
             .bits_per_word(8)
-            .max_speed_hz(1_000_000)
+            .max_speed_hz(4_000_000)  // 4x faster than before!
             .mode(SpiModeFlags::SPI_MODE_0)
             .build();
 
