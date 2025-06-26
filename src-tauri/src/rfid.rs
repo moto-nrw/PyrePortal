@@ -204,9 +204,7 @@ impl RfidBackgroundService {
                         }
                         println!("RFID scan error: {}", error);
                     }
-
-                    // Short delay before next attempt
-                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    // No additional delay needed - our adaptive polling in scan_rfid_hardware_with_timeout handles timing
                 }
             }
         }
@@ -215,7 +213,8 @@ impl RfidBackgroundService {
     async fn perform_platform_scan() -> Result<String, String> {
         #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
         {
-            raspberry_pi::scan_rfid_hardware().await
+            // Use longer timeout for continuous scanning - we'll return quickly when card is found
+            raspberry_pi::scan_rfid_hardware_continuous().await
         }
 
         #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
@@ -338,6 +337,12 @@ mod raspberry_pi {
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
         scan_rfid_hardware_with_timeout(Duration::from_secs(5)).await
     }
+    
+    // Optimized for continuous background scanning
+    pub async fn scan_rfid_hardware_continuous() -> Result<String, String> {
+        // Use a longer timeout but with adaptive polling for efficiency
+        scan_rfid_hardware_with_timeout(Duration::from_secs(30)).await
+    }
 
     async fn scan_rfid_hardware_with_timeout(timeout: Duration) -> Result<String, String> {
         // Ensure hardware is ready (but don't hold resources)
@@ -456,7 +461,7 @@ mod raspberry_pi {
             }
 
             // Sleep a bit before next check (optimized for maximum responsiveness)
-            thread::sleep(Duration::from_millis(15)); // Even faster polling for instant detection
+            thread::sleep(Duration::from_millis(10)); // Fast polling for instant detection
         }
     }
 
