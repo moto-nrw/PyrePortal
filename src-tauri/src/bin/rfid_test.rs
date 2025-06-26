@@ -97,8 +97,8 @@ fn scan_with_logging() -> Result<String, String> {
             return Err("Scan timeout - no card detected".to_string());
         }
         
-        // Try to detect card
-        if let Ok(_atqa) = mfrc522.reqa() {
+        // Try to detect card - WUPA works better for NTAG
+        if let Ok(_atqa) = mfrc522.wupa() {
             // Card detected, try to read UID
             if let Ok(uid) = mfrc522.select(&_atqa) {
                 let uid_bytes = uid.as_bytes();
