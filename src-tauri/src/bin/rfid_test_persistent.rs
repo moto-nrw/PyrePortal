@@ -57,31 +57,6 @@ fn main() {
     mfrc522.set_antenna_gain(ANTENNA_GAIN).ok();
     println!("✓ Antenna gain: {:?}", ANTENNA_GAIN);
     
-    // Configure timer for NTAG compatibility
-    println!("⚙️  Configuring NTAG-specific timers...");
-    // TModeReg (0x2A) - TAuto=1, prescaler starts automatically
-    if let Err(e) = mfrc522.write_register(0x2A, 0x80) {
-        println!("  ⚠️  Failed to set TModeReg: {:?}", e);
-    }
-    // TPrescalerReg (0x2B) - Set prescaler
-    if let Err(e) = mfrc522.write_register(0x2B, 0xA9) {
-        println!("  ⚠️  Failed to set TPrescalerReg: {:?}", e);
-    }
-    // TReloadReg (0x2C-0x2D) - Timer reload value
-    if let Err(e) = mfrc522.write_register(0x2C, 0x03) {
-        println!("  ⚠️  Failed to set TReloadRegH: {:?}", e);
-    }
-    if let Err(e) = mfrc522.write_register(0x2D, 0xE8) {
-        println!("  ⚠️  Failed to set TReloadRegL: {:?}", e);
-    }
-    
-    // ModWidthReg (0x24) - Modulation width
-    if let Err(e) = mfrc522.write_register(0x24, 0x26) {
-        println!("  ⚠️  Failed to set ModWidthReg: {:?}", e);
-    } else {
-        println!("✓ NTAG-specific registers configured");
-    }
-    
     println!("\nStarting continuous scan ({}ms interval)...\n", SCAN_INTERVAL_MS);
     
     // Scan forever
@@ -91,9 +66,6 @@ fn main() {
     
     loop {
         scan_num += 1;
-        
-        // Clear collision bits before scan
-        let _ = mfrc522.clear_register_bit_mask(0x0D, 0x80);
         
         // Try WUPA
         if let Ok(atqa) = mfrc522.wupa() {
@@ -122,33 +94,36 @@ fn main() {
                     // Wait a bit for card to be removed
                     thread::sleep(Duration::from_millis(500));
                 }
-                Err(mfrc522::Error::IncompleteFrame) => {
-                    incomplete_frames += 1;
-                    println!("[{}] ⚠️  IncompleteFrame - retrying...", scan_num);
-                    
-                    // Short delay before retry
-                    thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
-                    
-                    // Retry select without new WUPA
-                    match mfrc522.select(&atqa) {
-                        Ok(uid) => {
-                            successes += 1;
-                            let uid_bytes = uid.as_bytes();
-                            let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
-                            println!("[{}] ✅ RETRY SUCCESS: {}", scan_num, uid_hex.join(":"));
-                            let _ = mfrc522.hlta();
-                            thread::sleep(Duration::from_millis(500));
-                        }
-                        Err(e) => {
-                            println!("[{}] ❌ Retry also failed: {:?}", scan_num, e);
-                            let _ = mfrc522.hlta();
-                        }
-                    }
-                }
                 Err(e) => {
-                    println!("[{}] ❌ Select failed: {:?}", scan_num, e);
-                    // Still try to halt
-                    let _ = mfrc522.hlta();
+                    // Check if it's an IncompleteFrame error
+                    let error_str = format!("{:?}", e);
+                    if error_str.contains("IncompleteFrame") {
+                        incomplete_frames += 1;
+                        println!("[{}] ⚠️  IncompleteFrame - retrying...", scan_num);
+                        
+                        // Short delay before retry
+                        thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
+                        
+                        // Retry select without new WUPA
+                        match mfrc522.select(&atqa) {
+                            Ok(uid) => {
+                                successes += 1;
+                                let uid_bytes = uid.as_bytes();
+                                let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
+                                println!("[{}] ✅ RETRY SUCCESS: {}", scan_num, uid_hex.join(":"));
+                                let _ = mfrc522.hlta();
+                                thread::sleep(Duration::from_millis(500));
+                            }
+                            Err(e) => {
+                                println!("[{}] ❌ Retry also failed: {:?}", scan_num, e);
+                                let _ = mfrc522.hlta();
+                            }
+                        }
+                    } else {
+                        println!("[{}] ❌ Select failed: {:?}", scan_num, e);
+                        // Still try to halt
+                        let _ = mfrc522.hlta();
+                    }
                 }
             }
         } else {
