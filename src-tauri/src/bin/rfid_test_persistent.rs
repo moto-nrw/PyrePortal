@@ -80,11 +80,11 @@ fn main() {
                     let uid_len = uid_bytes.len();
                     println!("[{}] ✅ TAG: {} ({} bytes)", scan_num, uid_hex.join(":"), uid_len);
                     
-                    // Identify card type
+                    // Identify card type based on your actual hardware
                     if uid_len == 4 {
-                        println!("     → Likely NTAG216 wristband");
+                        println!("     → 4-byte UID (your RC522 card)");
                     } else if uid_len == 7 {
-                        println!("     → Likely RC522/Classic card");
+                        println!("     → 7-byte UID (your NTAG216 wristband)");
                     }
                     
                     // ALWAYS halt the card
@@ -110,7 +110,13 @@ fn main() {
                                 successes += 1;
                                 let uid_bytes = uid.as_bytes();
                                 let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
-                                println!("[{}] ✅ RETRY SUCCESS: {}", scan_num, uid_hex.join(":"));
+                                let uid_len = uid_bytes.len();
+                                println!("[{}] ✅ RETRY SUCCESS: {} ({} bytes)", scan_num, uid_hex.join(":"), uid_len);
+                                if uid_len == 4 {
+                                    println!("     → 4-byte UID (your RC522 card)");
+                                } else if uid_len == 7 {
+                                    println!("     → 7-byte UID (your NTAG216 wristband)");
+                                }
                                 let _ = mfrc522.hlta();
                                 thread::sleep(Duration::from_millis(500));
                             }
