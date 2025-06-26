@@ -193,7 +193,7 @@ impl RfidBackgroundService {
                     }
 
                     // Short wait after successful scan to avoid duplicate reads
-                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    tokio::time::sleep(Duration::from_millis(50)).await;
                 }
                 Err(error) => {
                     // Only log and update state for non-timeout errors
