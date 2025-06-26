@@ -444,8 +444,8 @@ mod raspberry_pi {
                 return Err("Scan timeout - no card detected".to_string());
             }
 
-            // Request card
-            if let Ok(atqa) = mfrc522.reqa() {
+            // Request card - WUPA works better for NTAG
+            if let Ok(atqa) = mfrc522.wupa() {
                 // Select card
                 if let Ok(uid) = mfrc522.select(&atqa) {
                     // Convert UID bytes to hex string
