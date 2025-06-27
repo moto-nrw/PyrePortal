@@ -341,12 +341,12 @@ mod raspberry_pi {
         spidev::{SpiModeFlags, SpidevOptions},
         Spidev,
     };
-    use mfrc522::{comm::eh02::spi::SpiInterface, Mfrc522, RxGain};
+    use mfrc522::{comm::eh02::spi::{SpiInterface, DummyNSS, DummyDelay}, Mfrc522, RxGain};
     use rppal::gpio::Gpio;
     use std::{error::Error, fmt, thread};
 
     // Type alias for the complete MFRC522 type with SpiInterface
-    type Mfrc522Scanner = Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>;
+    type Mfrc522Scanner = Mfrc522<SpiInterface<Spidev, DummyNSS, DummyDelay>, mfrc522::Initialized>;
     
     // Persistent scanner struct that holds the MFRC522 instance
     pub struct PersistentRfidScanner {
