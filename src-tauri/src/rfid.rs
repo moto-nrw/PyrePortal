@@ -345,12 +345,12 @@ mod raspberry_pi {
     use rppal::gpio::Gpio;
     use std::{error::Error, fmt, thread};
 
-    // Type alias for the SpiInterface with eh02 feature
-    type Spi = SpiInterface<Spidev>;
+    // Type alias for the complete MFRC522 type with SpiInterface
+    type Mfrc522Scanner = Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>;
     
     // Persistent scanner struct that holds the MFRC522 instance
     pub struct PersistentRfidScanner {
-        mfrc522: Mfrc522<Spi, mfrc522::Initialized>,
+        mfrc522: Mfrc522Scanner,
     }
 
     // Custom error type matching the original implementation
