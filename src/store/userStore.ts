@@ -447,6 +447,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           sessionRoom = {
             id: session.room_id,
             name: session.room_name,
+            is_occupied: true, // Current session room is always occupied
           };
         }
 

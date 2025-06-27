@@ -988,10 +988,12 @@ function RoomSelectionPage() {
                 }}
               >
                 {paginatedRooms.map((room) => {
+                  const isOccupied = room.is_occupied;
                   return (
                     <button
                       key={room.id}
-                      onClick={() => handleRoomSelect(room)}
+                      onClick={() => !isOccupied && handleRoomSelect(room)}
+                      disabled={isOccupied}
                       style={{
                         height: '160px',
                         padding: '16px',
@@ -1000,8 +1002,8 @@ function RoomSelectionPage() {
                         borderRadius: '12px',
                         fontSize: '18px',
                         fontWeight: 600,
-                        color: '#1F2937',
-                        cursor: 'pointer',
+                        color: isOccupied ? '#9CA3AF' : '#1F2937',
+                        cursor: isOccupied ? 'not-allowed' : 'pointer',
                         transition: 'all 200ms',
                         display: 'flex',
                         flexDirection: 'column',
@@ -1014,27 +1016,34 @@ function RoomSelectionPage() {
                         minWidth: '0',
                         gap: '12px',
                         WebkitTapHighlightColor: 'transparent',
+                        opacity: isOccupied ? 0.6 : 1,
                       }}
                       onTouchStart={(e) => {
-                        e.currentTarget.style.transform = 'scale(0.98)';
-                        e.currentTarget.style.backgroundColor = '#FEF3E2';
+                        if (!isOccupied) {
+                          e.currentTarget.style.transform = 'scale(0.98)';
+                          e.currentTarget.style.backgroundColor = '#FEF3E2';
+                        }
                       }}
                       onTouchEnd={(e) => {
-                        setTimeout(() => {
-                          if (e.currentTarget) {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }, 150);
+                        if (!isOccupied) {
+                          setTimeout(() => {
+                            if (e.currentTarget) {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }
+                          }, 150);
+                        }
                       }}
                     >
-                      {/* Gradient border wrapper - Orange for rooms */}
+                      {/* Gradient border wrapper - Orange for available, gray for occupied */}
                       <div
                         style={{
                           position: 'absolute',
                           inset: 0,
                           borderRadius: '12px',
-                          background: 'linear-gradient(to right, #f87C10, #e06c0a)',
+                          background: isOccupied 
+                            ? 'linear-gradient(to right, #9CA3AF, #6B7280)'
+                            : 'linear-gradient(to right, #f87C10, #e06c0a)',
                           zIndex: 0,
                         }}
                       />
@@ -1045,7 +1054,9 @@ function RoomSelectionPage() {
                           position: 'absolute',
                           inset: '2px',
                           borderRadius: '10px',
-                          background: 'linear-gradient(to bottom, #FFFFFF, #FEF7ED)',
+                          background: isOccupied
+                            ? 'linear-gradient(to bottom, #F9FAFB, #F3F4F6)'
+                            : 'linear-gradient(to bottom, #FFFFFF, #FEF7ED)',
                           zIndex: 1,
                         }}
                       />
@@ -1053,7 +1064,7 @@ function RoomSelectionPage() {
                       {/* Room Icon */}
                       <div
                         style={{
-                          color: '#f87C10',
+                          color: isOccupied ? '#9CA3AF' : '#f87C10',
                           position: 'relative',
                           zIndex: 2,
                         }}
@@ -1090,6 +1101,31 @@ function RoomSelectionPage() {
                           {room.capacity} Plätze
                         </div>
                       )}
+
+                      {/* Availability Badge */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          backgroundColor: isOccupied ? '#EF4444' : '#10B981',
+                          color: '#FFFFFF',
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          zIndex: 3,
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        }}
+                      >
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                        {isOccupied ? 'Belegt' : 'Verfügbar'}
+                      </div>
                     </button>
                   );
                 })}

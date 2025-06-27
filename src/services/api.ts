@@ -170,6 +170,11 @@ export interface Room {
   name: string;
   room_type?: string;
   capacity?: number;
+  building?: string;
+  floor?: number;
+  category?: string;
+  color?: string;
+  is_occupied: boolean;
 }
 
 /**
