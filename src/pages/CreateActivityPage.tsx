@@ -394,10 +394,12 @@ function CreateActivityPage() {
                 }}
               >
                 {paginatedActivities.map((activity) => {
+                  const isActive = activity.is_active;
                   return (
                     <button
                       key={activity.id}
-                      onClick={() => handleActivitySelect(activity)}
+                      onClick={() => !isActive && handleActivitySelect(activity)}
+                      disabled={isActive}
                       style={{
                         height: '160px',
                         padding: '16px',
@@ -407,7 +409,7 @@ function CreateActivityPage() {
                         fontSize: '18px',
                         fontWeight: 600,
                         color: '#1F2937',
-                        cursor: 'pointer',
+                        cursor: isActive ? 'not-allowed' : 'pointer',
                         transition: 'all 200ms',
                         display: 'flex',
                         flexDirection: 'column',
@@ -420,27 +422,34 @@ function CreateActivityPage() {
                         minWidth: '0',
                         gap: '12px',
                         WebkitTapHighlightColor: 'transparent',
+                        opacity: isActive ? 0.6 : 1,
                       }}
                       onTouchStart={(e) => {
-                        e.currentTarget.style.transform = 'scale(0.98)';
-                        e.currentTarget.style.backgroundColor = '#E6EFFF';
+                        if (!isActive) {
+                          e.currentTarget.style.transform = 'scale(0.98)';
+                          e.currentTarget.style.backgroundColor = '#E6EFFF';
+                        }
                       }}
                       onTouchEnd={(e) => {
-                        setTimeout(() => {
-                          if (e.currentTarget) {
-                            e.currentTarget.style.transform = 'scale(1)';
-                            e.currentTarget.style.backgroundColor = 'transparent';
-                          }
-                        }, 150);
+                        if (!isActive) {
+                          setTimeout(() => {
+                            if (e.currentTarget) {
+                              e.currentTarget.style.transform = 'scale(1)';
+                              e.currentTarget.style.backgroundColor = 'transparent';
+                            }
+                          }, 150);
+                        }
                       }}
                     >
-                      {/* Gradient border wrapper - Blue for activities */}
+                      {/* Gradient border wrapper - Gray for active, Blue for available */}
                       <div
                         style={{
                           position: 'absolute',
                           inset: 0,
                           borderRadius: '12px',
-                          background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
+                          background: isActive 
+                            ? 'linear-gradient(to right, #9CA3AF, #6B7280)' 
+                            : 'linear-gradient(to right, #5080D8, #3f6bc4)',
                           zIndex: 0,
                         }}
                       />
@@ -493,6 +502,31 @@ function CreateActivityPage() {
                         }}
                       >
                         {activity.enrollment_count}/{activity.max_participants}
+                      </div>
+
+                      {/* Activity Status Badge */}
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '8px',
+                          right: '8px',
+                          backgroundColor: isActive ? '#EF4444' : '#10B981',
+                          color: '#FFFFFF',
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '10px',
+                          fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                          zIndex: 3,
+                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                        }}
+                      >
+                        <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="12" cy="12" r="10"/>
+                        </svg>
+                        {isActive ? 'Aktiv' : 'Verfügbar'}
                       </div>
                     </button>
                   );
