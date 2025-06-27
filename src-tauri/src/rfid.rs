@@ -175,7 +175,7 @@ impl RfidBackgroundService {
                         }
 
                         // Perform scan with persistent scanner
-                        match raspberry_pi::scan_with_persistent_scanner(&mut scanner).await {
+                        match raspberry_pi::scan_with_persistent_scanner_sync(&mut scanner) {
                             Ok(tag_id) => {
                                 let timestamp = std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
@@ -345,9 +345,12 @@ mod raspberry_pi {
     use rppal::gpio::Gpio;
     use std::{error::Error, fmt, thread};
 
+    // Type alias for the SpiInterface with eh02 feature
+    type Spi = SpiInterface<Spidev>;
+    
     // Persistent scanner struct that holds the MFRC522 instance
     pub struct PersistentRfidScanner {
-        mfrc522: Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>,
+        mfrc522: Mfrc522<Spi, mfrc522::Initialized>,
     }
 
     // Custom error type matching the original implementation
@@ -504,7 +507,7 @@ mod raspberry_pi {
                             
                             while retry_count < MAX_RETRIES {
                                 // Small delay between retries
-                                tokio::time::sleep(Duration::from_millis(RETRY_DELAY_MS)).await;
+                                thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
                                 retry_count += 1;
                                 
                                 match scanner.mfrc522.select(&atqa) {
