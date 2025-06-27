@@ -343,27 +343,11 @@ mod raspberry_pi {
     };
     use mfrc522::{comm::eh02::spi::SpiInterface, Mfrc522, RxGain};
     use rppal::gpio::Gpio;
-    use embedded_hal::digital::v2::OutputPin;
     use std::{error::Error, fmt, thread};
 
     // Persistent scanner struct that holds the MFRC522 instance
-    // For eh02 feature, we need a dummy pin type for NSS (chip select)
-    struct DummyPin;
-    
-    impl embedded_hal::digital::v2::OutputPin for DummyPin {
-        type Error = std::convert::Infallible;
-        
-        fn set_low(&mut self) -> Result<(), Self::Error> {
-            Ok(())
-        }
-        
-        fn set_high(&mut self) -> Result<(), Self::Error> {
-            Ok(())
-        }
-    }
-    
     pub struct PersistentRfidScanner {
-        mfrc522: Mfrc522<SpiInterface<Spidev, DummyPin, embedded_hal::blocking::delay::NoopDelay>, mfrc522::Initialized>,
+        mfrc522: Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>,
     }
 
     // Custom error type matching the original implementation
@@ -470,9 +454,7 @@ mod raspberry_pi {
         println!("✓ Hardware reset");
         
         // Create MFRC522 instance
-        let dummy_pin = DummyPin;
-        let noop_delay = embedded_hal::blocking::delay::NoopDelay;
-        let spi_interface = SpiInterface::new(spi, dummy_pin, noop_delay);
+        let spi_interface = SpiInterface::new(spi);
         let mfrc522 = Mfrc522::new(spi_interface);
         let mut mfrc522 = mfrc522.init()
             .map_err(|e| format!("Failed to initialize MFRC522: {:?}", e))?;
@@ -491,8 +473,8 @@ mod raspberry_pi {
         Ok(PersistentRfidScanner { mfrc522 })
     }
 
-    // Scan using the persistent scanner instance
-    pub async fn scan_with_persistent_scanner(scanner: &mut PersistentRfidScanner) -> Result<String, String> {
+    // Scan using the persistent scanner instance (synchronous version)
+    pub fn scan_with_persistent_scanner_sync(scanner: &mut PersistentRfidScanner) -> Result<String, String> {
         const SCAN_INTERVAL_MS: u64 = 20; // Matches test_rfid_persistent
         const RETRY_DELAY_MS: u64 = 10; // Delay between retries
         const MAX_RETRIES: u32 = 5; // Maximum retry attempts for IncompleteFrame
@@ -553,7 +535,7 @@ mod raspberry_pi {
             }
             Err(_) => {
                 // No card detected - wait before next scan
-                tokio::time::sleep(Duration::from_millis(SCAN_INTERVAL_MS)).await;
+                thread::sleep(Duration::from_millis(SCAN_INTERVAL_MS));
                 Err("No card detected".to_string())
             }
         }
@@ -564,46 +546,51 @@ mod raspberry_pi {
     }
 
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
-        // Get or create the persistent scanner for single scans
-        let scanner_mutex = SINGLE_SCAN_SCANNER.get_or_init(|| {
-            match initialize_persistent_scanner() {
-                Ok(scanner) => {
-                    println!("Initialized persistent scanner for single scans");
-                    Mutex::new(scanner)
+        // Use spawn_blocking to run the synchronous RFID operations
+        tokio::task::spawn_blocking(|| {
+            // Get or create the persistent scanner for single scans
+            let scanner_mutex = SINGLE_SCAN_SCANNER.get_or_init(|| {
+                match initialize_persistent_scanner() {
+                    Ok(scanner) => {
+                        println!("Initialized persistent scanner for single scans");
+                        Mutex::new(scanner)
+                    }
+                    Err(e) => {
+                        println!("Failed to initialize single scan scanner: {}", e);
+                        panic!("Cannot initialize RFID scanner: {}", e);
+                    }
                 }
-                Err(e) => {
-                    println!("Failed to initialize single scan scanner: {}", e);
-                    panic!("Cannot initialize RFID scanner: {}", e);
-                }
-            }
-        });
-        
-        // Scan with 5 second timeout
-        let start_time = std::time::Instant::now();
-        let timeout = Duration::from_secs(5);
-        
-        loop {
-            // Check timeout
-            if start_time.elapsed() > timeout {
-                return Err("Scan timeout - no card detected".to_string());
-            }
+            });
             
-            // Try to scan - scope the lock to avoid holding it across await
-            let result = {
-                let mut scanner = scanner_mutex.lock()
-                    .map_err(|e| format!("Failed to lock scanner: {}", e))?;
-                scan_with_persistent_scanner(&mut scanner).await
-            };
+            // Scan with 5 second timeout
+            let start_time = std::time::Instant::now();
+            let timeout = Duration::from_secs(5);
             
-            match result {
-                Ok(tag_id) => return Ok(tag_id),
-                Err(e) if e.contains("No card") => {
-                    // Continue scanning until timeout
-                    continue;
+            loop {
+                // Check timeout
+                if start_time.elapsed() > timeout {
+                    return Err("Scan timeout - no card detected".to_string());
                 }
-                Err(e) => return Err(e),
+                
+                // Try to scan
+                let result = {
+                    let mut scanner = scanner_mutex.lock()
+                        .map_err(|e| format!("Failed to lock scanner: {}", e))?;
+                    scan_with_persistent_scanner_sync(&mut scanner)
+                };
+                
+                match result {
+                    Ok(tag_id) => return Ok(tag_id),
+                    Err(e) if e.contains("No card") => {
+                        // Continue scanning until timeout
+                        continue;
+                    }
+                    Err(e) => return Err(e),
+                }
             }
-        }
+        })
+        .await
+        .map_err(|e| format!("Task join error: {}", e))?
     }
     
     // Optimized for continuous background scanning
@@ -662,9 +649,7 @@ mod raspberry_pi {
         thread::sleep(Duration::from_millis(50));
 
         // Create an interface for the MFRC522
-        let dummy_pin = DummyPin;
-        let noop_delay = embedded_hal::blocking::delay::NoopDelay;
-        let spi_interface = SpiInterface::new(spi, dummy_pin, noop_delay);
+        let spi_interface = SpiInterface::new(spi);
 
         // Create MFRC522 instance with proper initialization
         let mfrc522 = Mfrc522::new(spi_interface);
