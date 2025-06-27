@@ -175,7 +175,7 @@ impl RfidBackgroundService {
                         }
 
                         // Perform scan with persistent scanner
-                        match raspberry_pi::scan_with_persistent_scanner(&mut scanner).await {
+                        match raspberry_pi::scan_with_persistent_scanner(&mut scanner) {
                             Ok(tag_id) => {
                                 let timestamp = std::time::SystemTime::now()
                                     .duration_since(std::time::UNIX_EPOCH)
@@ -345,12 +345,9 @@ mod raspberry_pi {
     use rppal::gpio::Gpio;
     use std::{error::Error, fmt, thread};
 
-    // Type alias for the complete MFRC522 type with SpiInterface
-    type Mfrc522Scanner = Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>;
-    
     // Persistent scanner struct that holds the MFRC522 instance
     pub struct PersistentRfidScanner {
-        mfrc522: Mfrc522Scanner,
+        mfrc522: Mfrc522<mfrc522::comm::eh02::spi::SpiInterface<Spidev, (), ()>, mfrc522::Initialized>,
     }
 
     // Custom error type matching the original implementation
@@ -481,7 +478,7 @@ mod raspberry_pi {
     }
 
     // Scan using the persistent scanner instance
-    pub async fn scan_with_persistent_scanner(scanner: &mut PersistentRfidScanner) -> Result<String, String> {
+    pub fn scan_with_persistent_scanner(scanner: &mut PersistentRfidScanner) -> Result<String, String> {
         const SCAN_INTERVAL_MS: u64 = 20; // Matches test_rfid_persistent
         const RETRY_DELAY_MS: u64 = 10; // Delay between retries
         const MAX_RETRIES: u32 = 5; // Maximum retry attempts for IncompleteFrame
@@ -511,7 +508,7 @@ mod raspberry_pi {
                             
                             while retry_count < MAX_RETRIES {
                                 // Small delay between retries
-                                tokio::time::sleep(Duration::from_millis(RETRY_DELAY_MS)).await;
+                                thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
                                 retry_count += 1;
                                 
                                 match scanner.mfrc522.select(&atqa) {
@@ -542,7 +539,7 @@ mod raspberry_pi {
             }
             Err(_) => {
                 // No card detected - wait before next scan
-                tokio::time::sleep(Duration::from_millis(SCAN_INTERVAL_MS)).await;
+                thread::sleep(Duration::from_millis(SCAN_INTERVAL_MS));
                 Err("No card detected".to_string())
             }
         }
@@ -590,7 +587,7 @@ mod raspberry_pi {
             let scan_result = {
                 let mut scanner = scanner_mutex.lock()
                     .map_err(|e| format!("Failed to lock scanner: {}", e))?;
-                scan_with_persistent_scanner(&mut scanner).await
+                scan_with_persistent_scanner(&mut scanner)
             }; // Lock is dropped here before we check the result
             
             // Check scan result
