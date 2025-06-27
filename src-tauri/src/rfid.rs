@@ -394,9 +394,6 @@ mod raspberry_pi {
     // Track initialization state to prevent repeated setup
     static HARDWARE_INITIALIZED: OnceLock<bool> = OnceLock::new();
     static INITIALIZATION_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
-    
-    // Persistent scanner for single scans (separate from continuous scanning)
-    static SINGLE_SCAN_SCANNER: OnceLock<Mutex<PersistentRfidScanner>> = OnceLock::new();
 
     fn ensure_hardware_ready() -> Result<(), String> {
         // Get or create the mutex
@@ -549,51 +546,7 @@ mod raspberry_pi {
     }
 
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
-        // Use spawn_blocking to run the synchronous RFID operations
-        tokio::task::spawn_blocking(|| {
-            // Get or create the persistent scanner for single scans
-            let scanner_mutex = SINGLE_SCAN_SCANNER.get_or_init(|| {
-                match initialize_persistent_scanner() {
-                    Ok(scanner) => {
-                        println!("Initialized persistent scanner for single scans");
-                        Mutex::new(scanner)
-                    }
-                    Err(e) => {
-                        println!("Failed to initialize single scan scanner: {}", e);
-                        panic!("Cannot initialize RFID scanner: {}", e);
-                    }
-                }
-            });
-            
-            // Scan with 5 second timeout
-            let start_time = std::time::Instant::now();
-            let timeout = Duration::from_secs(5);
-            
-            loop {
-                // Check timeout
-                if start_time.elapsed() > timeout {
-                    return Err("Scan timeout - no card detected".to_string());
-                }
-                
-                // Try to scan
-                let result = {
-                    let mut scanner = scanner_mutex.lock()
-                        .map_err(|e| format!("Failed to lock scanner: {}", e))?;
-                    scan_with_persistent_scanner_sync(&mut scanner)
-                };
-                
-                match result {
-                    Ok(tag_id) => return Ok(tag_id),
-                    Err(e) if e.contains("No card") => {
-                        // Continue scanning until timeout
-                        continue;
-                    }
-                    Err(e) => return Err(e),
-                }
-            }
-        })
-        .await
-        .map_err(|e| format!("Task join error: {}", e))?
+        scan_rfid_hardware_with_timeout(Duration::from_secs(5)).await
     }
     
     // Optimized for continuous background scanning
