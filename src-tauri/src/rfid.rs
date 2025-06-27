@@ -345,12 +345,9 @@ mod raspberry_pi {
     use rppal::gpio::Gpio;
     use std::{error::Error, fmt, thread};
 
-    // Type alias for the complete MFRC522 type with SpiInterface
-    type Mfrc522Scanner = Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>;
-    
     // Persistent scanner struct that holds the MFRC522 instance
     pub struct PersistentRfidScanner {
-        mfrc522: Mfrc522Scanner,
+        mfrc522: Mfrc522<SpiInterface<Spidev>, mfrc522::Initialized>,
     }
 
     // Custom error type matching the original implementation
@@ -390,7 +387,6 @@ mod raspberry_pi {
     }
 
     use std::sync::{Mutex, OnceLock};
-    use std::sync::atomic::{AtomicBool, Ordering};
 
     // Track initialization state to prevent repeated setup
     static HARDWARE_INITIALIZED: OnceLock<bool> = OnceLock::new();
@@ -398,9 +394,6 @@ mod raspberry_pi {
     
     // Persistent scanner for single scans (separate from continuous scanning)
     static SINGLE_SCAN_SCANNER: OnceLock<Mutex<PersistentRfidScanner>> = OnceLock::new();
-    
-    // Shared stop flag for aborting any scan
-    pub static STOP_REQUESTED: AtomicBool = AtomicBool::new(false);
 
     fn ensure_hardware_ready() -> Result<(), String> {
         // Get or create the mutex
@@ -553,9 +546,6 @@ mod raspberry_pi {
     }
 
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
-        // Reset stop flag at start of scan
-        STOP_REQUESTED.store(false, Ordering::Relaxed);
-        
         // Get or create the persistent scanner for single scans
         let scanner_mutex = SINGLE_SCAN_SCANNER.get_or_init(|| {
             match initialize_persistent_scanner() {
@@ -570,31 +560,22 @@ mod raspberry_pi {
             }
         });
         
+        // Lock the scanner
+        let mut scanner = scanner_mutex.lock()
+            .map_err(|e| format!("Failed to lock scanner: {}", e))?;
+        
         // Scan with 5 second timeout
         let start_time = std::time::Instant::now();
         let timeout = Duration::from_secs(5);
         
         loop {
-            // Check if stop was requested
-            if STOP_REQUESTED.load(Ordering::Relaxed) {
-                STOP_REQUESTED.store(false, Ordering::Relaxed); // Reset for next time
-                return Err("Scan cancelled".to_string());
-            }
-            
             // Check timeout
             if start_time.elapsed() > timeout {
                 return Err("Scan timeout - no card detected".to_string());
             }
             
-            // Perform scan with lock scope
-            let scan_result = {
-                let mut scanner = scanner_mutex.lock()
-                    .map_err(|e| format!("Failed to lock scanner: {}", e))?;
-                scan_with_persistent_scanner(&mut scanner).await
-            }; // Lock is dropped here before we check the result
-            
-            // Check scan result
-            match scan_result {
+            // Try to scan
+            match scan_with_persistent_scanner(&mut scanner).await {
                 Ok(tag_id) => return Ok(tag_id),
                 Err(e) if e.contains("No card") => {
                     // Continue scanning until timeout
@@ -856,10 +837,6 @@ pub async fn start_rfid_service() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn stop_rfid_service() -> Result<String, String> {
-    // Set stop flag for any running scans (continuous or single)
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    raspberry_pi::STOP_REQUESTED.store(true, std::sync::atomic::Ordering::Relaxed);
-    
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
         let service = service_arc
             .lock()
