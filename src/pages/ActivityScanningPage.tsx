@@ -490,23 +490,32 @@ const ActivityScanningPage: React.FC = () => {
                 // Daily checkout state - Question or Farewell icon
                 if (dailyCheckoutState) {
                   if (dailyCheckoutState.showingFarewell) {
-                    // Hand waving goodbye icon
+                    // Home icon for farewell
                     return (
-                      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M14 14.5c0 .5-.5 1-1 1H7c-.5 0-1-.5-1-1s.5-1 1-1h6c.5 0 1 .5 1 1z"/>
-                        <path d="M17 9.5c0 .5-.5 1-1 1h-5c-.5 0-1-.5-1-1s.5-1 1-1h5c.5 0 1 .5 1 1z"/>
-                        <path d="M20 5.5c0 .5-.5 1-1 1h-3c-.5 0-1-.5-1-1s.5-1 1-1h3c.5 0 1 .5 1 1z"/>
-                        <path d="M4 20a2 2 0 0 0 2-2V7a2 2 0 0 1 2-2 2 2 0 0 1 2 2v10a4 4 0 0 0 8 0V4"/>
-                      </svg>
+                      <img 
+                        src="/img/home.png" 
+                        alt="Home" 
+                        width="80" 
+                        height="80"
+                        style={{ 
+                          filter: 'brightness(0) invert(1)', // Make it white to match other icons
+                          objectFit: 'contain' 
+                        }}
+                      />
                     );
                   } else {
-                    // Question mark icon for asking
+                    // Home icon for asking if going home
                     return (
-                      <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                      </svg>
+                      <img 
+                        src="/img/home.png" 
+                        alt="Home" 
+                        width="80" 
+                        height="80"
+                        style={{ 
+                          filter: 'brightness(0) invert(1)', // Make it white to match other icons
+                          objectFit: 'contain' 
+                        }}
+                      />
                     );
                   }
                 }
