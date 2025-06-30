@@ -45,9 +45,8 @@ function HomeViewPage() {
 
   const handleTagAssignment = () => {
     if (!hasSupervisors) {
-      // This should not happen as the button is disabled, but adding for safety
       logUserAction('NFC-Scan attempted without supervisors');
-      setErrorMessage('Bitte wählen Sie zuerst mindestens einen Betreuer aus, bevor Sie NFC-Scan verwenden.');
+      setErrorMessage("Bitte wählen Sie zuerst mindestens einen Betreuer über 'Team anpassen' aus, bevor Sie die NFC-Scan Funktion nutzen können.");
       setShowErrorModal(true);
       return;
     }
@@ -116,7 +115,6 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleTagAssignment}
-            disabled={!hasSupervisors}
             style={{
               height: '56px',
               display: 'flex',
