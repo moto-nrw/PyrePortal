@@ -18,7 +18,7 @@ import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { selectedUser, authenticatedUser, selectedRoom, selectedActivity } = useUserStore();
+  const { authenticatedUser, selectedRoom, selectedActivity } = useUserStore();
   const appLogger = createLogger('App');
 
   // Initialize logger with runtime config and API
@@ -46,7 +46,6 @@ function App() {
   }, [appLogger]); // Include appLogger in dependency array
 
   // Auth states
-  const hasSelectedUser = !!selectedUser; // Teacher selected, need PIN
   const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authenticated
 
   // Check if a room is selected for the activity creation page
@@ -65,7 +64,7 @@ function App() {
             <Route path="/user-selection" element={<UserSelectionPage />} />
             <Route
               path="/pin"
-              element={hasSelectedUser ? <PinPage /> : <Navigate to="/user-selection" replace />}
+              element={<PinPage />}
             />
             <Route
               path="/home"

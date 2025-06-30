@@ -617,9 +617,10 @@ function RoomSelectionPage() {
       const sessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id, // Manual room selection
+        supervisor_ids: [authenticatedUser.staffId], // For now, use current staff as single supervisor
       };
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, authenticatedUser.staffId, sessionRequest);
+      const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
 
       performance.mark('session-start-end');
       performance.measure('session-start-duration', 'session-start-begin', 'session-start-end');
@@ -704,10 +705,11 @@ function RoomSelectionPage() {
       const forceSessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id, // Manual room selection
+        supervisor_ids: [authenticatedUser.staffId], // For now, use current staff as single supervisor
         force: true, // Force override any conflicts
       };
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, authenticatedUser.staffId, forceSessionRequest);
+      const sessionResponse = await api.startSession(authenticatedUser.pin, forceSessionRequest);
 
       logger.info('Session started successfully with force override', {
         sessionId: sessionResponse.active_group_id,

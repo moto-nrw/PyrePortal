@@ -8,7 +8,7 @@ import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function PinPage() {
-  const { selectedUser, selectedUserId, setAuthenticatedUser } = useUserStore();
+  const { setAuthenticatedUser } = useUserStore();
   const [pin, setPin] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isErrorModalOpen, setIsErrorModalOpen] = useState<boolean>(false);
@@ -20,17 +20,12 @@ function PinPage() {
 
   // Log component mount/unmount
   useEffect(() => {
-    logger.debug('PinPage component mounted', { user: selectedUser });
-
-    // If no user is selected, log an error
-    if (!selectedUser || !selectedUserId) {
-      logger.warn('PinPage accessed without selected user or ID', { selectedUser, selectedUserId });
-    }
+    logger.debug('PinPage component mounted for global PIN entry');
 
     return () => {
       logger.debug('PinPage component unmounted');
     };
-  }, [selectedUser, selectedUserId, logger]);
+  }, [logger]);
 
   // Maximum PIN length
   const maxPinLength = 4;
@@ -38,7 +33,7 @@ function PinPage() {
   // Auto-submit when PIN is complete
   useEffect(() => {
     if (pin.length === maxPinLength && !isLoading) {
-      logger.info('Auto-submitting PIN', { user: selectedUser });
+      logger.info('Auto-submitting global PIN');
       void handleSubmit();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -59,8 +54,8 @@ function PinPage() {
 
         // If PIN is complete after this digit, log it
         if (pin.length + 1 === maxPinLength) {
-          logger.info('PIN entry completed', { user: selectedUser });
-          logUserAction('pin_entry_completed', { user: selectedUser });
+          logger.info('Global PIN entry completed');
+          logUserAction('global_pin_entry_completed');
         }
       } else {
         logger.debug('Attempted to enter more than maximum PIN length');
@@ -92,7 +87,7 @@ function PinPage() {
     try {
       setPin('');
       logger.debug('PIN cleared');
-      logUserAction('pin_cleared', { user: selectedUser });
+      logUserAction('pin_cleared');
     } catch (error) {
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleClear');
     }
@@ -101,9 +96,9 @@ function PinPage() {
   // Handle back button click
   const handleBack = () => {
     try {
-      logger.info('User navigating back to user selection', { user: selectedUser });
-      logNavigation('PinPage', 'UserSelectionPage');
-      void navigate('/user-selection');
+      logger.info('User navigating back to landing page');
+      logNavigation('PinPage', 'LandingPage');
+      void navigate('/');
     } catch (error) {
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleBack');
     }
@@ -121,11 +116,9 @@ function PinPage() {
         logger.warn('PIN verification failed', {
           reason: 'incomplete_pin',
           pinLength: pin.length,
-          user: selectedUser,
         });
         logUserAction('pin_verification_failed', {
           reason: 'incomplete_pin',
-          user: selectedUser,
         });
         return;
       }
@@ -134,34 +127,22 @@ function PinPage() {
       performance.mark('pin-verification-start');
       setIsLoading(true);
 
-      // Check if we have selected user ID
-      if (!selectedUserId) {
-        const errorMsg = 'Kein Benutzer ausgewählt. Bitte gehen Sie zurück und wählen Sie einen Benutzer aus.';
-        setErrorMessage(errorMsg);
-        setIsErrorModalOpen(true);
-        setPin('');
-        logger.error('No user ID selected for PIN validation');
-        return;
-      }
-
-      // Validate PIN with real API
-      const result: PinValidationResult = await api.validateTeacherPin(pin, selectedUserId);
+      // Validate PIN with global OGS PIN via device ping
+      const result: PinValidationResult = await api.validateGlobalPin(pin);
 
       if (result.success && result.userData) {
-        // Store authenticated user context with PIN
+        // Store authenticated device context with global PIN
         setAuthenticatedUser({
-          staffId: result.userData.staffId,
-          staffName: result.userData.staffName,
+          staffId: 0, // No specific staff ID for global authentication
+          staffName: 'OGS Device',
           deviceName: result.userData.deviceName,
           pin: pin,
         });
 
-        logger.info('PIN verified successfully', {
-          user: selectedUser,
-          staffName: result.userData.staffName,
+        logger.info('Global PIN verified successfully', {
           deviceName: result.userData.deviceName,
         });
-        logUserAction('pin_verified', { user: selectedUser });
+        logUserAction('global_pin_verified');
 
         // Navigate to home page after successful PIN entry
         logNavigation('PinPage', 'HomeViewPage');
@@ -186,14 +167,11 @@ function PinPage() {
         setErrorMessage(errorMsg);
         setIsErrorModalOpen(true);
         setPin(''); // Clear PIN
-        logger.warn('PIN verification failed', {
-          reason: result.isLocked ? 'account_locked' : 'invalid_pin',
-          user: selectedUser,
-          isLocked: result.isLocked,
+        logger.warn('Global PIN verification failed', {
+          reason: 'invalid_pin',
         });
-        logUserAction('pin_verification_failed', {
-          reason: result.isLocked ? 'account_locked' : 'invalid_pin',
-          user: selectedUser,
+        logUserAction('global_pin_verification_failed', {
+          reason: 'invalid_pin',
         });
       }
     } catch (error) {
@@ -201,7 +179,7 @@ function PinPage() {
       setErrorMessage(errorMsg);
       setIsErrorModalOpen(true);
       setPin(''); // Clear PIN
-      logger.error('PIN verification error', { error, user: selectedUser });
+      logger.error('Global PIN verification error', { error });
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleSubmit');
     } finally {
       setIsLoading(false);
@@ -405,7 +383,7 @@ function PinPage() {
               lineHeight: 1.1,
             }}
           >
-            {selectedUser}
+            PIN-Eingabe
           </h1>
           <p
             style={{
@@ -415,6 +393,7 @@ function PinPage() {
               fontWeight: 500,
             }}
           >
+            Bitte geben Sie den globalen PIN ein
           </p>
         </div>
 

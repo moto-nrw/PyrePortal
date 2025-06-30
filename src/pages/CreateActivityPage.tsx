@@ -492,17 +492,19 @@ function CreateActivityPage() {
                         {activity.name}
                       </span>
 
-                      {/* Enrollment info */}
-                      <div
-                        style={{
-                          fontSize: '12px',
-                          color: '#6B7280',
-                          position: 'relative',
-                          zIndex: 2,
-                        }}
-                      >
-                        {activity.enrollment_count}/{activity.max_participants}
-                      </div>
+                      {/* Enrollment info - only show if data is available */}
+                      {activity.enrollment_count !== undefined && activity.max_participants !== undefined && (
+                        <div
+                          style={{
+                            fontSize: '12px',
+                            color: '#6B7280',
+                            position: 'relative',
+                            zIndex: 2,
+                          }}
+                        >
+                          {activity.enrollment_count}/{activity.max_participants}
+                        </div>
+                      )}
 
                       {/* Activity Status Badge */}
                       <div
