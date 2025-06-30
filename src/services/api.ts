@@ -74,8 +74,8 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     logger.debug('Making ping request', {
       url,
       method: options.method,
-      hasAuth: !!(options.headers as any)?.Authorization,
-      hasPin: !!(options.headers as any)?.['X-Staff-PIN'],
+      hasAuth: !!(options.headers as Record<string, string>)?.Authorization,
+      hasPin: !!(options.headers as Record<string, string>)?.['X-Staff-PIN'],
     });
   }
 

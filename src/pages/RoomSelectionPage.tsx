@@ -13,6 +13,7 @@ interface ConfirmationModalProps {
   isOpen: boolean;
   activity: ActivityResponse | null;
   room: Room;
+  supervisors: Array<{ id: number; name: string }>;
   onConfirm: () => void;
   onCancel: () => void;
   isLoading: boolean;
@@ -22,6 +23,7 @@ interface ConflictModalProps {
   isOpen: boolean;
   activity: ActivityResponse | null;
   room: Room;
+  supervisors: Array<{ id: number; name: string }>;
   onForceStart: () => void;
   onCancel: () => void;
   isLoading: boolean;
@@ -31,6 +33,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isOpen,
   activity,
   room,
+  supervisors,
   onConfirm,
   onCancel,
   isLoading,
@@ -82,8 +85,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           }}
         >
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <path d="M9 12l2 2 4-4"/>
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9 12l2 2 4-4" />
           </svg>
         </div>
 
@@ -99,17 +102,6 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           Aktivität starten?
         </h2>
 
-        <p
-          style={{
-            fontSize: '16px',
-            color: '#6B7280',
-            marginBottom: '32px',
-            lineHeight: 1.5,
-          }}
-        >
-          Sie sind dabei, eine neue Aktivitätssession zu starten.
-        </p>
-
         {/* Activity Details Card */}
         <div
           style={{
@@ -122,44 +114,61 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         >
           <div
             style={{
-              fontSize: '20px',
-              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '24px',
               marginBottom: '12px',
-              color: '#1F2937',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            {activity?.name}
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#1F2937',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              {activity?.name}
+            </div>
+
+            <div
+              style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: '#9CA3AF',
+              }}
+            >
+
+            </div>
+
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#1F2937',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f87C10" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+                <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+                <circle cx="11" cy="12" r="1" />
+              </svg>
+              {room.name}
+            </div>
           </div>
-          
-          <div
-            style={{
-              fontSize: '16px',
-              color: '#64748B',
-              marginBottom: '8px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87C10" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
-              <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2"/>
-              <circle cx="11" cy="12" r="1"/>
-            </svg>
-            {room.name}
-          </div>
-          
+
           {room.room_type && (
             <div
               style={{
@@ -171,17 +180,61 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               Typ: {room.room_type}
             </div>
           )}
-          
-          {room.capacity && (
-            <div
-              style={{
-                fontSize: '14px',
-                color: '#9CA3AF',
-              }}
-            >
-              Kapazität: {room.capacity} Plätze
-            </div>
-          )}
+        </div>
+
+        {/* Supervisors */}
+        <div
+          style={{
+            backgroundColor: '#F0F9FF',
+            borderRadius: '16px',
+            padding: '20px',
+            marginBottom: '32px',
+            border: '1px solid #BAE6FD',
+          }}
+        >
+          <div
+            style={{
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#0369A1',
+              marginBottom: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Betreuer ({supervisors.length})
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: '8px',
+            }}
+          >
+            {supervisors.map(supervisor => (
+              <div
+                key={supervisor.id}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: '#1F2937',
+                  border: '1px solid #E0E7FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                {supervisor.name}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Action Buttons */}
@@ -219,7 +272,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           >
             Abbrechen
           </button>
-          
+
           <button
             onClick={onConfirm}
             disabled={isLoading}
@@ -229,7 +282,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               fontSize: '16px',
               fontWeight: 600,
               color: '#FFFFFF',
-              background: isLoading 
+              background: isLoading
                 ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
                 : 'linear-gradient(to right, #83cd2d, #6ba529)',
               border: 'none',
@@ -238,8 +291,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: isLoading 
-                ? 'none' 
+              boxShadow: isLoading
+                ? 'none'
                 : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
               opacity: isLoading ? 0.6 : 1,
             }}
@@ -268,6 +321,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
   isOpen,
   activity,
   room,
+  supervisors,
   onForceStart,
   onCancel,
   isLoading,
@@ -319,9 +373,9 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
           }}
         >
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-            <line x1="12" y1="9" x2="12" y2="13"/>
-            <line x1="12" y1="17" x2="12.01" y2="17"/>
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
         </div>
 
@@ -370,44 +424,116 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
           >
             Neue Session
           </div>
-          
+
           <div
             style={{
-              fontSize: '20px',
-              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '24px',
               marginBottom: '12px',
-              color: '#1F2937',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '8px',
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-              <line x1="16" y1="2" x2="16" y2="6"/>
-              <line x1="8" y1="2" x2="8" y2="6"/>
-              <line x1="3" y1="10" x2="21" y2="10"/>
-            </svg>
-            {activity?.name}
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#1F2937',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+              {activity?.name}
+            </div>
+
+            <div
+              style={{
+                fontSize: '16px',
+                fontWeight: 600,
+                color: '#9CA3AF',
+              }}
+            >
+            </div>
+
+            <div
+              style={{
+                fontSize: '20px',
+                fontWeight: 600,
+                color: '#1F2937',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f87C10" strokeWidth="2">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+                <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+                <circle cx="11" cy="12" r="1" />
+              </svg>
+              {room.name}
+            </div>
           </div>
-          
+        </div>
+
+        {/* Supervisors */}
+        <div
+          style={{
+            backgroundColor: '#F0F9FF',
+            borderRadius: '16px',
+            padding: '20px',
+            marginBottom: '32px',
+            border: '1px solid #BAE6FD',
+          }}
+        >
           <div
             style={{
-              fontSize: '16px',
-              color: '#64748B',
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#0369A1',
+              marginBottom: '12px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Betreuer ({supervisors.length})
+          </div>
+          <div
+            style={{
               display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
+              flexWrap: 'wrap',
               gap: '8px',
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f87C10" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
-              <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2"/>
-              <circle cx="11" cy="12" r="1"/>
-            </svg>
-            {room.name}
+            {supervisors.map(supervisor => (
+              <div
+                key={supervisor.id}
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  padding: '8px 16px',
+                  borderRadius: '20px',
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: '#1F2937',
+                  border: '1px solid #E0E7FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                {supervisor.name}
+              </div>
+            ))}
           </div>
         </div>
 
@@ -468,7 +594,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
           >
             Abbrechen
           </button>
-          
+
           <button
             onClick={onForceStart}
             disabled={isLoading}
@@ -478,7 +604,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
               fontSize: '16px',
               fontWeight: 600,
               color: '#FFFFFF',
-              background: isLoading 
+              background: isLoading
                 ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
                 : 'linear-gradient(to right, #DC2626, #B91C1C)',
               border: 'none',
@@ -487,8 +613,8 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
               transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: isLoading 
-                ? 'none' 
+              boxShadow: isLoading
+                ? 'none'
                 : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
               opacity: isLoading ? 0.6 : 1,
             }}
@@ -517,6 +643,7 @@ function RoomSelectionPage() {
   const {
     authenticatedUser,
     selectedActivity,
+    selectedSupervisors,
     rooms,
     isLoading,
     error,
@@ -553,7 +680,7 @@ function RoomSelectionPage() {
     return 0;
   }, [paginatedRooms]);
 
-  // Redirect if missing authentication or selected activity
+  // Redirect if missing authentication, selected activity, or supervisors
   useEffect(() => {
     if (!authenticatedUser) {
       logger.warn('Unauthenticated access to RoomSelectionPage');
@@ -569,15 +696,23 @@ function RoomSelectionPage() {
       return;
     }
 
+    if (!selectedSupervisors || selectedSupervisors.length === 0) {
+      logger.warn('No supervisors selected, redirecting to staff selection');
+      logNavigation('RoomSelectionPage', '/staff-selection');
+      void navigate('/staff-selection');
+      return;
+    }
+
     logger.debug('RoomSelectionPage component mounted', {
       user: authenticatedUser.staffName,
       activity: selectedActivity.name,
+      supervisors: selectedSupervisors.length,
     });
 
     return () => {
       logger.debug('RoomSelectionPage component unmounted');
     };
-  }, [authenticatedUser, selectedActivity, navigate, logger]);
+  }, [authenticatedUser, selectedActivity, selectedSupervisors, navigate, logger]);
 
   // Fetch rooms when component mounts
   useEffect(() => {
@@ -609,7 +744,8 @@ function RoomSelectionPage() {
       logger.info('Starting activity session', {
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
-        staffId: authenticatedUser.staffId,
+        supervisorCount: selectedSupervisors.length,
+        supervisorIds: selectedSupervisors.map(s => s.id),
       });
 
       performance.mark('session-start-begin');
@@ -617,7 +753,7 @@ function RoomSelectionPage() {
       const sessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id, // Manual room selection
-        supervisor_ids: [authenticatedUser.staffId], // For now, use current staff as single supervisor
+        supervisor_ids: selectedSupervisors.map(s => s.id), // Use all selected supervisors
       };
 
       const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
@@ -676,7 +812,7 @@ function RoomSelectionPage() {
 
       // Handle 409 Conflict - show conflict modal
       logger.debug('Checking for conflict error', { errorMessage, includes409: errorMessage.includes('409'), includesConflict: errorMessage.includes('Conflict') });
-      
+
       if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
         logger.info('Showing conflict modal due to 409 error');
         setShowConflictModal(true);
@@ -705,7 +841,7 @@ function RoomSelectionPage() {
       const forceSessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id, // Manual room selection
-        supervisor_ids: [authenticatedUser.staffId], // For now, use current staff as single supervisor
+        supervisor_ids: selectedSupervisors.map(s => s.id), // Use all selected supervisors
         force: true, // Force override any conflicts
       };
 
@@ -797,21 +933,21 @@ function RoomSelectionPage() {
   const getRoomIcon = () => {
     return (
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
-        <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2"/>
-        <circle cx="11" cy="12" r="1"/>
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+        <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+        <circle cx="11" cy="12" r="1" />
       </svg>
     );
   };
 
-  if (!authenticatedUser || !selectedActivity) {
+  if (!authenticatedUser || !selectedActivity || !selectedSupervisors || selectedSupervisors.length === 0) {
     return null; // Will redirect via useEffect
   }
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{ 
-        width: '100%', 
+      <div style={{
+        width: '100%',
         height: '100%',
         padding: '16px',
         display: 'flex',
@@ -873,8 +1009,8 @@ function RoomSelectionPage() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M19 12H5"/>
-              <path d="M12 19l-7-7 7-7"/>
+              <path d="M19 12H5" />
+              <path d="M12 19l-7-7 7-7" />
             </svg>
             <span
               style={{
@@ -951,9 +1087,9 @@ function RoomSelectionPage() {
                 }}
               >
                 <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
-                  <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2"/>
-                  <circle cx="11" cy="12" r="1"/>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+                  <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+                  <circle cx="11" cy="12" r="1" />
                 </svg>
                 <div
                   style={{
@@ -1043,13 +1179,13 @@ function RoomSelectionPage() {
                           position: 'absolute',
                           inset: 0,
                           borderRadius: '12px',
-                          background: isOccupied 
+                          background: isOccupied
                             ? 'linear-gradient(to right, #9CA3AF, #6B7280)'
                             : 'linear-gradient(to right, #f87C10, #e06c0a)',
                           zIndex: 0,
                         }}
                       />
-                      
+
                       {/* Inner content wrapper for border effect */}
                       <div
                         style={{
@@ -1062,7 +1198,7 @@ function RoomSelectionPage() {
                           zIndex: 1,
                         }}
                       />
-                      
+
                       {/* Room Icon */}
                       <div
                         style={{
@@ -1073,7 +1209,7 @@ function RoomSelectionPage() {
                       >
                         {getRoomIcon()}
                       </div>
-                      
+
                       {/* Room Name */}
                       <span
                         style={{
@@ -1124,14 +1260,14 @@ function RoomSelectionPage() {
                         }}
                       >
                         <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="12" r="10"/>
+                          <circle cx="12" cy="12" r="10" />
                         </svg>
                         {isOccupied ? 'Belegt' : 'Verfügbar'}
                       </div>
                     </button>
                   );
                 })}
-                
+
                 {/* Empty placeholder slots */}
                 {emptySlots > 0 && Array.from({ length: emptySlots }).map((_, index) => (
                   <div
@@ -1167,9 +1303,9 @@ function RoomSelectionPage() {
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z"/>
-                        <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2"/>
-                        <circle cx="11" cy="12" r="1"/>
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+                        <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+                        <circle cx="11" cy="12" r="1" />
                       </svg>
                       <span
                         style={{
@@ -1274,6 +1410,7 @@ function RoomSelectionPage() {
         isOpen={showConfirmModal}
         activity={selectedActivity}
         room={selectedRoom!}
+        supervisors={selectedSupervisors}
         onConfirm={handleConfirmSession}
         onCancel={() => {
           setShowConfirmModal(false);
@@ -1287,6 +1424,7 @@ function RoomSelectionPage() {
         isOpen={showConflictModal}
         activity={selectedActivity}
         room={selectedRoom!}
+        supervisors={selectedSupervisors}
         onForceStart={handleForceSessionStart}
         onCancel={handleConflictCancel}
         isLoading={isStartingSession}

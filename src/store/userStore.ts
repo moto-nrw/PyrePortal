@@ -135,6 +135,7 @@ interface UserState {
   isLoading: boolean;
   error: string | null;
   nfcScanActive: boolean;
+  selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
 
   // RFID scanning state
   rfid: RfidState;
@@ -160,6 +161,11 @@ interface UserState {
   createActivity: () => Promise<boolean>;
   fetchActivities: () => Promise<ActivityResponse[] | null>;
   cancelActivityCreation: () => void;
+
+  // Supervisor selection actions
+  setSelectedSupervisors: (supervisors: User[]) => void;
+  toggleSupervisor: (user: User) => void;
+  clearSelectedSupervisors: () => void;
 
   // Check-in/check-out actions
   startNfcScan: () => void;
@@ -239,6 +245,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   isLoading: false,
   error: null,
   nfcScanActive: false,
+  selectedSupervisors: [] as User[], // New state for multi-supervisor selection
 
   // RFID initial state
   rfid: {
@@ -407,6 +414,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
                 sessionActivity = {
                   id: session.activity_id,
                   name: session.activity_name,
+                  category: '',
                   category_name: '',
                   category_color: '',
                   room_name: session.room_name ?? '',
@@ -426,6 +434,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
               sessionActivity = {
                 id: session.activity_id,
                 name: session.activity_name,
+                category: '',
                 category_name: '',
                 category_color: '',
                 room_name: session.room_name ?? '',
@@ -495,16 +504,40 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       selectedActivity: null,
       currentSession: null,
       currentActivity: null,
+      selectedSupervisors: [],
     });
   },
 
-  // Cancel activity creation and clear selected room
+  // Cancel activity creation and clear selected room and supervisors
   cancelActivityCreation: () => {
     set({
       currentActivity: null,
       selectedRoom: null,
+      selectedSupervisors: [],
     });
   },
+
+  // Supervisor selection actions
+  setSelectedSupervisors: (supervisors: User[]) => set({ selectedSupervisors: supervisors }),
+
+  toggleSupervisor: (user: User) => {
+    const { selectedSupervisors } = get();
+    const isSelected = selectedSupervisors.some(s => s.id === user.id);
+    
+    if (isSelected) {
+      // Remove supervisor
+      set({ 
+        selectedSupervisors: selectedSupervisors.filter(s => s.id !== user.id) 
+      });
+    } else {
+      // Add supervisor
+      set({ 
+        selectedSupervisors: [...selectedSupervisors, user] 
+      });
+    }
+  },
+
+  clearSelectedSupervisors: () => set({ selectedSupervisors: [] }),
 
   // Activity-related actions
   initializeActivity: (roomId: number) => {

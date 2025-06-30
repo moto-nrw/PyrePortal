@@ -9,6 +9,7 @@ import HomeViewPage from './pages/HomeViewPage';
 import LandingPage from './pages/LandingPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
+import StaffSelectionPage from './pages/StaffSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import UserSelectionPage from './pages/UserSelectionPage';
 import { initializeApi } from './services/api';
@@ -77,6 +78,10 @@ function App() {
             <Route
               path="/activity-selection"
               element={isFullyAuthenticated ? <CreateActivityPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/staff-selection"
+              element={isFullyAuthenticated ? <StaffSelectionPage /> : <Navigate to="/" replace />}
             />
             <Route
               path="/rooms"

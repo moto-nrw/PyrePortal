@@ -138,7 +138,7 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              Abmelden
+              Aktivität Beenden
             </span>
           </button>
         </div>

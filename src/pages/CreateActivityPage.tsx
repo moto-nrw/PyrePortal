@@ -150,12 +150,12 @@ function CreateActivityPage() {
       // Store the selected activity for the room selection page
       setSelectedActivity(activity);
 
-      // Navigate to room selection with selected activity
-      logNavigation('CreateActivityPage', 'RoomSelectionPage', {
+      // Navigate to staff selection with selected activity
+      logNavigation('CreateActivityPage', 'StaffSelectionPage', {
         reason: 'activity_selected',
         activityId: activity.id,
       });
-      void navigate('/rooms');
+      void navigate('/staff-selection');
     } catch (error) {
       logError(
         error instanceof Error ? error : new Error(String(error)),
