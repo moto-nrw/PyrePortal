@@ -148,33 +148,6 @@ function HomeViewPage() {
           textAlign: 'center',
           marginBottom: '32px',
         }}>
-          <div
-            style={{
-              width: '100px',
-              height: '100px',
-              background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 24px',
-              boxShadow: '0 8px 24px rgba(80, 128, 216, 0.3)',
-            }}
-          >
-            <svg
-              width="56"
-              height="56"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#FFFFFF"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </div>
 
           <h1
             style={{
@@ -185,7 +158,7 @@ function HomeViewPage() {
               lineHeight: 1.2,
             }}
           >
-            Hallo, {firstName}!
+            Menü
           </h1>
         </div>
 
@@ -416,7 +389,7 @@ function HomeViewPage() {
           }
         `}
       </style>
-    </ContentBox>
+    </ContentBox >
   );
 }
 
