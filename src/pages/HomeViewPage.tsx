@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ContentBox } from '../components/ui';
+import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { logNavigation, logUserAction } from '../utils/logger';
@@ -18,10 +19,23 @@ function HomeViewPage() {
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
 
   const handleLogout = async () => {
-    logUserAction('User logout initiated');
-    await logout();
-    logNavigation('Home View', '/');
-    void navigate('/');
+    if (currentSession) {
+      // End the current session
+      logUserAction('Ending current session');
+      try {
+        await api.endSession(authenticatedUser!.pin);
+        await fetchCurrentSession(); // Refresh session state
+        logUserAction('Session ended successfully');
+      } catch (error) {
+        logUserAction('Failed to end session', { error });
+      }
+    } else {
+      // Logout and redirect to landing page
+      logUserAction('User logout initiated');
+      await logout();
+      logNavigation('Home View', '/');
+      void navigate('/');
+    }
   };
 
   const handleTagAssignment = () => {
@@ -61,8 +75,8 @@ function HomeViewPage() {
     return null; // Will redirect via useEffect
   }
 
-  // Extract first name from full name
-  const firstName = authenticatedUser.staffName.split(' ')[0];
+  // Extract first name from full name (unused for now)
+  // const firstName = authenticatedUser.staffName.split(' ')[0];
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
@@ -138,7 +152,7 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              Aktivität Beenden
+              {currentSession ? 'Aktivität Beenden' : 'Abmelden'}
             </span>
           </button>
         </div>
