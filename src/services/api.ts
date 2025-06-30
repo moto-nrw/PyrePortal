@@ -545,15 +545,18 @@ export const api = {
   },
 
   /**
-   * Get teacher's students for tag assignment
-   * Endpoint: GET /api/iot/students
+   * Get students supervised by specified teachers
+   * Endpoint: GET /api/iot/students?teacher_ids=1,2,3
    */
-  async getStudents(pin: string): Promise<Student[]> {
+  async getStudents(pin: string, teacherIds: number[]): Promise<Student[]> {
+    // Create query parameter string
+    const queryParam = teacherIds.length > 0 ? `?teacher_ids=${teacherIds.join(',')}` : '';
+    
     const response = await apiCall<{
       status: string;
       data: Student[];
       message: string;
-    }>('/api/iot/students', {
+    }>(`/api/iot/students${queryParam}`, {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
@@ -599,7 +602,9 @@ export const api = {
     const response = await apiCall<{
       status: string;
       data?: {
+        success: boolean;
         student_id: number;
+        student_name: string;
         rfid_tag: string;
         previous_tag?: string;
         message?: string;
@@ -618,8 +623,11 @@ export const api = {
 
     // Transform the API response to match our expected TagAssignmentResult interface
     return {
-      success: response.status === 'success',
+      success: response.data?.success ?? (response.status === 'success'),
       message: response.data?.message ?? response.message ?? 'Tag erfolgreich zugewiesen',
+      student_id: response.data?.student_id,
+      student_name: response.data?.student_name,
+      rfid_tag: response.data?.rfid_tag,
       previous_tag: response.data?.previous_tag,
     };
   },
@@ -790,7 +798,7 @@ export interface Student {
 }
 
 /**
- * Tag assignment check response from /api/rfid-cards/{tagId}
+ * Tag assignment check response from /api/iot/rfid/{tagId}
  */
 export interface TagAssignmentCheck {
   assigned: boolean;
@@ -806,6 +814,9 @@ export interface TagAssignmentCheck {
  */
 export interface TagAssignmentResult {
   success: boolean;
+  student_id?: number;
+  student_name?: string;
+  rfid_tag?: string;
   previous_tag?: string;
   message?: string;
 }

@@ -68,7 +68,7 @@ This document tracks the implementation of multiple supervisor support for RFID 
 ---
 
 ### Objective 3: Start Session with Multiple Supervisors ✅
-**Status**: COMPLETE - Multi-supervisor session creation implemented  
+**Status**: COMPLETE - Multi-supervisor session creation implemented
 **Completed**: 2025-06-30
 
 **API Design**:
@@ -142,7 +142,7 @@ POST /api/iot/session/start
 **Status**: NOT NEEDED - Per user decision: "we do not need backwards compatibility as the device will also change!!"
 **Decision Date**: 2025-06-30
 
-**Rationale**: 
+**Rationale**:
 - Devices will be updated to use the new multi-supervisor API
 - No need to maintain backward compatibility
 - `supervisor_ids` is required in all session start requests
@@ -304,7 +304,7 @@ Legend: ✅ Complete | ⏳ Pending | ❌ Not Needed/Skipped
 ## Implementation Complete! 🎉
 
 All objectives have been successfully implemented:
-1. ✅ Global PIN authentication 
+1. ✅ Global PIN authentication
 2. ✅ Teacher list endpoint
 3. ✅ Multi-supervisor session creation
 4. ❌ Backward compatibility (not needed)
@@ -663,7 +663,7 @@ X-Staff-PIN: {global_pin}
 
 1. **Breaking Change**: `supervisor_ids` is now REQUIRED when starting sessions (no backward compatibility)
 
-2. **Supervisor Management**: 
+2. **Supervisor Management**:
    - Minimum 1 supervisor required at all times
    - Use PUT endpoint to update entire supervisor list
    - Supervisors are automatically deduplicated
@@ -749,3 +749,248 @@ lets for now ignore the frontend integration only backend and api integration ne
 ---
 
 so i approved chris pull request and merged it into development (current branch). for more information you might look at pr Feat/multiple educational group supervisors #219
+
+
+API Documentation: IoT RFID Endpoints
+
+  Based on verified implementation and actual test results, here are the correct API formats:
+
+  1. GET /api/iot/rfid/{tagId}
+
+  Purpose: Check if an RFID tag is assigned to a student
+
+  Request
+
+  GET /api/iot/rfid/{tagId}
+  Authorization: Bearer {device_api_key}
+  X-Staff-PIN: {global_ogs_pin}
+  Content-Type: application/json
+
+  Path Parameters:
+  - tagId (string, required): The RFID tag ID to check
+
+  Headers:
+  - Authorization (required): Bearer token with device API key
+  - X-Staff-PIN (required): Global OGS PIN (currently "1234")
+  - Content-Type: application/json
+
+  Response
+
+  Success (200) - Tag Assigned:
+  {
+    "status": "success",
+    "data": {
+      "assigned": true,
+      "student": {
+        "id": 116,
+        "name": "Carl Klein",
+        "group": "3B"
+      }
+    },
+    "message": "RFID tag assignment status retrieved"
+  }
+
+  Success (200) - Tag Not Assigned:
+  {
+    "status": "success",
+    "data": {
+      "assigned": false
+    },
+    "message": "RFID tag assignment status retrieved"
+  }
+
+  2. GET /api/iot/students
+
+  Purpose: Get students supervised by specified teachers
+
+  Request
+
+  GET /api/iot/students?teacher_ids={comma_separated_teacher_ids}
+  Authorization: Bearer {device_api_key}
+  X-Staff-PIN: {global_ogs_pin}
+  Content-Type: application/json
+
+  Query Parameters:
+  - teacher_ids (string, required): Comma-separated list of teacher IDs (e.g., "1,2,3")
+
+  Headers:
+  - Authorization (required): Bearer token with device API key
+  - X-Staff-PIN (required): Global OGS PIN
+  - Content-Type: application/json
+
+  Response
+
+  Success (200):
+  {
+    "status": "success",
+    "data": [
+      {
+        "student_id": 116,
+        "person_id": 146,
+        "first_name": "Carl",
+        "last_name": "Klein",
+        "school_class": "3B",
+        "group_name": "Klasse 3B",
+        "rfid_tag": "A39359FF91EABA"
+      },
+      {
+        "student_id": 117,
+        "person_id": 147,
+        "first_name": "Anton",
+        "last_name": "Keller",
+        "school_class": "4A",
+        "group_name": "Klasse 4A",
+        "rfid_tag": "D2D4B47EEDBE57"
+      }
+      // ... more students
+    ],
+    "message": "Found 48 unique students"
+  }
+
+  Success (200) - No Teacher IDs Provided:
+  {
+    "status": "success",
+    "data": [],
+    "message": "No teacher IDs provided"
+  }
+
+  Notes:
+  - Returns unique students (no duplicates even if student belongs to multiple groups)
+  - Empty rfid_tag field means no tag assigned
+  - Students are from all groups supervised by any of the specified teachers
+
+  3. POST /api/students/{studentId}/rfid
+
+  Purpose: Assign an RFID tag to a student
+
+  Request
+
+  POST /api/students/{studentId}/rfid
+  Authorization: Bearer {device_api_key}
+  X-Staff-PIN: {global_ogs_pin}
+  Content-Type: application/json
+
+  {
+    "rfid_tag": "A39359FF91EABA"
+  }
+
+  Path Parameters:
+  - studentId (integer, required): The student ID to assign the tag to
+
+  Headers:
+  - Authorization (required): Bearer token with device API key
+  - X-Staff-PIN (required): Global OGS PIN
+  - Content-Type: application/json
+
+  Request Body:
+  {
+    "rfid_tag": "string"  // Required, the RFID tag to assign
+  }
+
+  Response
+
+  Success (200):
+  {
+    "status": "success",
+    "data": {
+      "success": true,
+      "student_id": 116,
+      "student_name": "Carl Klein",
+      "rfid_tag": "A39359FF91EABA",
+      "previous_tag": "0F7204B854A3A3",
+      "message": "RFID tag assigned successfully (previous tag replaced)"
+    },
+    "message": "RFID tag assigned successfully (previous tag replaced)"
+  }
+
+  Success (200) - First Tag Assignment:
+  {
+    "status": "success",
+    "data": {
+      "success": true,
+      "student_id": 116,
+      "student_name": "Carl Klein",
+      "rfid_tag": "A39359FF91EABA",
+      "previous_tag": null,
+      "message": "RFID tag assigned successfully"
+    },
+    "message": "RFID tag assigned successfully"
+  }
+
+  Error Responses (All Endpoints)
+
+  401 Unauthorized - Missing/Invalid Authentication:
+  {
+    "status": "error",
+    "error": "Device authentication failed",
+    "details": "Invalid API key"
+  }
+
+  401 Unauthorized - Invalid PIN:
+  {
+    "status": "error",
+    "error": "Device authentication failed",
+    "details": "Invalid PIN"
+  }
+
+  404 Not Found - Student Not Found:
+  {
+    "status": "error",
+    "error": "Student not found"
+  }
+
+  400 Bad Request - Invalid Request:
+  {
+    "status": "error",
+    "error": "Invalid request",
+    "details": "rfid_tag is required"
+  }
+
+  Important Implementation Notes
+
+  1. Authentication: All endpoints require both:
+    - Device API key in Authorization: Bearer header
+    - Global OGS PIN in X-Staff-PIN header
+  2. No Teacher Authorization: With global PIN, there's no individual teacher authentication or
+  supervision check
+  3. Tag Reassignment: Assigning a new tag automatically unlinks the previous tag
+  4. Unique Students: The students endpoint automatically deduplicates if a student appears in
+  multiple groups
+  5. Environment Variable: The global PIN is configured via OGS_DEVICE_PIN environment variable
+
+  Example Usage
+
+  // Example: Check tag, get students, assign tag
+  const API_KEY = 'dev_f13264b47528911197e0f6ea90d92366b8d2193670cc61a612899dd7e1bc5359';
+  const OGS_PIN = '1234';
+
+  // 1. Check if tag is assigned
+  const checkTag = await fetch('/api/iot/rfid/A39359FF91EABA', {
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'X-Staff-PIN': OGS_PIN,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  // 2. Get students for teachers 1, 2, 3
+  const getStudents = await fetch('/api/iot/students?teacher_ids=1,2,3', {
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'X-Staff-PIN': OGS_PIN,
+      'Content-Type': 'application/json'
+    }
+  });
+
+  // 3. Assign tag to student
+  const assignTag = await fetch('/api/students/116/rfid', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${API_KEY}`,
+      'X-Staff-PIN': OGS_PIN,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      rfid_tag: 'A39359FF91EABA'
+    })
+  });

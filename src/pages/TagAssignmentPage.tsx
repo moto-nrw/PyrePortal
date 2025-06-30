@@ -37,7 +37,7 @@ interface RfidScannerStatus {
  * 6. Show confirmation and options to continue or go back
  */
 function TagAssignmentPage() {
-  const { authenticatedUser } = useUserStore();
+  const { authenticatedUser, selectedSupervisors } = useUserStore();
   const navigate = useNavigate();
 
   // UI state
@@ -201,13 +201,16 @@ function TagAssignmentPage() {
     return await api.checkTagAssignment(authenticatedUser.pin, tagId);
   };
 
-  // Fetch teacher's students
+  // Fetch students supervised by selected teachers
   const fetchStudents = async (): Promise<Student[]> => {
     if (!authenticatedUser?.pin) {
       throw new Error('Keine Authentifizierung verfügbar');
     }
 
-    return await api.getStudents(authenticatedUser.pin);
+    // Extract teacher IDs from selected supervisors
+    const teacherIds = selectedSupervisors.map(supervisor => supervisor.id);
+    
+    return await api.getStudents(authenticatedUser.pin, teacherIds);
   };
 
   // Assign tag to selected student
