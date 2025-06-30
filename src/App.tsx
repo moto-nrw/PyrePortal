@@ -11,6 +11,7 @@ import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
 import StaffSelectionPage from './pages/StaffSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
+import TeamManagementPage from './pages/TeamManagementPage';
 import UserSelectionPage from './pages/UserSelectionPage';
 import { initializeApi } from './services/api';
 import { useUserStore } from './store/userStore';
@@ -82,6 +83,10 @@ function App() {
             <Route
               path="/staff-selection"
               element={isFullyAuthenticated ? <StaffSelectionPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/team-management"
+              element={isFullyAuthenticated ? <TeamManagementPage /> : <Navigate to="/" replace />}
             />
             <Route
               path="/rooms"

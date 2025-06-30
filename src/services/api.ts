@@ -246,6 +246,7 @@ export interface CurrentSession {
   duration: string;
   is_active?: boolean;
   active_students?: number;
+  supervisors?: SupervisorInfo[];
 }
 
 /**

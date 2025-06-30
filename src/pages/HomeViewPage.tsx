@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox } from '../components/ui';
+import { ContentBox, ErrorModal } from '../components/ui';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -14,9 +14,14 @@ import { logNavigation, logUserAction } from '../utils/logger';
  * Displays after successful PIN validation
  */
 function HomeViewPage() {
-  const { authenticatedUser, currentSession, logout, fetchCurrentSession } = useUserStore();
+  const { authenticatedUser, currentSession, logout, fetchCurrentSession, selectedSupervisors } = useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  // Check if supervisors are selected
+  const hasSupervisors = selectedSupervisors.length > 0;
 
   const handleLogout = async () => {
     if (currentSession) {
@@ -39,6 +44,13 @@ function HomeViewPage() {
   };
 
   const handleTagAssignment = () => {
+    if (!hasSupervisors) {
+      // This should not happen as the button is disabled, but adding for safety
+      logUserAction('NFC-Scan attempted without supervisors');
+      setErrorMessage('Bitte wählen Sie zuerst mindestens einen Betreuer aus, bevor Sie NFC-Scan verwenden.');
+      setShowErrorModal(true);
+      return;
+    }
     logNavigation('Home View', '/tag-assignment');
     void navigate('/tag-assignment');
   };
@@ -56,6 +68,11 @@ function HomeViewPage() {
       });
       void navigate('/nfc-scanning');
     }
+  };
+
+  const handleTeamManagement = () => {
+    logNavigation('Home View', '/team-management');
+    void navigate('/team-management');
   };
 
 
@@ -87,6 +104,73 @@ function HomeViewPage() {
         display: 'flex',
         flexDirection: 'column',
       }}>
+        {/* NFC Scan button - Top Left */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '20px',
+            zIndex: 10,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleTagAssignment}
+            disabled={!hasSupervisors}
+            style={{
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '0 28px',
+              backgroundColor: hasSupervisors ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)',
+              border: hasSupervisors ? '1px solid rgba(80, 128, 216, 0.2)' : '1px solid rgba(156, 163, 175, 0.2)',
+              borderRadius: '28px',
+              cursor: hasSupervisors ? 'pointer' : 'not-allowed',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              boxShadow: hasSupervisors ? '0 4px 12px rgba(0, 0, 0, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.1)',
+              backdropFilter: 'blur(8px)',
+              opacity: hasSupervisors ? 1 : 0.6,
+            }}
+            onTouchStart={(e) => {
+              if (hasSupervisors) {
+                e.currentTarget.style.transform = 'scale(0.95)';
+                e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
+                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (hasSupervisors) {
+                setTimeout(() => {
+                  if (e.currentTarget) {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  }
+                }, 150);
+              }
+            }}
+          >
+            <FontAwesomeIcon
+              icon={faWifi}
+              size="lg"
+              style={{ color: hasSupervisors ? '#5080D8' : '#9CA3AF', transform: 'rotate(90deg)' }}
+            />
+            <span
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: hasSupervisors ? '#5080D8' : '#9CA3AF',
+              }}
+            >
+              NFC-Scan
+            </span>
+          </button>
+        </div>
+
         {/* Modern logout button - Top Right */}
         <div
           style={{
@@ -291,10 +375,10 @@ function HomeViewPage() {
                 </div>
               </button>
 
-              {/* NFC Scan Button */}
+              {/* Team Management Button */}
               <button
-                onClick={handleTagAssignment}
-                onTouchStart={() => setTouchedButton('nfc')}
+                onClick={handleTeamManagement}
+                onTouchStart={() => setTouchedButton('team')}
                 onTouchEnd={() => setTouchedButton(null)}
                 style={{
                   position: 'relative',
@@ -306,13 +390,13 @@ function HomeViewPage() {
                   transition: 'all 200ms',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '200px',
+                  minHeight: '300px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '16px',
-                  transform: touchedButton === 'nfc' ? 'scale(0.97)' : 'scale(1)',
+                  transform: touchedButton === 'team' ? 'scale(0.97)' : 'scale(1)',
                 }}
               >
                 {/* Gradient border */}
@@ -321,7 +405,7 @@ function HomeViewPage() {
                     position: 'absolute',
                     inset: 0,
                     borderRadius: '20px',
-                    background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+                    background: 'linear-gradient(135deg, #9333EA, #7C3AED)',
                     zIndex: 0,
                   }}
                 />
@@ -332,7 +416,7 @@ function HomeViewPage() {
                     position: 'absolute',
                     inset: '3px',
                     borderRadius: '17px',
-                    background: 'linear-gradient(to bottom, #FFFFFF, #EFF6FF)',
+                    background: 'linear-gradient(to bottom, #FFFFFF, #F5F3FF)',
                     zIndex: 1,
                   }}
                 />
@@ -343,7 +427,7 @@ function HomeViewPage() {
                     style={{
                       width: '80px',
                       height: '80px',
-                      backgroundColor: '#E6EFFF',
+                      backgroundColor: '#EDE9FE',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -351,11 +435,12 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    <FontAwesomeIcon
-                      icon={faWifi}
-                      size="3x"
-                      style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
-                    />
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9333EA" strokeWidth="2.5">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
                   </div>
 
                   <h3
@@ -367,7 +452,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    NFC-Scan
+                    Team anpassen
                   </h3>
                   <p
                     style={{
@@ -377,7 +462,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    Armband einlesen
+                    Betreuer verwalten
                   </p>
                 </div>
               </button>
@@ -403,6 +488,14 @@ function HomeViewPage() {
           }
         `}
       </style>
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        message={errorMessage}
+        autoCloseDelay={3000}
+      />
     </ContentBox >
   );
 }
