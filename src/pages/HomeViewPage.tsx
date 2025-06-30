@@ -1,7 +1,10 @@
+import { faWifi } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox } from '../components/ui';
+import { ContentBox, ErrorModal } from '../components/ui';
+import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { logNavigation, logUserAction } from '../utils/logger';
@@ -11,18 +14,42 @@ import { logNavigation, logUserAction } from '../utils/logger';
  * Displays after successful PIN validation
  */
 function HomeViewPage() {
-  const { authenticatedUser, currentSession, logout, fetchCurrentSession } = useUserStore();
+  const { authenticatedUser, currentSession, logout, fetchCurrentSession, selectedSupervisors } = useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  
+  // Check if supervisors are selected
+  const hasSupervisors = selectedSupervisors.length > 0;
 
   const handleLogout = async () => {
-    logUserAction('User logout initiated');
-    await logout();
-    logNavigation('Home View', '/');
-    void navigate('/');
+    if (currentSession) {
+      // End the current session
+      logUserAction('Ending current session');
+      try {
+        await api.endSession(authenticatedUser!.pin);
+        await fetchCurrentSession(); // Refresh session state
+        logUserAction('Session ended successfully');
+      } catch (error) {
+        logUserAction('Failed to end session', { error });
+      }
+    } else {
+      // Logout and redirect to landing page
+      logUserAction('User logout initiated');
+      await logout();
+      logNavigation('Home View', '/');
+      void navigate('/');
+    }
   };
 
   const handleTagAssignment = () => {
+    if (!hasSupervisors) {
+      logUserAction('NFC-Scan attempted without supervisors');
+      setErrorMessage("Bitte wählen Sie zuerst mindestens einen Betreuer über 'Team anpassen' aus, bevor Sie die NFC-Scan Funktion nutzen können.");
+      setShowErrorModal(true);
+      return;
+    }
     logNavigation('Home View', '/tag-assignment');
     void navigate('/tag-assignment');
   };
@@ -42,10 +69,11 @@ function HomeViewPage() {
     }
   };
 
-  const handleAttendance = () => {
-    logNavigation('Home View', '/attendance');
-    void navigate('/attendance');
+  const handleTeamManagement = () => {
+    logNavigation('Home View', '/team-management');
+    void navigate('/team-management');
   };
+
 
   // Redirect to login if no authenticated user and fetch current session
   useEffect(() => {
@@ -63,18 +91,84 @@ function HomeViewPage() {
     return null; // Will redirect via useEffect
   }
 
-  // Extract first name from full name
-  const firstName = authenticatedUser.staffName.split(' ')[0];
+  // Extract first name from full name (unused for now)
+  // const firstName = authenticatedUser.staffName.split(' ')[0];
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{ 
-        width: '100%', 
+      <div style={{
+        width: '100%',
         height: '100%',
         padding: '16px',
         display: 'flex',
         flexDirection: 'column',
       }}>
+        {/* NFC Scan button - Top Left */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '20px',
+            left: '20px',
+            zIndex: 10,
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleTagAssignment}
+            style={{
+              height: '56px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '0 28px',
+              backgroundColor: hasSupervisors ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)',
+              border: hasSupervisors ? '1px solid rgba(80, 128, 216, 0.2)' : '1px solid rgba(156, 163, 175, 0.2)',
+              borderRadius: '28px',
+              cursor: hasSupervisors ? 'pointer' : 'not-allowed',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              boxShadow: hasSupervisors ? '0 4px 12px rgba(0, 0, 0, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.1)',
+              backdropFilter: 'blur(8px)',
+              opacity: hasSupervisors ? 1 : 0.6,
+            }}
+            onTouchStart={(e) => {
+              if (hasSupervisors) {
+                e.currentTarget.style.transform = 'scale(0.95)';
+                e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
+                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+              }
+            }}
+            onTouchEnd={(e) => {
+              if (hasSupervisors) {
+                setTimeout(() => {
+                  if (e.currentTarget) {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  }
+                }, 150);
+              }
+            }}
+          >
+            <FontAwesomeIcon
+              icon={faWifi}
+              size="lg"
+              style={{ color: hasSupervisors ? '#5080D8' : '#9CA3AF', transform: 'rotate(90deg)' }}
+            />
+            <span
+              style={{
+                fontSize: '18px',
+                fontWeight: 600,
+                color: hasSupervisors ? '#5080D8' : '#9CA3AF',
+              }}
+            >
+              NFC-Scan
+            </span>
+          </button>
+        </div>
+
         {/* Modern logout button - Top Right */}
         <div
           style={{
@@ -129,9 +223,9 @@ function HomeViewPage() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-              <polyline points="16 17 21 12 16 7"/>
-              <line x1="21" y1="12" x2="9" y2="12"/>
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
             </svg>
             <span
               style={{
@@ -140,44 +234,17 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              Abmelden
+              {currentSession ? 'Aktivität Beenden' : 'Abmelden'}
             </span>
           </button>
         </div>
 
         {/* Welcome Header */}
-        <div style={{ 
+        <div style={{
           textAlign: 'center',
           marginBottom: '32px',
         }}>
-          <div
-            style={{
-              width: '100px',
-              height: '100px',
-              background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 24px',
-              boxShadow: '0 8px 24px rgba(80, 128, 216, 0.3)',
-            }}
-          >
-            <svg
-              width="56"
-              height="56"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#FFFFFF"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </div>
-          
+
           <h1
             style={{
               fontSize: '48px',
@@ -187,28 +254,18 @@ function HomeViewPage() {
               lineHeight: 1.2,
             }}
           >
-            Hallo, {firstName}!
+            Menü
           </h1>
-          <p
-            style={{
-              fontSize: '20px',
-              color: theme.colors.text.secondary,
-              margin: '8px 0 0 0',
-              fontWeight: 500,
-            }}
-          >
-            Was möchten Sie heute tun?
-          </p>
         </div>
 
         {/* Main Content - Centered */}
-        <div style={{ 
+        <div style={{
           flex: 1,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
         }}>
-          <div style={{ width: '100%', maxWidth: '600px' }}>
+          <div style={{ width: '100%', maxWidth: '720px' }}>
             {/* Primary Actions Grid */}
             <div
               style={{
@@ -233,7 +290,7 @@ function HomeViewPage() {
                   transition: 'all 200ms',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '200px',
+                  minHeight: '300px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -252,7 +309,7 @@ function HomeViewPage() {
                     zIndex: 0,
                   }}
                 />
-                
+
                 {/* Inner content */}
                 <div
                   style={{
@@ -280,18 +337,18 @@ function HomeViewPage() {
                   >
                     {currentSession ? (
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">
-                        <circle cx="12" cy="12" r="10"/>
-                        <polygon points="10,8 16,12 10,16" fill="#83cd2d"/>
+                        <circle cx="12" cy="12" r="10" />
+                        <polygon points="10,8 16,12 10,16" fill="#83cd2d" />
                       </svg>
                     ) : (
                       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">
-                        <circle cx="12" cy="12" r="10"/>
-                        <line x1="12" y1="8" x2="12" y2="16"/>
-                        <line x1="8" y1="12" x2="16" y2="12"/>
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="16" />
+                        <line x1="8" y1="12" x2="16" y2="12" />
                       </svg>
                     )}
                   </div>
-                  
+
                   <h3
                     style={{
                       fontSize: '24px',
@@ -316,10 +373,10 @@ function HomeViewPage() {
                 </div>
               </button>
 
-              {/* NFC Scan Button */}
+              {/* Team Management Button */}
               <button
-                onClick={handleTagAssignment}
-                onTouchStart={() => setTouchedButton('nfc')}
+                onClick={handleTeamManagement}
+                onTouchStart={() => setTouchedButton('team')}
                 onTouchEnd={() => setTouchedButton(null)}
                 style={{
                   position: 'relative',
@@ -331,13 +388,13 @@ function HomeViewPage() {
                   transition: 'all 200ms',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '200px',
+                  minHeight: '300px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '16px',
-                  transform: touchedButton === 'nfc' ? 'scale(0.97)' : 'scale(1)',
+                  transform: touchedButton === 'team' ? 'scale(0.97)' : 'scale(1)',
                 }}
               >
                 {/* Gradient border */}
@@ -346,18 +403,18 @@ function HomeViewPage() {
                     position: 'absolute',
                     inset: 0,
                     borderRadius: '20px',
-                    background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+                    background: 'linear-gradient(135deg, #9333EA, #7C3AED)',
                     zIndex: 0,
                   }}
                 />
-                
+
                 {/* Inner content */}
                 <div
                   style={{
                     position: 'absolute',
                     inset: '3px',
                     borderRadius: '17px',
-                    background: 'linear-gradient(to bottom, #FFFFFF, #EFF6FF)',
+                    background: 'linear-gradient(to bottom, #FFFFFF, #F5F3FF)',
                     zIndex: 1,
                   }}
                 />
@@ -368,7 +425,7 @@ function HomeViewPage() {
                     style={{
                       width: '80px',
                       height: '80px',
-                      backgroundColor: '#E6EFFF',
+                      backgroundColor: '#EDE9FE',
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -376,15 +433,14 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#5080D8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      {/* Standard NFC/Contactless payment symbol */}
-                      <path d="M2 12h3.5" />
-                      <path d="M5.5 6a6 6 0 0 1 0 12" />
-                      <path d="M8.5 3a9 9 0 0 1 0 18" />
-                      <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9333EA" strokeWidth="2.5">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                   </div>
-                  
+
                   <h3
                     style={{
                       fontSize: '24px',
@@ -394,7 +450,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    NFC-Scan
+                    Team anpassen
                   </h3>
                   <p
                     style={{
@@ -404,64 +460,12 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    Armband einlesen
+                    Betreuer verwalten
                   </p>
                 </div>
               </button>
             </div>
 
-            {/* Attendance Button - Full Width */}
-            <button
-              onClick={handleAttendance}
-              style={{
-                height: '56px',
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px',
-                padding: '0 24px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                border: '2px solid #E5E7EB',
-                borderRadius: '28px',
-                cursor: 'pointer',
-                transition: 'all 200ms',
-                outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
-                backdropFilter: 'blur(8px)',
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#374151',
-              }}
-              onTouchStart={(e) => {
-                e.currentTarget.style.transform = 'scale(0.98)';
-                e.currentTarget.style.backgroundColor = '#F9FAFB';
-                e.currentTarget.style.boxShadow = '0 1px 4px rgba(0, 0, 0, 0.12)';
-              }}
-              onTouchEnd={(e) => {
-                setTimeout(() => {
-                  if (e.currentTarget) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.08)';
-                  }
-                }, 150);
-              }}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                <line x1="16" y1="2" x2="16" y2="6"/>
-                <line x1="8" y1="2" x2="8" y2="6"/>
-                <line x1="3" y1="10" x2="21" y2="10"/>
-                <path d="M8 14h.01"/>
-                <path d="M12 14h.01"/>
-                <path d="M16 14h.01"/>
-                <path d="M8 18h.01"/>
-                <path d="M12 18h.01"/>
-              </svg>
-              Anwesenheit verwalten
-            </button>
           </div>
         </div>
       </div>
@@ -482,7 +486,15 @@ function HomeViewPage() {
           }
         `}
       </style>
-    </ContentBox>
+
+      {/* Error Modal */}
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        message={errorMessage}
+        autoCloseDelay={3000}
+      />
+    </ContentBox >
   );
 }
 

@@ -189,7 +189,7 @@ function AttendancePage() {
       throw new Error('Keine Authentifizierung verfügbar');
     }
     
-    return await api.getAttendanceStatus(authenticatedUser.pin, authenticatedUser.staffId, tagId);
+    return await api.getAttendanceStatus(authenticatedUser.pin, tagId);
   };
 
   // Toggle attendance (check-in/check-out)
@@ -212,7 +212,6 @@ function AttendancePage() {
       // Call the attendance toggle API
       const result = await api.toggleAttendance(
         authenticatedUser.pin, 
-        authenticatedUser.staffId, 
         scannedTag, 
         'confirm'
       );

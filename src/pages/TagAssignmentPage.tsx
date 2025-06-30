@@ -1,3 +1,5 @@
+import { faWifi } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -35,7 +37,7 @@ interface RfidScannerStatus {
  * 6. Show confirmation and options to continue or go back
  */
 function TagAssignmentPage() {
-  const { authenticatedUser } = useUserStore();
+  const { authenticatedUser, selectedSupervisors } = useUserStore();
   const navigate = useNavigate();
 
   // UI state
@@ -196,16 +198,19 @@ function TagAssignmentPage() {
       throw new Error('Keine Authentifizierung verfügbar');
     }
 
-    return await api.checkTagAssignment(authenticatedUser.pin, authenticatedUser.staffId, tagId);
+    return await api.checkTagAssignment(authenticatedUser.pin, tagId);
   };
 
-  // Fetch teacher's students
+  // Fetch students supervised by selected teachers
   const fetchStudents = async (): Promise<Student[]> => {
     if (!authenticatedUser?.pin) {
       throw new Error('Keine Authentifizierung verfügbar');
     }
 
-    return await api.getStudents(authenticatedUser.pin, authenticatedUser.staffId);
+    // Extract teacher IDs from selected supervisors
+    const teacherIds = selectedSupervisors.map(supervisor => supervisor.id);
+    
+    return await api.getStudents(authenticatedUser.pin, teacherIds);
   };
 
   // Assign tag to selected student
@@ -232,7 +237,7 @@ function TagAssignmentPage() {
       });
 
       // Call the actual API endpoint
-      const result = await api.assignTag(authenticatedUser.pin, authenticatedUser.staffId, selectedStudentId, scannedTag);
+      const result = await api.assignTag(authenticatedUser.pin, selectedStudentId, scannedTag);
 
       if (result.success) {
         const studentName = `${selectedStudent.first_name} ${selectedStudent.last_name}`;
@@ -315,27 +320,12 @@ function TagAssignmentPage() {
                 border: '1px solid rgba(0, 0, 0, 0.1)',
                 borderRadius: '28px',
                 cursor: 'pointer',
-                transition: 'all 200ms',
                 outline: 'none',
                 WebkitTapHighlightColor: 'transparent',
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                 position: 'relative',
                 overflow: 'hidden',
                 backdropFilter: 'blur(8px)',
-              }}
-              onTouchStart={(e) => {
-                e.currentTarget.style.transform = 'scale(0.95)';
-                e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
-              }}
-              onTouchEnd={(e) => {
-                setTimeout(() => {
-                  if (e.currentTarget) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                  }
-                }, 150);
               }}
             >
               <svg
@@ -403,8 +393,6 @@ function TagAssignmentPage() {
                 boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
                 position: 'relative',
                 overflow: 'hidden',
-                transform: 'scale(1)',
-                animation: 'modalPop 0.3s ease-out',
               }}
             >
               {/* Background pattern */}
@@ -433,16 +421,13 @@ function TagAssignmentPage() {
                   margin: '0 auto 32px',
                   position: 'relative',
                   zIndex: 2,
-                  animation: 'pulse 2s infinite',
                 }}
               >
-                <svg width="70" height="70" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  {/* Standard NFC/Contactless payment symbol */}
-                  <path d="M2 12h3.5" />
-                  <path d="M5.5 6a6 6 0 0 1 0 12" />
-                  <path d="M8.5 3a9 9 0 0 1 0 18" />
-                  <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
-                </svg>
+                <FontAwesomeIcon 
+                  icon={faWifi} 
+                  size="4x"
+                  style={{ color: 'white', transform: 'rotate(90deg)' }}
+                />
               </div>
               
               <h2
@@ -487,14 +472,6 @@ function TagAssignmentPage() {
                   position: 'relative',
                   zIndex: 2,
                 }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
-                  e.currentTarget.style.transform = 'scale(1.05)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
-                  e.currentTarget.style.transform = 'scale(1)';
-                }}
               >
                 Abbrechen
               </button>
@@ -524,13 +501,11 @@ function TagAssignmentPage() {
                     margin: '0 auto 40px',
                   }}
                 >
-                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#5080D8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    {/* Standard NFC/Contactless payment symbol */}
-                    <path d="M2 12h3.5" />
-                    <path d="M5.5 6a6 6 0 0 1 0 12" />
-                    <path d="M8.5 3a9 9 0 0 1 0 18" />
-                    <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
-                  </svg>
+                  <FontAwesomeIcon 
+                    icon={faWifi} 
+                    size="5x"
+                    style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
+                  />
                 </div>
                 
                 <p
@@ -563,20 +538,6 @@ function TagAssignmentPage() {
                     boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
                     opacity: (isLoading || (!scannerStatus?.is_available && isTauriContext())) ? 0.5 : 1,
                   }}
-                  onTouchStart={(e) => {
-                    if (!e.currentTarget.disabled) {
-                      e.currentTarget.style.transform = 'scale(0.95)';
-                      e.currentTarget.style.boxShadow = '0 3px 10px rgba(80, 128, 216, 0.4)';
-                    }
-                  }}
-                  onTouchEnd={(e) => {
-                    setTimeout(() => {
-                      if (e.currentTarget && !e.currentTarget.disabled) {
-                        e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = '0 6px 20px rgba(80, 128, 216, 0.3)';
-                      }
-                    }, 150);
-                  }}
                 >
                   {scannerStatus?.platform.includes('Development')
                     ? 'Mock Scannen'
@@ -595,7 +556,6 @@ function TagAssignmentPage() {
                     border: '4px solid #E5E7EB',
                     borderTopColor: '#5080D8',
                     borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
                     margin: '0 auto 32px',
                   }}
                 />
@@ -733,7 +693,6 @@ function TagAssignmentPage() {
                       border: '2px solid #E5E7EB',
                       backgroundColor: '#FFFFFF',
                       cursor: 'pointer',
-                      transition: 'all 200ms',
                       outline: 'none',
                       WebkitAppearance: 'none',
                       MozAppearance: 'none',
@@ -787,18 +746,6 @@ function TagAssignmentPage() {
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: selectedStudentId ? '0 4px 16px rgba(131, 205, 45, 0.3)' : 'none',
                     }}
-                    onTouchStart={(e) => {
-                      if (!e.currentTarget.disabled) {
-                        e.currentTarget.style.transform = 'scale(0.95)';
-                      }
-                    }}
-                    onTouchEnd={(e) => {
-                      setTimeout(() => {
-                        if (e.currentTarget && !e.currentTarget.disabled) {
-                          e.currentTarget.style.transform = 'scale(1)';
-                        }
-                      }, 150);
-                    }}
                   >
                     {tagAssignment.assigned ? 'Neu zuweisen' : 'Zuweisen'}
                   </button>
@@ -817,18 +764,6 @@ function TagAssignmentPage() {
                       transition: 'all 200ms',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
-                    }}
-                    onTouchStart={(e) => {
-                      e.currentTarget.style.transform = 'scale(0.95)';
-                      e.currentTarget.style.backgroundColor = '#F9FAFB';
-                    }}
-                    onTouchEnd={(e) => {
-                      setTimeout(() => {
-                        if (e.currentTarget) {
-                          e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.backgroundColor = 'white';
-                        }
-                      }, 150);
                     }}
                   >
                     Neuer Scan
@@ -850,7 +785,6 @@ function TagAssignmentPage() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     margin: '0 auto 32px',
-                    animation: 'successPop 0.5s ease-out',
                   }}
                 >
                   <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -901,16 +835,6 @@ function TagAssignmentPage() {
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
                     }}
-                    onTouchStart={(e) => {
-                      e.currentTarget.style.transform = 'scale(0.95)';
-                    }}
-                    onTouchEnd={(e) => {
-                      setTimeout(() => {
-                        if (e.currentTarget) {
-                          e.currentTarget.style.transform = 'scale(1)';
-                        }
-                      }, 150);
-                    }}
                   >
                     Weiteres Armband scannen
                   </button>
@@ -930,18 +854,6 @@ function TagAssignmentPage() {
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
                     }}
-                    onTouchStart={(e) => {
-                      e.currentTarget.style.transform = 'scale(0.95)';
-                      e.currentTarget.style.backgroundColor = '#F9FAFB';
-                    }}
-                    onTouchEnd={(e) => {
-                      setTimeout(() => {
-                        if (e.currentTarget) {
-                          e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.backgroundColor = 'white';
-                        }
-                      }, 150);
-                    }}
                   >
                     Zurück
                   </button>
@@ -952,55 +864,6 @@ function TagAssignmentPage() {
           </div>
         </div>
 
-        {/* Add animation keyframes */}
-        <style>
-          {`
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-            
-            @keyframes modalPop {
-              0% {
-                transform: scale(0.8);
-                opacity: 0;
-              }
-              50% {
-                transform: scale(1.05);
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
-            }
-            
-            @keyframes pulse {
-              0% {
-                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.7);
-              }
-              70% {
-                box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
-              }
-              100% {
-                box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
-              }
-            }
-            
-            @keyframes successPop {
-              0% {
-                transform: scale(0);
-                opacity: 0;
-              }
-              50% {
-                transform: scale(1.2);
-              }
-              100% {
-                transform: scale(1);
-                opacity: 1;
-              }
-            }
-          `}
-        </style>
       </ContentBox>
 
       {/* Error Modal */}

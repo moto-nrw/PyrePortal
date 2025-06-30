@@ -9,7 +9,9 @@ import HomeViewPage from './pages/HomeViewPage';
 import LandingPage from './pages/LandingPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
+import StaffSelectionPage from './pages/StaffSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
+import TeamManagementPage from './pages/TeamManagementPage';
 import UserSelectionPage from './pages/UserSelectionPage';
 import { initializeApi } from './services/api';
 import { useUserStore } from './store/userStore';
@@ -18,7 +20,7 @@ import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { selectedUser, authenticatedUser, selectedRoom, selectedActivity } = useUserStore();
+  const { authenticatedUser, selectedRoom, selectedActivity } = useUserStore();
   const appLogger = createLogger('App');
 
   // Initialize logger with runtime config and API
@@ -46,7 +48,6 @@ function App() {
   }, [appLogger]); // Include appLogger in dependency array
 
   // Auth states
-  const hasSelectedUser = !!selectedUser; // Teacher selected, need PIN
   const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authenticated
 
   // Check if a room is selected for the activity creation page
@@ -65,7 +66,7 @@ function App() {
             <Route path="/user-selection" element={<UserSelectionPage />} />
             <Route
               path="/pin"
-              element={hasSelectedUser ? <PinPage /> : <Navigate to="/user-selection" replace />}
+              element={<PinPage />}
             />
             <Route
               path="/home"
@@ -78,6 +79,14 @@ function App() {
             <Route
               path="/activity-selection"
               element={isFullyAuthenticated ? <CreateActivityPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/staff-selection"
+              element={isFullyAuthenticated ? <StaffSelectionPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/team-management"
+              element={isFullyAuthenticated ? <TeamManagementPage /> : <Navigate to="/" replace />}
             />
             <Route
               path="/rooms"

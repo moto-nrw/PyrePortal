@@ -69,6 +69,16 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   
   const url = `${API_BASE_URL}${endpoint}`;
 
+  // Debug logging for authentication issues
+  if (endpoint === '/api/iot/ping') {
+    logger.debug('Making ping request', {
+      url,
+      method: options.method,
+      hasAuth: !!(options.headers as Record<string, string>)?.Authorization,
+      hasPin: !!(options.headers as Record<string, string>)?.['X-Staff-PIN'],
+    });
+  }
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -143,14 +153,16 @@ export interface PinValidationResult {
 export interface ActivityResponse {
   id: number;
   name: string;
-  category_name: string;
-  category_color: string;
-  room_name: string;
-  enrollment_count: number;
-  max_participants: number;
-  has_spots: boolean;
-  supervisor_name: string;
-  is_active: boolean;
+  category: string;
+  // Optional fields that might not be present in the new API
+  category_name?: string;
+  category_color?: string;
+  room_name?: string;
+  enrollment_count?: number;
+  max_participants?: number;
+  has_spots?: boolean;
+  supervisor_name?: string;
+  is_active?: boolean;
 }
 
 /**
@@ -170,6 +182,11 @@ export interface Room {
   name: string;
   room_type?: string;
   capacity?: number;
+  building?: string;
+  floor?: number;
+  category?: string;
+  color?: string;
+  is_occupied: boolean;
 }
 
 /**
@@ -187,7 +204,19 @@ interface RoomsResponse {
 export interface SessionStartRequest {
   activity_id: number;
   room_id?: number; // Optional: Override the activity's planned room
+  supervisor_ids: number[]; // Required: Array of staff IDs who will supervise
   force?: boolean; // Optional: Force start even if conflicts exist
+}
+
+/**
+ * Supervisor info in session response
+ */
+export interface SupervisorInfo {
+  staff_id: number;
+  first_name: string;
+  last_name: string;
+  display_name: string;
+  role: string;
 }
 
 /**
@@ -198,6 +227,7 @@ export interface SessionStartResponse {
   activity_id: number;
   device_id: number;
   start_time: string;
+  supervisors: SupervisorInfo[];
   status: string;
   message: string;
 }
@@ -216,6 +246,7 @@ export interface CurrentSession {
   duration: string;
   is_active?: boolean;
   active_students?: number;
+  supervisors?: SupervisorInfo[];
 }
 
 /**
@@ -234,6 +265,57 @@ export const api = {
     });
 
     return response.data;
+  },
+
+  /**
+   * Validate global OGS PIN
+   * Endpoint: POST /api/iot/ping
+   */
+  async validateGlobalPin(pin: string): Promise<PinValidationResult> {
+    try {
+      logger.debug('Starting global PIN validation', { 
+        pin: pin.length + ' digits',
+        hasApiKey: !!DEVICE_API_KEY,
+        apiKeyLength: DEVICE_API_KEY?.length 
+      });
+
+      await apiCall('/api/iot/ping', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+        },
+      });
+
+      logger.info('Global PIN validation successful');
+
+      return {
+        success: true,
+        userData: {
+          deviceName: 'OGS Device',
+          staffName: 'OGS Global User',
+          staffId: 0, // No specific staff ID for global PIN
+        },
+      };
+    } catch (error) {
+      logger.error('Global PIN validation failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (errorMessage.includes('401')) {
+        return {
+          success: false,
+          error: 'Ungültiger PIN. Bitte versuchen Sie es erneut.',
+        };
+      } else {
+        return {
+          success: false,
+          error: 'Verbindungsfehler. Bitte überprüfen Sie Ihre Netzwerkverbindung.',
+        };
+      }
+    }
   },
 
   /**
@@ -314,12 +396,11 @@ export const api = {
    * Get teacher's activities for today
    * Endpoint: GET /api/iot/activities
    */
-  async getActivities(pin: string, staffId: number): Promise<ActivityResponse[]> {
+  async getActivities(pin: string): Promise<ActivityResponse[]> {
     const response = await apiCall<ActivitiesResponse>('/api/iot/activities', {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
     });
 
@@ -330,13 +411,12 @@ export const api = {
    * Device health ping
    * Endpoint: POST /api/iot/ping
    */
-  async pingDevice(pin: string, staffId: number): Promise<void> {
+  async pingDevice(pin: string): Promise<void> {
     await apiCall('/api/iot/ping', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
     });
   },
@@ -345,7 +425,7 @@ export const api = {
    * Get available rooms (device authenticated)
    * Endpoint: GET /api/iot/rooms/available
    */
-  async getRooms(pin: string, staffId: number, capacity?: number): Promise<Room[]> {
+  async getRooms(pin: string, capacity?: number): Promise<Room[]> {
     const params = new URLSearchParams();
     if (capacity) {
       params.append('capacity', capacity.toString());
@@ -357,7 +437,6 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
     });
 
@@ -365,10 +444,10 @@ export const api = {
   },
 
   /**
-   * Start activity session
+   * Start activity session with multiple supervisors
    * Endpoint: POST /api/iot/session/start
    */
-  async startSession(pin: string, staffId: number, request: SessionStartRequest): Promise<SessionStartResponse> {
+  async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
     logger.info('Starting session with request:', { ...request });
     
     const response = await apiCall<{
@@ -380,7 +459,6 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
       body: JSON.stringify(request),
     });
@@ -392,7 +470,7 @@ export const api = {
    * Get current session for device
    * Endpoint: GET /api/iot/session/current
    */
-  async getCurrentSession(pin: string, staffId: number): Promise<CurrentSession | null> {
+  async getCurrentSession(pin: string): Promise<CurrentSession | null> {
     try {
       const response = await apiCall<{
         status: string;
@@ -402,7 +480,6 @@ export const api = {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
-          'X-Staff-ID': staffId.toString(),
         },
       });
 
@@ -427,31 +504,62 @@ export const api = {
    * End current session
    * Endpoint: POST /api/iot/session/end
    */
-  async endSession(pin: string, staffId: number): Promise<void> {
+  async endSession(pin: string): Promise<void> {
     await apiCall('/api/iot/session/end', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
     });
   },
 
   /**
-   * Get teacher's students for tag assignment
-   * Endpoint: GET /api/iot/students
+   * Update session supervisors
+   * Endpoint: PUT /api/iot/session/{sessionId}/supervisors
    */
-  async getStudents(pin: string, staffId: number): Promise<Student[]> {
+  async updateSessionSupervisors(
+    pin: string,
+    sessionId: number,
+    supervisorIds: number[]
+  ): Promise<{ supervisors: SupervisorInfo[] }> {
+    const response = await apiCall<{
+      status: string;
+      data: {
+        active_group_id: number;
+        supervisors: SupervisorInfo[];
+        status: string;
+        message: string;
+      };
+      message?: string;
+    }>(`/api/iot/session/${sessionId}/supervisors`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+      body: JSON.stringify({ supervisor_ids: supervisorIds }),
+    });
+
+    return { supervisors: response.data.supervisors };
+  },
+
+  /**
+   * Get students supervised by specified teachers
+   * Endpoint: GET /api/iot/students?teacher_ids=1,2,3
+   */
+  async getStudents(pin: string, teacherIds: number[]): Promise<Student[]> {
+    // Create query parameter string
+    const queryParam = teacherIds.length > 0 ? `?teacher_ids=${teacherIds.join(',')}` : '';
+    
     const response = await apiCall<{
       status: string;
       data: Student[];
       message: string;
-    }>('/api/iot/students', {
+    }>(`/api/iot/students${queryParam}`, {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
     });
 
@@ -462,7 +570,7 @@ export const api = {
    * Check RFID tag assignment status
    * Endpoint: GET /api/iot/rfid/{tagId}
    */
-  async checkTagAssignment(pin: string, staffId: number, tagId: string): Promise<TagAssignmentCheck> {
+  async checkTagAssignment(pin: string, tagId: string): Promise<TagAssignmentCheck> {
     try {
       const response = await apiCall<{
         status: string;
@@ -472,7 +580,6 @@ export const api = {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
-          'X-Staff-ID': staffId.toString(),
         },
       });
 
@@ -491,11 +598,13 @@ export const api = {
    * Assign RFID tag to student
    * Endpoint: POST /api/students/{studentId}/rfid
    */
-  async assignTag(pin: string, staffId: number, studentId: number, tagId: string): Promise<TagAssignmentResult> {
+  async assignTag(pin: string, studentId: number, tagId: string): Promise<TagAssignmentResult> {
     const response = await apiCall<{
       status: string;
       data?: {
+        success: boolean;
         student_id: number;
+        student_name: string;
         rfid_tag: string;
         previous_tag?: string;
         message?: string;
@@ -506,7 +615,6 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
       body: JSON.stringify({
         rfid_tag: tagId,
@@ -515,8 +623,11 @@ export const api = {
 
     // Transform the API response to match our expected TagAssignmentResult interface
     return {
-      success: response.status === 'success',
+      success: response.data?.success ?? (response.status === 'success'),
       message: response.data?.message ?? response.message ?? 'Tag erfolgreich zugewiesen',
+      student_id: response.data?.student_id,
+      student_name: response.data?.student_name,
+      rfid_tag: response.data?.rfid_tag,
       previous_tag: response.data?.previous_tag,
     };
   },
@@ -531,8 +642,7 @@ export const api = {
       action: 'checkin' | 'checkout';
       room_id: number;
     },
-    pin: string,
-    staffId: number
+    pin: string
   ): Promise<RfidScanResult> {
     const response = await apiCall<{
       data: RfidScanResult;
@@ -543,7 +653,6 @@ export const api = {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
       body: JSON.stringify(scanData),
     });
@@ -556,13 +665,12 @@ export const api = {
    * Update session activity to prevent timeout
    * Endpoint: POST /api/iot/session/activity
    */
-  async updateSessionActivity(pin: string, staffId: number): Promise<void> {
+  async updateSessionActivity(pin: string): Promise<void> {
     await apiCall('/api/iot/session/activity', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
-        'X-Staff-ID': staffId.toString(),
       },
       body: JSON.stringify({
         activity_type: 'rfid_scan', // Changed from 'student_scan' to 'rfid_scan'
@@ -576,8 +684,7 @@ export const api = {
    * Endpoint: GET /api/iot/session/current
    */
   async getCurrentSessionInfo(
-    pin: string,
-    staffId: number
+    pin: string
   ): Promise<{ activity_name: string; room_name: string; active_students: number } | null> {
     try {
       const response = await apiCall<{
@@ -588,7 +695,6 @@ export const api = {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
-          'X-Staff-ID': staffId.toString(),
         },
       });
 
@@ -620,13 +726,12 @@ export const api = {
    * Get student attendance status
    * Endpoint: GET /api/iot/attendance/status/{rfid}
    */
-  async getAttendanceStatus(pin: string, staffId: number, rfid: string): Promise<AttendanceStatusResponse> {
+  async getAttendanceStatus(pin: string, rfid: string): Promise<AttendanceStatusResponse> {
     try {
       const response = await apiCall<AttendanceStatusResponse>(`/api/iot/attendance/status/${rfid}`, {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
-          'X-Staff-ID': staffId.toString(),
         },
       });
 
@@ -649,7 +754,6 @@ export const api = {
    */
   async toggleAttendance(
     pin: string,
-    staffId: number,
     rfid: string,
     action: 'confirm' | 'cancel'
   ): Promise<AttendanceToggleResponse> {
@@ -659,7 +763,6 @@ export const api = {
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
-          'X-Staff-ID': staffId.toString(),
         },
         body: JSON.stringify({
           rfid,
@@ -695,7 +798,7 @@ export interface Student {
 }
 
 /**
- * Tag assignment check response from /api/rfid-cards/{tagId}
+ * Tag assignment check response from /api/iot/rfid/{tagId}
  */
 export interface TagAssignmentCheck {
   assigned: boolean;
@@ -711,6 +814,9 @@ export interface TagAssignmentCheck {
  */
 export interface TagAssignmentResult {
   success: boolean;
+  student_id?: number;
+  student_name?: string;
+  rfid_tag?: string;
   previous_tag?: string;
   message?: string;
 }

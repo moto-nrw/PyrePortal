@@ -12,8 +12,8 @@ function LandingPage() {
   const handleLogin = () => {
     logger.info('User initiated login from landing page');
     logUserAction('landing_login_clicked');
-    logNavigation('LandingPage', 'UserSelectionPage');
-    void navigate('/user-selection');
+    logNavigation('LandingPage', 'PinPage');
+    void navigate('/pin');
   };
 
   // Handle application quit

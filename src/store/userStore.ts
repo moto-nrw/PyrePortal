@@ -71,6 +71,35 @@ interface AuthenticatedUser {
   pin: string; // Store PIN for subsequent API calls
 }
 
+// Optimistic scan state for immediate UI feedback
+interface OptimisticScanState {
+  id: string;
+  tagId: string;
+  status: 'pending' | 'processing' | 'success' | 'failed';
+  optimisticAction: 'checkin' | 'checkout';
+  optimisticStudentCount: number;
+  timestamp: number;
+  studentInfo?: {
+    name: string;
+    id: number;
+  };
+}
+
+// Student action history for smart duplicate prevention
+interface StudentActionHistory {
+  studentId: string;
+  lastAction: 'checkin' | 'checkout';
+  timestamp: number;
+  isProcessing: boolean;
+}
+
+// Recent tag scan tracking
+interface RecentTagScan {
+  timestamp: number;
+  studentId?: string;
+  result?: RfidScanResult;
+}
+
 // RFID scanning state
 interface RfidState {
   isScanning: boolean;
@@ -79,6 +108,15 @@ interface RfidState {
   scanTimeout: number; // 3 seconds default
   modalDisplayTime: number; // 1.25 seconds default
   showModal: boolean;
+  
+  // New optimistic state management
+  optimisticScans: OptimisticScanState[];
+  studentHistory: Map<string, StudentActionHistory>;
+  processingQueue: Set<string>; // Currently processing tag IDs
+  
+  // New additions for proper duplicate prevention
+  recentTagScans: Map<string, RecentTagScan>; // Track recent scans by tagId
+  tagToStudentMap: Map<string, string>; // Cache tagId -> studentId mappings
 }
 
 // Define the store state interface
@@ -97,6 +135,7 @@ interface UserState {
   isLoading: boolean;
   error: string | null;
   nfcScanActive: boolean;
+  selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
 
   // RFID scanning state
   rfid: RfidState;
@@ -123,6 +162,11 @@ interface UserState {
   fetchActivities: () => Promise<ActivityResponse[] | null>;
   cancelActivityCreation: () => void;
 
+  // Supervisor selection actions
+  setSelectedSupervisors: (supervisors: User[]) => void;
+  toggleSupervisor: (user: User) => void;
+  clearSelectedSupervisors: () => void;
+
   // Check-in/check-out actions
   startNfcScan: () => void;
   stopNfcScan: () => void;
@@ -142,6 +186,23 @@ interface UserState {
   clearBlockedTag: (tagId: string) => void;
   showScanModal: () => void;
   hideScanModal: () => void;
+  
+  // New optimistic RFID actions
+  addOptimisticScan: (scan: OptimisticScanState) => void;
+  updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => void;
+  removeOptimisticScan: (id: string) => void;
+  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
+  isValidScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
+  addToProcessingQueue: (tagId: string) => void;
+  removeFromProcessingQueue: (tagId: string) => void;
+  
+  // Enhanced duplicate prevention actions
+  canProcessTag: (tagId: string) => boolean;
+  recordTagScan: (tagId: string, scan: RecentTagScan) => void;
+  mapTagToStudent: (tagId: string, studentId: string) => void;
+  getCachedStudentId: (tagId: string) => string | undefined;
+  clearOldTagScans: () => void;
+  isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
 }
 
 // Define the type for the Zustand set function
@@ -184,6 +245,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   isLoading: false,
   error: null,
   nfcScanActive: false,
+  selectedSupervisors: [] as User[], // New state for multi-supervisor selection
 
   // RFID initial state
   rfid: {
@@ -193,6 +255,15 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     scanTimeout: 3000, // 3 seconds
     modalDisplayTime: 2000, // 2 seconds - balanced for animation viewing
     showModal: false,
+    
+    // New optimistic state
+    optimisticScans: [],
+    studentHistory: new Map<string, StudentActionHistory>(),
+    processingQueue: new Set<string>(),
+    
+    // New duplicate prevention state
+    recentTagScans: new Map<string, RecentTagScan>(),
+    tagToStudentMap: new Map<string, string>(),
   },
 
   // Actions
@@ -267,7 +338,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         staffName: authenticatedUser.staffName,
       });
 
-      const rooms = await api.getRooms(authenticatedUser.pin, authenticatedUser.staffId);
+      const rooms = await api.getRooms(authenticatedUser.pin);
 
       storeLogger.debug('Available rooms fetched successfully', { count: rooms.length });
       set({ rooms, isLoading: false });
@@ -301,7 +372,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
     try {
       storeLogger.info('Fetching current session for device');
-      const session = await api.getCurrentSession(authenticatedUser.pin, authenticatedUser.staffId);
+      const session = await api.getCurrentSession(authenticatedUser.pin);
 
       if (session) {
         storeLogger.info('Active session found', {
@@ -325,18 +396,59 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           if (currentSelectedActivity && currentSelectedActivity.id === session.activity_id) {
             sessionActivity = currentSelectedActivity;
           } else {
-            sessionActivity = {
-              id: session.activity_id,
-              name: session.activity_name,
-              category_name: '',
-              category_color: '',
-              room_name: session.room_name ?? '',
-              enrollment_count: 0,
-              max_participants: 0,
-              has_spots: true,
-              supervisor_name: authenticatedUser.staffName,
-              is_active: session.is_active ?? true,
-            };
+            // Fetch complete activity data to get accurate max_participants and other fields
+            try {
+              storeLogger.debug('Fetching activities to restore complete session activity data', { activityId: session.activity_id });
+              const activities = await api.getActivities(authenticatedUser.pin);
+              const matchingActivity = activities.find(activity => activity.id === session.activity_id);
+              
+              if (matchingActivity) {
+                sessionActivity = matchingActivity;
+                storeLogger.info('Session activity restored from API with complete data', { 
+                  activityId: session.activity_id, 
+                  maxParticipants: matchingActivity.max_participants,
+                  enrollmentCount: matchingActivity.enrollment_count
+                });
+              } else {
+                // Fallback to minimal activity object if activity not found in API response
+                sessionActivity = {
+                  id: session.activity_id,
+                  name: session.activity_name,
+                  category: '',
+                  category_name: '',
+                  category_color: '',
+                  room_name: session.room_name ?? '',
+                  enrollment_count: 0,
+                  max_participants: 0,
+                  has_spots: true,
+                  supervisor_name: authenticatedUser.staffName,
+                  is_active: session.is_active ?? true,
+                };
+                storeLogger.warn('Activity not found in API response during session restoration, using fallback with limited data', { 
+                  activityId: session.activity_id,
+                  availableActivityIds: activities.map(a => a.id)
+                });
+              }
+            } catch (error) {
+              // If API call fails, use minimal activity object as fallback
+              sessionActivity = {
+                id: session.activity_id,
+                name: session.activity_name,
+                category: '',
+                category_name: '',
+                category_color: '',
+                room_name: session.room_name ?? '',
+                enrollment_count: 0,
+                max_participants: 0,
+                has_spots: true,
+                supervisor_name: authenticatedUser.staffName,
+                is_active: session.is_active ?? true,
+              };
+              storeLogger.error('Failed to fetch activities during session restoration, using fallback', { 
+                error: error instanceof Error ? error.message : 'Unknown error',
+                activityId: session.activity_id
+              });
+            }
           }
         }
 
@@ -344,6 +456,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           sessionRoom = {
             id: session.room_id,
             name: session.room_name,
+            is_occupied: true, // Current session room is always occupied
           };
         }
 
@@ -374,7 +487,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           activityId: currentSession.activity_id,
         });
 
-        await api.endSession(authenticatedUser.pin, authenticatedUser.staffId);
+        await api.endSession(authenticatedUser.pin);
         storeLogger.info('Session ended successfully');
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -391,16 +504,40 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       selectedActivity: null,
       currentSession: null,
       currentActivity: null,
+      selectedSupervisors: [],
     });
   },
 
-  // Cancel activity creation and clear selected room
+  // Cancel activity creation and clear selected room and supervisors
   cancelActivityCreation: () => {
     set({
       currentActivity: null,
       selectedRoom: null,
+      selectedSupervisors: [],
     });
   },
+
+  // Supervisor selection actions
+  setSelectedSupervisors: (supervisors: User[]) => set({ selectedSupervisors: supervisors }),
+
+  toggleSupervisor: (user: User) => {
+    const { selectedSupervisors } = get();
+    const isSelected = selectedSupervisors.some(s => s.id === user.id);
+    
+    if (isSelected) {
+      // Remove supervisor
+      set({ 
+        selectedSupervisors: selectedSupervisors.filter(s => s.id !== user.id) 
+      });
+    } else {
+      // Add supervisor
+      set({ 
+        selectedSupervisors: [...selectedSupervisors, user] 
+      });
+    }
+  },
+
+  clearSelectedSupervisors: () => set({ selectedSupervisors: [] }),
 
   // Activity-related actions
   initializeActivity: (roomId: number) => {
@@ -545,7 +682,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
             staffName: authenticatedUser.staffName,
           });
 
-          const activitiesData = await api.getActivities(authenticatedUser.pin, authenticatedUser.staffId);
+          const activitiesData = await api.getActivities(authenticatedUser.pin);
 
           storeLogger.info('Activities loaded successfully', {
             count: activitiesData.length,
@@ -819,6 +956,175 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     set(state => ({
       rfid: { ...state.rfid, showModal: false, currentScan: null },
     }));
+  },
+
+  // New optimistic RFID actions
+  addOptimisticScan: (scan: OptimisticScanState) => {
+    set(state => ({
+      rfid: { 
+        ...state.rfid, 
+        optimisticScans: [...state.rfid.optimisticScans, scan] 
+      },
+    }));
+  },
+
+  updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        optimisticScans: state.rfid.optimisticScans.map(scan =>
+          scan.id === id ? { ...scan, status } : scan
+        ),
+      },
+    }));
+  },
+
+  removeOptimisticScan: (id: string) => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        optimisticScans: state.rfid.optimisticScans.filter(scan => scan.id !== id),
+      },
+    }));
+  },
+
+  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => {
+    set(state => {
+      const newHistory = new Map(state.rfid.studentHistory);
+      newHistory.set(studentId, {
+        studentId,
+        lastAction: action,
+        timestamp: Date.now(),
+        isProcessing: false,
+      });
+      return {
+        rfid: { ...state.rfid, studentHistory: newHistory },
+      };
+    });
+  },
+
+  isValidScan: (studentId: string, action: 'checkin' | 'checkout') => {
+    const { rfid } = get();
+    const history = rfid.studentHistory.get(studentId);
+    
+    // Allow if no previous action
+    if (!history) return true;
+    
+    // Allow same action (idempotent)
+    if (history.lastAction === action) return true;
+    
+    // Block opposite action only if recent (10s) and still processing
+    if (history.isProcessing && Date.now() - history.timestamp < 10000) {
+      return false;
+    }
+    
+    return true;
+  },
+
+  addToProcessingQueue: (tagId: string) => {
+    set(state => {
+      const newQueue = new Set(state.rfid.processingQueue);
+      newQueue.add(tagId);
+      return {
+        rfid: { ...state.rfid, processingQueue: newQueue },
+      };
+    });
+  },
+
+  removeFromProcessingQueue: (tagId: string) => {
+    set(state => {
+      const newQueue = new Set(state.rfid.processingQueue);
+      newQueue.delete(tagId);
+      return {
+        rfid: { ...state.rfid, processingQueue: newQueue },
+      };
+    });
+  },
+
+  // Enhanced duplicate prevention functions
+  canProcessTag: (tagId: string) => {
+    const { rfid } = get();
+    
+    // Layer 1: Check if tag is currently being processed
+    if (rfid.processingQueue.has(tagId)) {
+      return false;
+    }
+    
+    // Layer 2: Check recent tag scans (within 2 seconds)
+    const recentScan = rfid.recentTagScans.get(tagId);
+    if (recentScan && Date.now() - recentScan.timestamp < 2000) {
+      return false;
+    }
+    
+    // Layer 3: If we know the studentId, check student history
+    const studentId = rfid.tagToStudentMap.get(tagId);
+    if (studentId) {
+      return get().isValidStudentScan(studentId, 'checkin');
+    }
+    
+    return true;
+  },
+
+  recordTagScan: (tagId: string, scan: RecentTagScan) => {
+    set(state => {
+      const newScans = new Map(state.rfid.recentTagScans);
+      newScans.set(tagId, scan);
+      return {
+        rfid: { ...state.rfid, recentTagScans: newScans },
+      };
+    });
+  },
+
+  mapTagToStudent: (tagId: string, studentId: string) => {
+    set(state => {
+      const newMap = new Map(state.rfid.tagToStudentMap);
+      newMap.set(tagId, studentId);
+      return {
+        rfid: { ...state.rfid, tagToStudentMap: newMap },
+      };
+    });
+  },
+
+  getCachedStudentId: (tagId: string) => {
+    const { rfid } = get();
+    return rfid.tagToStudentMap.get(tagId);
+  },
+
+  clearOldTagScans: () => {
+    set(state => {
+      const now = Date.now();
+      const newScans = new Map<string, RecentTagScan>();
+      
+      // Keep only scans from last 2 seconds
+      state.rfid.recentTagScans.forEach((scan, tagId) => {
+        if (now - scan.timestamp < 2000) {
+          newScans.set(tagId, scan);
+        }
+      });
+      
+      return {
+        rfid: { ...state.rfid, recentTagScans: newScans },
+      };
+    });
+  },
+
+  // Rename isValidScan to isValidStudentScan for clarity
+  isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => {
+    const { rfid } = get();
+    const history = rfid.studentHistory.get(studentId);
+    
+    // Allow if no previous action
+    if (!history) return true;
+    
+    // Allow same action (idempotent)
+    if (history.lastAction === action) return true;
+    
+    // Block opposite action only if recent (10s) and still processing
+    if (history.isProcessing && Date.now() - history.timestamp < 10000) {
+      return false;
+    }
+    
+    return true;
   },
 });
 

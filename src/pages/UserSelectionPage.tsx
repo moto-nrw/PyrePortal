@@ -359,18 +359,6 @@ function UserSelectionPage() {
                         overflow: 'hidden',
                       }}
                     >
-                      {/* Glass shine effect */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '-50%',
-                          left: '-50%',
-                          width: '200%',
-                          height: '200%',
-                          background: 'linear-gradient(45deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%)',
-                          animation: 'shine 2s ease-in-out infinite',
-                        }}
-                      />
                       <svg
                         width="36"
                         height="36"
@@ -542,17 +530,6 @@ function UserSelectionPage() {
             to { transform: rotate(360deg); }
           }
           
-          @keyframes shine {
-            0% {
-              transform: translateX(-100%) translateY(-100%) rotate(45deg);
-            }
-            50% {
-              transform: translateX(0%) translateY(0%) rotate(45deg);
-            }
-            100% {
-              transform: translateX(100%) translateY(100%) rotate(45deg);
-            }
-          }
           
           @keyframes modalPop {
             0% {

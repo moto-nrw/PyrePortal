@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ContentBox } from '../components/ui';
@@ -15,6 +15,10 @@ const ActivityScanningPage: React.FC = () => {
 
   const { isScanning, currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
   
+  // Get access to the store's RFID functions
+  const { recentTagScans } = useUserStore(state => state.rfid);
+  const { hideScanModal } = useUserStore();
+
   // Debug logging for selectedActivity
   useEffect(() => {
     if (selectedActivity) {
@@ -51,17 +55,24 @@ const ActivityScanningPage: React.FC = () => {
   const [studentCount, setStudentCount] = useState(0);
   // Add initial loading state to prevent emoji flicker
   const [isInitializing, setIsInitializing] = useState(true);
+  
+  // State for daily checkout flow
+  const [dailyCheckoutState, setDailyCheckoutState] = useState<{
+    rfid: string;
+    studentName: string;
+    showingFarewell: boolean;
+  } | null>(null);
 
   // Start scanning when component mounts
   useEffect(() => {
     logger.info('Activity Scanning Page mounted, starting RFID scanning');
-    
+
     // Start scanning and clear initializing state
     const initializeScanning = async () => {
       await startScanning();
       setIsInitializing(false);
     };
-    
+
     void initializeScanning();
 
     // Cleanup: stop scanning when component unmounts
@@ -77,7 +88,7 @@ const ActivityScanningPage: React.FC = () => {
     if (!authenticatedUser?.pin) return;
 
     try {
-      const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin, authenticatedUser.staffId);
+      const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
       logger.debug('Session info received:', sessionInfo ?? {});
 
       if (sessionInfo) {
@@ -111,194 +122,75 @@ const ActivityScanningPage: React.FC = () => {
   useEffect(() => {
     if (currentScan && showModal) {
       // Instead of fetching, update count based on scan action
-      logger.debug('Updating student count based on scan', { 
+      logger.debug('Updating student count based on scan', {
         action: currentScan.action,
-        currentCount: studentCount 
+        currentCount: studentCount
       });
-      
-      if (currentScan.action === 'checked_in') {
-        setStudentCount(prev => prev + 1);
-      } else if (currentScan.action === 'checked_out') {
-        setStudentCount(prev => Math.max(0, prev - 1));
-      } else if (currentScan.action === 'transferred') {
-        // For transfers, check if student is coming to or leaving our room
-        const currentRoomName = selectedRoom?.name;
-        if (currentScan.room_name === currentRoomName) {
-          // Student transferred TO our room from another room
+
+      // Only update count for successful actions (not errors or info states)
+      const isError = Boolean((currentScan as { showAsError?: boolean }).showAsError);
+      const isInfo = Boolean((currentScan as { isInfo?: boolean }).isInfo);
+
+      if (!isError && !isInfo) {
+        if (currentScan.action === 'checked_in') {
           setStudentCount(prev => prev + 1);
-        } else if (currentScan.previous_room === currentRoomName) {
-          // Student transferred FROM our room to another room
+        } else if (currentScan.action === 'checked_out') {
           setStudentCount(prev => Math.max(0, prev - 1));
+        } else if ((currentScan.action as string) === 'checked_out_daily') {
+          // Handle daily checkout - find the RFID tag from recent scans
+          let rfidTag = '';
+          
+          // Look through recent tag scans to find the one for this student
+          for (const [tag, scan] of recentTagScans.entries()) {
+            if (scan.result?.student_id === currentScan.student_id) {
+              rfidTag = tag;
+              break;
+            }
+          }
+          
+          // Set up daily checkout state
+          setDailyCheckoutState({
+            rfid: rfidTag,
+            studentName: currentScan.student_name,
+            showingFarewell: false,
+          });
+          
+          // Update student count - they're checking out of the room
+          setStudentCount(prev => Math.max(0, prev - 1));
+        } else if (currentScan.action === 'transferred') {
+          // For transfers, check if student is coming to or leaving our room
+          const currentRoomName = selectedRoom?.name;
+          if (currentScan.room_name === currentRoomName) {
+            // Student transferred TO our room from another room
+            setStudentCount(prev => prev + 1);
+          } else if (currentScan.previous_room === currentRoomName) {
+            // Student transferred FROM our room to another room
+            setStudentCount(prev => Math.max(0, prev - 1));
+          }
+          // If neither matches, don't change count (shouldn't happen)
         }
-        // If neither matches, don't change count (shouldn't happen)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
 
-  // Launch confetti animation
-  const launchConfetti = useCallback(() => {
-    const container = document.getElementById('confetti-container');
-    if (!container) return;
 
-    // Clear any existing confetti
-    container.innerHTML = '';
-    
-    // Colors for the confetti - vibrant and varied
-    const colors = ['#FF3130', '#f87C10', '#83cd2d', '#5080D8', '#FFD700', '#FF69B4', '#00CED1', '#9370DB'];
-    
-    // Create 200 confetti pieces for intense effect
-    for (let i = 0; i < 200; i++) {
-      setTimeout(() => {
-        const confetti = document.createElement('div');
-        const color = colors[Math.floor(Math.random() * colors.length)];
-        const size = Math.random() * 12 + 4;
-        
-        // Random shapes - squares, rectangles, and circles
-        const isCircle = Math.random() > 0.6;
-        const aspectRatio = isCircle ? 1 : 0.4 + Math.random() * 0.8;
-        
-        // Style the confetti
-        confetti.style.position = 'fixed';
-        confetti.style.width = `${size}px`;
-        confetti.style.height = `${size * aspectRatio}px`;
-        confetti.style.backgroundColor = color;
-        confetti.style.borderRadius = isCircle ? '50%' : '0';
-        confetti.style.left = '50%';
-        confetti.style.top = '50%';
-        confetti.style.transform = 'translate(-50%, -50%)';
-        confetti.style.pointerEvents = 'none';
-        confetti.style.zIndex = '1001';
-        confetti.style.boxShadow = `0 0 ${size/2}px ${color}40`;
-        
-        container.appendChild(confetti);
-        
-        // More chaotic angles for explosive effect
-        const angle = Math.random() * Math.PI * 2;
-        const velocity = 300 + Math.random() * 400; // Faster initial velocity
-        const rotationSpeed = Math.random() * 1080 - 540; // More rotation
-        
-        // Add some pieces that go more horizontal
-        const horizontalBias = Math.random() > 0.5 ? 1.5 : 1;
-        const verticalBias = Math.random() > 0.7 ? 0.5 : 1;
-        
-        // Animate with more dramatic motion
-        const animation = confetti.animate([
-          {
-            transform: 'translate(-50%, -50%) scale(0) rotate(0deg)',
-            opacity: 1,
-          },
-          {
-            transform: `translate(calc(-50% + ${Math.cos(angle) * velocity * 0.4 * horizontalBias}px), calc(-50% + ${Math.sin(angle) * velocity * 0.3 * verticalBias}px)) scale(1.2) rotate(${rotationSpeed * 0.3}deg)`,
-            opacity: 1,
-          },
-          {
-            transform: `translate(calc(-50% + ${Math.cos(angle) * velocity * horizontalBias}px), calc(-50% + ${Math.sin(angle) * velocity * verticalBias + 150}px)) scale(0.3) rotate(${rotationSpeed}deg)`,
-            opacity: 0,
-          }
-        ], {
-          duration: 2500 + Math.random() * 500, // Varied duration
-          easing: 'cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-        });
-        
-        animation.onfinish = () => confetti.remove();
-      }, i * 5); // Faster spawn rate for burst effect
-    }
-  }, []);
-
-  // Launch bubble animation for check-out
-  const launchBubbles = useCallback(() => {
-    const container = document.getElementById('confetti-container');
-    if (!container) return;
-
-    // Clear any existing elements
-    container.innerHTML = '';
-    
-    // Create 30 bubbles
-    for (let i = 0; i < 30; i++) {
-      setTimeout(() => {
-        const bubble = document.createElement('div');
-        const size = Math.random() * 40 + 20; // 20-60px bubbles
-        
-        // Style the bubble
-        bubble.style.position = 'fixed';
-        bubble.style.width = `${size}px`;
-        bubble.style.height = `${size}px`;
-        bubble.style.borderRadius = '50%';
-        bubble.style.background = 'radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.4))';
-        bubble.style.border = '2px solid rgba(255, 255, 255, 0.6)';
-        bubble.style.boxShadow = 'inset -10px -10px 20px rgba(255, 255, 255, 0.3), 0 0 20px rgba(248, 124, 16, 0.3)';
-        bubble.style.pointerEvents = 'none';
-        bubble.style.zIndex = '1001';
-        
-        // Random starting position at bottom of screen
-        const startX = Math.random() * window.innerWidth;
-        bubble.style.left = `${startX}px`;
-        bubble.style.bottom = '-100px';
-        
-        container.appendChild(bubble);
-        
-        // Create floating path
-        const swayAmount = (Math.random() - 0.5) * 200; // -100 to 100px horizontal drift
-        const floatDuration = 3000 + Math.random() * 2000; // 3-5 seconds
-        
-        // Animate bubble floating up
-        const animation = bubble.animate([
-          {
-            transform: 'translateY(0) translateX(0) scale(0.5)',
-            opacity: 0.7,
-          },
-          {
-            transform: `translateY(-${window.innerHeight * 0.4}px) translateX(${swayAmount * 0.5}px) scale(1)`,
-            opacity: 0.8,
-          },
-          {
-            transform: `translateY(-${window.innerHeight * 0.7}px) translateX(${swayAmount * 0.8}px) scale(1.1)`,
-            opacity: 0.6,
-          },
-          {
-            transform: `translateY(-${window.innerHeight + 100}px) translateX(${swayAmount}px) scale(0.8)`,
-            opacity: 0,
-          }
-        ], {
-          duration: floatDuration,
-          easing: 'cubic-bezier(0.4, 0.0, 0.2, 1)',
-        });
-        
-        // Add shimmer effect
-        const shimmer = document.createElement('div');
-        shimmer.style.position = 'absolute';
-        shimmer.style.width = '40%';
-        shimmer.style.height = '40%';
-        shimmer.style.background = 'radial-gradient(circle, rgba(255,255,255,0.9) 0%, transparent 70%)';
-        shimmer.style.top = '15%';
-        shimmer.style.left = '20%';
-        shimmer.style.borderRadius = '50%';
-        shimmer.style.animation = 'shimmer 2s infinite';
-        bubble.appendChild(shimmer);
-        
-        animation.onfinish = () => bubble.remove();
-      }, i * 100); // Staggered release
-    }
-  }, []);
-
-  // Auto-close modal after delay and trigger animations
+  // Auto-close modal after delay
   useEffect(() => {
     if (showModal && currentScan) {
-      // Launch confetti for check-ins
-      if (currentScan.action === 'checked_in' || currentScan.action === 'transferred') {
-        launchConfetti();
-      } else if (currentScan.action === 'checked_out') {
-        // Launch bubbles for check-outs
-        launchBubbles();
-      }
+      // Use 10 seconds for daily checkout, otherwise use default modal display time
+      const timeout = dailyCheckoutState ? 10000 : rfid.modalDisplayTime;
       
       const timer = setTimeout(() => {
+        // For daily checkout, clean up state if no action taken
+        if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
+          setDailyCheckoutState(null);
+        }
         // Modal will auto-close through the hook
-      }, rfid.modalDisplayTime);
+      }, timeout);
       return () => clearTimeout(timer);
     }
-  }, [showModal, currentScan, rfid.modalDisplayTime, launchConfetti, launchBubbles]);
+  }, [showModal, currentScan, rfid.modalDisplayTime, dailyCheckoutState]);
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -322,6 +214,41 @@ const ActivityScanningPage: React.FC = () => {
     void stopScanning(); // Handle async function
     // Navigate to PIN page for teacher access
     void navigate('/pin');
+  };
+  
+  // Handle daily checkout confirmation
+  const handleDailyCheckoutConfirm = async () => {
+    if (!dailyCheckoutState || !authenticatedUser?.pin) return;
+    
+    try {
+      logger.info('Processing daily checkout attendance toggle', { 
+        rfid: dailyCheckoutState.rfid,
+        studentName: dailyCheckoutState.studentName 
+      });
+      
+      // Call attendance toggle API - use 'cancel' to log out for the day
+      await api.toggleAttendance(
+        authenticatedUser.pin,
+        dailyCheckoutState.rfid,
+        'cancel'
+      );
+      
+      logger.info('Daily checkout attendance toggle successful');
+      
+      // Show farewell message
+      setDailyCheckoutState(prev => prev ? {...prev, showingFarewell: true} : null);
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setDailyCheckoutState(null);
+        hideScanModal();
+      }, 2000);
+    } catch (error) {
+      logger.error('Failed to toggle attendance', { error });
+      // On error, just close modal (student stays logged in)
+      setDailyCheckoutState(null);
+      hideScanModal();
+    }
   };
 
   return (
@@ -370,8 +297,8 @@ const ActivityScanningPage: React.FC = () => {
           }}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-            <circle cx="12" cy="7" r="4"/>
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
           </svg>
           Anmelden
         </button>
@@ -442,7 +369,7 @@ const ActivityScanningPage: React.FC = () => {
                   fontWeight: 600,
                 }}
               >
-                von {selectedActivity.max_participants} Schülern
+                Schülern
               </div>
               <div
                 style={{
@@ -472,11 +399,11 @@ const ActivityScanningPage: React.FC = () => {
                 fontWeight: 500,
               }}
             >
-              {isInitializing 
-                ? 'Bitte warten, während der Scanner initialisiert wird...' 
-                : isScanning 
-                ? 'Halte dein Armband auf das bunte Scannersymbol'
-                : 'Scanner ist pausiert'
+              {isInitializing
+                ? 'Bitte warten, während der Scanner initialisiert wird...'
+                : isScanning
+                  ? 'Halte dein Armband auf das bunte Scannersymbol'
+                  : 'Scanner ist pausiert'
               }
             </p>
           </div>
@@ -498,12 +425,27 @@ const ActivityScanningPage: React.FC = () => {
             justifyContent: 'center',
             zIndex: 1000,
           }}
+          onClick={() => {
+            // Allow clicking backdrop to dismiss daily checkout modal
+            if (dailyCheckoutState) {
+              setDailyCheckoutState(null);
+              hideScanModal();
+            }
+          }}
         >
           <div
             style={{
-              backgroundColor: currentScan.action === 'checked_in' || currentScan.action === 'transferred' 
-                ? '#83cd2d' 
-                : '#f87C10',
+              backgroundColor: (() => {
+                // Check for daily checkout state
+                if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
+                // Check for error or info states
+                if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
+                if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
+                // Original logic for success states
+                return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
+                  ? '#83cd2d'
+                  : '#f87C10';
+              })(),
               borderRadius: '32px',
               padding: '64px',
               maxWidth: '700px',
@@ -513,8 +455,8 @@ const ActivityScanningPage: React.FC = () => {
               position: 'relative',
               overflow: 'hidden',
               transform: 'scale(1)',
-              animation: 'modalPop 0.3s ease-out',
             }}
+            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
           >
             {/* Background pattern for visual interest */}
             <div
@@ -528,7 +470,7 @@ const ActivityScanningPage: React.FC = () => {
                 pointerEvents: 'none',
               }}
             />
-            
+
             {/* Icon container with background circle */}
             <div
               style={{
@@ -544,17 +486,71 @@ const ActivityScanningPage: React.FC = () => {
                 zIndex: 2,
               }}
             >
-              {currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 6L9 17l-5-5"/>
-                </svg>
-              ) : (
-                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-                  <polyline points="16 17 21 12 16 7"/>
-                  <line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-              )}
+              {(() => {
+                // Daily checkout state - Question or Farewell icon
+                if (dailyCheckoutState) {
+                  if (dailyCheckoutState.showingFarewell) {
+                    // Home icon for farewell
+                    return (
+                      <img 
+                        src="/img/home.png" 
+                        alt="Home" 
+                        width="80" 
+                        height="80"
+                        style={{ 
+                          filter: 'brightness(0) invert(1)', // Make it white to match other icons
+                          objectFit: 'contain' 
+                        }}
+                      />
+                    );
+                  } else {
+                    // Home icon for asking if going home
+                    return (
+                      <img 
+                        src="/img/home.png" 
+                        alt="Home" 
+                        width="80" 
+                        height="80"
+                        style={{ 
+                          filter: 'brightness(0) invert(1)', // Make it white to match other icons
+                          objectFit: 'contain' 
+                        }}
+                      />
+                    );
+                  }
+                }
+                // Error state - X icon
+                if ((currentScan as { showAsError?: boolean }).showAsError) {
+                  return (
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  );
+                }
+                // Info state - Info icon
+                if ((currentScan as { isInfo?: boolean }).isInfo) {
+                  return (
+                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <line x1="12" y1="16" x2="12" y2="12"></line>
+                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                  );
+                }
+                // Success states
+                return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
+                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                ) : (
+                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                );
+              })()}
             </div>
 
             <h2
@@ -568,74 +564,110 @@ const ActivityScanningPage: React.FC = () => {
                 zIndex: 2,
               }}
             >
-              {currentScan.message ??
-                (currentScan.action === 'checked_in'
+              {(() => {
+                // Daily checkout state
+                if (dailyCheckoutState) {
+                  if (dailyCheckoutState.showingFarewell) {
+                    // Extract first name from full name
+                    const firstName = dailyCheckoutState.studentName.split(' ')[0];
+                    return `Auf Wiedersehen, ${firstName}!`;
+                  } else {
+                    return 'Gehst du nach Hause?';
+                  }
+                }
+
+                // Show custom message if available
+                if (currentScan.message) return currentScan.message;
+
+                // Error/Info states use student_name as the title
+                if ((currentScan as { showAsError?: boolean }).showAsError || (currentScan as { isInfo?: boolean }).isInfo) {
+                  return currentScan.student_name;
+                }
+
+                // Normal greeting
+                return currentScan.action === 'checked_in'
                   ? `Hallo, ${currentScan.student_name}!`
-                  : `Tschüss, ${currentScan.student_name}!`)}
+                  : `Tschüss, ${currentScan.student_name}!`;
+              })()}
             </h2>
 
-            <div
-              style={{
-                fontSize: '28px',
-                color: 'rgba(255, 255, 255, 0.95)',
-                fontWeight: 600,
-                position: 'relative',
-                zIndex: 2,
-              }}
-            >
-              {(() => {
-                switch (currentScan.action) {
-                  case 'checked_in':
-                    return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
-                  case 'checked_out':
-                    return 'Du bist jetzt ausgecheckt';
-                  case 'transferred':
-                    return 'Raumwechsel erfolgreich';
-                  default:
-                    return '';
-                }
-              })()}
-            </div>
+            {/* Content area for message or button */}
+            {dailyCheckoutState ? (
+              <>
+                {!dailyCheckoutState.showingFarewell && (
+                  <>
+                    <div
+                      style={{
+                        fontSize: '32px',
+                        color: 'rgba(255, 255, 255, 0.95)',
+                        fontWeight: 600,
+                        marginBottom: '32px',
+                        position: 'relative',
+                        zIndex: 2,
+                      }}
+                    >
+                      {dailyCheckoutState.studentName}
+                    </div>
+                    
+                    <button
+                      onClick={handleDailyCheckoutConfirm}
+                      style={{
+                        backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                        border: '2px solid rgba(255, 255, 255, 0.5)',
+                        borderRadius: '16px',
+                        color: '#FFFFFF',
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        padding: '16px 48px',
+                        cursor: 'pointer',
+                        transition: 'all 200ms',
+                        position: 'relative',
+                        zIndex: 2,
+                        outline: 'none',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                        e.currentTarget.style.transform = 'scale(1.05)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                        e.currentTarget.style.transform = 'scale(1)';
+                      }}
+                    >
+                      Ja
+                    </button>
+                  </>
+                )}
+              </>
+            ) : (
+              <div
+                style={{
+                  fontSize: '28px',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                  fontWeight: 600,
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              >
+                {(() => {
+                  switch (currentScan.action) {
+                    case 'checked_in':
+                      return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
+                    case 'checked_out':
+                      return 'Du bist jetzt ausgecheckt';
+                    case 'transferred':
+                      return 'Raumwechsel erfolgreich';
+                    default:
+                      return '';
+                  }
+                })()}
+              </div>
+            )}
           </div>
 
-          {/* Confetti container */}
-          <div id="confetti-container" />
         </div>
       )}
 
-      {/* Add animation keyframes */}
-      <style>
-        {`
-          @keyframes modalPop {
-            0% {
-              transform: scale(0.8);
-              opacity: 0;
-            }
-            50% {
-              transform: scale(1.05);
-            }
-            100% {
-              transform: scale(1);
-              opacity: 1;
-            }
-          }
-          
-          @keyframes shimmer {
-            0% {
-              transform: translate(-5px, -5px) scale(1);
-              opacity: 0.9;
-            }
-            50% {
-              transform: translate(5px, 5px) scale(0.8);
-              opacity: 0.6;
-            }
-            100% {
-              transform: translate(-5px, -5px) scale(1);
-              opacity: 0.9;
-            }
-          }
-        `}
-      </style>
     </>
   );
 };
