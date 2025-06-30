@@ -119,7 +119,7 @@ const ActivityScanningPage: React.FC = () => {
       // Only update count for successful actions (not errors or info states)
       const isError = Boolean((currentScan as { showAsError?: boolean }).showAsError);
       const isInfo = Boolean((currentScan as { isInfo?: boolean }).isInfo);
-      
+
       if (!isError && !isInfo) {
         if (currentScan.action === 'checked_in') {
           setStudentCount(prev => prev + 1);
@@ -295,7 +295,7 @@ const ActivityScanningPage: React.FC = () => {
                   fontWeight: 600,
                 }}
               >
-                von {selectedActivity.max_participants} Schülern
+                Schülern
               </div>
               <div
                 style={{
@@ -372,7 +372,6 @@ const ActivityScanningPage: React.FC = () => {
               position: 'relative',
               overflow: 'hidden',
               transform: 'scale(1)',
-              animation: 'modalPop 0.3s ease-out',
             }}
           >
             {/* Background pattern for visual interest */}
@@ -452,12 +451,12 @@ const ActivityScanningPage: React.FC = () => {
               {(() => {
                 // Show custom message if available
                 if (currentScan.message) return currentScan.message;
-                
+
                 // Error/Info states use student_name as the title
                 if ((currentScan as { showAsError?: boolean }).showAsError || (currentScan as { isInfo?: boolean }).isInfo) {
                   return currentScan.student_name;
                 }
-                
+
                 // Normal greeting
                 return currentScan.action === 'checked_in'
                   ? `Hallo, ${currentScan.student_name}!`
@@ -492,24 +491,6 @@ const ActivityScanningPage: React.FC = () => {
         </div>
       )}
 
-      {/* Add animation keyframes */}
-      <style>
-        {`
-          @keyframes modalPop {
-            0% {
-              transform: scale(0.8);
-              opacity: 0;
-            }
-            50% {
-              transform: scale(1.05);
-            }
-            100% {
-              transform: scale(1);
-              opacity: 1;
-            }
-          }
-        `}
-      </style>
     </>
   );
 };
