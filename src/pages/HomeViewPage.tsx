@@ -521,7 +521,12 @@ function HomeViewPage() {
                           alignItems: 'center',
                           gap: '4px'
                         }}>
-                          👥 {sessionSettings.last_session.supervisor_names.length} Betreuer
+                          👥 {selectedSupervisors.length > 0 && selectedSupervisors.length !== sessionSettings.last_session.supervisor_names.length
+                            ? `${selectedSupervisors.length} Betreuer (gespeichert: ${sessionSettings.last_session.supervisor_names.length})`
+                            : selectedSupervisors.length > 0
+                            ? `${selectedSupervisors.length} Betreuer`
+                            : `${sessionSettings.last_session.supervisor_names.length} Betreuer`
+                          }
                         </span>
                       </div>
                     </div>
