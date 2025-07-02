@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ContentBox } from '../components/ui';
 import { api, type Room, type SessionStartRequest, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
@@ -115,7 +116,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         <div
           style={{
             backgroundColor: '#F8FAFC',
-            borderRadius: '16px',
+            borderRadius: designSystem.borderRadius.lg,
             padding: '24px',
             marginBottom: '32px',
             border: '1px solid #E2E8F0',
@@ -207,7 +208,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         <div
           style={{
             backgroundColor: '#F0F9FF',
-            borderRadius: '16px',
+            borderRadius: designSystem.borderRadius.lg,
             padding: '20px',
             marginBottom: '32px',
             border: '1px solid #BAE6FD',
@@ -278,7 +279,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               color: '#6B7280',
               backgroundColor: 'transparent',
               border: '2px solid #E5E7EB',
-              borderRadius: '16px',
+              borderRadius: designSystem.borderRadius.lg,
               cursor: isLoading ? 'not-allowed' : 'pointer',
               transition: 'all 200ms',
               outline: 'none',
@@ -314,7 +315,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
                 : 'linear-gradient(to right, #83cd2d, #6ba529)',
               border: 'none',
-              borderRadius: '16px',
+              borderRadius: designSystem.borderRadius.lg,
               cursor: isLoading ? 'not-allowed' : 'pointer',
               transition: 'all 200ms',
               outline: 'none',
@@ -442,7 +443,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         <div
           style={{
             backgroundColor: '#FEF3C7',
-            borderRadius: '16px',
+            borderRadius: designSystem.borderRadius.lg,
             padding: '24px',
             marginBottom: '32px',
             border: '1px solid #FCD34D',
@@ -535,7 +536,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         <div
           style={{
             backgroundColor: '#F0F9FF',
-            borderRadius: '16px',
+            borderRadius: designSystem.borderRadius.lg,
             padding: '20px',
             marginBottom: '32px',
             border: '1px solid #BAE6FD',
@@ -598,7 +599,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
           style={{
             backgroundColor: '#FEF2F2',
             border: '1px solid #FECACA',
-            borderRadius: '12px',
+            borderRadius: designSystem.borderRadius.md,
             padding: '16px',
             marginBottom: '32px',
           }}
@@ -628,7 +629,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
               color: '#6B7280',
               backgroundColor: 'transparent',
               border: '2px solid #E5E7EB',
-              borderRadius: '16px',
+              borderRadius: designSystem.borderRadius.lg,
               cursor: isLoading ? 'not-allowed' : 'pointer',
               transition: 'all 200ms',
               outline: 'none',
@@ -664,7 +665,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
                 ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
                 : 'linear-gradient(to right, #DC2626, #B91C1C)',
               border: 'none',
-              borderRadius: '16px',
+              borderRadius: designSystem.borderRadius.lg,
               cursor: isLoading ? 'not-allowed' : 'pointer',
               transition: 'all 200ms',
               outline: 'none',
@@ -1039,35 +1040,28 @@ function RoomSelectionPage() {
             type="button"
             onClick={handleGoBack}
             style={{
-              height: '56px',
+              ...designSystem.components.backButton,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '10px',
-              padding: '0 28px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: '28px',
               cursor: 'pointer',
-              transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
               position: 'relative',
               overflow: 'hidden',
-              backdropFilter: 'blur(8px)',
             }}
             onTouchStart={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.transform = designSystem.scales.activeSmall;
               e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+              e.currentTarget.style.boxShadow = designSystem.shadows.button;
             }}
             onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
+                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
                 }
               }, 150);
             }}
@@ -1217,12 +1211,12 @@ function RoomSelectionPage() {
                         padding: '16px',
                         backgroundColor: 'transparent',
                         border: 'none',
-                        borderRadius: '12px',
+                        borderRadius: designSystem.borderRadius.xl,
                         fontSize: '18px',
                         fontWeight: 600,
-                        color: isOccupied ? '#9CA3AF' : '#1F2937',
+                        color: isOccupied ? '#9CA3AF' : designSystem.colors.textPrimary,
                         cursor: isOccupied ? 'not-allowed' : 'pointer',
-                        transition: 'all 200ms',
+                        transition: designSystem.transitions.smooth,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -1235,11 +1229,12 @@ function RoomSelectionPage() {
                         gap: '12px',
                         WebkitTapHighlightColor: 'transparent',
                         opacity: isOccupied ? 0.6 : 1,
+                        boxShadow: designSystem.shadows.card,
                       }}
                       onTouchStart={e => {
                         if (!isOccupied) {
-                          e.currentTarget.style.transform = 'scale(0.98)';
-                          e.currentTarget.style.backgroundColor = '#FEF3E2';
+                          e.currentTarget.style.transform = designSystem.scales.active;
+                          e.currentTarget.style.boxShadow = designSystem.shadows.card;
                         }
                       }}
                       onTouchEnd={e => {
@@ -1247,7 +1242,7 @@ function RoomSelectionPage() {
                           setTimeout(() => {
                             if (e.currentTarget) {
                               e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.boxShadow = designSystem.shadows.card;
                             }
                           }, 150);
                         }
@@ -1258,10 +1253,10 @@ function RoomSelectionPage() {
                         style={{
                           position: 'absolute',
                           inset: 0,
-                          borderRadius: '12px',
+                          borderRadius: designSystem.borderRadius.xl,
                           background: isOccupied
-                            ? 'linear-gradient(to right, #9CA3AF, #6B7280)'
-                            : 'linear-gradient(to right, #f87C10, #e06c0a)',
+                            ? 'linear-gradient(135deg, #9CA3AF, #6B7280)'
+                            : 'linear-gradient(135deg, #f87C10, #e06c0a)',
                           zIndex: 0,
                         }}
                       />
@@ -1271,10 +1266,10 @@ function RoomSelectionPage() {
                         style={{
                           position: 'absolute',
                           inset: '2px',
-                          borderRadius: '10px',
-                          background: isOccupied
-                            ? 'linear-gradient(to bottom, #F9FAFB, #F3F4F6)'
-                            : 'linear-gradient(to bottom, #FFFFFF, #FEF7ED)',
+                          borderRadius: `calc(${designSystem.borderRadius.xl} - 2px)`,
+                          background: designSystem.gradients.light,
+                          backdropFilter: designSystem.glass.blur,
+                          WebkitBackdropFilter: designSystem.glass.blur,
                           zIndex: 1,
                         }}
                       />
@@ -1329,7 +1324,7 @@ function RoomSelectionPage() {
                           backgroundColor: isOccupied ? '#EF4444' : '#10B981',
                           color: '#FFFFFF',
                           padding: '4px 8px',
-                          borderRadius: '12px',
+                          borderRadius: designSystem.borderRadius.md,
                           fontSize: '10px',
                           fontWeight: 600,
                           display: 'flex',
@@ -1357,7 +1352,7 @@ function RoomSelectionPage() {
                         height: '160px',
                         backgroundColor: '#FAFAFA',
                         border: '2px dashed #E5E7EB',
-                        borderRadius: '12px',
+                        borderRadius: designSystem.borderRadius.md,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',

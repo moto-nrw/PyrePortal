@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ContentBox } from '../components/ui';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
@@ -242,35 +243,28 @@ function CreateActivityPage() {
             type="button"
             onClick={handleBack}
             style={{
-              height: '56px',
+              ...designSystem.components.backButton,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '10px',
-              padding: '0 28px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: '28px',
               cursor: 'pointer',
-              transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
               position: 'relative',
               overflow: 'hidden',
-              backdropFilter: 'blur(8px)',
             }}
             onTouchStart={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.transform = designSystem.scales.activeSmall;
               e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+              e.currentTarget.style.boxShadow = designSystem.shadows.button;
             }}
             onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
+                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
                 }
               }, 150);
             }}
@@ -421,12 +415,12 @@ function CreateActivityPage() {
                         padding: '16px',
                         backgroundColor: 'transparent',
                         border: 'none',
-                        borderRadius: '12px',
+                        borderRadius: designSystem.borderRadius.xl,
                         fontSize: '18px',
                         fontWeight: 600,
-                        color: '#1F2937',
+                        color: designSystem.colors.textPrimary,
                         cursor: isActive ? 'not-allowed' : 'pointer',
-                        transition: 'all 200ms',
+                        transition: designSystem.transitions.smooth,
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
@@ -439,11 +433,12 @@ function CreateActivityPage() {
                         gap: '12px',
                         WebkitTapHighlightColor: 'transparent',
                         opacity: isActive ? 0.6 : 1,
+                        boxShadow: designSystem.shadows.card,
                       }}
                       onTouchStart={e => {
                         if (!isActive) {
-                          e.currentTarget.style.transform = 'scale(0.98)';
-                          e.currentTarget.style.backgroundColor = '#E6EFFF';
+                          e.currentTarget.style.transform = designSystem.scales.active;
+                          e.currentTarget.style.boxShadow = designSystem.shadows.card;
                         }
                       }}
                       onTouchEnd={e => {
@@ -451,7 +446,7 @@ function CreateActivityPage() {
                           setTimeout(() => {
                             if (e.currentTarget) {
                               e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.backgroundColor = 'transparent';
+                              e.currentTarget.style.boxShadow = designSystem.shadows.card;
                             }
                           }, 150);
                         }
@@ -462,10 +457,10 @@ function CreateActivityPage() {
                         style={{
                           position: 'absolute',
                           inset: 0,
-                          borderRadius: '12px',
+                          borderRadius: designSystem.borderRadius.xl,
                           background: isActive
-                            ? 'linear-gradient(to right, #9CA3AF, #6B7280)'
-                            : 'linear-gradient(to right, #5080D8, #3f6bc4)',
+                            ? 'linear-gradient(135deg, #9CA3AF, #6B7280)'
+                            : designSystem.gradients.blue,
                           zIndex: 0,
                         }}
                       />
@@ -475,8 +470,10 @@ function CreateActivityPage() {
                         style={{
                           position: 'absolute',
                           inset: '2px',
-                          borderRadius: '10px',
-                          background: 'linear-gradient(to bottom, #FFFFFF, #F0F4FF)',
+                          borderRadius: `calc(${designSystem.borderRadius.xl} - 2px)`,
+                          background: designSystem.gradients.light,
+                          backdropFilter: designSystem.glass.blur,
+                          WebkitBackdropFilter: designSystem.glass.blur,
                           zIndex: 1,
                         }}
                       />
@@ -484,7 +481,7 @@ function CreateActivityPage() {
                       {/* Activity Icon */}
                       <div
                         style={{
-                          color: '#5080D8',
+                          color: designSystem.colors.primaryBlue,
                           position: 'relative',
                           zIndex: 2,
                         }}

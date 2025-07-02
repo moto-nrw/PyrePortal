@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { ContentBox, ErrorModal, SuccessModal } from '../components/ui';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction } from '../utils/logger';
 
@@ -223,35 +224,28 @@ function TeamManagementPage() {
             type="button"
             onClick={handleBack}
             style={{
-              height: '56px',
+              ...designSystem.components.backButton,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               gap: '10px',
-              padding: '0 28px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: '28px',
               cursor: 'pointer',
-              transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
               position: 'relative',
               overflow: 'hidden',
-              backdropFilter: 'blur(8px)',
             }}
             onTouchStart={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.transform = designSystem.scales.activeSmall;
               e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+              e.currentTarget.style.boxShadow = designSystem.shadows.button;
             }}
             onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
+                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
                 }
               }, 150);
             }}
@@ -349,29 +343,29 @@ function TeamManagementPage() {
                     key={user.id}
                     style={{
                       background: isSelected
-                        ? 'linear-gradient(135deg, #14B8A6, #0D9488)'
-                        : 'linear-gradient(135deg, #5080D8, #3f6bc4)',
-                      borderRadius: '20px',
+                        ? designSystem.gradients.green
+                        : designSystem.gradients.blue,
+                      borderRadius: designSystem.borderRadius.xl,
                       padding: '3px',
                       cursor: 'pointer',
-                      transition: 'all 200ms',
+                      transition: designSystem.transitions.base,
                       boxShadow: isSelected
-                        ? '0 8px 25px rgba(20, 184, 166, 0.25)'
-                        : '0 8px 25px rgba(80, 128, 216, 0.15)',
+                        ? designSystem.shadows.green
+                        : designSystem.shadows.blue,
                     }}
                     onTouchStart={e => {
-                      e.currentTarget.style.transform = 'scale(0.95)';
+                      e.currentTarget.style.transform = designSystem.scales.activeSmall;
                       e.currentTarget.style.boxShadow = isSelected
-                        ? '0 4px 15px rgba(20, 184, 166, 0.35)'
-                        : '0 4px 15px rgba(80, 128, 216, 0.25)';
+                        ? designSystem.shadows.green
+                        : designSystem.shadows.blue;
                     }}
                     onTouchEnd={e => {
                       setTimeout(() => {
                         if (e.currentTarget) {
                           e.currentTarget.style.transform = 'scale(1)';
                           e.currentTarget.style.boxShadow = isSelected
-                            ? '0 8px 25px rgba(20, 184, 166, 0.25)'
-                            : '0 8px 25px rgba(80, 128, 216, 0.15)';
+                            ? designSystem.shadows.green
+                            : designSystem.shadows.blue;
                         }
                       }, 150);
                     }}
@@ -383,7 +377,7 @@ function TeamManagementPage() {
                         height: '160px',
                         backgroundColor: '#FFFFFF',
                         border: 'none',
-                        borderRadius: '17px',
+                        borderRadius: `calc(${designSystem.borderRadius.xl} - 3px)`,
                         cursor: 'pointer',
                         outline: 'none',
                         WebkitTapHighlightColor: 'transparent',
@@ -392,8 +386,9 @@ function TeamManagementPage() {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: '16px',
-                        background: 'linear-gradient(to bottom, #FFFFFF, #F8FAFC)',
-                        backdropFilter: 'blur(8px)',
+                        background: designSystem.gradients.light,
+                        backdropFilter: designSystem.glass.blur,
+                        WebkitBackdropFilter: designSystem.glass.blur,
                         position: 'relative',
                       }}
                     >
@@ -406,7 +401,7 @@ function TeamManagementPage() {
                           width: '24px',
                           height: '24px',
                           borderRadius: '50%',
-                          backgroundColor: isSelected ? '#14B8A6' : '#E5E7EB',
+                          backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -433,15 +428,15 @@ function TeamManagementPage() {
                           width: '64px',
                           height: '64px',
                           background: isSelected
-                            ? 'linear-gradient(135deg, #14B8A6, #0D9488)'
-                            : 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+                            ? designSystem.gradients.green
+                            : designSystem.gradients.blue,
                           borderRadius: '50%',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           boxShadow: isSelected
-                            ? '0 6px 20px rgba(20, 184, 166, 0.3)'
-                            : '0 6px 20px rgba(80, 128, 216, 0.3)',
+                            ? designSystem.shadows.green
+                            : designSystem.shadows.blue,
                           position: 'relative',
                           overflow: 'hidden',
                         }}
@@ -627,29 +622,29 @@ function TeamManagementPage() {
                   background:
                     selectedSupervisors.length === 0 || isSaving
                       ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                      : 'linear-gradient(to right, #14B8A6, #0D9488)',
+                      : designSystem.gradients.greenRight,
                   border: 'none',
-                  borderRadius: '28px',
+                  borderRadius: designSystem.borderRadius.full,
                   cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',
-                  transition: 'all 200ms',
+                  transition: designSystem.transitions.base,
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
                   boxShadow:
                     selectedSupervisors.length === 0 || isSaving
                       ? 'none'
-                      : '0 4px 14px 0 rgba(20, 184, 166, 0.4)',
+                      : designSystem.shadows.green,
                   opacity: selectedSupervisors.length === 0 || isSaving ? 0.6 : 1,
                 }}
                 onTouchStart={e => {
                   if (selectedSupervisors.length > 0 && !isSaving) {
-                    e.currentTarget.style.transform = 'scale(0.98)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(20, 184, 166, 0.5)';
+                    e.currentTarget.style.transform = designSystem.scales.active;
+                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
                   }
                 }}
                 onTouchEnd={e => {
                   if (selectedSupervisors.length > 0 && !isSaving) {
                     e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(20, 184, 166, 0.4)';
+                    e.currentTarget.style.boxShadow = designSystem.shadows.green;
                   }
                 }}
               >

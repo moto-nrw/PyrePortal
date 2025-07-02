@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { ContentBox, ErrorModal } from '../components/ui';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { logNavigation, logUserAction } from '../utils/logger';
 
@@ -127,27 +128,28 @@ function HomeViewPage() {
               gap: '10px',
               padding: '0 28px',
               backgroundColor: hasSupervisors
-                ? 'rgba(255, 255, 255, 0.9)'
+                ? designSystem.glass.background
                 : 'rgba(255, 255, 255, 0.6)',
               border: hasSupervisors
                 ? '1px solid rgba(80, 128, 216, 0.2)'
                 : '1px solid rgba(156, 163, 175, 0.2)',
               borderRadius: '28px',
               cursor: hasSupervisors ? 'pointer' : 'not-allowed',
-              transition: 'all 200ms',
+              transition: designSystem.transitions.base,
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
               boxShadow: hasSupervisors
-                ? '0 4px 12px rgba(0, 0, 0, 0.15)'
+                ? designSystem.shadows.button
                 : '0 2px 6px rgba(0, 0, 0, 0.1)',
-              backdropFilter: 'blur(8px)',
+              backdropFilter: designSystem.glass.blur,
+              WebkitBackdropFilter: designSystem.glass.blur,
               opacity: hasSupervisors ? 1 : 0.6,
             }}
             onTouchStart={e => {
               if (hasSupervisors) {
-                e.currentTarget.style.transform = 'scale(0.95)';
+                e.currentTarget.style.transform = designSystem.scales.activeSmall;
                 e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+                e.currentTarget.style.boxShadow = designSystem.shadows.button;
               }
             }}
             onTouchEnd={e => {
@@ -155,8 +157,8 @@ function HomeViewPage() {
                 setTimeout(() => {
                   if (e.currentTarget) {
                     e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                    e.currentTarget.style.backgroundColor = designSystem.glass.background;
+                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
                   }
                 }, 150);
               }
@@ -198,27 +200,28 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '10px',
               padding: '0 28px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              backgroundColor: designSystem.glass.background,
               border: '1px solid rgba(255, 49, 48, 0.2)',
               borderRadius: '28px',
               cursor: 'pointer',
-              transition: 'all 200ms',
+              transition: designSystem.transitions.base,
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              backdropFilter: 'blur(8px)',
+              boxShadow: designSystem.shadows.button,
+              backdropFilter: designSystem.glass.blur,
+              WebkitBackdropFilter: designSystem.glass.blur,
             }}
             onTouchStart={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.transform = designSystem.scales.activeSmall;
               e.currentTarget.style.backgroundColor = 'rgba(255, 49, 48, 0.1)';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+              e.currentTarget.style.boxShadow = designSystem.shadows.button;
             }}
             onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
+                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
                 }
               }, 150);
             }}
@@ -297,10 +300,10 @@ function HomeViewPage() {
                   position: 'relative',
                   backgroundColor: 'transparent',
                   border: 'none',
-                  borderRadius: '20px',
+                  borderRadius: designSystem.borderRadius.xl,
                   padding: '32px',
                   cursor: 'pointer',
-                  transition: 'all 200ms',
+                  transition: designSystem.transitions.smooth,
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
                   minHeight: '300px',
@@ -309,7 +312,8 @@ function HomeViewPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '16px',
-                  transform: touchedButton === 'activity' ? 'scale(0.97)' : 'scale(1)',
+                  transform: touchedButton === 'activity' ? designSystem.scales.active : 'scale(1)',
+                  boxShadow: touchedButton === 'activity' ? designSystem.shadows.card : designSystem.shadows.cardHover,
                 }}
               >
                 {/* Gradient border */}
@@ -317,8 +321,8 @@ function HomeViewPage() {
                   style={{
                     position: 'absolute',
                     inset: 0,
-                    borderRadius: '20px',
-                    background: 'linear-gradient(135deg, #83cd2d, #6ba529)',
+                    borderRadius: designSystem.borderRadius.xl,
+                    background: designSystem.gradients.green,
                     zIndex: 0,
                   }}
                 />
@@ -328,8 +332,10 @@ function HomeViewPage() {
                   style={{
                     position: 'absolute',
                     inset: '3px',
-                    borderRadius: '17px',
-                    background: 'linear-gradient(to bottom, #FFFFFF, #F7FEF1)',
+                    borderRadius: `calc(${designSystem.borderRadius.xl} - 3px)`,
+                    background: designSystem.gradients.light,
+                    backdropFilter: designSystem.glass.blur,
+                    WebkitBackdropFilter: designSystem.glass.blur,
                     zIndex: 1,
                   }}
                 />
@@ -411,10 +417,10 @@ function HomeViewPage() {
                   position: 'relative',
                   backgroundColor: 'transparent',
                   border: 'none',
-                  borderRadius: '20px',
+                  borderRadius: designSystem.borderRadius.xl,
                   padding: '32px',
                   cursor: 'pointer',
-                  transition: 'all 200ms',
+                  transition: designSystem.transitions.smooth,
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
                   minHeight: '300px',
@@ -423,7 +429,8 @@ function HomeViewPage() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '16px',
-                  transform: touchedButton === 'team' ? 'scale(0.97)' : 'scale(1)',
+                  transform: touchedButton === 'team' ? designSystem.scales.active : 'scale(1)',
+                  boxShadow: touchedButton === 'team' ? designSystem.shadows.card : designSystem.shadows.cardHover,
                 }}
               >
                 {/* Gradient border */}
@@ -431,7 +438,7 @@ function HomeViewPage() {
                   style={{
                     position: 'absolute',
                     inset: 0,
-                    borderRadius: '20px',
+                    borderRadius: designSystem.borderRadius.xl,
                     background: 'linear-gradient(135deg, #9333EA, #7C3AED)',
                     zIndex: 0,
                   }}
@@ -442,8 +449,10 @@ function HomeViewPage() {
                   style={{
                     position: 'absolute',
                     inset: '3px',
-                    borderRadius: '17px',
-                    background: 'linear-gradient(to bottom, #FFFFFF, #F5F3FF)',
+                    borderRadius: `calc(${designSystem.borderRadius.xl} - 3px)`,
+                    background: designSystem.gradients.light,
+                    backdropFilter: designSystem.glass.blur,
+                    WebkitBackdropFilter: designSystem.glass.blur,
                     zIndex: 1,
                   }}
                 />
