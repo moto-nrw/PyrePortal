@@ -1264,12 +1264,32 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       let supervisors = selectedSupervisors;
       
       if (supervisors.length === 0) {
-        // Validate saved supervisors exist
-        supervisors = sessionSettings.last_session!.supervisor_ids
-          .map(id => users.find(u => u.id === id))
-          .filter((u): u is User => u !== undefined);
+        // Ensure we have teachers loaded first
+        if (users.length === 0) {
+          storeLogger.debug('Loading teachers to validate supervisors');
+          await get().fetchTeachers();
+          const updatedUsers = get().users;
+          
+          if (updatedUsers.length === 0) {
+            throw new Error('Fehler beim Laden der Betreuer');
+          }
+          
+          // Now try to find supervisors with loaded users
+          supervisors = sessionSettings.last_session!.supervisor_ids
+            .map(id => updatedUsers.find(u => u.id === id))
+            .filter((u): u is User => u !== undefined);
+        } else {
+          // Users already loaded, validate saved supervisors
+          supervisors = sessionSettings.last_session!.supervisor_ids
+            .map(id => users.find(u => u.id === id))
+            .filter((u): u is User => u !== undefined);
+        }
           
         if (supervisors.length === 0) {
+          storeLogger.warn('No valid supervisors found', {
+            savedIds: sessionSettings.last_session!.supervisor_ids,
+            availableUsers: users.length === 0 ? get().users.map(u => u.id) : users.map(u => u.id),
+          });
           throw new Error('Keine gültigen Betreuer gefunden');
         }
       }
