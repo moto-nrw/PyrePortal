@@ -114,20 +114,23 @@ function AttendancePage() {
         setTimeout(() => {
           // Get mock tags from environment variable or use defaults
           const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
-          const mockStudentTags: string[] = envTags 
-            ? envTags.split(',').map((tag) => tag.trim())
+          const mockStudentTags: string[] = envTags
+            ? envTags.split(',').map(tag => tag.trim())
             : [
                 // Default realistic hardware format tags
                 '04:D6:94:82:97:6A:80',
                 '04:A7:B3:C2:D1:E0:F5',
                 '04:12:34:56:78:9A:BC',
                 '04:FE:DC:BA:98:76:54',
-                '04:11:22:33:44:55:66'
+                '04:11:22:33:44:55:66',
               ];
-          
+
           // Pick a random tag from the list
           const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
-          logUserAction('Mock RFID tag scanned for attendance', { tagId: mockTagId, platform: 'Development' });
+          logUserAction('Mock RFID tag scanned for attendance', {
+            tagId: mockTagId,
+            platform: 'Development',
+          });
           void handleTagScanned(mockTagId);
         }, 2000);
         return;
@@ -188,7 +191,7 @@ function AttendancePage() {
     if (!authenticatedUser?.pin) {
       throw new Error('Keine Authentifizierung verfügbar');
     }
-    
+
     return await api.getAttendanceStatus(authenticatedUser.pin, tagId);
   };
 
@@ -210,11 +213,7 @@ function AttendancePage() {
       });
 
       // Call the attendance toggle API
-      const result = await api.toggleAttendance(
-        authenticatedUser.pin, 
-        scannedTag, 
-        'confirm'
-      );
+      const result = await api.toggleAttendance(authenticatedUser.pin, scannedTag, 'confirm');
 
       if (result.status === 'success' && result.data.action !== 'cancelled') {
         const studentName = `${result.data.student.first_name} ${result.data.student.last_name}`;
@@ -265,7 +264,7 @@ function AttendancePage() {
   // Determine the action text based on current status
   const getActionText = (): string => {
     if (!attendanceStatus?.data.attendance.status) return 'Anmelden';
-    
+
     switch (attendanceStatus.data.attendance.status) {
       case 'not_checked_in':
       case 'checked_out':
@@ -298,13 +297,15 @@ function AttendancePage() {
   return (
     <>
       <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-        <div style={{ 
-          width: '100%', 
-          height: '100%',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           {/* Modern back button - positioned absolutely like TagAssignmentPage */}
           <div
             style={{
@@ -336,12 +337,12 @@ function AttendancePage() {
                 overflow: 'hidden',
                 backdropFilter: 'blur(8px)',
               }}
-              onTouchStart={(e) => {
+              onTouchStart={e => {
                 e.currentTarget.style.transform = 'scale(0.95)';
                 e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
                 e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
               }}
-              onTouchEnd={(e) => {
+              onTouchEnd={e => {
                 setTimeout(() => {
                   if (e.currentTarget) {
                     e.currentTarget.style.transform = 'scale(1)';
@@ -361,8 +362,8 @@ function AttendancePage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M19 12H5"/>
-                <path d="M12 19l-7-7 7-7"/>
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
               </svg>
               <span
                 style={{
@@ -428,11 +429,12 @@ function AttendancePage() {
                     left: 0,
                     right: 0,
                     bottom: 0,
-                    background: 'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                    background:
+                      'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
                     pointerEvents: 'none',
                   }}
                 />
-                
+
                 {/* Icon container */}
                 <div
                   style={{
@@ -449,7 +451,16 @@ function AttendancePage() {
                     animation: 'pulse 2s infinite',
                   }}
                 >
-                  <svg width="70" height="70" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="70"
+                    height="70"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     {/* Standard NFC/Contactless payment symbol */}
                     <path d="M2 12h3.5" />
                     <path d="M5.5 6a6 6 0 0 1 0 12" />
@@ -457,7 +468,7 @@ function AttendancePage() {
                     <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
                   </svg>
                 </div>
-                
+
                 <h2
                   style={{
                     fontSize: '36px',
@@ -483,7 +494,7 @@ function AttendancePage() {
                     ? 'Simuliere Scan-Vorgang...'
                     : 'Halten Sie das Armband an den Scanner'}
                 </p>
-                
+
                 <button
                   onClick={() => setShowScanner(false)}
                   style={{
@@ -500,11 +511,11 @@ function AttendancePage() {
                     position: 'relative',
                     zIndex: 2,
                   }}
-                  onMouseEnter={(e) => {
+                  onMouseEnter={e => {
                     e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.3)';
                     e.currentTarget.style.transform = 'scale(1.05)';
                   }}
-                  onMouseLeave={(e) => {
+                  onMouseLeave={e => {
                     e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.2)';
                     e.currentTarget.style.transform = 'scale(1)';
                   }}
@@ -516,12 +527,14 @@ function AttendancePage() {
           )}
 
           {/* Main Content - Centered */}
-          <div style={{ 
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             {/* Initial State - Start Scanning */}
             {!scannedTag && !isLoading && (
               <div style={{ textAlign: 'center' }}>
@@ -537,7 +550,16 @@ function AttendancePage() {
                     margin: '0 auto 40px',
                   }}
                 >
-                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#5080D8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#5080D8"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     {/* Standard NFC/Contactless payment symbol */}
                     <path d="M2 12h3.5" />
                     <path d="M5.5 6a6 6 0 0 1 0 12" />
@@ -545,7 +567,7 @@ function AttendancePage() {
                     <path d="M11.5 0.5a11.5 11.5 0 0 1 0 23" />
                   </svg>
                 </div>
-                
+
                 <p
                   style={{
                     fontSize: '24px',
@@ -554,7 +576,9 @@ function AttendancePage() {
                     lineHeight: '1.4',
                   }}
                 >
-                  Klicken Sie auf "Scannen", um die<br />Anwesenheit zu prüfen
+                  Klicken Sie auf "Scannen", um die
+                  <br />
+                  Anwesenheit zu prüfen
                 </p>
 
                 <button
@@ -574,15 +598,16 @@ function AttendancePage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
-                    opacity: (isLoading || (!scannerStatus?.is_available && isTauriContext())) ? 0.5 : 1,
+                    opacity:
+                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.5 : 1,
                   }}
-                  onTouchStart={(e) => {
+                  onTouchStart={e => {
                     if (!e.currentTarget.disabled) {
                       e.currentTarget.style.transform = 'scale(0.95)';
                       e.currentTarget.style.boxShadow = '0 3px 10px rgba(80, 128, 216, 0.4)';
                     }
                   }}
-                  onTouchEnd={(e) => {
+                  onTouchEnd={e => {
                     setTimeout(() => {
                       if (e.currentTarget && !e.currentTarget.disabled) {
                         e.currentTarget.style.transform = 'scale(1)';
@@ -644,22 +669,27 @@ function AttendancePage() {
                       textAlign: 'center',
                     }}
                   >
-                    <h2 style={{ 
-                      fontSize: '24px', 
-                      fontWeight: 700,
-                      marginBottom: '16px',
-                      color: '#1F2937'
-                    }}>
-                      {attendanceStatus.data.student.first_name} {attendanceStatus.data.student.last_name}
+                    <h2
+                      style={{
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        marginBottom: '16px',
+                        color: '#1F2937',
+                      }}
+                    >
+                      {attendanceStatus.data.student.first_name}{' '}
+                      {attendanceStatus.data.student.last_name}
                     </h2>
-                    <p style={{ 
-                      fontSize: '18px', 
-                      color: '#6B7280',
-                      marginBottom: '24px'
-                    }}>
+                    <p
+                      style={{
+                        fontSize: '18px',
+                        color: '#6B7280',
+                        marginBottom: '24px',
+                      }}
+                    >
                       {attendanceStatus.data.student.group.name}
                     </p>
-                    
+
                     {/* Status Badge */}
                     <div
                       style={{
@@ -667,29 +697,48 @@ function AttendancePage() {
                         alignItems: 'center',
                         gap: '8px',
                         padding: '12px 24px',
-                        backgroundColor: getStatusDisplay().color === theme.colors.success 
-                          ? '#E7F7DF' 
-                          : '#F3F4F6',
+                        backgroundColor:
+                          getStatusDisplay().color === theme.colors.success ? '#E7F7DF' : '#F3F4F6',
                         borderRadius: '24px',
                         marginBottom: attendanceStatus.data.attendance.check_in_time ? '20px' : '0',
                       }}
                     >
                       {getStatusDisplay().color === theme.colors.success ? (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M20 6L9 17l-5-5"/>
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#83cd2d"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M20 6L9 17l-5-5" />
                         </svg>
                       ) : (
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6B7280" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <circle cx="12" cy="12" r="10"/>
-                          <line x1="15" y1="9" x2="9" y2="15"/>
-                          <line x1="9" y1="9" x2="15" y2="15"/>
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#6B7280"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="15" y1="9" x2="9" y2="15" />
+                          <line x1="9" y1="9" x2="15" y2="15" />
                         </svg>
                       )}
-                      <span style={{ 
-                        fontSize: '18px', 
-                        fontWeight: 600, 
-                        color: getStatusDisplay().color 
-                      }}>
+                      <span
+                        style={{
+                          fontSize: '18px',
+                          fontWeight: 600,
+                          color: getStatusDisplay().color,
+                        }}
+                      >
                         {getStatusDisplay().text}
                       </span>
                     </div>
@@ -698,13 +747,21 @@ function AttendancePage() {
                     {attendanceStatus.data.attendance.check_in_time && (
                       <div style={{ fontSize: '14px', color: '#6B7280', lineHeight: 1.6 }}>
                         <p style={{ margin: 0, marginBottom: '4px' }}>
-                          <strong>Angemeldet:</strong> {new Date(attendanceStatus.data.attendance.check_in_time).toLocaleTimeString('de-DE')}
-                          {attendanceStatus.data.attendance.checked_in_by && ` von ${attendanceStatus.data.attendance.checked_in_by}`}
+                          <strong>Angemeldet:</strong>{' '}
+                          {new Date(
+                            attendanceStatus.data.attendance.check_in_time
+                          ).toLocaleTimeString('de-DE')}
+                          {attendanceStatus.data.attendance.checked_in_by &&
+                            ` von ${attendanceStatus.data.attendance.checked_in_by}`}
                         </p>
                         {attendanceStatus.data.attendance.check_out_time && (
                           <p style={{ margin: 0 }}>
-                            <strong>Abgemeldet:</strong> {new Date(attendanceStatus.data.attendance.check_out_time).toLocaleTimeString('de-DE')}
-                            {attendanceStatus.data.attendance.checked_out_by && ` von ${attendanceStatus.data.attendance.checked_out_by}`}
+                            <strong>Abgemeldet:</strong>{' '}
+                            {new Date(
+                              attendanceStatus.data.attendance.check_out_time
+                            ).toLocaleTimeString('de-DE')}
+                            {attendanceStatus.data.attendance.checked_out_by &&
+                              ` von ${attendanceStatus.data.attendance.checked_out_by}`}
                           </p>
                         )}
                       </div>
@@ -736,17 +793,18 @@ function AttendancePage() {
                       transition: 'all 200ms',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: getActionText() === 'Anmelden' 
-                        ? '0 4px 16px rgba(131, 205, 45, 0.3)'
-                        : '0 4px 16px rgba(248, 124, 16, 0.3)',
+                      boxShadow:
+                        getActionText() === 'Anmelden'
+                          ? '0 4px 16px rgba(131, 205, 45, 0.3)'
+                          : '0 4px 16px rgba(248, 124, 16, 0.3)',
                       opacity: isLoading ? 0.5 : 1,
                     }}
-                    onTouchStart={(e) => {
+                    onTouchStart={e => {
                       if (!e.currentTarget.disabled) {
                         e.currentTarget.style.transform = 'scale(0.95)';
                       }
                     }}
-                    onTouchEnd={(e) => {
+                    onTouchEnd={e => {
                       setTimeout(() => {
                         if (e.currentTarget && !e.currentTarget.disabled) {
                           e.currentTarget.style.transform = 'scale(1)';
@@ -772,11 +830,11 @@ function AttendancePage() {
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
                     }}
-                    onTouchStart={(e) => {
+                    onTouchStart={e => {
                       e.currentTarget.style.transform = 'scale(0.95)';
                       e.currentTarget.style.backgroundColor = '#F9FAFB';
                     }}
-                    onTouchEnd={(e) => {
+                    onTouchEnd={e => {
                       setTimeout(() => {
                         if (e.currentTarget) {
                           e.currentTarget.style.transform = 'scale(1)';
@@ -807,8 +865,17 @@ function AttendancePage() {
                     animation: 'successPop 0.5s ease-out',
                   }}
                 >
-                  <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5"/>
+                  <svg
+                    width="60"
+                    height="60"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#83cd2d"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 6L9 17l-5-5" />
                   </svg>
                 </div>
                 <h2
@@ -855,10 +922,10 @@ function AttendancePage() {
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
                     }}
-                    onTouchStart={(e) => {
+                    onTouchStart={e => {
                       e.currentTarget.style.transform = 'scale(0.95)';
                     }}
-                    onTouchEnd={(e) => {
+                    onTouchEnd={e => {
                       setTimeout(() => {
                         if (e.currentTarget) {
                           e.currentTarget.style.transform = 'scale(1)';
@@ -884,11 +951,11 @@ function AttendancePage() {
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
                     }}
-                    onTouchStart={(e) => {
+                    onTouchStart={e => {
                       e.currentTarget.style.transform = 'scale(0.95)';
                       e.currentTarget.style.backgroundColor = '#F9FAFB';
                     }}
-                    onTouchEnd={(e) => {
+                    onTouchEnd={e => {
                       setTimeout(() => {
                         if (e.currentTarget) {
                           e.currentTarget.style.transform = 'scale(1)';
@@ -902,7 +969,6 @@ function AttendancePage() {
                 </div>
               </div>
             )}
-
           </div>
         </div>
 

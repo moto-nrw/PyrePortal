@@ -50,11 +50,9 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
           textAlign: 'center',
           boxShadow: theme.shadows.lg,
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
-        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>
-          ❌
-        </div>
+        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>❌</div>
         <h2
           style={{
             fontSize: theme.fonts.size.xl,

@@ -1,6 +1,7 @@
 # Device Multi-Supervisor Implementation Plan
 
 ## Overview
+
 This document tracks the implementation of multiple supervisor support for RFID device sessions. Previously, devices authenticated with individual staff PINs and sessions had single supervisors. The new system uses a global OGS PIN and supports multiple supervisors per session.
 
 **Branch**: `feature/global-ogs-pin`
@@ -11,6 +12,7 @@ This document tracks the implementation of multiple supervisor support for RFID 
 ## Current Status
 
 ### ✅ Completed (All Objectives Done!)
+
 - [x] Global PIN authentication implemented (Objective 1)
 - [x] Device authentication without staff context (Objective 1)
 - [x] Teacher list endpoint for supervisor selection (Objective 2)
@@ -21,6 +23,7 @@ This document tracks the implementation of multiple supervisor support for RFID 
 - [x] Comprehensive Bruno test suite
 
 ### ❌ Not Needed
+
 - Backward compatibility (Objective 4) - Devices will be updated
 
 ---
@@ -28,15 +31,18 @@ This document tracks the implementation of multiple supervisor support for RFID 
 ## Objectives & Test Criteria
 
 ### Objective 1: Global PIN Authentication ✅
+
 **Status**: COMPLETE - Implemented and tested
 **Completed**: 2025-06-30
 
 **Implementation**:
+
 - Modified `DeviceAuthenticator` middleware to use `OGS_DEVICE_PIN` environment variable
 - Removed staff context requirement from device authentication
 - Updated all IoT handlers to work without staff context
 
 **Test Results**:
+
 - ✅ Device ping endpoint works with global PIN
 - ✅ Bruno test `dev/device-auth.bru` passes
 - ✅ Environment variable properly configured in all .env files
@@ -44,23 +50,27 @@ This document tracks the implementation of multiple supervisor support for RFID 
 ---
 
 ### Objective 2: Fetch Available Teachers ✅
+
 **Status**: COMPLETE - Endpoint working correctly
 **Completed**: 2025-06-30
 
 **Endpoint**: `GET /api/iot/teachers`
 
 **Implementation**:
+
 - Removed PIN check filter from `getAvailableTeachers` function
 - Endpoint now returns all teachers regardless of PIN status
 - Uses `DeviceOnlyAuthenticator` (no PIN required, only API key)
 
 **Test Results**:
+
 - ✅ Returns all 20 teachers in test database
 - ✅ Works with device API key only (no PIN needed)
 - ✅ Returns staff_id, person_id, first_name, last_name, display_name
 - ✅ Bruno test created and passing
 
 **Testing Checklist**:
+
 - [x] Create Bruno test file `dev/device-teachers-list.bru`
 - [x] Verify response includes all teachers (20 returned)
 - [x] Confirm no staff context required
@@ -68,10 +78,12 @@ This document tracks the implementation of multiple supervisor support for RFID 
 ---
 
 ### Objective 3: Start Session with Multiple Supervisors ✅
+
 **Status**: COMPLETE - Multi-supervisor session creation implemented
 **Completed**: 2025-06-30
 
 **API Design**:
+
 ```json
 POST /api/iot/session/start
 {
@@ -83,6 +95,7 @@ POST /api/iot/session/start
 ```
 
 **Response includes supervisors**:
+
 ```json
 {
   "active_group_id": 789,
@@ -111,6 +124,7 @@ POST /api/iot/session/start
 ```
 
 **Implementation Details**:
+
 - ✅ **NO BACKWARD COMPATIBILITY** - `supervisor_ids` is REQUIRED (returns 400 if missing)
 - ✅ Added service methods: `StartActivitySessionWithSupervisors` and `ForceStartActivitySessionWithSupervisors`
 - ✅ Implemented supervisor validation in `validateSupervisorIDs` helper
@@ -119,17 +133,20 @@ POST /api/iot/session/start
 - ✅ All operations wrapped in database transaction
 
 **Key Implementation Challenges Solved**:
+
 1. **BUN ORM Person Loading**: Fixed "relation people does not exist" error by implementing proper query in `FindWithPerson`
 2. **Response Enhancement**: Added `SupervisorInfo` struct to include staff details in response
 3. **Data Integrity**: All supervisor assignments verified in database with proper foreign keys
 
 **Database Verification**:
+
 - Groups created with correct activity_id, device_id, room_id
 - All supervisors properly assigned with role="supervisor"
 - No orphaned records or duplicates
 - Staff-Person relationships intact
 
 **Test Results**:
+
 - [x] Single supervisor: ✅ Works
 - [x] Multiple supervisors [1,2,3]: ✅ All assigned correctly
 - [x] Different supervisor sets [4,5]: ✅ Works with any valid staff
@@ -139,10 +156,12 @@ POST /api/iot/session/start
 ---
 
 ### Objective 4: Backward Compatibility ❌
+
 **Status**: NOT NEEDED - Per user decision: "we do not need backwards compatibility as the device will also change!!"
 **Decision Date**: 2025-06-30
 
 **Rationale**:
+
 - Devices will be updated to use the new multi-supervisor API
 - No need to maintain backward compatibility
 - `supervisor_ids` is required in all session start requests
@@ -151,10 +170,12 @@ POST /api/iot/session/start
 ---
 
 ### Objectives 5 & 6: Update Supervisors for Active Session ✅
+
 **Status**: COMPLETE - Merged into single PUT endpoint
 **Completed**: 2025-06-30
 
 **API Design** (Final Implementation):
+
 ```json
 PUT /api/iot/session/{session_id}/supervisors
 {
@@ -163,6 +184,7 @@ PUT /api/iot/session/{session_id}/supervisors
 ```
 
 **Implementation Details**:
+
 - ✅ Single PUT endpoint replaces entire supervisor list (RESTful best practice)
 - ✅ Validates session exists and is active
 - ✅ Validates all supervisor IDs are valid staff members
@@ -174,11 +196,13 @@ PUT /api/iot/session/{session_id}/supervisors
 **Service Method**: `UpdateActiveGroupSupervisors(ctx, activeGroupID, supervisorIDs)`
 
 **Key Implementation Challenges Solved**:
+
 1. **Schema-qualified tables**: Fixed repository Update method to use proper ModelTableExpr
 2. **Unique constraint handling**: Reactivates existing supervisors instead of creating duplicates
 3. **BUN ORM relations**: Manually load supervisors to avoid schema issues with relations
 
 **Test Results**:
+
 - [x] Update supervisors (normal case): ✅ Works
 - [x] Empty supervisor list: ✅ Returns 400 error "at least one supervisor is required"
 - [x] Invalid supervisor ID: ✅ Returns error "staff member with ID 999999 not found"
@@ -186,6 +210,7 @@ PUT /api/iot/session/{session_id}/supervisors
 - [x] Non-existent session: ✅ Returns error
 
 **Bruno Tests Created**:
+
 - `dev/device-supervisor-update.bru` - Main update test
 - `dev/device-supervisor-update-edge.bru` - Edge case tests
 - `dev/device-supervisor-update-invalid.bru` - Invalid session test
@@ -194,25 +219,30 @@ PUT /api/iot/session/{session_id}/supervisors
 ---
 
 ### Objective 7: Session Management Rules ✅
+
 **Status**: COMPLETE - All actual requirements already implemented
 **Completed**: 2025-06-30
 
 **Business Rules Implemented**:
+
 - [x] Cannot start session with 0 supervisors - Validated in session start and supervisor update
 - [x] "Springerkraft" can supervise multiple rooms simultaneously - Already supported
 - [x] Session lifecycle controlled by end session API - No automatic termination
 
 **Implementation Notes**:
+
 - Minimum 1 supervisor enforced in both session start and PUT update endpoint
 - Staff can be assigned to multiple active sessions (no restrictions)
 - Sessions only end via explicit API call to `/api/iot/session/end`
 - No requirement for automatic session termination when supervisors removed
 
 **What Was NOT Required**:
+
 - ❌ "Session remains active if at least 1 supervisor remains" - Never requested
 - ❌ "Session continues even if all supervisors removed" - Conflicts with min supervisor rule
 
 **Verification**:
+
 - Starting session with 0 supervisors returns 400 error ✅
 - Updating to 0 supervisors returns 400 error ✅
 - One staff member can supervise multiple rooms ✅
@@ -223,18 +253,21 @@ PUT /api/iot/session/{session_id}/supervisors
 ## Implementation Timeline
 
 ### Phase 1: Core Implementation (Completed)
+
 - [x] Global PIN authentication
 - [x] Verify teacher list endpoint
 - [x] Implement multi-supervisor session start
 - [x] ~~Ensure backward compatibility~~ (Not needed - devices will update)
 
 ### Phase 2: Dynamic Management (Completed)
+
 - [x] ~~Add supervisor endpoint~~ → Merged into PUT endpoint
 - [x] ~~Remove supervisor endpoint~~ → Merged into PUT endpoint
 - [x] Update supervisors endpoint (PUT)
 - [x] Edge case handling
 
 ### Phase 3: Integration & Testing (Completed)
+
 - [x] Complete test suite (Bruno tests created)
 - [x] Business rules verified
 - [x] Documentation updated
@@ -243,18 +276,18 @@ PUT /api/iot/session/{session_id}/supervisors
 
 ## Testing Matrix
 
-| Scenario | O1 | O2 | O3 | O4 | O5 | O6 | O7 |
-|----------|----|----|----|----|----|----|----|
-| Device auth with global PIN | ✅ | | | | | | |
-| List all teachers | | ✅ | | | | | |
-| Start with 1 supervisor | | | ✅ | | | | |
-| Start with 3 supervisors | | | ✅ | | | | |
-| Old API still works | | | | ❌ | | | |
-| Update supervisors (PUT) | | | | | ✅ | | |
-| Empty supervisor validation | | | | | ✅ | | |
-| Invalid supervisor validation | | | | | ✅ | | |
-| Duplicate handling | | | | | ✅ | | |
-| Multiple rooms per person | | | | | | | ✅ |
+| Scenario                      | O1  | O2  | O3  | O4  | O5  | O6  | O7  |
+| ----------------------------- | --- | --- | --- | --- | --- | --- | --- |
+| Device auth with global PIN   | ✅  |     |     |     |     |     |     |
+| List all teachers             |     | ✅  |     |     |     |     |     |
+| Start with 1 supervisor       |     |     | ✅  |     |     |     |     |
+| Start with 3 supervisors      |     |     | ✅  |     |     |     |     |
+| Old API still works           |     |     |     | ❌  |     |     |     |
+| Update supervisors (PUT)      |     |     |     |     | ✅  |     |     |
+| Empty supervisor validation   |     |     |     |     | ✅  |     |     |
+| Invalid supervisor validation |     |     |     |     | ✅  |     |     |
+| Duplicate handling            |     |     |     |     | ✅  |     |     |
+| Multiple rooms per person     |     |     |     |     |     |     | ✅  |
 
 Legend: ✅ Complete | ⏳ Pending | ❌ Not Needed/Skipped
 
@@ -263,6 +296,7 @@ Legend: ✅ Complete | ⏳ Pending | ❌ Not Needed/Skipped
 ## Code Locations
 
 ### Backend Files Modified:
+
 - `backend/auth/device/device_auth.go` - Global PIN authentication
 - `backend/api/iot/api.go` - Device endpoints, multi-supervisor handling, PUT update endpoint
 - `backend/services/active/interface.go` - Added multi-supervisor service methods
@@ -272,16 +306,19 @@ Legend: ✅ Complete | ⏳ Pending | ❌ Not Needed/Skipped
 - `backend/database/repositories/users/staff.go` - FindWithPerson implementation
 
 ### Environment Files:
+
 - `.env.example` - Added OGS_DEVICE_PIN
 - `backend/dev.env.example` - Added OGS_DEVICE_PIN
 - `docker-compose.yml` - Added OGS_DEVICE_PIN to server environment
 - `docker-compose.example.yml` - Added OGS_DEVICE_PIN
 
 ### Database Tables (from PR #219):
+
 - `active.groups` - Activity sessions
 - `active.group_supervisors` - Supervisor assignments (many-to-many)
 
 ### Bruno Test Files:
+
 - `bruno/dev/device-teachers-list.bru` - Teacher list endpoint test
 - `bruno/dev/device-session-start-multi.bru` - Multi-supervisor session test
 - `bruno/dev/device-session-start-multi-edge.bru` - Edge case tests
@@ -304,6 +341,7 @@ Legend: ✅ Complete | ⏳ Pending | ❌ Not Needed/Skipped
 ## Implementation Complete! 🎉
 
 All objectives have been successfully implemented:
+
 1. ✅ Global PIN authentication
 2. ✅ Teacher list endpoint
 3. ✅ Multi-supervisor session creation
@@ -319,16 +357,20 @@ The multi-supervisor RFID device implementation is now ready for deployment.
 ## API Reference for Device Implementation
 
 ### Authentication Headers
+
 All device endpoints require these headers:
+
 - `Authorization: Bearer {device_api_key}` - Device API key
 - `X-Staff-PIN: {global_pin}` - Global OGS PIN (currently: 1234)
 
 ### 1. Device Authentication Check
+
 **Endpoint:** `POST /api/iot/ping`
 
 **Purpose:** Verify device is authenticated and online
 
 **Headers:**
+
 ```
 Authorization: Bearer {device_api_key}
 X-Staff-PIN: {global_pin}
@@ -337,6 +379,7 @@ X-Staff-PIN: {global_pin}
 **Request Body:** None
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "success",
@@ -353,11 +396,13 @@ X-Staff-PIN: {global_pin}
 ```
 
 ### 2. Get Available Teachers
+
 **Endpoint:** `GET /api/iot/teachers`
 
 **Purpose:** Retrieve list of all teachers for supervisor selection
 
 **Headers:**
+
 ```
 Authorization: Bearer {device_api_key}
 ```
@@ -365,6 +410,7 @@ Authorization: Bearer {device_api_key}
 **Request Body:** None
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "success",
@@ -390,11 +436,13 @@ Authorization: Bearer {device_api_key}
 ```
 
 ### 3. Start Session with Multiple Supervisors
+
 **Endpoint:** `POST /api/iot/session/start`
 
 **Purpose:** Start a new activity session with multiple supervisors
 
 **Headers:**
+
 ```
 Authorization: Bearer {device_api_key}
 X-Staff-PIN: {global_pin}
@@ -402,16 +450,18 @@ Content-Type: application/json
 ```
 
 **Request Body:**
+
 ```json
 {
-  "activity_id": 1,                    // Required: Activity ID
-  "room_id": 1,                       // Optional: Room ID (can be null)
-  "supervisor_ids": [1, 2, 3],        // Required: Array of staff IDs (min 1)
-  "force": false                      // Optional: Force start even if conflicts
+  "activity_id": 1, // Required: Activity ID
+  "room_id": 1, // Optional: Room ID (can be null)
+  "supervisor_ids": [1, 2, 3], // Required: Array of staff IDs (min 1)
+  "force": false // Optional: Force start even if conflicts
 }
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "success",
@@ -444,6 +494,7 @@ Content-Type: application/json
 ```
 
 **Error Response (400):**
+
 ```json
 {
   "status": "error",
@@ -452,11 +503,13 @@ Content-Type: application/json
 ```
 
 ### 4. Update Session Supervisors
+
 **Endpoint:** `PUT /api/iot/session/{active_group_id}/supervisors`
 
 **Purpose:** Replace entire supervisor list for an active session
 
 **Headers:**
+
 ```
 Authorization: Bearer {device_api_key}
 X-Staff-PIN: {global_pin}
@@ -464,13 +517,15 @@ Content-Type: application/json
 ```
 
 **Request Body:**
+
 ```json
 {
-  "supervisor_ids": [2, 4, 5]         // Required: New complete list (min 1)
+  "supervisor_ids": [2, 4, 5] // Required: New complete list (min 1)
 }
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "success",
@@ -507,17 +562,20 @@ Content-Type: application/json
 ```
 
 **Error Responses:**
+
 - 400: "at least one supervisor is required"
 - 400: "supervisor_ids must be an array"
 - 404: "active group not found"
 - 400: "staff member with ID {id} not found"
 
 ### 5. Student Check-in/Check-out
+
 **Endpoint:** `POST /api/iot/checkin`
 
 **Purpose:** Check student in or out using RFID tag
 
 **Headers:**
+
 ```
 Authorization: Bearer {device_api_key}
 X-Staff-PIN: {global_pin}
@@ -525,23 +583,26 @@ Content-Type: application/json
 ```
 
 **Request Body (Check-in):**
+
 ```json
 {
-  "student_rfid": "0717E589DBE0C0",   // Required: RFID tag number
-  "action": "checkin",                // Required: "checkin" or "checkout"
-  "room_id": 1                        // Required for checkin only
+  "student_rfid": "0717E589DBE0C0", // Required: RFID tag number
+  "action": "checkin", // Required: "checkin" or "checkout"
+  "room_id": 1 // Required for checkin only
 }
 ```
 
 **Request Body (Check-out):**
+
 ```json
 {
-  "student_rfid": "0717E589DBE0C0",   // Required: RFID tag number
-  "action": "checkout"                // Required: "checkin" or "checkout"
+  "student_rfid": "0717E589DBE0C0", // Required: RFID tag number
+  "action": "checkout" // Required: "checkin" or "checkout"
 }
 ```
 
 **Response (200 OK - Check-in):**
+
 ```json
 {
   "status": "success",
@@ -560,6 +621,7 @@ Content-Type: application/json
 ```
 
 **Response (200 OK - Check-out):**
+
 ```json
 {
   "status": "success",
@@ -578,17 +640,20 @@ Content-Type: application/json
 ```
 
 ### 6. Get Current Session
+
 **Endpoint:** `GET /api/iot/session/current`
 
 **Purpose:** Get details of the current active session for this device
 
 **Headers:**
+
 ```
 Authorization: Bearer {device_api_key}
 X-Staff-PIN: {global_pin}
 ```
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "success",
@@ -614,6 +679,7 @@ X-Staff-PIN: {global_pin}
 ```
 
 **Response (404 - No Session):**
+
 ```json
 {
   "status": "error",
@@ -622,11 +688,13 @@ X-Staff-PIN: {global_pin}
 ```
 
 ### 7. End Session
+
 **Endpoint:** `POST /api/iot/session/end`
 
 **Purpose:** End the current active session
 
 **Headers:**
+
 ```
 Authorization: Bearer {device_api_key}
 X-Staff-PIN: {global_pin}
@@ -635,6 +703,7 @@ X-Staff-PIN: {global_pin}
 **Request Body:** None
 
 **Response (200 OK):**
+
 ```json
 {
   "status": "success",
@@ -652,6 +721,7 @@ X-Staff-PIN: {global_pin}
 ```
 
 **Response (400 - No Session):**
+
 ```json
 {
   "status": "error",
@@ -664,17 +734,20 @@ X-Staff-PIN: {global_pin}
 1. **Breaking Change**: `supervisor_ids` is now REQUIRED when starting sessions (no backward compatibility)
 
 2. **Supervisor Management**:
+
    - Minimum 1 supervisor required at all times
    - Use PUT endpoint to update entire supervisor list
    - Supervisors are automatically deduplicated
    - One supervisor can manage multiple rooms (Springerkraft)
 
 3. **Session Lifecycle**:
+
    - Sessions only end via explicit API call
    - No automatic termination when supervisors change
    - Device can only have one active session at a time
 
 4. **Error Handling**:
+
    - All errors return JSON with `status: "error"` and `error` message
    - HTTP status codes: 200 (success), 400 (bad request), 401 (auth), 404 (not found)
 
@@ -687,6 +760,7 @@ X-Staff-PIN: {global_pin}
 ## Current Implementation Status (2025-06-30)
 
 ### ✅ What's Working:
+
 1. **Global PIN Authentication**: Devices authenticate with `OGS_DEVICE_PIN` environment variable
 2. **Teacher List Endpoint**: Returns all teachers for supervisor selection
 3. **Multi-Supervisor Sessions**: Can start sessions with multiple supervisors
@@ -694,18 +768,21 @@ X-Staff-PIN: {global_pin}
 5. **API Response**: Includes full supervisor details (name, role)
 
 ### ⚠️ Important Notes:
+
 1. **Breaking Change**: `supervisor_ids` is REQUIRED - no backward compatibility
 2. **Minimum Supervisors**: At least 1 supervisor must be specified
 3. **Validation**: All supervisor IDs must exist as valid staff members
 4. **Transaction Safety**: Group and supervisor creation is atomic
 
 ### 🔧 Technical Details to Remember:
+
 1. **FindWithPerson Fix**: Staff repository method modified to avoid BUN ORM relation issues
 2. **Debug Logging**: Extensive logging added for troubleshooting (can be removed later)
 3. **Deduplication**: Supervisor IDs automatically deduplicated before insertion
 4. **Response Structure**: Added `SupervisorInfo` struct for API responses
 
 ### 📝 Deployment Ready:
+
 1. ✅ Dynamic supervisor endpoints implemented (PUT)
 2. ✅ Business rules for session management added
 3. ✅ "Springerkraft" support working (staff can supervise multiple rooms)
@@ -713,36 +790,32 @@ X-Staff-PIN: {global_pin}
 
 Last Updated: 2025-06-30 14:45
 
-
-
-
-
 # More context
 
 1. yes it should present all teachers we have in our database
 2. no no limit minimum always 1 and max is free
 3. all should be able to assign all no verification needed
-4.   4. Dynamic Supervisor Changes: Can supervisors be added/removed from an active session, or
-is the supervisor list fixed at session creation? it should be dynmaic. on the device there will be a settings page where we can add and remove supervisors
-5.   5. Session Ownership: If all supervisors leave/log out, should the session automatically
-end, or continue running? the session should end with a special end session button. we already have a api endpoint for that right?
+4. 4. Dynamic Supervisor Changes: Can supervisors be added/removed from an active session, or
+      is the supervisor list fixed at session creation? it should be dynmaic. on the device there will be a settings page where we can add and remove supervisors
+5. 5. Session Ownership: If all supervisors leave/log out, should the session automatically
+      end, or continue running? the session should end with a special end session button. we already have a api endpoint for that right?
 6. Activity Instances: When selecting "Hausaufgabenbetreuung", does the device create a new
-instance or join an existing one? How do we differentiate between instances? it always creates a new instances, no merges. but we still should be able to continue a session on the same device
+   instance or join an existing one? How do we differentiate between instances? it always creates a new instances, no merges. but we still should be able to continue a session on the same device
 
 7. Action Attribution: When multiple supervisors are assigned, how should we track which
-supervisor performed specific actions (like checking in a student)? lets for now just share the specific actions and no tracking. this is currently not so important. so if teacher a is group supervisor for
-group 1 then all other added personal should be able to assign tags
+   supervisor performed specific actions (like checking in a student)? lets for now just share the specific actions and no tracking. this is currently not so important. so if teacher a is group supervisor for
+   group 1 then all other added personal should be able to assign tags
 
-8.   8. Supervisor Availability: Should we prevent selecting supervisors who are already assigned
-to another active session, or allow one person to supervise multiple rooms? so there is usually people who supervise one room but there is also 1 "Springerkraft" that goes from room to room and should
-therefore be assigned to both rooms
+8. 8. Supervisor Availability: Should we prevent selecting supervisors who are already assigned
+      to another active session, or allow one person to supervise multiple rooms? so there is usually people who supervise one room but there is also 1 "Springerkraft" that goes from room to room and should
+      therefore be assigned to both rooms
 
 Frontend Integration
 
 9. MyRoom Page Logic: Currently it likely queries by single supervisor_id. Should it show
-data for ALL rooms where the user is a supervisor, or have a room selector?
+   data for ALL rooms where the user is a supervisor, or have a room selector?
 10. Real-time Updates: Should all supervisors see real-time updates when any supervisor
-performs an action in their shared session?
+    performs an action in their shared session?
 
 lets for now ignore the frontend integration only backend and api integration neccessary
 
@@ -750,247 +823,256 @@ lets for now ignore the frontend integration only backend and api integration ne
 
 so i approved chris pull request and merged it into development (current branch). for more information you might look at pr Feat/multiple educational group supervisors #219
 
-
 API Documentation: IoT RFID Endpoints
 
-  Based on verified implementation and actual test results, here are the correct API formats:
+Based on verified implementation and actual test results, here are the correct API formats:
 
-  1. GET /api/iot/rfid/{tagId}
+1. GET /api/iot/rfid/{tagId}
 
-  Purpose: Check if an RFID tag is assigned to a student
+Purpose: Check if an RFID tag is assigned to a student
 
-  Request
+Request
 
-  GET /api/iot/rfid/{tagId}
-  Authorization: Bearer {device_api_key}
-  X-Staff-PIN: {global_ogs_pin}
-  Content-Type: application/json
+GET /api/iot/rfid/{tagId}
+Authorization: Bearer {device_api_key}
+X-Staff-PIN: {global_ogs_pin}
+Content-Type: application/json
 
-  Path Parameters:
-  - tagId (string, required): The RFID tag ID to check
+Path Parameters:
 
-  Headers:
-  - Authorization (required): Bearer token with device API key
-  - X-Staff-PIN (required): Global OGS PIN (currently "1234")
-  - Content-Type: application/json
+- tagId (string, required): The RFID tag ID to check
 
-  Response
+Headers:
 
-  Success (200) - Tag Assigned:
-  {
-    "status": "success",
-    "data": {
-      "assigned": true,
-      "student": {
-        "id": 116,
-        "name": "Carl Klein",
-        "group": "3B"
-      }
-    },
-    "message": "RFID tag assignment status retrieved"
-  }
+- Authorization (required): Bearer token with device API key
+- X-Staff-PIN (required): Global OGS PIN (currently "1234")
+- Content-Type: application/json
 
-  Success (200) - Tag Not Assigned:
-  {
-    "status": "success",
-    "data": {
-      "assigned": false
-    },
-    "message": "RFID tag assignment status retrieved"
-  }
+Response
 
-  2. GET /api/iot/students
+Success (200) - Tag Assigned:
+{
+"status": "success",
+"data": {
+"assigned": true,
+"student": {
+"id": 116,
+"name": "Carl Klein",
+"group": "3B"
+}
+},
+"message": "RFID tag assignment status retrieved"
+}
 
-  Purpose: Get students supervised by specified teachers
+Success (200) - Tag Not Assigned:
+{
+"status": "success",
+"data": {
+"assigned": false
+},
+"message": "RFID tag assignment status retrieved"
+}
 
-  Request
+2. GET /api/iot/students
 
-  GET /api/iot/students?teacher_ids={comma_separated_teacher_ids}
-  Authorization: Bearer {device_api_key}
-  X-Staff-PIN: {global_ogs_pin}
-  Content-Type: application/json
+Purpose: Get students supervised by specified teachers
 
-  Query Parameters:
-  - teacher_ids (string, required): Comma-separated list of teacher IDs (e.g., "1,2,3")
+Request
 
-  Headers:
-  - Authorization (required): Bearer token with device API key
-  - X-Staff-PIN (required): Global OGS PIN
-  - Content-Type: application/json
+GET /api/iot/students?teacher_ids={comma_separated_teacher_ids}
+Authorization: Bearer {device_api_key}
+X-Staff-PIN: {global_ogs_pin}
+Content-Type: application/json
 
-  Response
+Query Parameters:
 
-  Success (200):
-  {
-    "status": "success",
-    "data": [
-      {
-        "student_id": 116,
-        "person_id": 146,
-        "first_name": "Carl",
-        "last_name": "Klein",
-        "school_class": "3B",
-        "group_name": "Klasse 3B",
-        "rfid_tag": "A39359FF91EABA"
-      },
-      {
-        "student_id": 117,
-        "person_id": 147,
-        "first_name": "Anton",
-        "last_name": "Keller",
-        "school_class": "4A",
-        "group_name": "Klasse 4A",
-        "rfid_tag": "D2D4B47EEDBE57"
-      }
-      // ... more students
-    ],
-    "message": "Found 48 unique students"
-  }
+- teacher_ids (string, required): Comma-separated list of teacher IDs (e.g., "1,2,3")
 
-  Success (200) - No Teacher IDs Provided:
-  {
-    "status": "success",
-    "data": [],
-    "message": "No teacher IDs provided"
-  }
+Headers:
 
-  Notes:
-  - Returns unique students (no duplicates even if student belongs to multiple groups)
-  - Empty rfid_tag field means no tag assigned
-  - Students are from all groups supervised by any of the specified teachers
+- Authorization (required): Bearer token with device API key
+- X-Staff-PIN (required): Global OGS PIN
+- Content-Type: application/json
 
-  3. POST /api/students/{studentId}/rfid
+Response
 
-  Purpose: Assign an RFID tag to a student
+Success (200):
+{
+"status": "success",
+"data": [
+{
+"student_id": 116,
+"person_id": 146,
+"first_name": "Carl",
+"last_name": "Klein",
+"school_class": "3B",
+"group_name": "Klasse 3B",
+"rfid_tag": "A39359FF91EABA"
+},
+{
+"student_id": 117,
+"person_id": 147,
+"first_name": "Anton",
+"last_name": "Keller",
+"school_class": "4A",
+"group_name": "Klasse 4A",
+"rfid_tag": "D2D4B47EEDBE57"
+}
+// ... more students
+],
+"message": "Found 48 unique students"
+}
 
-  Request
+Success (200) - No Teacher IDs Provided:
+{
+"status": "success",
+"data": [],
+"message": "No teacher IDs provided"
+}
 
-  POST /api/students/{studentId}/rfid
-  Authorization: Bearer {device_api_key}
-  X-Staff-PIN: {global_ogs_pin}
-  Content-Type: application/json
+Notes:
 
-  {
-    "rfid_tag": "A39359FF91EABA"
-  }
+- Returns unique students (no duplicates even if student belongs to multiple groups)
+- Empty rfid_tag field means no tag assigned
+- Students are from all groups supervised by any of the specified teachers
 
-  Path Parameters:
-  - studentId (integer, required): The student ID to assign the tag to
+3. POST /api/students/{studentId}/rfid
 
-  Headers:
-  - Authorization (required): Bearer token with device API key
-  - X-Staff-PIN (required): Global OGS PIN
-  - Content-Type: application/json
+Purpose: Assign an RFID tag to a student
 
-  Request Body:
-  {
-    "rfid_tag": "string"  // Required, the RFID tag to assign
-  }
+Request
 
-  Response
+POST /api/students/{studentId}/rfid
+Authorization: Bearer {device_api_key}
+X-Staff-PIN: {global_ogs_pin}
+Content-Type: application/json
 
-  Success (200):
-  {
-    "status": "success",
-    "data": {
-      "success": true,
-      "student_id": 116,
-      "student_name": "Carl Klein",
-      "rfid_tag": "A39359FF91EABA",
-      "previous_tag": "0F7204B854A3A3",
-      "message": "RFID tag assigned successfully (previous tag replaced)"
-    },
-    "message": "RFID tag assigned successfully (previous tag replaced)"
-  }
+{
+"rfid_tag": "A39359FF91EABA"
+}
 
-  Success (200) - First Tag Assignment:
-  {
-    "status": "success",
-    "data": {
-      "success": true,
-      "student_id": 116,
-      "student_name": "Carl Klein",
-      "rfid_tag": "A39359FF91EABA",
-      "previous_tag": null,
-      "message": "RFID tag assigned successfully"
-    },
-    "message": "RFID tag assigned successfully"
-  }
+Path Parameters:
 
-  Error Responses (All Endpoints)
+- studentId (integer, required): The student ID to assign the tag to
 
-  401 Unauthorized - Missing/Invalid Authentication:
-  {
-    "status": "error",
-    "error": "Device authentication failed",
-    "details": "Invalid API key"
-  }
+Headers:
 
-  401 Unauthorized - Invalid PIN:
-  {
-    "status": "error",
-    "error": "Device authentication failed",
-    "details": "Invalid PIN"
-  }
+- Authorization (required): Bearer token with device API key
+- X-Staff-PIN (required): Global OGS PIN
+- Content-Type: application/json
 
-  404 Not Found - Student Not Found:
-  {
-    "status": "error",
-    "error": "Student not found"
-  }
+Request Body:
+{
+"rfid_tag": "string" // Required, the RFID tag to assign
+}
 
-  400 Bad Request - Invalid Request:
-  {
-    "status": "error",
-    "error": "Invalid request",
-    "details": "rfid_tag is required"
-  }
+Response
 
-  Important Implementation Notes
+Success (200):
+{
+"status": "success",
+"data": {
+"success": true,
+"student_id": 116,
+"student_name": "Carl Klein",
+"rfid_tag": "A39359FF91EABA",
+"previous_tag": "0F7204B854A3A3",
+"message": "RFID tag assigned successfully (previous tag replaced)"
+},
+"message": "RFID tag assigned successfully (previous tag replaced)"
+}
 
-  1. Authentication: All endpoints require both:
+Success (200) - First Tag Assignment:
+{
+"status": "success",
+"data": {
+"success": true,
+"student_id": 116,
+"student_name": "Carl Klein",
+"rfid_tag": "A39359FF91EABA",
+"previous_tag": null,
+"message": "RFID tag assigned successfully"
+},
+"message": "RFID tag assigned successfully"
+}
+
+Error Responses (All Endpoints)
+
+401 Unauthorized - Missing/Invalid Authentication:
+{
+"status": "error",
+"error": "Device authentication failed",
+"details": "Invalid API key"
+}
+
+401 Unauthorized - Invalid PIN:
+{
+"status": "error",
+"error": "Device authentication failed",
+"details": "Invalid PIN"
+}
+
+404 Not Found - Student Not Found:
+{
+"status": "error",
+"error": "Student not found"
+}
+
+400 Bad Request - Invalid Request:
+{
+"status": "error",
+"error": "Invalid request",
+"details": "rfid_tag is required"
+}
+
+Important Implementation Notes
+
+1. Authentication: All endpoints require both:
+
+
     - Device API key in Authorization: Bearer header
     - Global OGS PIN in X-Staff-PIN header
-  2. No Teacher Authorization: With global PIN, there's no individual teacher authentication or
-  supervision check
-  3. Tag Reassignment: Assigning a new tag automatically unlinks the previous tag
-  4. Unique Students: The students endpoint automatically deduplicates if a student appears in
-  multiple groups
-  5. Environment Variable: The global PIN is configured via OGS_DEVICE_PIN environment variable
 
-  Example Usage
+2. No Teacher Authorization: With global PIN, there's no individual teacher authentication or
+   supervision check
+3. Tag Reassignment: Assigning a new tag automatically unlinks the previous tag
+4. Unique Students: The students endpoint automatically deduplicates if a student appears in
+   multiple groups
+5. Environment Variable: The global PIN is configured via OGS_DEVICE_PIN environment variable
 
-  // Example: Check tag, get students, assign tag
-  const API_KEY = 'dev_f13264b47528911197e0f6ea90d92366b8d2193670cc61a612899dd7e1bc5359';
-  const OGS_PIN = '1234';
+Example Usage
 
-  // 1. Check if tag is assigned
-  const checkTag = await fetch('/api/iot/rfid/A39359FF91EABA', {
-    headers: {
-      'Authorization': `Bearer ${API_KEY}`,
-      'X-Staff-PIN': OGS_PIN,
-      'Content-Type': 'application/json'
-    }
-  });
+// Example: Check tag, get students, assign tag
+const API_KEY = 'dev_f13264b47528911197e0f6ea90d92366b8d2193670cc61a612899dd7e1bc5359';
+const OGS_PIN = '1234';
 
-  // 2. Get students for teachers 1, 2, 3
-  const getStudents = await fetch('/api/iot/students?teacher_ids=1,2,3', {
-    headers: {
-      'Authorization': `Bearer ${API_KEY}`,
-      'X-Staff-PIN': OGS_PIN,
-      'Content-Type': 'application/json'
-    }
-  });
+// 1. Check if tag is assigned
+const checkTag = await fetch('/api/iot/rfid/A39359FF91EABA', {
+headers: {
+'Authorization': `Bearer ${API_KEY}`,
+'X-Staff-PIN': OGS_PIN,
+'Content-Type': 'application/json'
+}
+});
 
-  // 3. Assign tag to student
-  const assignTag = await fetch('/api/students/116/rfid', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${API_KEY}`,
-      'X-Staff-PIN': OGS_PIN,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      rfid_tag: 'A39359FF91EABA'
-    })
-  });
+// 2. Get students for teachers 1, 2, 3
+const getStudents = await fetch('/api/iot/students?teacher_ids=1,2,3', {
+headers: {
+'Authorization': `Bearer ${API_KEY}`,
+'X-Staff-PIN': OGS_PIN,
+'Content-Type': 'application/json'
+}
+});
+
+// 3. Assign tag to student
+const assignTag = await fetch('/api/students/116/rfid', {
+method: 'POST',
+headers: {
+'Authorization': `Bearer ${API_KEY}`,
+'X-Staff-PIN': OGS_PIN,
+'Content-Type': 'application/json'
+},
+body: JSON.stringify({
+rfid_tag: 'A39359FF91EABA'
+})
+});

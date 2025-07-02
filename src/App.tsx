@@ -29,7 +29,7 @@ function App() {
       // Initialize logger
       const config = getRuntimeConfig();
       logger.updateConfig(config);
-      
+
       // Initialize API configuration
       try {
         await initializeApi();
@@ -37,13 +37,13 @@ function App() {
       } catch (error) {
         appLogger.error('Failed to initialize API configuration', { error });
       }
-      
+
       appLogger.info('Application initialized', {
         version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
         environment: import.meta.env.MODE,
       });
     };
-    
+
     void initApp();
   }, [appLogger]); // Include appLogger in dependency array
 
@@ -64,10 +64,7 @@ function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/user-selection" element={<UserSelectionPage />} />
-            <Route
-              path="/pin"
-              element={<PinPage />}
-            />
+            <Route path="/pin" element={<PinPage />} />
             <Route
               path="/home"
               element={isFullyAuthenticated ? <HomeViewPage /> : <Navigate to="/" replace />}

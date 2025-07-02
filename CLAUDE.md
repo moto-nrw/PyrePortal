@@ -18,17 +18,20 @@ PyrePortal is a desktop application built with Tauri v2, React, and TypeScript. 
 ## Architecture
 
 ### Frontend (React + TypeScript)
+
 - State management: Zustand with middleware for logging
 - Routing: React Router v7 with typed routes
 - Styling: Tailwind CSS v4 with custom theme system
 - API layer: Centralized service with error handling
 
 ### Backend (Rust + Tauri)
+
 - IPC commands for logging and RFID operations
 - Platform-specific RFID hardware integration
 - File system operations with security checks
 
 ### Key Architectural Patterns
+
 - **Mock/Real API switching**: Environment-based configuration
 - **RFID abstraction**: Hardware implementation with mock fallback
 - **Logging layers**: Frontend → Tauri IPC → File system
@@ -95,13 +98,13 @@ TAURI_FULLSCREEN=false
 
 ### API Endpoints (Project Phoenix)
 
-| Endpoint | Status | Description |
-|----------|--------|-------------|
-| `GET /api/iot/staff` | ✅ Implemented | Fetch teacher list |
-| `POST /api/iot/status` | 🔧 In Progress | PIN validation |
-| `GET /api/iot/rooms` | 📋 Planned | Room list/status |
-| `POST /api/iot/rfid/scan` | ✅ Implemented | RFID check-in/out |
-| `POST /api/iot/session/start` | ✅ Implemented | Start activity session |
+| Endpoint                         | Status         | Description             |
+| -------------------------------- | -------------- | ----------------------- |
+| `GET /api/iot/staff`             | ✅ Implemented | Fetch teacher list      |
+| `POST /api/iot/status`           | 🔧 In Progress | PIN validation          |
+| `GET /api/iot/rooms`             | 📋 Planned     | Room list/status        |
+| `POST /api/iot/rfid/scan`        | ✅ Implemented | RFID check-in/out       |
+| `POST /api/iot/session/start`    | ✅ Implemented | Start activity session  |
 | `POST /api/iot/session/activity` | ✅ Implemented | Update session activity |
 
 ## Key Implementation Patterns
@@ -236,7 +239,7 @@ npm run tauri build
 ### Log Locations
 
 - **Development**: Browser console + in-memory viewer
-- **Production**: 
+- **Production**:
   - Windows: `%APPDATA%\pyreportal\logs`
   - macOS: `~/Library/Logs/pyreportal`
   - Linux: `~/.config/pyreportal/logs`
@@ -278,6 +281,7 @@ await invoke('write_log', { entry: logData });
 ## Current Implementation Status
 
 ### ✅ Completed
+
 - Teacher list API integration
 - Basic PIN authentication flow
 - RFID mock scanning
@@ -286,11 +290,13 @@ await invoke('write_log', { entry: logData });
 - Error modal component
 
 ### 🔧 In Progress
+
 - Real PIN validation via API
 - Session timeout management
 - Activity analytics
 
 ### 📋 Planned
+
 - Offline mode with sync
 - Biometric authentication
 - Advanced reporting

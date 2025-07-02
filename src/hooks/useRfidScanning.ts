@@ -85,7 +85,7 @@ export const useRfidScanning = () => {
       // Enhanced duplicate prevention - check all layers
       if (!canProcessTag(tagId)) {
         logger.info(`Tag ${tagId} blocked by duplicate prevention`);
-        
+
         // Check if we have a recent cached result to show
         const recentScan = rfid.recentTagScans.get(tagId);
         if (recentScan?.result && Date.now() - recentScan.timestamp < 2000) {
@@ -101,14 +101,14 @@ export const useRfidScanning = () => {
         }
         return;
       }
-      
+
       // Add to processing queue immediately
       addToProcessingQueue(tagId);
       recordTagScan(tagId, { timestamp: Date.now() });
 
       // Generate unique ID for this scan
       const scanId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       // 1. IMMEDIATE OPTIMISTIC UI FEEDBACK (0ms delay)
       const optimisticScan = {
         id: scanId,
@@ -132,7 +132,7 @@ export const useRfidScanning = () => {
       try {
         // Update status to processing
         updateOptimisticScan(scanId, 'processing');
-        
+
         // Add to processing queue for tracking
         addToProcessingQueue(tagId);
 
@@ -151,18 +151,18 @@ export const useRfidScanning = () => {
         // 3. UPDATE UI WITH REAL RESULTS
         updateOptimisticScan(scanId, 'success');
         setScanResult(result);
-        
+
         // Update all tracking mechanisms
         if (result.student_id) {
           const studentId = result.student_id.toString();
           const action = result.action === 'checked_in' ? 'checkin' : 'checkout';
-          
+
           // Map tag to student for future lookups
           mapTagToStudent(tagId, studentId);
-          
+
           // Update student history
           updateStudentHistory(studentId, action);
-          
+
           // Cache the scan result for 2 seconds
           recordTagScan(tagId, {
             timestamp: Date.now(),
@@ -184,34 +184,33 @@ export const useRfidScanning = () => {
           hideScanModal();
           removeOptimisticScan(scanId);
         }, rfid.modalDisplayTime);
-
       } catch (error) {
         logger.error('Failed to process RFID scan', { error });
-        
+
         // 4. ERROR HANDLING - Show real errors to users
         const errorMessage = error instanceof Error ? error.message : String(error);
-        
+
         if (errorMessage.includes('already has an active visit')) {
           // This is an info state, not an error - student is already checked in
           logger.info('Student already has active visit - showing info to user');
           updateOptimisticScan(scanId, 'failed');
-          
+
           // Show informative message (not success!)
           const infoResult: ExtendedRfidScanResult = {
-            student_name: "Already Checked In",
+            student_name: 'Already Checked In',
             student_id: 0,
             action: 'already_in',
-            message: "This student is already checked into this room",
+            message: 'This student is already checked into this room',
             isInfo: true,
           };
           setScanResult(infoResult as RfidScanResult);
-          
+
           // Don't update student count or history for info states!
         } else {
           // Real error
           updateOptimisticScan(scanId, 'failed');
           const errorResult: ExtendedRfidScanResult = {
-            student_name: "Scan Failed",
+            student_name: 'Scan Failed',
             student_id: 0,
             action: 'error',
             message: errorMessage || 'Please try again',
@@ -219,10 +218,10 @@ export const useRfidScanning = () => {
           };
           setScanResult(errorResult as RfidScanResult);
         }
-        
+
         // Show modal with error/info state
         showScanModal();
-        
+
         // Clean up after display
         setTimeout(() => {
           hideScanModal();
@@ -296,42 +295,45 @@ export const useRfidScanning = () => {
     // Check if RFID is enabled
     if (!isRfidEnabled()) {
       logger.info('RFID not enabled, starting mock scanning mode');
-      
+
       // Start mock scanning interval
       if (!mockScanInterval) {
         startRfidScanning(); // Update store state
-        
+
         // Generate mock scans every 3-5 seconds
-        mockScanInterval = setInterval(() => {
-          // Get mock tags from environment variable or use defaults
-          const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
-          const mockStudentTags: string[] = envTags 
-            ? envTags.split(',').map((tag) => tag.trim())
-            : [
-                // Default realistic hardware format tags
-                '04:D6:94:82:97:6A:80',
-                '04:A7:B3:C2:D1:E0:F5',
-                '04:12:34:56:78:9A:BC',
-                '04:FE:DC:BA:98:76:54',
-                '04:11:22:33:44:55:66'
-              ];
-          
-          // Pick a random tag from the list
-          const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
-          
-          logger.info('Mock RFID scan generated', {
-            tagId: mockTagId,
-            platform: 'Development Mock'
-          });
-          
-          // Check if tag is blocked before processing
-          if (!isTagBlocked(mockTagId)) {
-            void processScan(mockTagId);
-          } else {
-            logger.debug(`Mock tag ${mockTagId} is blocked, skipping`);
-          }
-        }, 3000 + Math.random() * 2000); // Random interval between 3-5 seconds
-        
+        mockScanInterval = setInterval(
+          () => {
+            // Get mock tags from environment variable or use defaults
+            const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
+            const mockStudentTags: string[] = envTags
+              ? envTags.split(',').map(tag => tag.trim())
+              : [
+                  // Default realistic hardware format tags
+                  '04:D6:94:82:97:6A:80',
+                  '04:A7:B3:C2:D1:E0:F5',
+                  '04:12:34:56:78:9A:BC',
+                  '04:FE:DC:BA:98:76:54',
+                  '04:11:22:33:44:55:66',
+                ];
+
+            // Pick a random tag from the list
+            const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
+
+            logger.info('Mock RFID scan generated', {
+              tagId: mockTagId,
+              platform: 'Development Mock',
+            });
+
+            // Check if tag is blocked before processing
+            if (!isTagBlocked(mockTagId)) {
+              void processScan(mockTagId);
+            } else {
+              logger.debug(`Mock tag ${mockTagId} is blocked, skipping`);
+            }
+          },
+          3000 + Math.random() * 2000
+        ); // Random interval between 3-5 seconds
+
         isServiceStartedRef.current = true;
         logger.info('Mock RFID scanning started');
       }
@@ -384,7 +386,7 @@ export const useRfidScanning = () => {
   // Check actual service state from backend
   const syncServiceState = useCallback(async () => {
     if (!isRfidEnabled()) return;
-    
+
     try {
       const serviceStatus = await safeInvoke<{ is_running: boolean }>('get_rfid_service_status');
       if (serviceStatus?.is_running) {

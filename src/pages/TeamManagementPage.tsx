@@ -54,7 +54,7 @@ function TeamManagementPage() {
     const initializePage = async () => {
       try {
         await fetchTeachers();
-        
+
         // If we have an active session and no supervisors selected yet,
         // initialize with current session supervisors
         if (currentSession && selectedSupervisors.length === 0) {
@@ -62,10 +62,11 @@ function TeamManagementPage() {
           const sessionDetails = await api.getCurrentSession(authenticatedUser!.pin);
           if (sessionDetails && 'supervisors' in sessionDetails) {
             // Map supervisor info to user format
-            const currentSupervisors = sessionDetails.supervisors?.map(sup => ({
-              id: sup.staff_id,
-              name: sup.display_name,
-            })) ?? [];
+            const currentSupervisors =
+              sessionDetails.supervisors?.map(sup => ({
+                id: sup.staff_id,
+                name: sup.display_name,
+              })) ?? [];
             setSelectedSupervisors(currentSupervisors);
           }
         }
@@ -77,7 +78,14 @@ function TeamManagementPage() {
     if (authenticatedUser) {
       void initializePage();
     }
-  }, [authenticatedUser, currentSession, fetchTeachers, selectedSupervisors.length, setSelectedSupervisors, logger]);
+  }, [
+    authenticatedUser,
+    currentSession,
+    fetchTeachers,
+    selectedSupervisors.length,
+    setSelectedSupervisors,
+    logger,
+  ]);
 
   // Calculate pagination
   const totalPages = Math.ceil(users.length / USERS_PER_PAGE);
@@ -108,7 +116,7 @@ function TeamManagementPage() {
     logUserAction('team_supervisor_toggle', {
       username: user.name,
       userId: user.id,
-      selected: !selectedSupervisors.some(s => s.id === user.id)
+      selected: !selectedSupervisors.some(s => s.id === user.id),
     });
   };
 
@@ -146,7 +154,7 @@ function TeamManagementPage() {
 
       // Show success modal
       setShowSuccessModal(true);
-      
+
       // Navigate back to home after a short delay
       setTimeout(() => {
         logNavigation('TeamManagementPage', 'HomeViewPage');
@@ -193,13 +201,15 @@ function TeamManagementPage() {
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{
-        width: '100%',
-        height: '100%',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Modern back button following tablet/mobile conventions */}
         <div
           style={{
@@ -231,12 +241,12 @@ function TeamManagementPage() {
               overflow: 'hidden',
               backdropFilter: 'blur(8px)',
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               e.currentTarget.style.transform = 'scale(0.95)';
               e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
               e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
@@ -282,7 +292,6 @@ function TeamManagementPage() {
         >
           Team anpassen
         </h1>
-
 
         {error && (
           <div
@@ -333,7 +342,7 @@ function TeamManagementPage() {
                 alignContent: 'start',
               }}
             >
-              {paginatedUsers.map((user) => {
+              {paginatedUsers.map(user => {
                 const isSelected = isUserSelected(user.id);
                 return (
                   <div
@@ -350,13 +359,13 @@ function TeamManagementPage() {
                         ? '0 8px 25px rgba(20, 184, 166, 0.25)'
                         : '0 8px 25px rgba(80, 128, 216, 0.15)',
                     }}
-                    onTouchStart={(e) => {
+                    onTouchStart={e => {
                       e.currentTarget.style.transform = 'scale(0.95)';
                       e.currentTarget.style.boxShadow = isSelected
                         ? '0 4px 15px rgba(20, 184, 166, 0.35)'
                         : '0 4px 15px rgba(80, 128, 216, 0.25)';
                     }}
-                    onTouchEnd={(e) => {
+                    onTouchEnd={e => {
                       setTimeout(() => {
                         if (e.currentTarget) {
                           e.currentTarget.style.transform = 'scale(1)';
@@ -405,7 +414,14 @@ function TeamManagementPage() {
                         }}
                       >
                         {isSelected && (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="3">
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#FFFFFF"
+                            strokeWidth="3"
+                          >
                             <polyline points="20 6 9 17 4 12"></polyline>
                           </svg>
                         )}
@@ -469,55 +485,56 @@ function TeamManagementPage() {
               })}
 
               {/* Empty placeholder slots */}
-              {emptySlots > 0 && Array.from({ length: emptySlots }).map((_, index) => (
-                <div
-                  key={`empty-${index}`}
-                  style={{
-                    height: '160px',
-                    backgroundColor: '#FAFAFA',
-                    border: '2px dashed #E5E7EB',
-                    borderRadius: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
+              {emptySlots > 0 &&
+                Array.from({ length: emptySlots }).map((_, index) => (
                   <div
+                    key={`empty-${index}`}
                     style={{
+                      height: '160px',
+                      backgroundColor: '#FAFAFA',
+                      border: '2px dashed #E5E7EB',
+                      borderRadius: '20px',
                       display: 'flex',
-                      flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '8px',
-                      opacity: 0.4,
+                      justifyContent: 'center',
+                      position: 'relative',
+                      overflow: 'hidden',
                     }}
                   >
-                    <svg
-                      width="32"
-                      height="32"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#9CA3AF"
-                      strokeWidth="1.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                    <span
+                    <div
                       style={{
-                        fontSize: '14px',
-                        color: '#9CA3AF',
-                        fontWeight: 400,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '8px',
+                        opacity: 0.4,
                       }}
                     >
-                      Leer
-                    </span>
+                      <svg
+                        width="32"
+                        height="32"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#9CA3AF"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          color: '#9CA3AF',
+                          fontWeight: 400,
+                        }}
+                      >
+                        Leer
+                      </span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
             </div>
 
             {/* Pagination Controls */}
@@ -607,27 +624,29 @@ function TeamManagementPage() {
                   fontSize: '18px',
                   fontWeight: 600,
                   color: '#FFFFFF',
-                  background: selectedSupervisors.length === 0 || isSaving
-                    ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                    : 'linear-gradient(to right, #14B8A6, #0D9488)',
+                  background:
+                    selectedSupervisors.length === 0 || isSaving
+                      ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                      : 'linear-gradient(to right, #14B8A6, #0D9488)',
                   border: 'none',
                   borderRadius: '28px',
                   cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',
                   transition: 'all 200ms',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  boxShadow: selectedSupervisors.length === 0 || isSaving
-                    ? 'none'
-                    : '0 4px 14px 0 rgba(20, 184, 166, 0.4)',
+                  boxShadow:
+                    selectedSupervisors.length === 0 || isSaving
+                      ? 'none'
+                      : '0 4px 14px 0 rgba(20, 184, 166, 0.4)',
                   opacity: selectedSupervisors.length === 0 || isSaving ? 0.6 : 1,
                 }}
-                onTouchStart={(e) => {
+                onTouchStart={e => {
                   if (selectedSupervisors.length > 0 && !isSaving) {
                     e.currentTarget.style.transform = 'scale(0.98)';
                     e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(20, 184, 166, 0.5)';
                   }
                 }}
-                onTouchEnd={(e) => {
+                onTouchEnd={e => {
                   if (selectedSupervisors.length > 0 && !isSaving) {
                     e.currentTarget.style.transform = 'scale(1)';
                     e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(20, 184, 166, 0.4)';
@@ -644,7 +663,9 @@ function TeamManagementPage() {
         <SuccessModal
           isOpen={showSuccessModal}
           onClose={() => setShowSuccessModal(false)}
-          message={currentSession ? 'Team erfolgreich aktualisiert!' : 'Team erfolgreich gespeichert!'}
+          message={
+            currentSession ? 'Team erfolgreich aktualisiert!' : 'Team erfolgreich gespeichert!'
+          }
           autoCloseDelay={1500}
         />
 

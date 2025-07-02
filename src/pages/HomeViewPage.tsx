@@ -14,12 +14,13 @@ import { logNavigation, logUserAction } from '../utils/logger';
  * Displays after successful PIN validation
  */
 function HomeViewPage() {
-  const { authenticatedUser, currentSession, logout, fetchCurrentSession, selectedSupervisors } = useUserStore();
+  const { authenticatedUser, currentSession, logout, fetchCurrentSession, selectedSupervisors } =
+    useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  
+
   // Check if supervisors are selected
   const hasSupervisors = selectedSupervisors.length > 0;
 
@@ -46,7 +47,9 @@ function HomeViewPage() {
   const handleTagAssignment = () => {
     if (!hasSupervisors) {
       logUserAction('NFC-Scan attempted without supervisors');
-      setErrorMessage("Bitte wählen Sie zuerst mindestens einen Betreuer über 'Team anpassen' aus, bevor Sie die NFC-Scan Funktion nutzen können.");
+      setErrorMessage(
+        "Bitte wählen Sie zuerst mindestens einen Betreuer über 'Team anpassen' aus, bevor Sie die NFC-Scan Funktion nutzen können."
+      );
       setShowErrorModal(true);
       return;
     }
@@ -74,7 +77,6 @@ function HomeViewPage() {
     void navigate('/team-management');
   };
 
-
   // Redirect to login if no authenticated user and fetch current session
   useEffect(() => {
     if (!authenticatedUser) {
@@ -96,13 +98,15 @@ function HomeViewPage() {
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{
-        width: '100%',
-        height: '100%',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* NFC Scan button - Top Left */}
         <div
           style={{
@@ -122,25 +126,31 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '10px',
               padding: '0 28px',
-              backgroundColor: hasSupervisors ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 255, 255, 0.6)',
-              border: hasSupervisors ? '1px solid rgba(80, 128, 216, 0.2)' : '1px solid rgba(156, 163, 175, 0.2)',
+              backgroundColor: hasSupervisors
+                ? 'rgba(255, 255, 255, 0.9)'
+                : 'rgba(255, 255, 255, 0.6)',
+              border: hasSupervisors
+                ? '1px solid rgba(80, 128, 216, 0.2)'
+                : '1px solid rgba(156, 163, 175, 0.2)',
               borderRadius: '28px',
               cursor: hasSupervisors ? 'pointer' : 'not-allowed',
               transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: hasSupervisors ? '0 4px 12px rgba(0, 0, 0, 0.15)' : '0 2px 6px rgba(0, 0, 0, 0.1)',
+              boxShadow: hasSupervisors
+                ? '0 4px 12px rgba(0, 0, 0, 0.15)'
+                : '0 2px 6px rgba(0, 0, 0, 0.1)',
               backdropFilter: 'blur(8px)',
               opacity: hasSupervisors ? 1 : 0.6,
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               if (hasSupervisors) {
                 e.currentTarget.style.transform = 'scale(0.95)';
                 e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
                 e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
               }
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               if (hasSupervisors) {
                 setTimeout(() => {
                   if (e.currentTarget) {
@@ -198,12 +208,12 @@ function HomeViewPage() {
               boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
               backdropFilter: 'blur(8px)',
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               e.currentTarget.style.transform = 'scale(0.95)';
               e.currentTarget.style.backgroundColor = 'rgba(255, 49, 48, 0.1)';
               e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
@@ -240,11 +250,12 @@ function HomeViewPage() {
         </div>
 
         {/* Welcome Header */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '32px',
-        }}>
-
+        <div
+          style={{
+            textAlign: 'center',
+            marginBottom: '32px',
+          }}
+        >
           <h1
             style={{
               fontSize: '48px',
@@ -259,12 +270,14 @@ function HomeViewPage() {
         </div>
 
         {/* Main Content - Centered */}
-        <div style={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}>
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <div style={{ width: '100%', maxWidth: '720px' }}>
             {/* Primary Actions Grid */}
             <div
@@ -336,12 +349,26 @@ function HomeViewPage() {
                     }}
                   >
                     {currentSession ? (
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">
+                      <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#83cd2d"
+                        strokeWidth="2.5"
+                      >
                         <circle cx="12" cy="12" r="10" />
                         <polygon points="10,8 16,12 10,16" fill="#83cd2d" />
                       </svg>
                     ) : (
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">
+                      <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#83cd2d"
+                        strokeWidth="2.5"
+                      >
                         <circle cx="12" cy="12" r="10" />
                         <line x1="12" y1="8" x2="12" y2="16" />
                         <line x1="8" y1="12" x2="16" y2="12" />
@@ -358,7 +385,9 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {currentSession ? currentSession.activity_name ?? 'Aktivität' : 'Neue Aktivität'}
+                    {currentSession
+                      ? (currentSession.activity_name ?? 'Aktivität')
+                      : 'Neue Aktivität'}
                   </h3>
                   <p
                     style={{
@@ -433,7 +462,14 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#9333EA" strokeWidth="2.5">
+                    <svg
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#9333EA"
+                      strokeWidth="2.5"
+                    >
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                       <circle cx="9" cy="7" r="4" />
                       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -465,7 +501,6 @@ function HomeViewPage() {
                 </div>
               </button>
             </div>
-
           </div>
         </div>
       </div>
@@ -494,7 +529,7 @@ function HomeViewPage() {
         message={errorMessage}
         autoCloseDelay={3000}
       />
-    </ContentBox >
+    </ContentBox>
   );
 }
 

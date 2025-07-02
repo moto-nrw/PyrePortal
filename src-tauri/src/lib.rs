@@ -2,9 +2,9 @@
 mod logging;
 mod rfid;
 
+use serde::{Deserialize, Serialize};
 use std::env;
 use tauri::{WebviewUrl, WebviewWindowBuilder};
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ApiConfig {
@@ -18,11 +18,11 @@ fn get_api_config() -> Result<ApiConfig, String> {
     let api_base_url = env::var("API_BASE_URL")
         .or_else(|_| env::var("VITE_API_BASE_URL"))
         .unwrap_or_else(|_| "http://localhost:8080".to_string());
-    
+
     let device_api_key = env::var("DEVICE_API_KEY")
         .or_else(|_| env::var("VITE_DEVICE_API_KEY"))
         .map_err(|_| "API key not found. Please set DEVICE_API_KEY or VITE_DEVICE_API_KEY environment variable")?;
-    
+
     Ok(ApiConfig {
         api_base_url,
         device_api_key,
@@ -43,12 +43,13 @@ fn quit_app() {
 pub fn run() {
     // Load environment variables from .env file
     dotenvy::dotenv().ok();
-    
+
     // Read fullscreen setting from environment variable
     let fullscreen = env::var("TAURI_FULLSCREEN")
         .unwrap_or_else(|_| "true".to_string())
-        .to_lowercase() == "true";
-    
+        .to_lowercase()
+        == "true";
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -78,7 +79,7 @@ pub fn run() {
                 .center()
                 .decorations(!fullscreen) // No decorations in fullscreen, decorations in windowed mode
                 .build()?;
-            
+
             Ok(())
         })
         .run(tauri::generate_context!())

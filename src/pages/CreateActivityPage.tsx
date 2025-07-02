@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-
 import { ContentBox } from '../components/ui';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
@@ -180,7 +179,6 @@ function CreateActivityPage() {
     }
   };
 
-
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
       setCurrentPage(currentPage + 1);
@@ -198,11 +196,20 @@ function CreateActivityPage() {
   // Get general activity icon - single universal icon for all activities
   const getCategoryIcon = () => {
     return (
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-        <line x1="16" y1="2" x2="16" y2="6"/>
-        <line x1="8" y1="2" x2="8" y2="6"/>
-        <line x1="3" y1="10" x2="21" y2="10"/>
+      <svg
+        width="48"
+        height="48"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+        <line x1="16" y1="2" x2="16" y2="6" />
+        <line x1="8" y1="2" x2="8" y2="6" />
+        <line x1="3" y1="10" x2="21" y2="10" />
       </svg>
     );
   };
@@ -213,13 +220,15 @@ function CreateActivityPage() {
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{ 
-        width: '100%', 
-        height: '100%',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Modern back button following tablet/mobile conventions */}
         <div
           style={{
@@ -251,12 +260,12 @@ function CreateActivityPage() {
               overflow: 'hidden',
               backdropFilter: 'blur(8px)',
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               e.currentTarget.style.transform = 'scale(0.95)';
               e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
               e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
@@ -276,8 +285,8 @@ function CreateActivityPage() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M19 12H5"/>
-              <path d="M12 19l-7-7 7-7"/>
+              <path d="M19 12H5" />
+              <path d="M12 19l-7-7 7-7" />
             </svg>
             <span
               style={{
@@ -353,11 +362,18 @@ function CreateActivityPage() {
                   gap: '16px',
                 }}
               >
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                  <line x1="16" y1="2" x2="16" y2="6"/>
-                  <line x1="8" y1="2" x2="8" y2="6"/>
-                  <line x1="3" y1="10" x2="21" y2="10"/>
+                <svg
+                  width="64"
+                  height="64"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#9CA3AF"
+                  strokeWidth="2"
+                >
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                  <line x1="16" y1="2" x2="16" y2="6" />
+                  <line x1="8" y1="2" x2="8" y2="6" />
+                  <line x1="3" y1="10" x2="21" y2="10" />
                 </svg>
                 <div
                   style={{
@@ -393,7 +409,7 @@ function CreateActivityPage() {
                   alignContent: 'start',
                 }}
               >
-                {paginatedActivities.map((activity) => {
+                {paginatedActivities.map(activity => {
                   const isActive = activity.is_active;
                   return (
                     <button
@@ -424,13 +440,13 @@ function CreateActivityPage() {
                         WebkitTapHighlightColor: 'transparent',
                         opacity: isActive ? 0.6 : 1,
                       }}
-                      onTouchStart={(e) => {
+                      onTouchStart={e => {
                         if (!isActive) {
                           e.currentTarget.style.transform = 'scale(0.98)';
                           e.currentTarget.style.backgroundColor = '#E6EFFF';
                         }
                       }}
-                      onTouchEnd={(e) => {
+                      onTouchEnd={e => {
                         if (!isActive) {
                           setTimeout(() => {
                             if (e.currentTarget) {
@@ -447,13 +463,13 @@ function CreateActivityPage() {
                           position: 'absolute',
                           inset: 0,
                           borderRadius: '12px',
-                          background: isActive 
-                            ? 'linear-gradient(to right, #9CA3AF, #6B7280)' 
+                          background: isActive
+                            ? 'linear-gradient(to right, #9CA3AF, #6B7280)'
                             : 'linear-gradient(to right, #5080D8, #3f6bc4)',
                           zIndex: 0,
                         }}
                       />
-                      
+
                       {/* Inner content wrapper for border effect */}
                       <div
                         style={{
@@ -464,7 +480,7 @@ function CreateActivityPage() {
                           zIndex: 1,
                         }}
                       />
-                      
+
                       {/* Activity Icon */}
                       <div
                         style={{
@@ -475,7 +491,7 @@ function CreateActivityPage() {
                       >
                         {getCategoryIcon()}
                       </div>
-                      
+
                       {/* Activity Name */}
                       <span
                         style={{
@@ -493,18 +509,19 @@ function CreateActivityPage() {
                       </span>
 
                       {/* Enrollment info - only show if data is available */}
-                      {activity.enrollment_count !== undefined && activity.max_participants !== undefined && (
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            color: '#6B7280',
-                            position: 'relative',
-                            zIndex: 2,
-                          }}
-                        >
-                          {activity.enrollment_count}/{activity.max_participants}
-                        </div>
-                      )}
+                      {activity.enrollment_count !== undefined &&
+                        activity.max_participants !== undefined && (
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              color: '#6B7280',
+                              position: 'relative',
+                              zIndex: 2,
+                            }}
+                          >
+                            {activity.enrollment_count}/{activity.max_participants}
+                          </div>
+                        )}
 
                       {/* Activity Status Badge */}
                       <div
@@ -526,66 +543,67 @@ function CreateActivityPage() {
                         }}
                       >
                         <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="12" r="10"/>
+                          <circle cx="12" cy="12" r="10" />
                         </svg>
                         {isActive ? 'Aktiv' : 'Verfügbar'}
                       </div>
                     </button>
                   );
                 })}
-                
+
                 {/* Empty placeholder slots */}
-                {emptySlots > 0 && Array.from({ length: emptySlots }).map((_, index) => (
-                  <div
-                    key={`empty-${index}`}
-                    style={{
-                      height: '160px',
-                      backgroundColor: '#FAFAFA',
-                      border: '2px dashed #E5E7EB',
-                      borderRadius: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      overflow: 'hidden',
-                    }}
-                  >
+                {emptySlots > 0 &&
+                  Array.from({ length: emptySlots }).map((_, index) => (
                     <div
+                      key={`empty-${index}`}
                       style={{
+                        height: '160px',
+                        backgroundColor: '#FAFAFA',
+                        border: '2px dashed #E5E7EB',
+                        borderRadius: '12px',
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
-                        gap: '8px',
-                        opacity: 0.4,
+                        justifyContent: 'center',
+                        position: 'relative',
+                        overflow: 'hidden',
                       }}
                     >
-                      <svg
-                        width="32"
-                        height="32"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#9CA3AF"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                        <line x1="16" y1="2" x2="16" y2="6"/>
-                        <line x1="8" y1="2" x2="8" y2="6"/>
-                        <line x1="3" y1="10" x2="21" y2="10"/>
-                      </svg>
-                      <span
+                      <div
                         style={{
-                          fontSize: '14px',
-                          color: '#9CA3AF',
-                          fontWeight: 400,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '8px',
+                          opacity: 0.4,
                         }}
                       >
-                        Leer
-                      </span>
+                        <svg
+                          width="32"
+                          height="32"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#9CA3AF"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                          <line x1="16" y1="2" x2="16" y2="6" />
+                          <line x1="8" y1="2" x2="8" y2="6" />
+                          <line x1="3" y1="10" x2="21" y2="10" />
+                        </svg>
+                        <span
+                          style={{
+                            fontSize: '14px',
+                            color: '#9CA3AF',
+                            fontWeight: 400,
+                          }}
+                        >
+                          Leer
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
 

@@ -33,21 +33,23 @@ export async function initializeApi(): Promise<void> {
     API_BASE_URL = config.api_base_url;
     DEVICE_API_KEY = config.device_api_key;
     isInitialized = true;
-    
+
     logger.info('API initialized with runtime configuration', {
       baseUrl: API_BASE_URL,
-      hasApiKey: !!DEVICE_API_KEY
+      hasApiKey: !!DEVICE_API_KEY,
     });
   } catch (error) {
     // Fallback to build-time env vars if Tauri is not available (e.g., in dev without Tauri)
     logger.warn('Failed to load runtime config, falling back to build-time env vars', { error });
     API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
     DEVICE_API_KEY = import.meta.env.VITE_DEVICE_API_KEY as string;
-    
+
     if (!DEVICE_API_KEY) {
-      throw new Error('API key not found. Please set DEVICE_API_KEY or VITE_DEVICE_API_KEY environment variable');
+      throw new Error(
+        'API key not found. Please set DEVICE_API_KEY or VITE_DEVICE_API_KEY environment variable'
+      );
     }
-    
+
     isInitialized = true;
   }
 }
@@ -66,7 +68,7 @@ async function ensureInitialized(): Promise<void> {
  */
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   await ensureInitialized();
-  
+
   const url = `${API_BASE_URL}${endpoint}`;
 
   // Debug logging for authentication issues
@@ -92,7 +94,7 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
     let detailMessage = '';
     try {
-      const errorData = await response.json() as { message?: string; error?: string };
+      const errorData = (await response.json()) as { message?: string; error?: string };
       if (errorData.message) {
         detailMessage = errorData.message;
       } else if (errorData.error) {
@@ -101,12 +103,12 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     } catch {
       // If JSON parsing fails, use the default error message
     }
-    
+
     // Include both status code and detail message for better error handling
     if (detailMessage) {
       errorMessage = `${errorMessage}: ${detailMessage}`;
     }
-    
+
     throw new Error(errorMessage);
   }
 
@@ -273,10 +275,10 @@ export const api = {
    */
   async validateGlobalPin(pin: string): Promise<PinValidationResult> {
     try {
-      logger.debug('Starting global PIN validation', { 
+      logger.debug('Starting global PIN validation', {
         pin: pin.length + ' digits',
         hasApiKey: !!DEVICE_API_KEY,
-        apiKeyLength: DEVICE_API_KEY?.length 
+        apiKeyLength: DEVICE_API_KEY?.length,
       });
 
       await apiCall('/api/iot/ping', {
@@ -449,7 +451,7 @@ export const api = {
    */
   async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
     logger.info('Starting session with request:', { ...request });
-    
+
     const response = await apiCall<{
       status: string;
       data: SessionStartResponse;
@@ -551,7 +553,7 @@ export const api = {
   async getStudents(pin: string, teacherIds: number[]): Promise<Student[]> {
     // Create query parameter string
     const queryParam = teacherIds.length > 0 ? `?teacher_ids=${teacherIds.join(',')}` : '';
-    
+
     const response = await apiCall<{
       status: string;
       data: Student[];
@@ -623,7 +625,7 @@ export const api = {
 
     // Transform the API response to match our expected TagAssignmentResult interface
     return {
-      success: response.data?.success ?? (response.status === 'success'),
+      success: response.data?.success ?? response.status === 'success',
       message: response.data?.message ?? response.message ?? 'Tag erfolgreich zugewiesen',
       student_id: response.data?.student_id,
       student_name: response.data?.student_name,
@@ -699,12 +701,12 @@ export const api = {
       });
 
       logger.debug('getCurrentSessionInfo response', { response });
-      
+
       // Check if we have an active session
       if ('is_active' in response.data && response.data.is_active === false) {
         return null;
       }
-      
+
       // Map the CurrentSession to the simplified format expected by the UI
       const session = response.data;
       return {
@@ -728,12 +730,15 @@ export const api = {
    */
   async getAttendanceStatus(pin: string, rfid: string): Promise<AttendanceStatusResponse> {
     try {
-      const response = await apiCall<AttendanceStatusResponse>(`/api/iot/attendance/status/${rfid}`, {
-        headers: {
-          Authorization: `Bearer ${DEVICE_API_KEY}`,
-          'X-Staff-PIN': pin,
-        },
-      });
+      const response = await apiCall<AttendanceStatusResponse>(
+        `/api/iot/attendance/status/${rfid}`,
+        {
+          headers: {
+            Authorization: `Bearer ${DEVICE_API_KEY}`,
+            'X-Staff-PIN': pin,
+          },
+        }
+      );
 
       return response;
     } catch (error) {

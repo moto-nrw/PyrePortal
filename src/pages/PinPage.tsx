@@ -213,10 +213,10 @@ function PinPage() {
           overflow: 'hidden',
           WebkitTapHighlightColor: 'transparent',
         }}
-        onTouchStart={(e) => {
+        onTouchStart={e => {
           e.currentTarget.style.transform = 'scale(0.95)';
         }}
-        onTouchEnd={(e) => {
+        onTouchEnd={e => {
           setTimeout(() => {
             if (e.currentTarget) {
               e.currentTarget.style.transform = 'scale(1)';
@@ -263,13 +263,15 @@ function PinPage() {
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{
-        width: '100%',
-        height: '100%',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Modern back button - positioned absolutely like other pages */}
         <div
           style={{
@@ -301,12 +303,12 @@ function PinPage() {
               overflow: 'hidden',
               backdropFilter: 'blur(8px)',
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               e.currentTarget.style.transform = 'scale(0.95)';
               e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
               e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
@@ -342,10 +344,12 @@ function PinPage() {
         </div>
 
         {/* Welcome Header with User Info - Extra compact sizing */}
-        <div style={{
-          textAlign: 'center',
-          marginBottom: '0',
-        }}>
+        <div
+          style={{
+            textAlign: 'center',
+            marginBottom: '0',
+          }}
+        >
           <div
             style={{
               width: '56px',
@@ -398,13 +402,14 @@ function PinPage() {
         </div>
 
         {/* Main Content - Centered */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'flex-start',
-          justifyContent: 'center',
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+          }}
+        >
           <div style={{ width: '100%', maxWidth: '400px', marginTop: '12px' }}>
-
             {/* PIN display dots with modern styling - compact */}
             <div
               style={{
@@ -427,12 +432,12 @@ function PinPage() {
                     height: '18px',
                     borderRadius: '50%',
                     transition: 'all 300ms ease',
-                    background: i < pin.length
-                      ? 'linear-gradient(135deg, #5080D8, #3f6bc4)'
-                      : '#E5E7EB',
-                    boxShadow: i < pin.length
-                      ? '0 2px 6px rgba(80, 128, 216, 0.4)'
-                      : 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
+                    background:
+                      i < pin.length ? 'linear-gradient(135deg, #5080D8, #3f6bc4)' : '#E5E7EB',
+                    boxShadow:
+                      i < pin.length
+                        ? '0 2px 6px rgba(80, 128, 216, 0.4)'
+                        : 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
                     transform: i < pin.length ? 'scale(1.1)' : 'scale(1)',
                   }}
                 />
@@ -450,7 +455,7 @@ function PinPage() {
               }}
             >
               {/* Numbers 1-9 */}
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(num => (
                 <NumpadButton key={num} onClick={() => handleNumpadClick(num)}>
                   {num}
                 </NumpadButton>
@@ -461,9 +466,7 @@ function PinPage() {
                 C
               </NumpadButton>
 
-              <NumpadButton onClick={() => handleNumpadClick(0)}>
-                0
-              </NumpadButton>
+              <NumpadButton onClick={() => handleNumpadClick(0)}>0</NumpadButton>
 
               <NumpadButton onClick={handleDelete} isAction>
                 ⌫
@@ -472,10 +475,12 @@ function PinPage() {
 
             {/* Loading state */}
             {isLoading && (
-              <div style={{
-                textAlign: 'center',
-                marginTop: '24px',
-              }}>
+              <div
+                style={{
+                  textAlign: 'center',
+                  marginTop: '24px',
+                }}
+              >
                 <div
                   style={{
                     width: '32px',

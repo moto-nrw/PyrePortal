@@ -84,7 +84,16 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
           }}
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <circle cx="12" cy="12" r="10" />
             <path d="M9 12l2 2 4-4" />
           </svg>
@@ -131,7 +140,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 gap: '8px',
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#14B8A6"
+                strokeWidth="2"
+              >
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" />
@@ -146,9 +162,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 fontWeight: 600,
                 color: '#9CA3AF',
               }}
-            >
-
-            </div>
+            ></div>
 
             <div
               style={{
@@ -160,7 +174,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 gap: '8px',
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f87C10" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#f87C10"
+                strokeWidth="2"
+              >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
                 <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
                 <circle cx="11" cy="12" r="1" />
@@ -227,7 +248,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                   gap: '6px',
                 }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#14B8A6"
+                  strokeWidth="2"
+                >
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
@@ -257,13 +285,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               WebkitTapHighlightColor: 'transparent',
               opacity: isLoading ? 0.6 : 1,
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               if (!isLoading) {
                 e.currentTarget.style.backgroundColor = '#F9FAFB';
                 e.currentTarget.style.borderColor = '#D1D5DB';
               }
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               if (!isLoading) {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.borderColor = '#E5E7EB';
@@ -291,18 +319,16 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: isLoading
-                ? 'none'
-                : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
+              boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
               opacity: isLoading ? 0.6 : 1,
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               if (!isLoading) {
                 e.currentTarget.style.transform = 'scale(0.98)';
                 e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(131, 205, 45, 0.5)';
               }
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               if (!isLoading) {
                 e.currentTarget.style.transform = 'scale(1)';
                 e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(131, 205, 45, 0.4)';
@@ -372,7 +398,16 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
             boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
           }}
         >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="32"
+            height="32"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#FFFFFF"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" />
             <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -399,7 +434,8 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
             lineHeight: 1.5,
           }}
         >
-          Es läuft bereits eine Session für diese Aktivität oder diesen Raum. Möchten Sie die bestehende Session beenden und eine neue starten?
+          Es läuft bereits eine Session für diese Aktivität oder diesen Raum. Möchten Sie die
+          bestehende Session beenden und eine neue starten?
         </p>
 
         {/* Activity Details Card */}
@@ -444,7 +480,14 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
                 gap: '8px',
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#14B8A6"
+                strokeWidth="2"
+              >
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
                 <line x1="16" y1="2" x2="16" y2="6" />
                 <line x1="8" y1="2" x2="8" y2="6" />
@@ -459,8 +502,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
                 fontWeight: 600,
                 color: '#9CA3AF',
               }}
-            >
-            </div>
+            ></div>
 
             <div
               style={{
@@ -472,7 +514,14 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
                 gap: '8px',
               }}
             >
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f87C10" strokeWidth="2">
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="#f87C10"
+                strokeWidth="2"
+              >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
                 <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
                 <circle cx="11" cy="12" r="1" />
@@ -527,7 +576,14 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
                   gap: '6px',
                 }}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#14B8A6" strokeWidth="2">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#14B8A6"
+                  strokeWidth="2"
+                >
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                   <circle cx="12" cy="7" r="4" />
                 </svg>
@@ -579,13 +635,13 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
               WebkitTapHighlightColor: 'transparent',
               opacity: isLoading ? 0.6 : 1,
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               if (!isLoading) {
                 e.currentTarget.style.backgroundColor = '#F9FAFB';
                 e.currentTarget.style.borderColor = '#D1D5DB';
               }
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               if (!isLoading) {
                 e.currentTarget.style.backgroundColor = 'transparent';
                 e.currentTarget.style.borderColor = '#E5E7EB';
@@ -613,18 +669,16 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
               transition: 'all 200ms',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: isLoading
-                ? 'none'
-                : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
+              boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
               opacity: isLoading ? 0.6 : 1,
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               if (!isLoading) {
                 e.currentTarget.style.transform = 'scale(0.98)';
                 e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(220, 38, 38, 0.5)';
               }
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               if (!isLoading) {
                 e.currentTarget.style.transform = 'scale(1)';
                 e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(220, 38, 38, 0.4)';
@@ -811,7 +865,11 @@ function RoomSelectionPage() {
       );
 
       // Handle 409 Conflict - show conflict modal
-      logger.debug('Checking for conflict error', { errorMessage, includes409: errorMessage.includes('409'), includesConflict: errorMessage.includes('Conflict') });
+      logger.debug('Checking for conflict error', {
+        errorMessage,
+        includes409: errorMessage.includes('409'),
+        includesConflict: errorMessage.includes('Conflict'),
+      });
 
       if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
         logger.info('Showing conflict modal due to 409 error');
@@ -914,7 +972,6 @@ function RoomSelectionPage() {
     void navigate('/activity-selection');
   };
 
-
   const handleNextPage = () => {
     if (currentPage < totalPages - 1) {
       setCurrentPage(currentPage + 1);
@@ -932,7 +989,16 @@ function RoomSelectionPage() {
   // Get door icon - commonly used for rooms/access points
   const getRoomIcon = () => {
     return (
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="48"
+        height="48"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
         <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
         <circle cx="11" cy="12" r="1" />
@@ -940,19 +1006,26 @@ function RoomSelectionPage() {
     );
   };
 
-  if (!authenticatedUser || !selectedActivity || !selectedSupervisors || selectedSupervisors.length === 0) {
+  if (
+    !authenticatedUser ||
+    !selectedActivity ||
+    !selectedSupervisors ||
+    selectedSupervisors.length === 0
+  ) {
     return null; // Will redirect via useEffect
   }
 
   return (
     <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div style={{
-        width: '100%',
-        height: '100%',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Modern back button following tablet/mobile conventions */}
         <div
           style={{
@@ -984,12 +1057,12 @@ function RoomSelectionPage() {
               overflow: 'hidden',
               backdropFilter: 'blur(8px)',
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               e.currentTarget.style.transform = 'scale(0.95)';
               e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
               e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
@@ -1086,7 +1159,14 @@ function RoomSelectionPage() {
                   gap: '16px',
                 }}
               >
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                <svg
+                  width="64"
+                  height="64"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#9CA3AF"
+                  strokeWidth="2"
+                >
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
                   <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
                   <circle cx="11" cy="12" r="1" />
@@ -1125,7 +1205,7 @@ function RoomSelectionPage() {
                   alignContent: 'start',
                 }}
               >
-                {paginatedRooms.map((room) => {
+                {paginatedRooms.map(room => {
                   const isOccupied = room.is_occupied;
                   return (
                     <button
@@ -1156,13 +1236,13 @@ function RoomSelectionPage() {
                         WebkitTapHighlightColor: 'transparent',
                         opacity: isOccupied ? 0.6 : 1,
                       }}
-                      onTouchStart={(e) => {
+                      onTouchStart={e => {
                         if (!isOccupied) {
                           e.currentTarget.style.transform = 'scale(0.98)';
                           e.currentTarget.style.backgroundColor = '#FEF3E2';
                         }
                       }}
-                      onTouchEnd={(e) => {
+                      onTouchEnd={e => {
                         if (!isOccupied) {
                           setTimeout(() => {
                             if (e.currentTarget) {
@@ -1269,56 +1349,57 @@ function RoomSelectionPage() {
                 })}
 
                 {/* Empty placeholder slots */}
-                {emptySlots > 0 && Array.from({ length: emptySlots }).map((_, index) => (
-                  <div
-                    key={`empty-${index}`}
-                    style={{
-                      height: '160px',
-                      backgroundColor: '#FAFAFA',
-                      border: '2px dashed #E5E7EB',
-                      borderRadius: '12px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      overflow: 'hidden',
-                    }}
-                  >
+                {emptySlots > 0 &&
+                  Array.from({ length: emptySlots }).map((_, index) => (
                     <div
+                      key={`empty-${index}`}
                       style={{
+                        height: '160px',
+                        backgroundColor: '#FAFAFA',
+                        border: '2px dashed #E5E7EB',
+                        borderRadius: '12px',
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
-                        gap: '8px',
-                        opacity: 0.4,
+                        justifyContent: 'center',
+                        position: 'relative',
+                        overflow: 'hidden',
                       }}
                     >
-                      <svg
-                        width="32"
-                        height="32"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#9CA3AF"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-                        <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
-                        <circle cx="11" cy="12" r="1" />
-                      </svg>
-                      <span
+                      <div
                         style={{
-                          fontSize: '14px',
-                          color: '#9CA3AF',
-                          fontWeight: 400,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '8px',
+                          opacity: 0.4,
                         }}
                       >
-                        Leer
-                      </span>
+                        <svg
+                          width="32"
+                          height="32"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#9CA3AF"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+                          <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+                          <circle cx="11" cy="12" r="1" />
+                        </svg>
+                        <span
+                          style={{
+                            fontSize: '14px',
+                            color: '#9CA3AF',
+                            fontWeight: 400,
+                          }}
+                        >
+                          Leer
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
 

@@ -20,13 +20,16 @@ function LandingPage() {
   const handleQuit = () => {
     logger.info('User requested application quit from landing page');
     logUserAction('quit_app');
-    
+
     invoke('quit_app', {})
       .then(() => {
         logger.debug('Application quit command sent successfully');
       })
-      .catch((error) => {
-        logError(error instanceof Error ? error : new Error(String(error)), 'LandingPage.handleQuit');
+      .catch(error => {
+        logError(
+          error instanceof Error ? error : new Error(String(error)),
+          'LandingPage.handleQuit'
+        );
       });
   };
 
@@ -61,12 +64,12 @@ function LandingPage() {
             boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             backdropFilter: 'blur(8px)',
           }}
-          onTouchStart={(e) => {
+          onTouchStart={e => {
             e.currentTarget.style.transform = 'scale(0.95)';
             e.currentTarget.style.backgroundColor = 'rgba(255, 49, 48, 0.1)';
             e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
           }}
-          onTouchEnd={(e) => {
+          onTouchEnd={e => {
             setTimeout(() => {
               if (e.currentTarget) {
                 e.currentTarget.style.transform = 'scale(1)';
@@ -86,8 +89,8 @@ function LandingPage() {
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M18 6L6 18"/>
-            <path d="M6 6l12 12"/>
+            <path d="M18 6L6 18" />
+            <path d="M6 6l12 12" />
           </svg>
           <span
             style={{
@@ -167,7 +170,8 @@ function LandingPage() {
             color: '#FFFFFF',
             borderRadius: '12px',
             border: 'none',
-            boxShadow: '0 10px 25px -5px rgba(20, 184, 166, 0.3), 0 10px 10px -5px rgba(59, 130, 246, 0.2)',
+            boxShadow:
+              '0 10px 25px -5px rgba(20, 184, 166, 0.3), 0 10px 10px -5px rgba(59, 130, 246, 0.2)',
             cursor: 'pointer',
             transition: 'all 300ms cubic-bezier(0.4, 0, 0.2, 1)',
             outline: 'none',
@@ -175,13 +179,15 @@ function LandingPage() {
             position: 'relative',
             overflow: 'hidden',
           }}
-          onTouchStart={(e) => {
+          onTouchStart={e => {
             e.currentTarget.style.transform = 'scale(0.98)';
-            e.currentTarget.style.boxShadow = '0 5px 15px -5px rgba(20, 184, 166, 0.3), 0 5px 5px -5px rgba(59, 130, 246, 0.2)';
+            e.currentTarget.style.boxShadow =
+              '0 5px 15px -5px rgba(20, 184, 166, 0.3), 0 5px 5px -5px rgba(59, 130, 246, 0.2)';
           }}
-          onTouchEnd={(e) => {
+          onTouchEnd={e => {
             e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 10px 25px -5px rgba(20, 184, 166, 0.3), 0 10px 10px -5px rgba(59, 130, 246, 0.2)';
+            e.currentTarget.style.boxShadow =
+              '0 10px 25px -5px rgba(20, 184, 166, 0.3), 0 10px 10px -5px rgba(59, 130, 246, 0.2)';
           }}
         >
           <span style={{ position: 'relative', zIndex: 1 }}>Anmelden</span>

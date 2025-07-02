@@ -51,7 +51,7 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
           boxShadow: theme.shadows.lg,
           animation: 'modalPop 0.3s ease-out',
         }}
-        onClick={(e) => e.stopPropagation()}
+        onClick={e => e.stopPropagation()}
       >
         <div
           style={{
@@ -99,7 +99,7 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
           {message}
         </div>
       </div>
-      
+
       {/* Add animation keyframes */}
       <style>
         {`

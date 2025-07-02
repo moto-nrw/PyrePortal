@@ -12,7 +12,7 @@ function UserSelectionPage() {
   const { users, fetchTeachers, setSelectedUser, isLoading, error } = useUserStore();
   const [currentPage, setCurrentPage] = useState(0);
   const navigate = useNavigate();
-  
+
   // Create logger instance for this component
   const logger = createLogger('UserSelectionPage');
 
@@ -96,13 +96,15 @@ function UserSelectionPage() {
 
   return (
     <ContentBox centered shadow="md" rounded="lg">
-      <div style={{ 
-        width: '100%', 
-        height: '100%',
-        padding: '16px',
-        display: 'flex',
-        flexDirection: 'column',
-      }}>
+      <div
+        style={{
+          width: '100%',
+          height: '100%',
+          padding: '16px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         {/* Back button - positioned absolutely */}
         <div
           style={{
@@ -134,12 +136,12 @@ function UserSelectionPage() {
               overflow: 'hidden',
               backdropFilter: 'blur(8px)',
             }}
-            onTouchStart={(e) => {
+            onTouchStart={e => {
               e.currentTarget.style.transform = 'scale(0.95)';
               e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
               e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
             }}
-            onTouchEnd={(e) => {
+            onTouchEnd={e => {
               setTimeout(() => {
                 if (e.currentTarget) {
                   e.currentTarget.style.transform = 'scale(1)';
@@ -159,8 +161,8 @@ function UserSelectionPage() {
               strokeLinecap="round"
               strokeLinejoin="round"
             >
-              <path d="M19 12H5"/>
-              <path d="M12 19l-7-7 7-7"/>
+              <path d="M19 12H5" />
+              <path d="M12 19l-7-7 7-7" />
             </svg>
             <span
               style={{
@@ -186,345 +188,353 @@ function UserSelectionPage() {
           Benutzer auswählen
         </h1>
 
-      {error && (
-        <div
-          style={{
-            background: 'linear-gradient(to right, #EF4444, #DC2626)',
-            borderRadius: '16px',
-            padding: '3px',
-            marginBottom: '24px',
-            animation: 'modalPop 300ms ease-out',
-          }}
-        >
+        {error && (
           <div
             style={{
-              backgroundColor: '#FEF2F2',
-              borderRadius: '13px',
-              padding: '20px',
-              textAlign: 'center',
-            }}
-          >
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                backgroundColor: '#FEE2E2',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 12px',
-              }}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5">
-                <circle cx="12" cy="12" r="10"/>
-                <line x1="15" y1="9" x2="9" y2="15"/>
-                <line x1="9" y1="9" x2="15" y2="15"/>
-              </svg>
-            </div>
-            <p
-              style={{
-                color: '#DC2626',
-                fontSize: '16px',
-                fontWeight: 600,
-                margin: 0,
-              }}
-            >
-              {error}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {isLoading ? (
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '400px',
-            gap: '20px',
-          }}
-        >
-          <div
-            style={{
-              background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
-              borderRadius: '20px',
+              background: 'linear-gradient(to right, #EF4444, #DC2626)',
+              borderRadius: '16px',
               padding: '3px',
+              marginBottom: '24px',
+              animation: 'modalPop 300ms ease-out',
             }}
           >
             <div
               style={{
-                backgroundColor: '#FFFFFF',
-                borderRadius: '17px',
-                padding: '32px',
+                backgroundColor: '#FEF2F2',
+                borderRadius: '13px',
+                padding: '20px',
                 textAlign: 'center',
               }}
             >
               <div
                 style={{
-                  width: '60px',
-                  height: '60px',
-                  border: '4px solid #E5E7EB',
-                  borderTopColor: '#5080D8',
+                  width: '48px',
+                  height: '48px',
+                  backgroundColor: '#FEE2E2',
                   borderRadius: '50%',
-                  animation: 'spin 1s linear infinite',
-                  margin: '0 auto 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 12px',
                 }}
-              />
+              >
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#DC2626"
+                  strokeWidth="2.5"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="15" y1="9" x2="9" y2="15" />
+                  <line x1="9" y1="9" x2="15" y2="15" />
+                </svg>
+              </div>
               <p
                 style={{
-                  fontSize: '18px',
-                  color: '#6B7280',
+                  color: '#DC2626',
+                  fontSize: '16px',
                   fontWeight: 600,
                   margin: 0,
                 }}
               >
-                Benutzer werden geladen...
+                {error}
               </p>
             </div>
           </div>
-        </div>
-      ) : (
-        <>
-          {/* User Grid */}
+        )}
+
+        {isLoading ? (
           <div
             style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
-              gap: '14px',
-              marginBottom: '24px',
-              flex: 1,
-              alignContent: 'start',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              minHeight: '400px',
+              gap: '20px',
             }}
           >
-            {paginatedUsers.map((user) => {
-              return (
+            <div
+              style={{
+                background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
+                borderRadius: '20px',
+                padding: '3px',
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: '17px',
+                  padding: '32px',
+                  textAlign: 'center',
+                }}
+              >
                 <div
-                  key={user.id}
                   style={{
-                    background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
-                    borderRadius: '20px',
-                    padding: '3px',
-                    cursor: 'pointer',
-                    transition: 'all 200ms',
-                    boxShadow: '0 8px 25px rgba(80, 128, 216, 0.15)',
+                    width: '60px',
+                    height: '60px',
+                    border: '4px solid #E5E7EB',
+                    borderTopColor: '#5080D8',
+                    borderRadius: '50%',
+                    animation: 'spin 1s linear infinite',
+                    margin: '0 auto 16px',
                   }}
-                  onTouchStart={(e) => {
-                    e.currentTarget.style.transform = 'scale(0.95)';
-                    e.currentTarget.style.boxShadow = '0 4px 15px rgba(80, 128, 216, 0.25)';
-                  }}
-                  onTouchEnd={(e) => {
-                    setTimeout(() => {
-                      if (e.currentTarget) {
-                        e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(80, 128, 216, 0.15)';
-                      }
-                    }, 150);
+                />
+                <p
+                  style={{
+                    fontSize: '18px',
+                    color: '#6B7280',
+                    fontWeight: 600,
+                    margin: 0,
                   }}
                 >
-                  <button
-                    onClick={() => handleUserSelect(user.name, user.id)}
+                  Benutzer werden geladen...
+                </p>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* User Grid */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: '14px',
+                marginBottom: '24px',
+                flex: 1,
+                alignContent: 'start',
+              }}
+            >
+              {paginatedUsers.map(user => {
+                return (
+                  <div
+                    key={user.id}
                     style={{
-                      width: '100%',
-                      height: '160px',
-                      backgroundColor: '#FFFFFF',
-                      border: 'none',
-                      borderRadius: '17px',
+                      background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+                      borderRadius: '20px',
+                      padding: '3px',
                       cursor: 'pointer',
-                      outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '16px',
-                      background: 'linear-gradient(to bottom, #FFFFFF, #F8FAFC)',
-                      backdropFilter: 'blur(8px)',
+                      transition: 'all 200ms',
+                      boxShadow: '0 8px 25px rgba(80, 128, 216, 0.15)',
+                    }}
+                    onTouchStart={e => {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                      e.currentTarget.style.boxShadow = '0 4px 15px rgba(80, 128, 216, 0.25)';
+                    }}
+                    onTouchEnd={e => {
+                      setTimeout(() => {
+                        if (e.currentTarget) {
+                          e.currentTarget.style.transform = 'scale(1)';
+                          e.currentTarget.style.boxShadow = '0 8px 25px rgba(80, 128, 216, 0.15)';
+                        }
+                      }, 150);
                     }}
                   >
-                    {/* User Icon with modern glass effect */}
-                    <div
+                    <button
+                      onClick={() => handleUserSelect(user.name, user.id)}
                       style={{
-                        width: '64px',
-                        height: '64px',
-                        background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
-                        borderRadius: '50%',
+                        width: '100%',
+                        height: '160px',
+                        backgroundColor: '#FFFFFF',
+                        border: 'none',
+                        borderRadius: '17px',
+                        cursor: 'pointer',
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
                         display: 'flex',
+                        flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
-                        position: 'relative',
-                        overflow: 'hidden',
+                        gap: '16px',
+                        background: 'linear-gradient(to bottom, #FFFFFF, #F8FAFC)',
+                        backdropFilter: 'blur(8px)',
+                      }}
+                    >
+                      {/* User Icon with modern glass effect */}
+                      <div
+                        style={{
+                          width: '64px',
+                          height: '64px',
+                          background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
+                          position: 'relative',
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <svg
+                          width="36"
+                          height="36"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#FFFFFF"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          style={{ position: 'relative', zIndex: 1 }}
+                        >
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                          <circle cx="12" cy="7" r="4" />
+                        </svg>
+                      </div>
+
+                      {/* User Name with gradient text */}
+                      <span
+                        style={{
+                          fontSize: '18px',
+                          fontWeight: 700,
+                          lineHeight: '1.2',
+                          maxWidth: '100%',
+                          wordBreak: 'break-word',
+                          textAlign: 'center',
+                          background: 'linear-gradient(135deg, #1F2937, #374151)',
+                          WebkitBackgroundClip: 'text',
+                          WebkitTextFillColor: 'transparent',
+                          backgroundClip: 'text',
+                        }}
+                      >
+                        {user.name}
+                      </span>
+                    </button>
+                  </div>
+                );
+              })}
+
+              {/* Empty placeholder slots */}
+              {emptySlots > 0 &&
+                Array.from({ length: emptySlots }).map((_, index) => (
+                  <div
+                    key={`empty-${index}`}
+                    style={{
+                      height: '160px',
+                      backgroundColor: '#FAFAFA',
+                      border: '2px dashed #E5E7EB',
+                      borderRadius: '20px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      position: 'relative',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '8px',
+                        opacity: 0.4,
                       }}
                     >
                       <svg
-                        width="36"
-                        height="36"
+                        width="32"
+                        height="32"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#FFFFFF"
-                        strokeWidth="2"
+                        stroke="#9CA3AF"
+                        strokeWidth="1.5"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        style={{ position: 'relative', zIndex: 1 }}
                       >
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                         <circle cx="12" cy="7" r="4" />
                       </svg>
+                      <span
+                        style={{
+                          fontSize: '14px',
+                          color: '#9CA3AF',
+                          fontWeight: 400,
+                        }}
+                      >
+                        Leer
+                      </span>
                     </div>
-                    
-                    {/* User Name with gradient text */}
-                    <span
-                      style={{
-                        fontSize: '18px',
-                        fontWeight: 700,
-                        lineHeight: '1.2',
-                        maxWidth: '100%',
-                        wordBreak: 'break-word',
-                        textAlign: 'center',
-                        background: 'linear-gradient(135deg, #1F2937, #374151)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                        backgroundClip: 'text',
-                      }}
-                    >
-                      {user.name}
-                    </span>
-                  </button>
-                </div>
-              );
-            })}
-            
-            {/* Empty placeholder slots */}
-            {emptySlots > 0 && Array.from({ length: emptySlots }).map((_, index) => (
+                  </div>
+                ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
               <div
-                key={`empty-${index}`}
                 style={{
-                  height: '160px',
-                  backgroundColor: '#FAFAFA',
-                  border: '2px dashed #E5E7EB',
-                  borderRadius: '20px',
                   display: 'flex',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  overflow: 'hidden',
+                  marginTop: '12px',
                 }}
               >
-                <div
+                <button
+                  onClick={handlePrevPage}
+                  disabled={currentPage === 0}
                   style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '8px',
-                    opacity: 0.4,
+                    height: 'auto',
+                    width: 'auto',
+                    fontSize: '18px',
+                    fontWeight: 500,
+                    padding: '8px 16px',
+                    background: 'transparent',
+                    color: currentPage === 0 ? '#9CA3AF' : '#14B8A6',
+                    border: 'none',
+                    borderRadius: '0',
+                    cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
+                    opacity: currentPage === 0 ? 0.5 : 1,
+                    transition: 'all 200ms',
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    boxShadow: 'none',
                   }}
                 >
-                  <svg
-                    width="32"
-                    height="32"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="#9CA3AF"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                  </svg>
-                  <span
-                    style={{
-                      fontSize: '14px',
-                      color: '#9CA3AF',
-                      fontWeight: 400,
-                    }}
-                  >
-                    Leer
-                  </span>
-                </div>
+                  ← Zurück
+                </button>
+
+                <span
+                  style={{
+                    fontSize: '18px',
+                    color: theme.colors.text.secondary,
+                    fontWeight: 500,
+                  }}
+                >
+                  Seite {currentPage + 1} von {totalPages}
+                </span>
+
+                <button
+                  onClick={handleNextPage}
+                  disabled={currentPage === totalPages - 1}
+                  style={{
+                    height: 'auto',
+                    width: 'auto',
+                    fontSize: '18px',
+                    fontWeight: 500,
+                    padding: '8px 16px',
+                    background: 'transparent',
+                    color: currentPage === totalPages - 1 ? '#9CA3AF' : '#3B82F6',
+                    border: 'none',
+                    borderRadius: '0',
+                    cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
+                    opacity: currentPage === totalPages - 1 ? 0.5 : 1,
+                    transition: 'all 200ms',
+                    outline: 'none',
+                    WebkitTapHighlightColor: 'transparent',
+                    boxShadow: 'none',
+                    transform: 'translateZ(0)', // Force GPU acceleration
+                  }}
+                >
+                  Nächste →
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
+        )}
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginTop: '12px',
-              }}
-            >
-              <button
-                onClick={handlePrevPage}
-                disabled={currentPage === 0}
-                style={{
-                  height: 'auto',
-                  width: 'auto',
-                  fontSize: '18px',
-                  fontWeight: 500,
-                  padding: '8px 16px',
-                  background: 'transparent',
-                  color: currentPage === 0 ? '#9CA3AF' : '#14B8A6',
-                  border: 'none',
-                  borderRadius: '0',
-                  cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === 0 ? 0.5 : 1,
-                  transition: 'all 200ms',
-                  outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                  boxShadow: 'none',
-                }}
-              >
-                ← Zurück
-              </button>
-
-              <span
-                style={{
-                  fontSize: '18px',
-                  color: theme.colors.text.secondary,
-                  fontWeight: 500,
-                }}
-              >
-                Seite {currentPage + 1} von {totalPages}
-              </span>
-
-              <button
-                onClick={handleNextPage}
-                disabled={currentPage === totalPages - 1}
-                style={{
-                  height: 'auto',
-                  width: 'auto',
-                  fontSize: '18px',
-                  fontWeight: 500,
-                  padding: '8px 16px',
-                  background: 'transparent',
-                  color: currentPage === totalPages - 1 ? '#9CA3AF' : '#3B82F6',
-                  border: 'none',
-                  borderRadius: '0',
-                  cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
-                  opacity: currentPage === totalPages - 1 ? 0.5 : 1,
-                  transition: 'all 200ms',
-                  outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                  boxShadow: 'none',
-                  transform: 'translateZ(0)', // Force GPU acceleration
-                }}
-              >
-                Nächste →
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Add animation keyframes */}
-      <style>
-        {`
+        {/* Add animation keyframes */}
+        <style>
+          {`
           @keyframes spin {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
@@ -545,7 +555,7 @@ function UserSelectionPage() {
             }
           }
         `}
-      </style>
+        </style>
       </div>
     </ContentBox>
   );

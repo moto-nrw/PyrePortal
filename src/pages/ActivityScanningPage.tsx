@@ -14,7 +14,7 @@ const ActivityScanningPage: React.FC = () => {
   const { selectedActivity, selectedRoom, authenticatedUser, rfid } = useUserStore();
 
   const { isScanning, currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
-  
+
   // Get access to the store's RFID functions
   const { recentTagScans } = useUserStore(state => state.rfid);
   const { hideScanModal } = useUserStore();
@@ -55,7 +55,7 @@ const ActivityScanningPage: React.FC = () => {
   const [studentCount, setStudentCount] = useState(0);
   // Add initial loading state to prevent emoji flicker
   const [isInitializing, setIsInitializing] = useState(true);
-  
+
   // State for daily checkout flow
   const [dailyCheckoutState, setDailyCheckoutState] = useState<{
     rfid: string;
@@ -124,7 +124,7 @@ const ActivityScanningPage: React.FC = () => {
       // Instead of fetching, update count based on scan action
       logger.debug('Updating student count based on scan', {
         action: currentScan.action,
-        currentCount: studentCount
+        currentCount: studentCount,
       });
 
       // Only update count for successful actions (not errors or info states)
@@ -139,7 +139,7 @@ const ActivityScanningPage: React.FC = () => {
         } else if ((currentScan.action as string) === 'checked_out_daily') {
           // Handle daily checkout - find the RFID tag from recent scans
           let rfidTag = '';
-          
+
           // Look through recent tag scans to find the one for this student
           for (const [tag, scan] of recentTagScans.entries()) {
             if (scan.result?.student_id === currentScan.student_id) {
@@ -147,14 +147,14 @@ const ActivityScanningPage: React.FC = () => {
               break;
             }
           }
-          
+
           // Set up daily checkout state
           setDailyCheckoutState({
             rfid: rfidTag,
             studentName: currentScan.student_name,
             showingFarewell: false,
           });
-          
+
           // Update student count - they're checking out of the room
           setStudentCount(prev => Math.max(0, prev - 1));
         } else if (currentScan.action === 'transferred') {
@@ -174,13 +174,12 @@ const ActivityScanningPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
 
-
   // Auto-close modal after delay
   useEffect(() => {
     if (showModal && currentScan) {
       // Use 10 seconds for daily checkout, otherwise use default modal display time
       const timeout = dailyCheckoutState ? 10000 : rfid.modalDisplayTime;
-      
+
       const timer = setTimeout(() => {
         // For daily checkout, clean up state if no action taken
         if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
@@ -215,29 +214,25 @@ const ActivityScanningPage: React.FC = () => {
     // Navigate to PIN page for teacher access
     void navigate('/pin');
   };
-  
+
   // Handle daily checkout confirmation
   const handleDailyCheckoutConfirm = async () => {
     if (!dailyCheckoutState || !authenticatedUser?.pin) return;
-    
+
     try {
-      logger.info('Processing daily checkout attendance toggle', { 
+      logger.info('Processing daily checkout attendance toggle', {
         rfid: dailyCheckoutState.rfid,
-        studentName: dailyCheckoutState.studentName 
+        studentName: dailyCheckoutState.studentName,
       });
-      
+
       // Call attendance toggle API - use 'cancel' to log out for the day
-      await api.toggleAttendance(
-        authenticatedUser.pin,
-        dailyCheckoutState.rfid,
-        'cancel'
-      );
-      
+      await api.toggleAttendance(authenticatedUser.pin, dailyCheckoutState.rfid, 'cancel');
+
       logger.info('Daily checkout attendance toggle successful');
-      
+
       // Show farewell message
-      setDailyCheckoutState(prev => prev ? {...prev, showingFarewell: true} : null);
-      
+      setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+
       // Close modal after 2 seconds
       setTimeout(() => {
         setDailyCheckoutState(null);
@@ -281,12 +276,12 @@ const ActivityScanningPage: React.FC = () => {
             color: '#374151',
             zIndex: 10,
           }}
-          onTouchStart={(e) => {
+          onTouchStart={e => {
             e.currentTarget.style.transform = 'scale(0.95)';
             e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
             e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
           }}
-          onTouchEnd={(e) => {
+          onTouchEnd={e => {
             setTimeout(() => {
               if (e.currentTarget) {
                 e.currentTarget.style.transform = 'scale(1)';
@@ -296,7 +291,14 @@ const ActivityScanningPage: React.FC = () => {
             }, 150);
           }}
         >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
             <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
             <circle cx="12" cy="7" r="4" />
           </svg>
@@ -313,7 +315,6 @@ const ActivityScanningPage: React.FC = () => {
             padding: '24px',
           }}
         >
-
           {/* Header Section */}
           <div style={{ textAlign: 'center', marginTop: '-40px', marginBottom: '48px' }}>
             <h1
@@ -403,8 +404,7 @@ const ActivityScanningPage: React.FC = () => {
                 ? 'Bitte warten, während der Scanner initialisiert wird...'
                 : isScanning
                   ? 'Halte dein Armband auf das bunte Scannersymbol'
-                  : 'Scanner ist pausiert'
-              }
+                  : 'Scanner ist pausiert'}
             </p>
           </div>
         </div>
@@ -456,7 +456,7 @@ const ActivityScanningPage: React.FC = () => {
               overflow: 'hidden',
               transform: 'scale(1)',
             }}
-            onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside modal
+            onClick={e => e.stopPropagation()} // Prevent closing when clicking inside modal
           >
             {/* Background pattern for visual interest */}
             <div
@@ -466,7 +466,8 @@ const ActivityScanningPage: React.FC = () => {
                 left: 0,
                 right: 0,
                 bottom: 0,
-                background: 'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                background:
+                  'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
                 pointerEvents: 'none',
               }}
             />
@@ -492,28 +493,28 @@ const ActivityScanningPage: React.FC = () => {
                   if (dailyCheckoutState.showingFarewell) {
                     // Home icon for farewell
                     return (
-                      <img 
-                        src="/img/home.png" 
-                        alt="Home" 
-                        width="80" 
+                      <img
+                        src="/img/home.png"
+                        alt="Home"
+                        width="80"
                         height="80"
-                        style={{ 
+                        style={{
                           filter: 'brightness(0) invert(1)', // Make it white to match other icons
-                          objectFit: 'contain' 
+                          objectFit: 'contain',
                         }}
                       />
                     );
                   } else {
                     // Home icon for asking if going home
                     return (
-                      <img 
-                        src="/img/home.png" 
-                        alt="Home" 
-                        width="80" 
+                      <img
+                        src="/img/home.png"
+                        alt="Home"
+                        width="80"
                         height="80"
-                        style={{ 
+                        style={{
                           filter: 'brightness(0) invert(1)', // Make it white to match other icons
-                          objectFit: 'contain' 
+                          objectFit: 'contain',
                         }}
                       />
                     );
@@ -522,7 +523,16 @@ const ActivityScanningPage: React.FC = () => {
                 // Error state - X icon
                 if ((currentScan as { showAsError?: boolean }).showAsError) {
                   return (
-                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <line x1="18" y1="6" x2="6" y2="18"></line>
                       <line x1="6" y1="6" x2="18" y2="18"></line>
                     </svg>
@@ -531,7 +541,16 @@ const ActivityScanningPage: React.FC = () => {
                 // Info state - Info icon
                 if ((currentScan as { isInfo?: boolean }).isInfo) {
                   return (
-                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <circle cx="12" cy="12" r="10"></circle>
                       <line x1="12" y1="16" x2="12" y2="12"></line>
                       <line x1="12" y1="8" x2="12.01" y2="8"></line>
@@ -539,12 +558,31 @@ const ActivityScanningPage: React.FC = () => {
                   );
                 }
                 // Success states
-                return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
-                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                return currentScan.action === 'checked_in' ||
+                  currentScan.action === 'transferred' ? (
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M20 6L9 17l-5-5" />
                   </svg>
                 ) : (
-                  <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                     <polyline points="16 17 21 12 16 7" />
                     <line x1="21" y1="12" x2="9" y2="12" />
@@ -580,7 +618,10 @@ const ActivityScanningPage: React.FC = () => {
                 if (currentScan.message) return currentScan.message;
 
                 // Error/Info states use student_name as the title
-                if ((currentScan as { showAsError?: boolean }).showAsError || (currentScan as { isInfo?: boolean }).isInfo) {
+                if (
+                  (currentScan as { showAsError?: boolean }).showAsError ||
+                  (currentScan as { isInfo?: boolean }).isInfo
+                ) {
                   return currentScan.student_name;
                 }
 
@@ -608,7 +649,7 @@ const ActivityScanningPage: React.FC = () => {
                     >
                       {dailyCheckoutState.studentName}
                     </div>
-                    
+
                     <button
                       onClick={handleDailyCheckoutConfirm}
                       style={{
@@ -625,11 +666,11 @@ const ActivityScanningPage: React.FC = () => {
                         zIndex: 2,
                         outline: 'none',
                       }}
-                      onMouseEnter={(e) => {
+                      onMouseEnter={e => {
                         e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
                         e.currentTarget.style.transform = 'scale(1.05)';
                       }}
-                      onMouseLeave={(e) => {
+                      onMouseLeave={e => {
                         e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
                         e.currentTarget.style.transform = 'scale(1)';
                       }}
@@ -664,10 +705,8 @@ const ActivityScanningPage: React.FC = () => {
               </div>
             )}
           </div>
-
         </div>
       )}
-
     </>
   );
 };

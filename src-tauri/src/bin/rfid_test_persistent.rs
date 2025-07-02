@@ -24,7 +24,7 @@ fn main() {
     // Initialize hardware ONCE
     let mut spi = Spidev::open("/dev/spidev0.0").unwrap();
     println!("✓ SPI opened");
-    
+
     let options = SpidevOptions::new()
         .bits_per_word(8)
         .max_speed_hz(1_000_000)
@@ -32,10 +32,10 @@ fn main() {
         .build();
     spi.configure(&options).unwrap();
     println!("✓ SPI configured at 1MHz");
-    
+
     let gpio = Gpio::new().unwrap();
     let mut reset_pin = gpio.get(22).unwrap().into_output();
-    
+
     // Hardware reset
     reset_pin.set_high();
     reset_pin.set_low();
@@ -43,54 +43,63 @@ fn main() {
     reset_pin.set_high();
     thread::sleep(Duration::from_millis(50));
     println!("✓ Hardware reset");
-    
+
     let spi_interface = SpiInterface::new(spi);
     let mfrc522 = Mfrc522::new(spi_interface);
     let mut mfrc522 = mfrc522.init().unwrap();
     println!("✓ MFRC522 initialized");
-    
+
     if let Ok(v) = mfrc522.version() {
         println!("✓ Version: 0x{:02X}", v);
     }
-    
+
     // Set antenna gain
     mfrc522.set_antenna_gain(ANTENNA_GAIN).ok();
     println!("✓ Antenna gain: {:?}", ANTENNA_GAIN);
-    
-    println!("\nStarting continuous scan ({}ms interval)...\n", SCAN_INTERVAL_MS);
-    
+
+    println!(
+        "\nStarting continuous scan ({}ms interval)...\n",
+        SCAN_INTERVAL_MS
+    );
+
     // Scan forever
     let mut scan_num = 0;
     let mut incomplete_frames = 0;
     let mut successes = 0;
-    
+
     loop {
         scan_num += 1;
-        
+
         // Try WUPA
         if let Ok(atqa) = mfrc522.wupa() {
             println!("[{}] WUPA success!", scan_num);
-            
+
             // First select attempt
             match mfrc522.select(&atqa) {
                 Ok(uid) => {
                     successes += 1;
                     let uid_bytes = uid.as_bytes();
-                    let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
+                    let uid_hex: Vec<String> =
+                        uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
                     let uid_len = uid_bytes.len();
-                    println!("[{}] ✅ TAG: {} ({} bytes)", scan_num, uid_hex.join(":"), uid_len);
-                    
+                    println!(
+                        "[{}] ✅ TAG: {} ({} bytes)",
+                        scan_num,
+                        uid_hex.join(":"),
+                        uid_len
+                    );
+
                     // Identify card type based on your actual hardware
                     if uid_len == 4 {
                         println!("     → 4-byte UID (your RC522 card)");
                     } else if uid_len == 7 {
                         println!("     → 7-byte UID (your NTAG216 wristband)");
                     }
-                    
+
                     // ALWAYS halt the card
                     let _ = mfrc522.hlta();
                     println!("[{}] Card halted", scan_num);
-                    
+
                     // Wait a bit for card to be removed
                     thread::sleep(Duration::from_millis(500));
                 }
@@ -99,25 +108,35 @@ fn main() {
                     let error_str = format!("{:?}", e);
                     if error_str.contains("IncompleteFrame") {
                         incomplete_frames += 1;
-                        println!("[{}] ⚠️  IncompleteFrame - retrying up to 5 times...", scan_num);
-                        
+                        println!(
+                            "[{}] ⚠️  IncompleteFrame - retrying up to 5 times...",
+                            scan_num
+                        );
+
                         // Try up to 5 retries
                         let mut retry_count = 0;
                         let mut retry_success = false;
-                        
+
                         while retry_count < 5 && !retry_success {
                             // Delay between retries
                             thread::sleep(Duration::from_millis(10));
                             retry_count += 1;
-                            
+
                             match mfrc522.select(&atqa) {
                                 Ok(uid) => {
                                     successes += 1;
                                     retry_success = true;
                                     let uid_bytes = uid.as_bytes();
-                                    let uid_hex: Vec<String> = uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
+                                    let uid_hex: Vec<String> =
+                                        uid_bytes.iter().map(|b| format!("{:02X}", b)).collect();
                                     let uid_len = uid_bytes.len();
-                                    println!("[{}] ✅ RETRY {} SUCCESS: {} ({} bytes)", scan_num, retry_count, uid_hex.join(":"), uid_len);
+                                    println!(
+                                        "[{}] ✅ RETRY {} SUCCESS: {} ({} bytes)",
+                                        scan_num,
+                                        retry_count,
+                                        uid_hex.join(":"),
+                                        uid_len
+                                    );
                                     if uid_len == 4 {
                                         println!("     → 4-byte UID (your RC522 card)");
                                     } else if uid_len == 7 {
@@ -128,12 +147,15 @@ fn main() {
                                 }
                                 Err(e) => {
                                     if retry_count == 5 {
-                                        println!("[{}] ❌ All 5 retries failed. Last error: {:?}", scan_num, e);
+                                        println!(
+                                            "[{}] ❌ All 5 retries failed. Last error: {:?}",
+                                            scan_num, e
+                                        );
                                     }
                                 }
                             }
                         }
-                        
+
                         if !retry_success {
                             let _ = mfrc522.hlta();
                         }
@@ -147,11 +169,13 @@ fn main() {
         } else {
             // Only print every 10th scan to reduce noise
             if scan_num % 10 == 0 {
-                println!("[{}] No card (Success: {}, IncFrames: {})", 
-                         scan_num, successes, incomplete_frames);
+                println!(
+                    "[{}] No card (Success: {}, IncFrames: {})",
+                    scan_num, successes, incomplete_frames
+                );
             }
         }
-        
+
         thread::sleep(Duration::from_millis(SCAN_INTERVAL_MS));
     }
 }

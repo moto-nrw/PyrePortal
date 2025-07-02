@@ -119,17 +119,17 @@ function TagAssignmentPage() {
         setTimeout(() => {
           // Get mock tags from environment variable or use defaults
           const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
-          const mockStudentTags: string[] = envTags 
-            ? envTags.split(',').map((tag) => tag.trim())
+          const mockStudentTags: string[] = envTags
+            ? envTags.split(',').map(tag => tag.trim())
             : [
                 // Default realistic hardware format tags
                 '04:D6:94:82:97:6A:80',
                 '04:A7:B3:C2:D1:E0:F5',
                 '04:12:34:56:78:9A:BC',
                 '04:FE:DC:BA:98:76:54',
-                '04:11:22:33:44:55:66'
+                '04:11:22:33:44:55:66',
               ];
-          
+
           // Pick a random tag from the list
           const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
           logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
@@ -209,7 +209,7 @@ function TagAssignmentPage() {
 
     // Extract teacher IDs from selected supervisors
     const teacherIds = selectedSupervisors.map(supervisor => supervisor.id);
-    
+
     return await api.getStudents(authenticatedUser.pin, teacherIds);
   };
 
@@ -290,13 +290,15 @@ function TagAssignmentPage() {
   return (
     <>
       <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-        <div style={{ 
-          width: '100%', 
-          height: '100%',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
+        <div
+          style={{
+            width: '100%',
+            height: '100%',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           {/* Modern back button */}
           <div
             style={{
@@ -338,8 +340,8 @@ function TagAssignmentPage() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M19 12H5"/>
-                <path d="M12 19l-7-7 7-7"/>
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
               </svg>
               <span
                 style={{
@@ -366,126 +368,129 @@ function TagAssignmentPage() {
             {scannedTag && !success ? 'Tag zuweisen' : 'Armband scannen'}
           </h1>
 
-        {/* Scanner Modal Overlay */}
-        {showScanner && (
+          {/* Scanner Modal Overlay */}
+          {showScanner && (
+            <div
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 1000,
+              }}
+            >
+              <div
+                style={{
+                  backgroundColor: '#5080D8',
+                  borderRadius: '32px',
+                  padding: '64px',
+                  maxWidth: '600px',
+                  width: '90%',
+                  textAlign: 'center',
+                  boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Background pattern */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    background:
+                      'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                    pointerEvents: 'none',
+                  }}
+                />
+
+                {/* Icon container */}
+                <div
+                  style={{
+                    width: '120px',
+                    height: '120px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: '0 auto 32px',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  <FontAwesomeIcon
+                    icon={faWifi}
+                    size="4x"
+                    style={{ color: 'white', transform: 'rotate(90deg)' }}
+                  />
+                </div>
+
+                <h2
+                  style={{
+                    fontSize: '36px',
+                    fontWeight: 700,
+                    marginBottom: '16px',
+                    color: '#FFFFFF',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  RFID Tag scannen...
+                </h2>
+                <p
+                  style={{
+                    fontSize: '20px',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    marginBottom: '32px',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  {scannerStatus?.platform.includes('Development')
+                    ? 'Simuliere Scan-Vorgang...'
+                    : 'Halten Sie das Armband an den Scanner'}
+                </p>
+
+                <button
+                  onClick={() => setShowScanner(false)}
+                  style={{
+                    padding: '12px 32px',
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                    color: 'white',
+                    border: '2px solid rgba(255, 255, 255, 0.3)',
+                    borderRadius: '24px',
+                    cursor: 'pointer',
+                    transition: 'all 200ms',
+                    outline: 'none',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Main Content - Centered */}
           <div
             style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              flex: 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              zIndex: 1000,
             }}
           >
-            <div
-              style={{
-                backgroundColor: '#5080D8',
-                borderRadius: '32px',
-                padding: '64px',
-                maxWidth: '600px',
-                width: '90%',
-                textAlign: 'center',
-                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-                position: 'relative',
-                overflow: 'hidden',
-              }}
-            >
-              {/* Background pattern */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background: 'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                  pointerEvents: 'none',
-                }}
-              />
-              
-              {/* Icon container */}
-              <div
-                style={{
-                  width: '120px',
-                  height: '120px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: '0 auto 32px',
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                <FontAwesomeIcon 
-                  icon={faWifi} 
-                  size="4x"
-                  style={{ color: 'white', transform: 'rotate(90deg)' }}
-                />
-              </div>
-              
-              <h2
-                style={{
-                  fontSize: '36px',
-                  fontWeight: 700,
-                  marginBottom: '16px',
-                  color: '#FFFFFF',
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                RFID Tag scannen...
-              </h2>
-              <p
-                style={{
-                  fontSize: '20px',
-                  color: 'rgba(255, 255, 255, 0.9)',
-                  marginBottom: '32px',
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                {scannerStatus?.platform.includes('Development')
-                  ? 'Simuliere Scan-Vorgang...'
-                  : 'Halten Sie das Armband an den Scanner'}
-              </p>
-              
-              <button
-                onClick={() => setShowScanner(false)}
-                style={{
-                  padding: '12px 32px',
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                  color: 'white',
-                  border: '2px solid rgba(255, 255, 255, 0.3)',
-                  borderRadius: '24px',
-                  cursor: 'pointer',
-                  transition: 'all 200ms',
-                  outline: 'none',
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        )}
-
-          {/* Main Content - Centered */}
-          <div style={{ 
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}>
             {/* Initial State - Start Scanning */}
             {!scannedTag && !isLoading && (
               <div style={{ textAlign: 'center' }}>
@@ -501,13 +506,13 @@ function TagAssignmentPage() {
                     margin: '0 auto 40px',
                   }}
                 >
-                  <FontAwesomeIcon 
-                    icon={faWifi} 
+                  <FontAwesomeIcon
+                    icon={faWifi}
                     size="5x"
                     style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
                   />
                 </div>
-                
+
                 <p
                   style={{
                     fontSize: '24px',
@@ -516,7 +521,9 @@ function TagAssignmentPage() {
                     lineHeight: '1.4',
                   }}
                 >
-                  Klicken Sie auf "Scannen", um ein<br />RFID-Armband zu scannen
+                  Klicken Sie auf "Scannen", um ein
+                  <br />
+                  RFID-Armband zu scannen
                 </p>
 
                 <button
@@ -536,7 +543,8 @@ function TagAssignmentPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
-                    opacity: (isLoading || (!scannerStatus?.is_available && isTauriContext())) ? 0.5 : 1,
+                    opacity:
+                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.5 : 1,
                   }}
                 >
                   {scannerStatus?.platform.includes('Development')
@@ -602,9 +610,18 @@ function TagAssignmentPage() {
                         marginBottom: '20px',
                       }}
                     >
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#5080D8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                        <polyline points="22 4 12 14.01 9 11.01"/>
+                      <svg
+                        width="24"
+                        height="24"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#5080D8"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                        <polyline points="22 4 12 14.01 9 11.01" />
                       </svg>
                       <span style={{ fontSize: '18px', fontWeight: 600, color: '#374151' }}>
                         Tag: {scannedTag}
@@ -614,25 +631,31 @@ function TagAssignmentPage() {
                     {/* Current Assignment Status */}
                     {tagAssignment.assigned && tagAssignment.student ? (
                       <div>
-                        <p style={{ 
-                          fontSize: '16px', 
-                          color: '#6B7280', 
-                          marginBottom: '8px' 
-                        }}>
+                        <p
+                          style={{
+                            fontSize: '16px',
+                            color: '#6B7280',
+                            marginBottom: '8px',
+                          }}
+                        >
                           Aktuell zugewiesen an:
                         </p>
-                        <p style={{
-                          fontSize: '24px',
-                          fontWeight: 700,
-                          color: '#1F2937',
-                          marginBottom: '4px',
-                        }}>
+                        <p
+                          style={{
+                            fontSize: '24px',
+                            fontWeight: 700,
+                            color: '#1F2937',
+                            marginBottom: '4px',
+                          }}
+                        >
                           {tagAssignment.student.name}
                         </p>
-                        <p style={{
-                          fontSize: '18px',
-                          color: '#6B7280',
-                        }}>
+                        <p
+                          style={{
+                            fontSize: '18px',
+                            color: '#6B7280',
+                          }}
+                        >
                           {tagAssignment.student.group}
                         </p>
                       </div>
@@ -650,17 +673,28 @@ function TagAssignmentPage() {
                             margin: '0 auto 16px',
                           }}
                         >
-                          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <circle cx="12" cy="12" r="10"/>
-                            <line x1="12" y1="8" x2="12" y2="12"/>
-                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                          <svg
+                            width="32"
+                            height="32"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#F59E0B"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <circle cx="12" cy="12" r="10" />
+                            <line x1="12" y1="8" x2="12" y2="12" />
+                            <line x1="12" y1="16" x2="12.01" y2="16" />
                           </svg>
                         </div>
-                        <p style={{
-                          fontSize: '20px',
-                          color: '#6B7280',
-                          fontWeight: 500,
-                        }}>
+                        <p
+                          style={{
+                            fontSize: '20px',
+                            color: '#6B7280',
+                            fontWeight: 500,
+                          }}
+                        >
                           Tag ist nicht zugewiesen
                         </p>
                       </div>
@@ -702,11 +736,11 @@ function TagAssignmentPage() {
                       backgroundPosition: 'right 16px center',
                       paddingRight: '48px',
                     }}
-                    onFocus={(e) => {
+                    onFocus={e => {
                       e.currentTarget.style.borderColor = '#5080D8';
                       e.currentTarget.style.boxShadow = '0 0 0 3px rgba(80, 128, 216, 0.1)';
                     }}
-                    onBlur={(e) => {
+                    onBlur={e => {
                       e.currentTarget.style.borderColor = '#E5E7EB';
                       e.currentTarget.style.boxShadow = 'none';
                     }}
@@ -787,8 +821,17 @@ function TagAssignmentPage() {
                     margin: '0 auto 32px',
                   }}
                 >
-                  <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5"/>
+                  <svg
+                    width="60"
+                    height="60"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#83cd2d"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M20 6L9 17l-5-5" />
                   </svg>
                 </div>
                 <h2
@@ -860,10 +903,8 @@ function TagAssignmentPage() {
                 </div>
               </div>
             )}
-
           </div>
         </div>
-
       </ContentBox>
 
       {/* Error Modal */}
