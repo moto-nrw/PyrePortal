@@ -4,7 +4,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ContentBox, ErrorModal } from '../components/ui';
-import { api } from '../services/api';
+import { LastSessionToggle } from '../components/LastSessionToggle';
+import { api, type SessionStartRequest } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
@@ -15,12 +16,22 @@ import { logNavigation, logUserAction } from '../utils/logger';
  * Displays after successful PIN validation
  */
 function HomeViewPage() {
-  const { authenticatedUser, currentSession, logout, fetchCurrentSession, selectedSupervisors } =
-    useUserStore();
+  const { 
+    authenticatedUser, 
+    currentSession, 
+    logout, 
+    fetchCurrentSession, 
+    selectedSupervisors,
+    sessionSettings,
+    loadSessionSettings,
+    validateAndRecreateSession,
+    isValidatingLastSession
+  } = useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Check if supervisors are selected
   const hasSupervisors = selectedSupervisors.length > 0;
@@ -58,9 +69,21 @@ function HomeViewPage() {
     void navigate('/tag-assignment');
   };
 
-  const handleStartActivity = () => {
-    logNavigation('Home View', '/activity-selection');
-    void navigate('/activity-selection');
+  const handleStartActivity = async () => {
+    // Check if we should recreate last session
+    if (sessionSettings?.use_last_session && sessionSettings.last_session) {
+      logUserAction('Attempting to recreate last session');
+      const success = await validateAndRecreateSession();
+      
+      if (success) {
+        // Show confirmation modal with session details
+        setShowConfirmModal(true);
+      }
+    } else {
+      // Normal flow
+      logNavigation('Home View', '/activity-selection');
+      void navigate('/activity-selection');
+    }
   };
 
   const handleContinueActivity = () => {
@@ -77,6 +100,56 @@ function HomeViewPage() {
     logNavigation('Home View', '/team-management');
     void navigate('/team-management');
   };
+  
+  const handleConfirmRecreation = async () => {
+    if (!authenticatedUser || !sessionSettings?.last_session) return;
+    
+    try {
+      const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
+      
+      if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
+        setErrorMessage('Fehler bei der Validierung der gespeicherten Sitzung');
+        setShowErrorModal(true);
+        setShowConfirmModal(false);
+        return;
+      }
+      
+      logUserAction('Confirming session recreation', {
+        activityId: selectedActivity.id,
+        roomId: selectedRoom.id,
+        supervisorCount: selectedSupervisors.length,
+      });
+      
+      // Start the session
+      const sessionRequest: SessionStartRequest = {
+        activity_id: selectedActivity.id,
+        room_id: selectedRoom.id,
+        supervisor_ids: selectedSupervisors.map(s => s.id),
+      };
+      
+      const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
+      
+      logUserAction('Session recreated successfully', {
+        sessionId: sessionResponse.active_group_id,
+      });
+      
+      // Save the new session data
+      await useUserStore.getState().saveLastSessionData();
+      
+      // Fetch current session to update state
+      await fetchCurrentSession();
+      
+      // Navigate to NFC scanning
+      logNavigation('Home View', '/nfc-scanning');
+      void navigate('/nfc-scanning');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
+    } finally {
+      setShowConfirmModal(false);
+    }
+  };
 
   // Redirect to login if no authenticated user and fetch current session
   useEffect(() => {
@@ -88,7 +161,10 @@ function HomeViewPage() {
 
     // Check for existing session when component mounts
     void fetchCurrentSession();
-  }, [authenticatedUser, navigate, fetchCurrentSession]);
+    
+    // Load session settings
+    void loadSessionSettings();
+  }, [authenticatedUser, navigate, fetchCurrentSession, loadSessionSettings]);
 
   if (!authenticatedUser) {
     return null; // Will redirect via useEffect
@@ -296,13 +372,13 @@ function HomeViewPage() {
                 onClick={currentSession ? handleContinueActivity : handleStartActivity}
                 onTouchStart={() => setTouchedButton('activity')}
                 onTouchEnd={() => setTouchedButton(null)}
+                disabled={isValidatingLastSession}
                 style={{
                   position: 'relative',
                   backgroundColor: 'transparent',
                   border: 'none',
                   borderRadius: designSystem.borderRadius.xl,
                   padding: '32px',
-                  cursor: 'pointer',
                   transition: designSystem.transitions.smooth,
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
@@ -314,6 +390,8 @@ function HomeViewPage() {
                   gap: '16px',
                   transform: touchedButton === 'activity' ? designSystem.scales.active : 'scale(1)',
                   boxShadow: touchedButton === 'activity' ? designSystem.shadows.card : designSystem.shadows.cardHover,
+                  opacity: isValidatingLastSession ? 0.7 : 1,
+                  cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
                 }}
               >
                 {/* Gradient border */}
@@ -393,6 +471,8 @@ function HomeViewPage() {
                   >
                     {currentSession
                       ? (currentSession.activity_name ?? 'Aktivität')
+                      : sessionSettings?.use_last_session && sessionSettings.last_session
+                      ? 'Aktivität wiederholen'
                       : 'Neue Aktivität'}
                   </h3>
                   <p
@@ -403,8 +483,49 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {currentSession ? 'Fortsetzen' : 'Starten'}
+                    {currentSession 
+                      ? 'Fortsetzen' 
+                      : sessionSettings?.use_last_session && sessionSettings.last_session
+                      ? sessionSettings.last_session.activity_name
+                      : 'Starten'}
                   </p>
+                  
+                  {/* Show room and supervisor info for saved session */}
+                  {!currentSession && sessionSettings?.use_last_session && sessionSettings.last_session && (
+                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        gap: '8px', 
+                        justifyContent: 'center',
+                        flexWrap: 'wrap'
+                      }}>
+                        <span style={{
+                          fontSize: '13px',
+                          backgroundColor: '#E0E7FF',
+                          color: '#4C1D95',
+                          padding: '4px 12px',
+                          borderRadius: '9999px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          📍 {sessionSettings.last_session.room_name}
+                        </span>
+                        <span style={{
+                          fontSize: '13px',
+                          backgroundColor: '#D1FAE5',
+                          color: '#065F46',
+                          padding: '4px 12px',
+                          borderRadius: '9999px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          👥 {sessionSettings.last_session.supervisor_names.length} Betreuer
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </button>
 
@@ -512,6 +633,9 @@ function HomeViewPage() {
             </div>
           </div>
         </div>
+        
+        {/* Last Session Toggle - only show when no current session */}
+        {!currentSession && <LastSessionToggle />}
       </div>
 
       {/* Add animation keyframes */}
@@ -538,6 +662,167 @@ function HomeViewPage() {
         message={errorMessage}
         autoCloseDelay={3000}
       />
+      
+      {/* Confirmation Modal for Recreation */}
+      {showConfirmModal && sessionSettings?.last_session && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            backdropFilter: 'blur(4px)',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowConfirmModal(false);
+            }
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: designSystem.borderRadius.xl,
+              padding: '32px',
+              maxWidth: '480px',
+              width: '90%',
+              textAlign: 'center',
+              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.2)',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Success Icon */}
+            <div
+              style={{
+                width: '64px',
+                height: '64px',
+                background: 'linear-gradient(to right, #83CD2D, #70B525)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 24px auto',
+                boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
+              }}
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M5 12l5 5L20 7"
+                  stroke="white"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </div>
+
+            {/* Title */}
+            <h2
+              style={{
+                fontSize: '24px',
+                fontWeight: 700,
+                color: '#1F2937',
+                marginBottom: '12px',
+              }}
+            >
+              Aktivität wiederholen?
+            </h2>
+
+            {/* Activity Details */}
+            {useUserStore.getState().selectedActivity && useUserStore.getState().selectedRoom && (
+              <div style={{ marginBottom: '24px' }}>
+                <div
+                  style={{
+                    fontSize: '18px',
+                    fontWeight: 600,
+                    color: '#374151',
+                    marginBottom: '16px',
+                  }}
+                >
+                  {useUserStore.getState().selectedActivity?.name}
+                </div>
+
+                <div
+                  style={{
+                    backgroundColor: '#F3F4F6',
+                    borderRadius: designSystem.borderRadius.lg,
+                    padding: '16px',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{ marginBottom: '8px' }}>
+                    <span style={{ color: '#6B7280', fontSize: '14px' }}>Raum:</span>
+                    <span style={{ color: '#1F2937', fontSize: '14px', fontWeight: 500, marginLeft: '8px' }}>
+                      {useUserStore.getState().selectedRoom?.name}
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ color: '#6B7280', fontSize: '14px' }}>Betreuer:</span>
+                    <span style={{ color: '#1F2937', fontSize: '14px', fontWeight: 500, marginLeft: '8px' }}>
+                      {useUserStore.getState().selectedSupervisors.map(s => s.name).join(', ')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                style={{
+                  flex: 1,
+                  height: '48px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#6B7280',
+                  backgroundColor: 'transparent',
+                  border: '2px solid #E5E7EB',
+                  borderRadius: designSystem.borderRadius.lg,
+                  cursor: 'pointer',
+                  transition: 'all 200ms',
+                  outline: 'none',
+                }}
+              >
+                Abbrechen
+              </button>
+
+              <button
+                onClick={handleConfirmRecreation}
+                disabled={isValidatingLastSession}
+                style={{
+                  flex: 1,
+                  height: '48px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  color: '#FFFFFF',
+                  background: isValidatingLastSession
+                    ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                    : 'linear-gradient(to right, #83CD2D, #70B525)',
+                  border: 'none',
+                  borderRadius: designSystem.borderRadius.lg,
+                  cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
+                  transition: 'all 200ms',
+                  outline: 'none',
+                  boxShadow: isValidatingLastSession ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
+                  opacity: isValidatingLastSession ? 0.6 : 1,
+                }}
+              >
+                {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
     </ContentBox>
   );
 }

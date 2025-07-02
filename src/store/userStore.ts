@@ -8,6 +8,12 @@ import {
   type CurrentSession,
   type RfidScanResult,
 } from '../services/api';
+import { 
+  type SessionSettings, 
+  saveSessionSettings, 
+  loadSessionSettings, 
+  clearLastSession 
+} from '../services/sessionStorage';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -139,6 +145,10 @@ interface UserState {
 
   // RFID scanning state
   rfid: RfidState;
+  
+  // Session settings state
+  sessionSettings: SessionSettings | null;
+  isValidatingLastSession: boolean;
 
   // Actions
   setSelectedUser: (userName: string, userId: number | null) => void;
@@ -203,6 +213,13 @@ interface UserState {
   getCachedStudentId: (tagId: string) => string | undefined;
   clearOldTagScans: () => void;
   isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
+  
+  // Session settings actions
+  loadSessionSettings: () => Promise<void>;
+  toggleUseLastSession: (enabled: boolean) => Promise<void>;
+  saveLastSessionData: () => Promise<void>;
+  validateAndRecreateSession: () => Promise<boolean>;
+  clearSessionSettings: () => Promise<void>;
 }
 
 // Define the type for the Zustand set function
@@ -265,6 +282,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     recentTagScans: new Map<string, RecentTagScan>(),
     tagToStudentMap: new Map<string, string>(),
   },
+  
+  // Session settings initial state
+  sessionSettings: null,
+  isValidatingLastSession: false,
 
   // Actions
   setSelectedUser: (userName: string, userId: number | null) =>
@@ -1136,6 +1157,165 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
 
     return true;
+  },
+  
+  // Session settings actions
+  loadSessionSettings: async () => {
+    try {
+      storeLogger.debug('Loading session settings');
+      const settings = await loadSessionSettings();
+      
+      if (settings) {
+        set({ sessionSettings: settings });
+        storeLogger.info('Session settings loaded', {
+          useLastSession: settings.use_last_session,
+          hasLastSession: !!settings.last_session,
+        });
+      }
+    } catch (error) {
+      storeLogger.error('Failed to load session settings', { error });
+    }
+  },
+  
+  toggleUseLastSession: async (enabled: boolean) => {
+    const { sessionSettings } = get();
+    
+    const newSettings: SessionSettings = {
+      use_last_session: enabled,
+      auto_save_enabled: true,
+      last_session: sessionSettings?.last_session || null,
+    };
+    
+    try {
+      await saveSessionSettings(newSettings);
+      set({ sessionSettings: newSettings });
+      storeLogger.info('Toggle use last session', { enabled });
+    } catch (error) {
+      storeLogger.error('Failed to save session settings', { error });
+    }
+  },
+  
+  saveLastSessionData: async () => {
+    const { selectedActivity, selectedRoom, selectedSupervisors, sessionSettings } = get();
+    
+    if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
+      storeLogger.warn('Cannot save session data: missing required fields');
+      return;
+    }
+    
+    const lastSessionConfig = {
+      activity_id: selectedActivity.id,
+      room_id: selectedRoom.id,
+      supervisor_ids: selectedSupervisors.map(s => s.id),
+      saved_at: new Date().toISOString(),
+      activity_name: selectedActivity.name,
+      room_name: selectedRoom.name,
+      supervisor_names: selectedSupervisors.map(s => s.name),
+    };
+    
+    const newSettings: SessionSettings = {
+      use_last_session: sessionSettings?.use_last_session ?? false,
+      auto_save_enabled: true,
+      last_session: lastSessionConfig,
+    };
+    
+    try {
+      await saveSessionSettings(newSettings);
+      set({ sessionSettings: newSettings });
+      storeLogger.info('Last session data saved', {
+        activityId: selectedActivity.id,
+        roomId: selectedRoom.id,
+        supervisorCount: selectedSupervisors.length,
+      });
+    } catch (error) {
+      storeLogger.error('Failed to save last session data', { error });
+    }
+  },
+  
+  validateAndRecreateSession: async () => {
+    const { sessionSettings, authenticatedUser } = get();
+    
+    if (!sessionSettings?.last_session || !authenticatedUser?.pin) {
+      storeLogger.warn('Cannot recreate session: no saved session or authentication');
+      return false;
+    }
+    
+    set({ isValidatingLastSession: true, error: null });
+    
+    try {
+      // Validate activity exists
+      const activities = await api.getActivities(authenticatedUser.pin);
+      const activity = activities.find(a => a.id === sessionSettings.last_session!.activity_id);
+      
+      if (!activity) {
+        throw new Error('Gespeicherte Aktivität nicht mehr verfügbar');
+      }
+      
+      // Validate room is available
+      const rooms = await api.getRooms(authenticatedUser.pin);
+      const room = rooms.find(r => r.id === sessionSettings.last_session!.room_id);
+      
+      if (!room) {
+        throw new Error('Gespeicherter Raum nicht verfügbar');
+      }
+      
+      // Check supervisors - use current if already selected, otherwise validate saved ones
+      const { selectedSupervisors, users } = get();
+      let supervisors = selectedSupervisors;
+      
+      if (supervisors.length === 0) {
+        // Validate saved supervisors exist
+        supervisors = sessionSettings.last_session!.supervisor_ids
+          .map(id => users.find(u => u.id === id))
+          .filter((u): u is User => u !== undefined);
+          
+        if (supervisors.length === 0) {
+          throw new Error('Keine gültigen Betreuer gefunden');
+        }
+      }
+      
+      // Set validated data in store
+      set({
+        selectedActivity: activity,
+        selectedRoom: room,
+        selectedSupervisors: supervisors,
+        isValidatingLastSession: false,
+      });
+      
+      storeLogger.info('Session validation successful', {
+        activityId: activity.id,
+        roomId: room.id,
+        supervisorCount: supervisors.length,
+      });
+      
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
+      storeLogger.error('Session validation failed', { error: errorMessage });
+      
+      // Clear invalid session data
+      await clearLastSession();
+      set({
+        sessionSettings: { ...sessionSettings, last_session: null, use_last_session: false },
+        isValidatingLastSession: false,
+        error: errorMessage,
+      });
+      
+      return false;
+    }
+  },
+  
+  clearSessionSettings: async () => {
+    try {
+      await clearLastSession();
+      const { sessionSettings } = get();
+      set({
+        sessionSettings: sessionSettings ? { ...sessionSettings, last_session: null, use_last_session: false } : null,
+      });
+      storeLogger.info('Session settings cleared');
+    } catch (error) {
+      storeLogger.error('Failed to clear session settings', { error });
+    }
   },
 });
 

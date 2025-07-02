@@ -705,6 +705,7 @@ function RoomSelectionPage() {
     fetchRooms,
     selectRoom,
     fetchCurrentSession,
+    saveLastSessionData,
   } = useUserStore();
 
   const [isStartingSession, setIsStartingSession] = useState(false);
@@ -829,6 +830,9 @@ function RoomSelectionPage() {
 
       // Fetch and update current session to ensure state consistency
       await fetchCurrentSession();
+      
+      // Auto-save this session for quick recreation
+      await saveLastSessionData();
 
       logUserAction('session_started', {
         sessionId: sessionResponse.active_group_id,
@@ -917,6 +921,9 @@ function RoomSelectionPage() {
 
       // Fetch and update current session to ensure state consistency
       await fetchCurrentSession();
+      
+      // Auto-save this session for quick recreation
+      await saveLastSessionData();
 
       logUserAction('session_started_force', {
         sessionId: sessionResponse.active_group_id,

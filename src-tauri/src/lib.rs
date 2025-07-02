@@ -1,6 +1,7 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod logging;
 mod rfid;
+mod session_storage;
 
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -67,7 +68,10 @@ pub fn run() {
             rfid::get_rfid_service_status,
             rfid::get_rfid_scanner_status,
             rfid::scan_rfid_single,
-            rfid::scan_rfid_with_timeout
+            rfid::scan_rfid_with_timeout,
+            session_storage::save_session_settings,
+            session_storage::load_session_settings,
+            session_storage::clear_last_session
         ])
         .setup(move |app| {
             // Create the main window with dynamic fullscreen setting
