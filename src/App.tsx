@@ -10,6 +10,7 @@ import LandingPage from './pages/LandingPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
 import StaffSelectionPage from './pages/StaffSelectionPage';
+import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
 import UserSelectionPage from './pages/UserSelectionPage';
@@ -72,6 +73,10 @@ function App() {
             <Route
               path="/tag-assignment"
               element={isFullyAuthenticated ? <TagAssignmentPage /> : <Navigate to="/" replace />}
+            />
+            <Route
+              path="/student-selection"
+              element={isFullyAuthenticated ? <StudentSelectionPage /> : <Navigate to="/" replace />}
             />
             <Route
               path="/activity-selection"

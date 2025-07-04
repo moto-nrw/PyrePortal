@@ -1,10 +1,10 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 import { ContentBox, ErrorModal } from '../components/ui';
-import { api, type Student, type TagAssignmentCheck } from '../services/api';
+import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
@@ -37,16 +37,15 @@ interface RfidScannerStatus {
  * 6. Show confirmation and options to continue or go back
  */
 function TagAssignmentPage() {
-  const { authenticatedUser, selectedSupervisors } = useUserStore();
+  const { authenticatedUser } = useUserStore();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [scannedTag, setScannedTag] = useState<string | null>(null);
   const [tagAssignment, setTagAssignment] = useState<TagAssignmentCheck | null>(null);
-  const [students, setStudents] = useState<Student[]>([]);
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
   const [success, setSuccess] = useState<string | null>(null);
@@ -55,7 +54,6 @@ function TagAssignmentPage() {
   const clearStates = useCallback(() => {
     setScannedTag(null);
     setTagAssignment(null);
-    setSelectedStudentId(null);
     setError(null);
     setSuccess(null);
   }, []);
@@ -65,6 +63,37 @@ function TagAssignmentPage() {
     logNavigation('Tag Assignment', '/home');
     void navigate('/home');
   };
+
+  // Handle success state from student selection page
+  useEffect(() => {
+    const locationState = location.state as {
+      assignmentSuccess?: boolean;
+      studentName?: string;
+      previousTag?: string;
+      scannedTag?: string;
+      tagAssignment?: TagAssignmentCheck;
+    } | null;
+    
+    if (locationState?.assignmentSuccess) {
+      const { studentName, previousTag, scannedTag, tagAssignment } = locationState;
+      
+      // Restore tag data if coming back from student selection
+      if (scannedTag && tagAssignment) {
+        setScannedTag(scannedTag);
+        setTagAssignment(tagAssignment);
+      }
+      
+      let successMessage = `Tag erfolgreich zugewiesen an ${studentName ?? 'Schüler'}`;
+      if (previousTag) {
+        successMessage += ` (Vorheriger Tag: ${previousTag})`;
+      }
+      
+      setSuccess(successMessage);
+      
+      // Clear location state to prevent showing success on page refresh
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   // Check RFID scanner status on component mount
   useEffect(() => {
@@ -177,10 +206,6 @@ function TagAssignmentPage() {
       // Check if tag is already assigned
       const assignment = await checkTagAssignment(tagId);
       setTagAssignment(assignment);
-
-      // Fetch teacher's students for assignment dropdown
-      const teacherStudents = await fetchStudents();
-      setStudents(teacherStudents);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       const errorMessage = error.message;
@@ -201,71 +226,25 @@ function TagAssignmentPage() {
     return await api.checkTagAssignment(authenticatedUser.pin, tagId);
   };
 
-  // Fetch students supervised by selected teachers
-  const fetchStudents = async (): Promise<Student[]> => {
-    if (!authenticatedUser?.pin) {
-      throw new Error('Keine Authentifizierung verfügbar');
-    }
-
-    // Extract teacher IDs from selected supervisors
-    const teacherIds = selectedSupervisors.map(supervisor => supervisor.id);
-
-    return await api.getStudents(authenticatedUser.pin, teacherIds);
-  };
-
-  // Assign tag to selected student
-  const handleAssignTag = async () => {
-    if (!scannedTag || !selectedStudentId || !authenticatedUser?.pin) {
-      setError('Ungültige Auswahl. Bitte versuchen Sie es erneut.');
+  // Navigate to student selection
+  const handleNavigateToStudentSelection = () => {
+    if (!scannedTag || !tagAssignment) {
+      setError('Ungültige Tag-Daten. Bitte scannen Sie erneut.');
       setShowErrorModal(true);
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    logUserAction('Navigating to student selection', {
+      tagId: scannedTag,
+      currentlyAssigned: tagAssignment.assigned,
+    });
 
-    try {
-      const selectedStudent = students.find(s => s.student_id === selectedStudentId);
-      if (!selectedStudent) {
-        throw new Error('Student nicht gefunden');
-      }
-
-      logUserAction('Tag assignment initiated', {
-        tagId: scannedTag,
-        studentId: selectedStudentId,
-        studentName: `${selectedStudent.first_name} ${selectedStudent.last_name}`,
-      });
-
-      // Call the actual API endpoint
-      const result = await api.assignTag(authenticatedUser.pin, selectedStudentId, scannedTag);
-
-      if (result.success) {
-        const studentName = `${selectedStudent.first_name} ${selectedStudent.last_name}`;
-        let successMessage = `Tag erfolgreich zugewiesen an ${studentName}`;
-
-        if (result.previous_tag) {
-          successMessage += ` (Vorheriger Tag: ${result.previous_tag})`;
-        }
-
-        setSuccess(successMessage);
-
-        logUserAction('Tag assignment completed successfully', {
-          tagId: scannedTag,
-          studentName,
-          previousTag: result.previous_tag,
-        });
-      } else {
-        throw new Error(result.message ?? 'Tag-Zuweisung fehlgeschlagen');
-      }
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      const errorMessage = error.message;
-      logError(error, 'Tag assignment failed');
-      setError(`Fehler bei der Tag-Zuweisung: ${errorMessage}`);
-      setShowErrorModal(true);
-    } finally {
-      setIsLoading(false);
-    }
+    void navigate('/student-selection', {
+      state: {
+        scannedTag,
+        tagAssignment,
+      },
+    });
   };
 
   // Start a new scan
@@ -365,7 +344,7 @@ function TagAssignmentPage() {
               color: theme.colors.text.primary,
             }}
           >
-            {scannedTag && !success ? 'Tag zuweisen' : 'Armband scannen'}
+            Tag zuweisen
           </h1>
 
           {/* Scanner Modal Overlay */}
@@ -470,7 +449,6 @@ function TagAssignmentPage() {
                     border: '2px solid rgba(255, 255, 255, 0.3)',
                     borderRadius: '24px',
                     cursor: 'pointer',
-                    transition: 'all 200ms',
                     outline: 'none',
                     position: 'relative',
                     zIndex: 2,
@@ -521,9 +499,9 @@ function TagAssignmentPage() {
                     lineHeight: '1.4',
                   }}
                 >
-                  Klicken Sie auf "Scannen", um ein
+                  Wählen Sie einen Schüler aus,
                   <br />
-                  RFID-Armband zu scannen
+                  um ein Tag zuzuweisen
                 </p>
 
                 <button
@@ -539,7 +517,6 @@ function TagAssignmentPage() {
                     border: 'none',
                     borderRadius: '30px',
                     cursor: 'pointer',
-                    transition: 'all 200ms',
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
@@ -547,9 +524,7 @@ function TagAssignmentPage() {
                       isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.5 : 1,
                   }}
                 >
-                  {scannerStatus?.platform.includes('Development')
-                    ? 'Mock Scannen'
-                    : 'Scannen starten'}
+                  Schüler auswählen
                 </button>
               </div>
             )}
@@ -702,86 +677,34 @@ function TagAssignmentPage() {
                   </div>
                 </div>
 
-                {/* Student Selection */}
-                <div style={{ marginBottom: '32px' }}>
-                  <label
-                    style={{
-                      display: 'block',
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      marginBottom: '12px',
-                      color: '#1F2937',
-                    }}
-                  >
-                    {tagAssignment.assigned ? 'Neuen Schüler zuweisen:' : 'Schüler auswählen:'}
-                  </label>
-                  <select
-                    value={selectedStudentId ?? ''}
-                    onChange={e => setSelectedStudentId(Number(e.target.value) || null)}
-                    style={{
-                      width: '100%',
-                      height: '56px',
-                      padding: '0 16px',
-                      fontSize: '18px',
-                      borderRadius: '12px',
-                      border: '2px solid #E5E7EB',
-                      backgroundColor: '#FFFFFF',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      WebkitAppearance: 'none',
-                      MozAppearance: 'none',
-                      appearance: 'none',
-                      backgroundImage: `url("data:image/svg+xml;charset=UTF-8,%3csvg width='14' height='8' viewBox='0 0 14 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M1 1L7 7L13 1' stroke='%236B7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3e%3c/svg%3e")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 16px center',
-                      paddingRight: '48px',
-                    }}
-                    onFocus={e => {
-                      e.currentTarget.style.borderColor = '#5080D8';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(80, 128, 216, 0.1)';
-                    }}
-                    onBlur={e => {
-                      e.currentTarget.style.borderColor = '#E5E7EB';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    <option value="">Schüler auswählen...</option>
-                    {students.map(student => (
-                      <option key={student.student_id} value={student.student_id}>
-                        {student.first_name} {student.last_name} ({student.school_class ?? ''})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
                 {/* Action Buttons */}
                 <div
                   style={{
                     display: 'flex',
                     gap: '16px',
                     justifyContent: 'center',
+                    marginTop: '32px',
                   }}
                 >
                   <button
-                    onClick={handleAssignTag}
-                    disabled={!selectedStudentId || isLoading}
+                    onClick={handleNavigateToStudentSelection}
+                    disabled={isLoading}
                     style={{
                       flex: 1,
                       height: '56px',
                       fontSize: '18px',
                       fontWeight: 600,
-                      backgroundColor: selectedStudentId ? '#83cd2d' : '#E5E7EB',
-                      color: selectedStudentId ? 'white' : '#9CA3AF',
+                      backgroundColor: '#5080D8',
+                      color: 'white',
                       border: 'none',
                       borderRadius: '28px',
-                      cursor: selectedStudentId ? 'pointer' : 'not-allowed',
-                      transition: 'all 200ms',
+                      cursor: 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: selectedStudentId ? '0 4px 16px rgba(131, 205, 45, 0.3)' : 'none',
+                      boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
                     }}
                   >
-                    {tagAssignment.assigned ? 'Neu zuweisen' : 'Zuweisen'}
+                    {tagAssignment.assigned ? 'Neuen Schüler zuweisen' : 'Schüler auswählen'}
                   </button>
                   <button
                     onClick={handleScanAnother}
@@ -795,7 +718,6 @@ function TagAssignmentPage() {
                       border: '2px solid #E5E7EB',
                       borderRadius: '28px',
                       cursor: 'pointer',
-                      transition: 'all 200ms',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
                     }}
@@ -873,7 +795,6 @@ function TagAssignmentPage() {
                       border: 'none',
                       borderRadius: '28px',
                       cursor: 'pointer',
-                      transition: 'all 200ms',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
                       boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
@@ -893,7 +814,6 @@ function TagAssignmentPage() {
                       border: '2px solid #E5E7EB',
                       borderRadius: '28px',
                       cursor: 'pointer',
-                      transition: 'all 200ms',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
                     }}

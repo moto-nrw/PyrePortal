@@ -389,16 +389,6 @@ function PinPage() {
           >
             PIN-Eingabe
           </h1>
-          <p
-            style={{
-              fontSize: '17px',
-              color: theme.colors.text.secondary,
-              margin: '2px 0 0 0',
-              fontWeight: 500,
-            }}
-          >
-            Bitte geben Sie den globalen PIN ein
-          </p>
         </div>
 
         {/* Main Content - Centered */}
