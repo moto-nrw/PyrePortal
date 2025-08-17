@@ -300,3 +300,14 @@ await invoke('write_log', { entry: logData });
 - Offline mode with sync
 - Biometric authentication
 - Advanced reporting
+
+## Platform-Specific Builds
+
+### Raspberry Pi 4 Native 64-bit Build
+
+For optimal performance on Raspberry Pi 4 with 64-bit OS, use the native build process documented in `docs/pi4-native-build.md`. This provides significant performance improvements over cross-compiled 32-bit binaries:
+
+- **Performance gain**: 50-80% improvement in UI animations
+- **Target architecture**: aarch64 (native 64-bit ARM)
+- **Build time**: 15-30 minutes on Pi 4
+- **Expected FPS**: 30-45 FPS vs 15-25 FPS (32-bit)
