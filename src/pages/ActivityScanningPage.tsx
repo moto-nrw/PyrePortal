@@ -343,7 +343,6 @@ const ActivityScanningPage: React.FC = () => {
           {/* Main Student Count Display */}
           <div
             style={{
-              flex: 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -357,55 +356,32 @@ const ActivityScanningPage: React.FC = () => {
                   fontWeight: 800,
                   color: '#83cd2d',
                   lineHeight: 1,
-                  marginBottom: '20px',
+                  marginBottom: '0px',
                 }}
               >
                 {studentCount ?? 0}
               </div>
-              <div
-                style={{
-                  fontSize: '28px',
-                  color: '#6B7280',
-                  marginBottom: '12px',
-                  fontWeight: 600,
-                }}
-              >
-                Schülern
-              </div>
-              <div
-                style={{
-                  fontSize: '18px',
-                  color: '#9CA3AF',
-                  fontWeight: 500,
-                }}
-              >
-                eingecheckt
-              </div>
             </div>
           </div>
 
-          {/* Bottom Info Text */}
+          {/* Scan Arrow Image */}
           <div
             style={{
               textAlign: 'center',
-              paddingTop: '48px',
+              paddingTop: '0px',
               paddingBottom: '0',
             }}
           >
-            <p
+            <img
+              src="/img/scan_arrow_transparent.png"
+              alt="Scan hier"
               style={{
-                fontSize: '18px',
-                color: '#6B7280',
-                margin: 0,
-                fontWeight: 500,
+                width: '800px',
+                height: '225px',
+                opacity: isInitializing ? 0.3 : isScanning ? 1 : 0.5,
+                transition: 'opacity 300ms ease',
               }}
-            >
-              {isInitializing
-                ? 'Bitte warten, während der Scanner initialisiert wird...'
-                : isScanning
-                  ? 'Halte dein Armband auf das bunte Scannersymbol'
-                  : 'Scanner ist pausiert'}
-            </p>
+            />
           </div>
         </div>
       </ContentBox>
