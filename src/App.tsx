@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import { RfidServiceInitializer } from './components/RfidServiceInitializer';
+import NetworkStatus from './components/ui/NetworkStatus';
+import { useNetworkStatus } from './hooks/useNetworkStatus';
 import ActivityScanningPage from './pages/ActivityScanningPage';
 import AttendancePage from './pages/AttendancePage';
 import CreateActivityPage from './pages/CreateActivityPage';
@@ -15,13 +17,15 @@ import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
 import UserSelectionPage from './pages/UserSelectionPage';
 import { initializeApi } from './services/api';
+import { startAutoSync } from './services/syncQueue';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
 import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { authenticatedUser, selectedRoom, selectedActivity } = useUserStore();
+  const { authenticatedUser, selectedRoom, selectedActivity, setNetworkStatus } = useUserStore();
+  const { networkStatus } = useNetworkStatus();
   const appLogger = createLogger('App');
 
   // Initialize logger with runtime config and API
@@ -48,6 +52,23 @@ function App() {
     void initApp();
   }, [appLogger]); // Include appLogger in dependency array
 
+  // Sync network status from hook to store
+  useEffect(() => {
+    setNetworkStatus(networkStatus);
+  }, [networkStatus, setNetworkStatus]);
+
+  // Start automatic sync queue processing for offline operations
+  useEffect(() => {
+    appLogger.info('Starting automatic sync queue processing');
+    const stopAutoSync = startAutoSync(30000); // Check every 30 seconds
+
+    // Cleanup on unmount
+    return () => {
+      appLogger.info('Stopping automatic sync queue processing');
+      stopAutoSync();
+    };
+  }, [appLogger]);
+
   // Auth states
   const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authenticated
 
@@ -60,6 +81,20 @@ function App() {
   return (
     <ErrorBoundary>
       <RfidServiceInitializer />
+      {/* Network Status Indicator - only shown when poor/offline */}
+      {isFullyAuthenticated && (networkStatus.quality === 'poor' || networkStatus.quality === 'offline') && (
+        <div
+          style={{
+            position: 'fixed',
+            top: '8px',
+            right: '8px',
+            zIndex: 1000,
+            pointerEvents: 'none', // Doesn't interfere with interactions
+          }}
+        >
+          <NetworkStatus status={networkStatus} size="sm" />
+        </div>
+      )}
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">
         <BrowserRouter>
           <Routes>

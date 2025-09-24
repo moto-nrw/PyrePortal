@@ -64,12 +64,13 @@ async function ensureInitialized(): Promise<void> {
 }
 
 /**
- * Generic API call function with error handling
+ * Generic API call function with error handling and response timing
  */
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   await ensureInitialized();
 
   const url = `${API_BASE_URL}${endpoint}`;
+  const startTime = Date.now();
 
   // Debug logging for authentication issues
   if (endpoint === '/api/iot/ping') {
@@ -88,6 +89,8 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       ...options.headers,
     },
   });
+
+  const responseTime = Date.now() - startTime;
 
   if (!response.ok) {
     // Try to get error details from response body
@@ -109,7 +112,25 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       errorMessage = `${errorMessage}: ${detailMessage}`;
     }
 
+    // Log failed request with timing
+    logger.warn('API request failed', {
+      endpoint,
+      status: response.status,
+      responseTime,
+      error: errorMessage,
+    });
+
     throw new Error(errorMessage);
+  }
+
+  // Log successful request timing for critical endpoints
+  if (endpoint === '/api/iot/ping' || endpoint === '/api/iot/checkin' || responseTime > 1000) {
+    logger.info('API request completed', {
+      endpoint,
+      status: response.status,
+      responseTime,
+      quality: responseTime < 500 ? 'excellent' : responseTime < 1000 ? 'good' : 'poor',
+    });
   }
 
   return response.json() as Promise<T>;
@@ -410,7 +431,17 @@ export const api = {
   },
 
   /**
-   * Device health ping
+   * Device health check (unauthenticated)
+   * Endpoint: GET /health
+   */
+  async healthCheck(): Promise<void> {
+    await apiCall('/health', {
+      method: 'GET',
+    });
+  },
+
+  /**
+   * Device health ping (authenticated)
    * Endpoint: POST /api/iot/ping
    */
   async pingDevice(pin: string): Promise<void> {

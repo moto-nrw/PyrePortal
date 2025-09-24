@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 
 import { api } from '../services/api';
 import type { RfidScanResult } from '../services/api';
+import { queueFailedScan } from '../services/syncQueue';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
@@ -35,6 +36,7 @@ export const useRfidScanning = () => {
     rfid,
     authenticatedUser,
     selectedRoom,
+    selectedActivity,
     startRfidScanning,
     stopRfidScanning,
     setScanResult,
@@ -53,6 +55,10 @@ export const useRfidScanning = () => {
     recordTagScan,
     mapTagToStudent,
     clearOldTagScans,
+    // Student cache actions
+    getCachedStudentData,
+    cacheStudentData,
+    loadStudentCache,
   } = useUserStore();
 
   const isInitializedRef = useRef<boolean>(false);
@@ -109,132 +115,244 @@ export const useRfidScanning = () => {
       // Generate unique ID for this scan
       const scanId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      // 1. IMMEDIATE OPTIMISTIC UI FEEDBACK (0ms delay)
-      const optimisticScan = {
-        id: scanId,
-        tagId,
-        status: 'pending' as const,
-        optimisticAction: 'checkin' as const, // Will be determined by API
-        optimisticStudentCount: 0, // Will be updated after API call
-        timestamp: Date.now(),
-        studentInfo: {
-          name: 'Processing...', // Placeholder while API loads
-          id: 0,
-        },
-      };
+      // *** CACHE-FIRST SCANNING LOGIC ***
+      const startTime = Date.now();
 
-      // Show immediate visual feedback
-      addOptimisticScan(optimisticScan);
-      showScanModal();
-      logger.info('Showed immediate optimistic feedback for scan');
+      // 1. CHECK CACHE FIRST (instant response ~5ms)
+      const cachedStudent = getCachedStudentData(tagId);
 
-      // 2. BACKGROUND API PROCESSING
-      try {
-        // Update status to processing
-        updateOptimisticScan(scanId, 'processing');
+      if (cachedStudent) {
+        logger.info('CACHE HIT: Found cached student data', {
+          tagId,
+          studentId: cachedStudent.id,
+          studentName: cachedStudent.name,
+          cachedStatus: cachedStudent.status,
+          responseTime: Date.now() - startTime,
+        });
 
-        // Add to processing queue for tracking
-        addToProcessingQueue(tagId);
+        // Show immediate UI with predicted action
+        // Server logic: Same room = toggle (door behavior), Different room = always check-in
+        const cachedResult: RfidScanResult = {
+          student_id: cachedStudent.id,
+          student_name: cachedStudent.name,
+          action: cachedStudent.room === selectedRoom.name
+            ? (cachedStudent.status === 'checked_in' ? 'checked_out' : 'checked_in')
+            : 'checked_in',
+          room_name: selectedRoom.name,
+          processed_at: new Date().toISOString(),
+          message: undefined,
+        };
 
-        // Call the API to process the scan
-        const result = await api.processRfidScan(
-          {
-            student_rfid: tagId,
-            action: 'checkin',
-            room_id: selectedRoom.id,
-          },
-          authenticatedUser.pin
-        );
-
-        logger.info(`Scan completed: ${result.action} for ${result.student_name}`);
-
-        // 3. UPDATE UI WITH REAL RESULTS
-        updateOptimisticScan(scanId, 'success');
-        setScanResult(result);
-
-        // Update all tracking mechanisms
-        if (result.student_id) {
-          const studentId = result.student_id.toString();
-          const action = result.action === 'checked_in' ? 'checkin' : 'checkout';
-
-          // Map tag to student for future lookups
-          mapTagToStudent(tagId, studentId);
-
-          // Update student history
-          updateStudentHistory(studentId, action);
-
-          // Cache the scan result for 2 seconds
-          recordTagScan(tagId, {
-            timestamp: Date.now(),
-            studentId,
-            result,
-          });
-        }
-
-        // Update session activity to prevent timeout
-        try {
-          await api.updateSessionActivity(authenticatedUser.pin);
-          logger.debug('Session activity updated');
-        } catch (error) {
-          logger.warn('Failed to update session activity', { error });
-        }
-
-        // Clean up after modal display time
-        setTimeout(() => {
-          hideScanModal();
-          removeOptimisticScan(scanId);
-        }, rfid.modalDisplayTime);
-      } catch (error) {
-        logger.error('Failed to process RFID scan', { error });
-
-        // 4. ERROR HANDLING - Show real errors to users
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        if (errorMessage.includes('already has an active visit')) {
-          // This is an info state, not an error - student is already checked in
-          logger.info('Student already has active visit - showing info to user');
-          updateOptimisticScan(scanId, 'failed');
-
-          // Show informative message (not success!)
-          const infoResult: ExtendedRfidScanResult = {
-            student_name: 'Already Checked In',
-            student_id: 0,
-            action: 'already_in',
-            message: 'This student is already checked into this room',
-            isInfo: true,
-          };
-          setScanResult(infoResult as RfidScanResult);
-
-          // Don't update student count or history for info states!
-        } else {
-          // Real error
-          updateOptimisticScan(scanId, 'failed');
-          const errorResult: ExtendedRfidScanResult = {
-            student_name: 'Scan Failed',
-            student_id: 0,
-            action: 'error',
-            message: errorMessage || 'Please try again',
-            showAsError: true,
-          };
-          setScanResult(errorResult as RfidScanResult);
-        }
-
-        // Show modal with error/info state
+        setScanResult(cachedResult);
         showScanModal();
 
-        // Clean up after display
+        logger.info('Instant UI update completed with cached data', { responseTime: Date.now() - startTime });
+
+        // 2. BACKGROUND SYNC WITH SERVER (don't block UI)
+        void (async () => {
+          try {
+            logger.debug('Starting background sync for cached student');
+
+            const syncResult = await api.processRfidScan(
+              {
+                student_rfid: tagId,
+                action: 'checkin', // Let server determine actual action
+                room_id: selectedRoom.id,
+              },
+              authenticatedUser.pin
+            );
+
+            logger.info('Background sync completed', {
+              syncAction: syncResult.action,
+              serverStudentName: syncResult.student_name,
+              syncTime: Date.now() - startTime,
+            });
+
+            // Update cache with fresh server data (silently)
+            void cacheStudentData(tagId, syncResult, {
+              room: syncResult.room_name ?? selectedRoom.name,
+              activity: selectedActivity?.name,
+            });
+
+            // Update student history with actual server result
+            if (syncResult.student_id) {
+              const studentId = syncResult.student_id.toString();
+              const action = syncResult.action === 'checked_in' ? 'checkin' : 'checkout';
+              updateStudentHistory(studentId, action);
+              mapTagToStudent(tagId, studentId);
+            }
+
+            // Update session activity
+            try {
+              await api.updateSessionActivity(authenticatedUser.pin);
+              logger.debug('Session activity updated during background sync');
+            } catch (error) {
+              logger.warn('Failed to update session activity during sync', { error });
+            }
+
+          } catch (syncError) {
+            logger.warn('Background sync failed, queuing for retry', {
+              error: syncError instanceof Error ? syncError.message : String(syncError),
+              syncTime: Date.now() - startTime,
+            });
+
+            // Queue failed operation for retry when network recovers
+            const operationId = queueFailedScan(
+              tagId,
+              'checkin', // Server will determine actual action
+              selectedRoom.id,
+              authenticatedUser.pin
+            );
+
+            logger.info('Scan queued for background sync', { operationId, tagId });
+          }
+        })();
+
+        // Clean up modal after display time
         setTimeout(() => {
           hideScanModal();
-          removeOptimisticScan(scanId);
         }, rfid.modalDisplayTime);
-      } finally {
-        // Always clean up processing queue
-        removeFromProcessingQueue(tagId);
+
+      } else {
+        // CACHE MISS - Use existing network-based flow but add to cache
+        logger.info('CACHE MISS: No cached data found, using network call', {
+          tagId,
+          responseTime: Date.now() - startTime,
+        });
+
+        // 1. IMMEDIATE OPTIMISTIC UI FEEDBACK (existing logic)
+        const optimisticScan = {
+          id: scanId,
+          tagId,
+          status: 'pending' as const,
+          optimisticAction: 'checkin' as const,
+          optimisticStudentCount: 0,
+          timestamp: Date.now(),
+          studentInfo: {
+            name: 'Processing...', // Placeholder while API loads
+            id: 0,
+          },
+        };
+
+        // Show immediate visual feedback
+        addOptimisticScan(optimisticScan);
+        showScanModal();
+        logger.info('Showed immediate optimistic feedback for cache miss');
+
+        // 2. NETWORK API CALL
+        try {
+          // Update status to processing
+          updateOptimisticScan(scanId, 'processing');
+
+          // Call the API to process the scan
+          const result = await api.processRfidScan(
+            {
+              student_rfid: tagId,
+              action: 'checkin',
+              room_id: selectedRoom.id,
+            },
+            authenticatedUser.pin
+          );
+
+          logger.info(`Network scan completed: ${result.action} for ${result.student_name}`, {
+            networkTime: Date.now() - startTime,
+          });
+
+          // 3. UPDATE UI WITH REAL RESULTS
+          updateOptimisticScan(scanId, 'success');
+          setScanResult(result);
+
+          // 4. ADD TO CACHE for future instant access
+          void cacheStudentData(tagId, result, {
+            room: result.room_name ?? selectedRoom.name,
+            activity: selectedActivity?.name,
+          });
+
+          // Update all tracking mechanisms
+          if (result.student_id) {
+            const studentId = result.student_id.toString();
+            const action = result.action === 'checked_in' ? 'checkin' : 'checkout';
+
+            // Map tag to student for future lookups
+            mapTagToStudent(tagId, studentId);
+
+            // Update student history
+            updateStudentHistory(studentId, action);
+
+            // Cache the scan result for 2 seconds (existing logic)
+            recordTagScan(tagId, {
+              timestamp: Date.now(),
+              studentId,
+              result,
+            });
+          }
+
+          // Update session activity to prevent timeout
+          try {
+            await api.updateSessionActivity(authenticatedUser.pin);
+            logger.debug('Session activity updated');
+          } catch (error) {
+            logger.warn('Failed to update session activity', { error });
+          }
+
+          // Clean up after modal display time
+          setTimeout(() => {
+            hideScanModal();
+            removeOptimisticScan(scanId);
+          }, rfid.modalDisplayTime);
+
+        } catch (error) {
+          logger.error('Failed to process RFID scan', { error });
+
+          // ERROR HANDLING - Show real errors to users
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          if (errorMessage.includes('already has an active visit')) {
+            // This is an info state, not an error - student is already checked in
+            logger.info('Student already has active visit - showing info to user');
+            updateOptimisticScan(scanId, 'failed');
+
+            // Show informative message (not success!)
+            const infoResult: ExtendedRfidScanResult = {
+              student_name: 'Already Checked In',
+              student_id: 0,
+              action: 'already_in',
+              message: 'This student is already checked into this room',
+              isInfo: true,
+            };
+            setScanResult(infoResult as RfidScanResult);
+
+          } else {
+            // Real error
+            updateOptimisticScan(scanId, 'failed');
+            const errorResult: ExtendedRfidScanResult = {
+              student_name: 'Scan Failed',
+              student_id: 0,
+              action: 'error',
+              message: errorMessage || 'Please try again',
+              showAsError: true,
+            };
+            setScanResult(errorResult as RfidScanResult);
+          }
+
+          // Show modal with error/info state
+          showScanModal();
+
+          // Clean up after display
+          setTimeout(() => {
+            hideScanModal();
+            removeOptimisticScan(scanId);
+          }, rfid.modalDisplayTime);
+        }
       }
+
+      // Always clean up processing queue
+      removeFromProcessingQueue(tagId);
     },
     [
       authenticatedUser,
       selectedRoom,
+      selectedActivity,
       setScanResult,
       showScanModal,
       hideScanModal,
@@ -247,6 +365,8 @@ export const useRfidScanning = () => {
       canProcessTag,
       recordTagScan,
       mapTagToStudent,
+      getCachedStudentData,
+      cacheStudentData,
       rfid.modalDisplayTime,
       rfid.recentTagScans,
     ]
@@ -404,7 +524,11 @@ export const useRfidScanning = () => {
     void initializeService();
     void setupEventListener();
     void syncServiceState();
-  }, [initializeService, setupEventListener, syncServiceState]);
+
+    // Load student cache for offline operation
+    void loadStudentCache();
+    logger.info('Student cache loading initiated for offline scanning');
+  }, [initializeService, setupEventListener, syncServiceState, loadStudentCache]);
 
   // Auto-restart scanning after modal hides
   useEffect(() => {

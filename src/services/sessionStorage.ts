@@ -3,8 +3,8 @@
  * Handles saving and loading of last session configuration
  */
 
-import { safeInvoke } from '../utils/tauriContext';
 import { createLogger } from '../utils/logger';
+import { safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('SessionStorage');
 

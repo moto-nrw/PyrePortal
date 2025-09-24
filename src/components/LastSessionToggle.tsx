@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { useUserStore } from '../store/userStore';
+
 import { getRelativeTime } from '../services/sessionStorage';
+import { useUserStore } from '../store/userStore';
+
 import { InfoModal } from './InfoModal';
 
 export const LastSessionToggle: React.FC = () => {

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+
 import { designSystem } from '../styles/designSystem';
 
 interface InfoModalProps {

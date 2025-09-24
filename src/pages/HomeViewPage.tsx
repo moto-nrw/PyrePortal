@@ -3,8 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox, ErrorModal } from '../components/ui';
 import { LastSessionToggle } from '../components/LastSessionToggle';
+import { ContentBox, ErrorModal } from '../components/ui';
 import { api, type SessionStartRequest } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
