@@ -1,0 +1,87 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(./.env)",
+      "Write(./.env.*)",
+      "Read(./secrets/**)",
+      "Read(./**/secrets/**)",
+      "Read(./keys/**)",
+      "Read(./.ssh/**)",
+      "Read(./.aws/**)",
+      "Read(./.gcp/**)",
+      "Read(./private/**)",
+      "Read(./**/private/**)",
+      "Read(./node_modules/**)",
+      "Read(./dist/**)",
+      "Read(./build/**)",
+      "Read(./.turbo/**)",
+      "Read(./.cache/**)",
+      "Read(./src-tauri/target/**)",
+      "Read(./rfid-dev.log)",
+      "Read(./**/app_*.log)"
+    ],
+    "ask": [
+      "Bash(npm install:*)",
+      "Bash(yarn install:*)",
+      "Bash(pnpm install:*)",
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)",
+      "Bash(git push --force:*)",
+      "Bash(docker:*)",
+      "Write(package.json)",
+      "Write(tsconfig.json)",
+      "Write(./**/package.json)",
+      "Write(./**/tsconfig.json)",
+      "Write(Cargo.toml)",
+      "Write(./**/Cargo.toml)",
+      "Write(tailwind.config.js)",
+      "Write(vite.config.ts)",
+      "Write(eslint.config.js)",
+      "Write(prettier.config.js)"
+    ],
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run check:*)",
+      "Bash(npm run format:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run tauri:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(cargo check:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo build:*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/format-typescript.sh"
+          },
+          {
+            "type": "command",
+            "command": ".claude/hooks/lint-fix.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -4,310 +4,379 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-PyrePortal is a desktop application built with Tauri v2, React, and TypeScript. It serves as a client for the Project Phoenix system, providing an interface for managing room occupancy and activities in educational settings using RFID scanning for student check-in/check-out.
+PyrePortal is a **Raspberry Pi kiosk application** for German after-school care (OGS) that uses RFID scanning for student check-in/check-out. Built with Tauri v2, React 18, and TypeScript 5.6 in strict mode.
 
-### Key Features
-
-- **Teacher Authentication**: PIN-based login with real API integration
-- **Room Management**: View and select rooms with occupancy status
-- **RFID Scanning**: Hardware integration for student check-in/check-out (mock available for dev)
-- **Activity Tracking**: Create and manage educational activities
-- **Comprehensive Logging**: Multi-layer logging system (frontend, store, Rust backend)
-- **Cross-Platform**: Windows, macOS, and Linux support
-
-## Architecture
-
-### Frontend (React + TypeScript)
-
-- State management: Zustand with middleware for logging
-- Routing: React Router v7 with typed routes
-- Styling: Tailwind CSS v4 with custom theme system
-- API layer: Centralized service with error handling
-
-### Backend (Rust + Tauri)
-
-- IPC commands for logging and RFID operations
-- Platform-specific RFID hardware integration
-- File system operations with security checks
-
-### Key Architectural Patterns
-
-- **Mock/Real API switching**: Environment-based configuration
-- **RFID abstraction**: Hardware implementation with mock fallback
-- **Logging layers**: Frontend → Tauri IPC → File system
-- **Error boundaries**: Consistent error handling across IPC
+**Target deployment**: Raspberry Pi 4 (64-bit), fullscreen kiosk mode, physical RFID reader hardware.
 
 ## Development Commands
 
 ### Essential Commands
 
 ```bash
-# Install dependencies
-npm install
+# Development
+npm run tauri dev       # Full app (Rust + Frontend) - required for RFID testing
+npm run dev            # Frontend only (faster, use when working on UI only)
 
-# Development modes
-npm run tauri dev       # Full app with Tauri backend
-npm run dev            # Frontend only (faster UI development)
-
-# Code quality (run before committing)
-npm run check          # ESLint + TypeScript checks
-npm run typecheck      # TypeScript only
-npm run lint          # ESLint only
-npm run lint:fix      # Auto-fix lint issues
+# Code quality (ALWAYS run before committing)
+npm run check          # ESLint + TypeScript - must pass
+npm run format         # Auto-format with Prettier
 
 # Production build
-npm run tauri build    # Creates platform-specific installers
+npm run tauri build    # Platform-specific installers in src-tauri/target/release/bundle/
 
-# Maintenance
-npm run format        # Prettier formatting
-npm run clean:target  # Clean Rust build artifacts
+# Rust development (in src-tauri/)
+cargo clippy           # Linter (strict)
+cargo fmt             # Format
+cargo test            # Run tests
 ```
 
-### Rust Commands (run in src-tauri/)
+### Running Individual Tests
 
 ```bash
-cargo check          # Fast syntax/type checking
-cargo clippy         # Rust linter
-cargo fmt           # Format Rust code
-cargo test          # Run Rust tests
-```
-
-### Running Tests
-
-```bash
-# Frontend tests (when implemented)
-npm test            # Run all tests
-npm test -- --watch # Watch mode
+# Frontend tests (when implemented - currently no tests)
+npm test -- <test-file-pattern>
 
 # Rust tests
-cd src-tauri && cargo test
+cd src-tauri && cargo test <test-name>
+cd src-tauri && cargo test --bin rfid_test  # Test RFID hardware
 ```
 
-## API Integration
+## Critical Architecture Patterns
 
-### Environment Configuration
+### 1. Cache-First RFID Scanning (Performance-Critical)
 
-```bash
-# .env file setup (copy from .env.example)
-VITE_API_BASE_URL=http://localhost:8080
-VITE_DEVICE_API_KEY=your_device_api_key
-VITE_ENABLE_RFID=false  # true for real hardware
-VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,04:A7:B3:C2:D1:E0:F5
-TAURI_FULLSCREEN=false
+**Location**: `src/hooks/useRfidScanning.ts:118-215`
+
+**Why**: Network latency on Pi (200-500ms) vs cache (<10ms). Instant UI feedback is critical for UX.
+
+**Flow**:
+```typescript
+// 1. Check cache FIRST (instant)
+const cachedStudent = getCachedStudentData(tagId);
+if (cachedStudent) {
+  // Show instant UI with predicted action
+  setScanResult(predictedResult);
+  showScanModal();
+
+  // Background sync with server (async, non-blocking)
+  void (async () => {
+    const serverResult = await api.processRfidScan(...);
+    // Silently update cache
+  })();
+}
 ```
 
-### API Endpoints (Project Phoenix)
+**When modifying**:
+- Test rapid scans (<1s apart)
+- Verify offline → online transition
+- Check cache invalidation timing
 
-| Endpoint                         | Status         | Description             |
-| -------------------------------- | -------------- | ----------------------- |
-| `GET /api/iot/staff`             | ✅ Implemented | Fetch teacher list      |
-| `POST /api/iot/status`           | 🔧 In Progress | PIN validation          |
-| `GET /api/iot/rooms`             | 📋 Planned     | Room list/status        |
-| `POST /api/iot/rfid/scan`        | ✅ Implemented | RFID check-in/out       |
-| `POST /api/iot/session/start`    | ✅ Implemented | Start activity session  |
-| `POST /api/iot/session/activity` | ✅ Implemented | Update session activity |
+### 2. Multi-Layer Duplicate Prevention
 
-## Key Implementation Patterns
+**Location**: `src/store/userStore.ts:1117-1201`
 
-### State Management (Zustand)
+**Why**: RFID hardware emits multiple events per scan (hardware quirk). Three defensive layers:
+
+1. **Processing Queue**: Block if tag currently being processed
+2. **Recent Scans**: Block if scanned within 2 seconds
+3. **Student History**: Block opposite action if just performed
+
+**Implementation**:
+```typescript
+canProcessTag(tagId) → checks all 3 layers
+recordTagScan(tagId) → updates layer 2
+mapTagToStudent(tagId, studentId) → enables layer 3
+```
+
+### 3. Zustand Store with Logging Middleware
+
+**Location**: `src/store/userStore.ts:1540-1551`
+
+**Pattern**: Single store (not Redux) with custom middleware for complete action/state visibility.
 
 ```typescript
-// Store with logging middleware
 export const useUserStore = create<UserState>(
   loggerMiddleware(createUserStore, {
     name: 'UserStore',
     logLevel: LogLevel.DEBUG,
+    excludedActions: ['functionalUpdate'],  // Avoid noise
   })
 );
 ```
 
-### API Error Handling
+**Logs automatically capture**:
+- Action calls (with args)
+- State changes (before/after)
+- Component triggering the action
 
+### 4. Runtime Configuration via Tauri
+
+**Location**: `src-tauri/src/lib.rs:17-32`, `src/services/api.ts:25-54`
+
+**Why**: API keys must be changeable without rebuilding (different keys per Pi device).
+
+**Flow**:
+```
+.env file (runtime)
+  ↓
+Rust reads env vars
+  ↓
+Frontend calls get_api_config()
+  ↓
+API client configured with device-specific credentials
+```
+
+**Never** put API keys in VITE_* variables (baked into build).
+
+### 5. Three-Layer Logging System
+
+**Layers** (in order of data flow):
+
+1. **Frontend Logger** (`src/utils/logger.ts`)
+   - Browser console + in-memory buffer
+   - Sends entries to Rust via IPC
+
+2. **Store Logger** (`src/utils/storeMiddleware.ts`)
+   - Automatic Zustand action tracking
+   - Middleware wraps store creation
+
+3. **Rust File Logger** (`src-tauri/src/logging.rs`)
+   - Persists to disk with rotation
+   - Locations:
+     - macOS: `~/Library/Logs/pyreportal/`
+     - Linux: `~/.config/pyreportal/logs/`
+
+**Usage**:
 ```typescript
-// Consistent error structure
-try {
-  const result = await api.someMethod();
-} catch (error) {
-  // Error includes status code and detail message
-  logger.error('API call failed', { error });
+const logger = createLogger('ComponentName');
+logger.info('Message', { contextData });
+```
+
+## API Integration (Project Phoenix Backend)
+
+### Environment Setup
+
+```bash
+# .env (NEVER commit this file)
+API_BASE_URL=http://localhost:8080           # Runtime (Rust reads)
+DEVICE_API_KEY=device_secret_key_here        # Runtime (Rust reads)
+TAURI_FULLSCREEN=false                       # Runtime (Rust reads)
+
+# Development-only (baked into frontend at build time)
+VITE_ENABLE_RFID=false                       # true = real hardware
+VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,... # Mock tags for testing
+```
+
+### Authentication Pattern
+
+**Two-level auth** (all requests):
+```typescript
+headers: {
+  'Authorization': `Bearer ${DEVICE_API_KEY}`,  // Device level
+  'X-Staff-PIN': pin,                           // Staff level
+  'X-Staff-ID': staffId.toString()              // Optional
 }
 ```
 
-### RFID Integration
+### Key Endpoints
 
+| Endpoint | Purpose | Auth |
+|----------|---------|------|
+| `GET /api/iot/teachers` | Fetch staff list | Device only |
+| `POST /api/iot/ping` | Validate global PIN | Device + PIN |
+| `GET /api/iot/status` | Validate teacher PIN | Device + PIN + Staff ID |
+| `POST /api/iot/checkin` | Process RFID scan | Device + PIN |
+| `POST /api/iot/session/start` | Start activity session | Device + PIN |
+| `POST /api/iot/session/activity` | Prevent timeout | Device + PIN |
+
+**Error codes**:
+- 401: Invalid PIN
+- 423: Account locked (too many attempts)
+- 404: Not found
+
+## Adding New Features
+
+### Adding API Endpoint
+
+1. **Define types** in `src/services/api.ts`:
+   ```typescript
+   export interface NewDataType {
+     id: number;
+     name: string;
+   }
+   ```
+
+2. **Add API method** in `src/services/api.ts`:
+   ```typescript
+   async getNewData(pin: string): Promise<NewDataType[]> {
+     const response = await apiCall<{status: string; data: NewDataType[]}>(
+       '/api/endpoint',
+       { headers: { Authorization: `Bearer ${DEVICE_API_KEY}`, 'X-Staff-PIN': pin } }
+     );
+     return response.data;
+   }
+   ```
+
+3. **Add store action** in `src/store/userStore.ts`:
+   ```typescript
+   interface UserState {
+     newData: NewDataType[];
+     fetchNewData: () => Promise<void>;
+   }
+
+   const createUserStore = (set, get) => ({
+     newData: [],
+
+     fetchNewData: async () => {
+       set({ isLoading: true, error: null });
+       try {
+         const data = await api.getNewData(get().authenticatedUser.pin);
+         set({ newData: data, isLoading: false });
+       } catch (error) {
+         logger.error('Failed to fetch data', { error });
+         set({ error: 'User-friendly German message', isLoading: false });
+       }
+     }
+   });
+   ```
+
+### Adding Tauri Command
+
+1. **Define command** in `src-tauri/src/`:
+   ```rust
+   #[tauri::command]
+   fn do_something(param: String) -> Result<ReturnType, String> {
+       do_work(param)
+           .map_err(|e| format!("Failed: {}", e))
+   }
+   ```
+
+2. **Register** in `src-tauri/src/lib.rs`:
+   ```rust
+   .invoke_handler(tauri::generate_handler![
+       // ... existing
+       do_something
+   ])
+   ```
+
+3. **Use in frontend**:
+   ```typescript
+   import { safeInvoke } from '../utils/tauriContext';
+   const result = await safeInvoke<ReturnType>('do_something', { param: value });
+   ```
+
+## Working with RFID
+
+**Development** (no hardware):
+```bash
+VITE_ENABLE_RFID=false  # in .env
+```
+- Uses mock scanning (auto-generates scans every 3-5s)
+- Mock tags from `VITE_MOCK_RFID_TAGS`
+
+**Production** (Raspberry Pi):
+```bash
+VITE_ENABLE_RFID=true  # in .env
+```
+- Requires MFRC522 reader on SPI
+- Only compiles on ARM/ARM64 Linux
+- Test with: `cd src-tauri && ./test_rfid.sh`
+
+**Hook usage**:
 ```typescript
-// Check hardware availability
-if (isRfidEnabled()) {
-  // Real hardware
-  await safeInvoke('start_rfid_scanning');
-} else {
-  // Mock scanning for development
-  startMockScanning();
-}
+const { isScanning, startScanning, stopScanning, currentScan, showModal } = useRfidScanning();
 ```
 
-### Modal Patterns
+## TypeScript Configuration (Strict Mode)
 
-```typescript
-// Reusable modal with auto-close
-<ErrorModal
-  isOpen={showError}
-  onClose={() => setShowError(false)}
-  message={errorMsg}
-  autoCloseDelay={3000}
-/>
-```
+**tsconfig.json** enforces:
+- `strict: true` (all strict checks)
+- `noUnusedLocals: true`
+- `noUnusedParameters: true`
+- No implicit `any` types
+- Null/undefined must be explicitly handled
 
-## Common Development Tasks
+**ESLint** enforces:
+- Consistent type imports: `import { api, type Teacher } from ...`
+- Import order: external → internal → parent → sibling
+- React hooks rules (exhaustive deps)
+- Security rules (no hardcoded paths, no `__dirname`)
 
-### Adding a New Page/Route
+## Performance Optimization (Raspberry Pi)
 
-1. Create component in `/src/pages/`
-2. Add route in `/src/App.tsx`
-3. Update navigation logic
-4. Add logging for navigation events
+**Critical patterns**:
+- Use `React.memo` for expensive components
+- Batch Zustand `set()` calls (avoid cascading renders):
+  ```typescript
+  // ✅ GOOD
+  set({ isLoading: true, error: null, data: result });
 
-### Adding API Endpoints
+  // ❌ BAD
+  set({ isLoading: true });
+  set({ error: null });
+  set({ data: result });
+  ```
+- Minimize Tauri IPC calls (batch when possible)
+- Use CSS transforms for animations (GPU-accelerated)
 
-1. Define types in `/src/services/api.ts`
-2. Implement API call with error handling
-3. Update store actions in `/src/store/`
-4. Add appropriate logging
-
-### Adding Tauri Commands
-
-1. Define command in `/src-tauri/src/` with `#[tauri::command]`
-2. Register in `lib.rs` command handler
-3. Create TypeScript wrapper in frontend
-4. Handle errors across IPC boundary
-
-### Working with RFID
-
-1. Check `VITE_ENABLE_RFID` environment variable
-2. Use `useRfidScanning` hook for scanning logic
-3. Mock tags configured in `.env` for development
-4. Real hardware requires Raspberry Pi with RFID reader
+**Expected performance**:
+- 64-bit Pi build: 30-45 FPS ✅
+- 32-bit Pi build: 15-25 FPS ❌
 
 ## Troubleshooting
+
+### RFID Issues
+
+1. Check `.env`: `VITE_ENABLE_RFID=false` (dev) or `true` (Pi)
+2. Verify mock tags: `VITE_MOCK_RFID_TAGS=04:D6:...`
+3. Console: Look for "RFID service initialized"
+4. Pi hardware: `cd src-tauri && ./test_rfid.sh`
+
+### API Issues
+
+1. Check `.env`: `API_BASE_URL` and `DEVICE_API_KEY` set
+2. Console: Network tab for failed requests
+3. Backend running: `curl http://localhost:8080/health`
 
 ### Build Issues
 
 ```bash
-# Clean everything and rebuild
-npm run clean:target
-rm -rf node_modules
+npm run clean:target   # Clean Rust artifacts
+rm -rf node_modules dist
 npm install
 npm run tauri build
 ```
 
-### RFID Not Working
-
-1. Check `.env` configuration
-2. Verify mock tags match backend configuration
-3. Check console for RFID service initialization
-4. On Raspberry Pi: verify hardware connections
-
-### API Connection Issues
-
-1. Verify `VITE_API_BASE_URL` in `.env`
-2. Check `VITE_DEVICE_API_KEY` is set
-3. Look for CORS errors in console
-4. Check backend server is running
-
-## Performance Optimization
-
-- **Minimize Tauri IPC calls**: Batch operations when possible
-- **Use React.memo**: For expensive components
-- **Optimize re-renders**: Check Zustand subscriptions
-- **Log performance**: Use performance marks for critical paths
-
-## Logging System
-
-### Components
-
-1. **Frontend Logger** (`src/utils/logger.ts`): Context-aware with multiple levels
-2. **Store Logger** (`src/utils/storeLogger.ts`): Zustand middleware for action tracking
-3. **Rust Logger** (`src-tauri/src/logging.rs`): File persistence with rotation
-
-### Best Practices
-
-- Use appropriate log levels (DEBUG, INFO, WARN, ERROR)
-- Include context (user, room, activity IDs)
-- Never log sensitive data (PINs, tokens)
-- Follow patterns in `docs/logging-guidelines.md`
-
-### Log Locations
-
-- **Development**: Browser console + in-memory viewer
-- **Production**:
-  - Windows: `%APPDATA%\pyreportal\logs`
-  - macOS: `~/Library/Logs/pyreportal`
-  - Linux: `~/.config/pyreportal/logs`
-
-## Tauri IPC Interface
-
-### Command Pattern
-
-```rust
-// Rust side (src-tauri/src/logging.rs)
-#[tauri::command]
-async fn write_log(entry: LogEntry) -> Result<(), String> {
-    // Implementation
-}
-
-// Register in lib.rs
-.invoke_handler(tauri::generate_handler![write_log])
-```
-
-```typescript
-// Frontend side
-await invoke('write_log', { entry: logData });
-```
-
-### Current Commands
-
-- `write_log`: Persist log entries to file system
-- `quit_app`: Graceful application shutdown
-- RFID commands: `initialize_rfid_service`, `start_rfid_scanning`, etc.
-
-## Security Considerations
-
-- **API Keys**: Store in environment variables, never commit
-- **PIN Validation**: Server-side only, never trust client
-- **File Paths**: Validate all paths in Rust before file operations
-- **RFID Tags**: Validate format before processing
-- **IPC Boundaries**: Sanitize all data crossing JS/Rust boundary
-
 ## Current Implementation Status
 
 ### ✅ Completed
-
-- Teacher list API integration
-- Basic PIN authentication flow
-- RFID mock scanning
-- Activity session creation
-- Comprehensive logging system
-- Error modal component
+- Teacher authentication (PIN validation)
+- RFID scanning (cache-first, multi-layer duplicate prevention)
+- Session management (start/end with timeout prevention)
+- Student cache (offline operation)
+- Offline sync queue
+- Three-layer logging system
 
 ### 🔧 In Progress
-
-- Real PIN validation via API
-- Session timeout management
-- Activity analytics
+- Attendance analytics
+- Session timeout UI warnings
 
 ### 📋 Planned
-
-- Offline mode with sync
 - Biometric authentication
-- Advanced reporting
+- Advanced reporting dashboard
 
-## Platform-Specific Builds
+## Platform-Specific: Raspberry Pi 4
 
-### Raspberry Pi 4 Native 64-bit Build
+**Recommended**: Native 64-bit build (see `docs/pi4-native-build.md`)
 
-For optimal performance on Raspberry Pi 4 with 64-bit OS, use the native build process documented in `docs/pi4-native-build.md`. This provides significant performance improvements over cross-compiled 32-bit binaries:
+**Performance gain**: 50-80% vs cross-compiled 32-bit
+- Build time: 15-30 min on Pi 4
+- Target: `aarch64-unknown-linux-gnu`
 
-- **Performance gain**: 50-80% improvement in UI animations
-- **Target architecture**: aarch64 (native 64-bit ARM)
-- **Build time**: 15-30 minutes on Pi 4
-- **Expected FPS**: 30-45 FPS vs 15-25 FPS (32-bit)
+**Deployment**:
+```bash
+# On Pi
+DISPLAY=:0 TAURI_FULLSCREEN=true ./pyreportal
+```
+
+**Auto-start**: Create systemd service or desktop autostart entry
