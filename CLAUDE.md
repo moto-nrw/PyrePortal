@@ -298,8 +298,9 @@ VITE_ENABLE_RFID=true  # in .env
 ```
 
 - Requires MFRC522 reader on SPI
-- Only compiles on ARM/ARM64 Linux
-- Test with: `cd src-tauri && ./test_rfid.sh`
+- Only compiles on ARM/ARM64 Linux with `--features rfid`
+- Build: `cargo build --features rfid`
+- Test with: `cd src-tauri && cargo run --bin rfid_test --features rfid`
 
 **Hook usage**:
 
