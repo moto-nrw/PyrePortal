@@ -14,8 +14,8 @@ input=$(cat)
 # Extract file path
 file_path=$(echo "$input" | jq -r '.tool_input.file_path')
 
-# Only process TypeScript/JavaScript files
-if [[ ! "$file_path" =~ \.(ts|tsx|js|jsx)$ ]]; then
+# Only process files that Prettier supports
+if [[ ! "$file_path" =~ \.(ts|tsx|js|jsx|json|css|md)$ ]]; then
   exit 0
 fi
 
