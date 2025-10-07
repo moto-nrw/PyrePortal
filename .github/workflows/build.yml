@@ -25,27 +25,6 @@ jobs:
           name: pyreportal-macos-${{github.sha}}
           path: src-tauri/target/debug/bundle/macos
           
-  build-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Tauri environment
-        uses: ./.github/actions/setup-tauri-environment
-
-      - name: Build frontend
-        run: npm run build
-
-      - name: Build Tauri app (debug)
-        run: npm run tauri build -- --debug
-
-      - name: Upload Linux build
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyreportal-linux-${{github.sha}}
-          path: src-tauri/target/debug/bundle/deb
-
   build-linux-arm64:
     runs-on: ubuntu-24.04-arm
     steps:
@@ -55,14 +34,17 @@ jobs:
       - name: Setup Tauri environment
         uses: ./.github/actions/setup-tauri-environment
 
+      - name: Install AppImage dependencies
+        run: sudo apt-get update && sudo apt-get install -y xdg-utils
+
       - name: Build frontend
         run: npm run build
 
-      - name: Build Tauri app (debug) with RFID support
-        run: npm run tauri build -- --debug --features rfid
+      - name: Build Tauri app with RFID support
+        run: npm run tauri build -- --features rfid
 
       - name: Upload Linux ARM64 build
         uses: actions/upload-artifact@v4
         with:
           name: pyreportal-linux-arm64-${{github.sha}}
-          path: src-tauri/target/debug/bundle/deb
+          path: src-tauri/target/release/bundle/deb
