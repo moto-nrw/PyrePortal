@@ -361,10 +361,16 @@ const ActivityScanningPage: React.FC = () => {
           room: result.room_name,
         });
 
-        // Show success modal
-         
-        setScanResult(result);
-         
+        // Show special Schulhof success modal with custom message
+        const firstName = checkoutDestinationState.studentName.split(' ')[0];
+        const schulhofResult = {
+          ...result,
+          message: `Viel Spaß auf dem Schulhof, ${firstName}!`,
+          isSchulhof: true, // Flag for special yellow styling
+        } as RfidScanResult & { isSchulhof: boolean };
+
+        setScanResult(schulhofResult);
+
         showScanModal();
 
         // Auto-close after display time
@@ -382,9 +388,9 @@ const ActivityScanningPage: React.FC = () => {
           message: 'Bitte versuche es erneut oder wende dich an einen Betreuer',
           showAsError: true,
         };
-         
+
         setScanResult(errorResult as RfidScanResult);
-         
+
         showScanModal();
 
         setTimeout(() => {
@@ -567,6 +573,8 @@ const ActivityScanningPage: React.FC = () => {
               backgroundColor: (() => {
                 // Check for daily checkout state
                 if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
+                // Check for Schulhof check-in (special yellow)
+                if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
                 // Check for error or info states
                 if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
                 if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
@@ -820,6 +828,11 @@ const ActivityScanningPage: React.FC = () => {
                 }}
               >
                 {(() => {
+                  // Special handling for Schulhof - no additional content needed
+                  if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
+                    return ''; // Empty content - title message is enough
+                  }
+
                   switch (currentScan.action) {
                     case 'checked_in':
                       return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
