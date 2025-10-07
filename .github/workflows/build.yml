@@ -58,8 +58,8 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Build Tauri app (debug)
-        run: npm run tauri build -- --debug
+      - name: Build Tauri app (debug) with RFID support
+        run: npm run tauri build -- --debug --features rfid
 
       - name: Upload Linux ARM64 build
         uses: actions/upload-artifact@v4
