@@ -4,9 +4,9 @@ echo "Building and running RFID persistent test..."
 echo "This initializes hardware ONCE then scans continuously"
 echo ""
 
-# Build the test binary
+# Build the test binary with RFID feature
 cd "$(dirname "$0")"
-cargo build --bin rfid_test_persistent --release
+cargo build --bin rfid_test_persistent --release --features rfid
 
 # Check if build succeeded
 if [ $? -eq 0 ]; then
