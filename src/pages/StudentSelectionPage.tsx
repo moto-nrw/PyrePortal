@@ -62,13 +62,14 @@ function StudentSelectionPage() {
           supervisorCount: selectedSupervisors.length,
           supervisors: selectedSupervisors,
           authenticatedUserId: authenticatedUser.staffId,
-          authenticatedUserName: authenticatedUser.staffName
+          authenticatedUserName: authenticatedUser.staffName,
         });
 
         // If no supervisors selected, use authenticated user's ID
-        const teacherIds = selectedSupervisors.length > 0
-          ? selectedSupervisors.map(supervisor => supervisor.id)
-          : [authenticatedUser.staffId];
+        const teacherIds =
+          selectedSupervisors.length > 0
+            ? selectedSupervisors.map(supervisor => supervisor.id)
+            : [authenticatedUser.staffId];
 
         logger.debug('Teacher IDs for student fetch', { teacherIds });
 
@@ -80,7 +81,7 @@ function StudentSelectionPage() {
         const error = err instanceof Error ? err : new Error(String(err));
         logger.error('Failed to fetch students', {
           error: error.message,
-          stack: error.stack
+          stack: error.stack,
         });
         setError(`Fehler beim Laden der Schüler: ${error.message}`);
         setShowErrorModal(true);
@@ -143,20 +144,28 @@ function StudentSelectionPage() {
         studentId: selectedStudentId,
       });
 
-      const result = await api.assignTag(authenticatedUser.pin, selectedStudentId, state.scannedTag);
+      const result = await api.assignTag(
+        authenticatedUser.pin,
+        selectedStudentId,
+        state.scannedTag
+      );
 
       if (result.success) {
         logUserAction('tag_assignment_complete', {
           tagId: state.scannedTag,
           studentId: selectedStudentId,
-          studentName: selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : 'Unknown',
+          studentName: selectedStudent
+            ? `${selectedStudent.first_name} ${selectedStudent.last_name}`
+            : 'Unknown',
         });
 
         // Navigate back with success message and tag data
         void navigate('/tag-assignment', {
           state: {
             assignmentSuccess: true,
-            studentName: selectedStudent ? `${selectedStudent.first_name} ${selectedStudent.last_name}` : 'Unknown',
+            studentName: selectedStudent
+              ? `${selectedStudent.first_name} ${selectedStudent.last_name}`
+              : 'Unknown',
             previousTag: result.previous_tag,
             scannedTag: state.scannedTag,
             tagAssignment: state.tagAssignment,
@@ -305,9 +314,7 @@ function StudentSelectionPage() {
                 animation: 'spin 1s linear infinite',
               }}
             />
-            <p style={{ color: '#6B7280', fontSize: '16px' }}>
-              Lade Schüler...
-            </p>
+            <p style={{ color: '#6B7280', fontSize: '16px' }}>Lade Schüler...</p>
           </div>
         ) : students.length === 0 ? (
           <div
@@ -401,7 +408,9 @@ function StudentSelectionPage() {
                           width: '24px',
                           height: '24px',
                           borderRadius: '50%',
-                          backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
+                          backgroundColor: isSelected
+                            ? designSystem.colors.primaryGreen
+                            : '#E5E7EB',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -582,10 +591,7 @@ function StudentSelectionPage() {
                   cursor: !selectedStudentId || isSaving ? 'not-allowed' : 'pointer',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  boxShadow:
-                    !selectedStudentId || isSaving
-                      ? 'none'
-                      : designSystem.shadows.green,
+                  boxShadow: !selectedStudentId || isSaving ? 'none' : designSystem.shadows.green,
                   opacity: !selectedStudentId || isSaving ? 0.6 : 1,
                 }}
               >

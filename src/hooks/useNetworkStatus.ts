@@ -8,9 +8,9 @@ const logger = createLogger('useNetworkStatus');
 
 // Network quality thresholds (in milliseconds)
 const QUALITY_THRESHOLDS = {
-  excellent: 500,   // < 500ms
-  good: 1000,       // 500-1000ms
-  poor: 2000,       // 1000-2000ms
+  excellent: 500, // < 500ms
+  good: 1000, // 500-1000ms
+  poor: 2000, // 1000-2000ms
   // > 2000ms = poor/timeout
 };
 
@@ -18,7 +18,6 @@ const CHECK_INTERVAL = 30000; // Check every 30 seconds
 const TIMEOUT_THRESHOLD = 5000; // Consider offline after 5 seconds
 
 export const useNetworkStatus = () => {
-
   // Network status state
   const [networkStatus, setNetworkStatus] = useState<NetworkStatusData>({
     isOnline: navigator.onLine,
@@ -32,13 +31,16 @@ export const useNetworkStatus = () => {
   const isCheckingRef = useRef<boolean>(false);
 
   // Determine quality based on response time and online status
-  const determineQuality = useCallback((isOnline: boolean, responseTime: number): NetworkStatusData['quality'] => {
-    if (!isOnline) return 'offline';
+  const determineQuality = useCallback(
+    (isOnline: boolean, responseTime: number): NetworkStatusData['quality'] => {
+      if (!isOnline) return 'offline';
 
-    if (responseTime < QUALITY_THRESHOLDS.excellent) return 'excellent';
-    if (responseTime < QUALITY_THRESHOLDS.good) return 'good';
-    return 'poor';
-  }, []);
+      if (responseTime < QUALITY_THRESHOLDS.excellent) return 'excellent';
+      if (responseTime < QUALITY_THRESHOLDS.good) return 'good';
+      return 'poor';
+    },
+    []
+  );
 
   // Perform network connectivity check using unauthenticated health endpoint
   const checkNetworkStatus = useCallback(async (): Promise<NetworkStatusData> => {

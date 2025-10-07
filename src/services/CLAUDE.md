@@ -5,14 +5,17 @@ This directory contains all business logic abstraction layers for PyrePortal.
 ## Service Files
 
 ### api.ts (947 lines)
+
 **Purpose**: All HTTP communication with Project Phoenix backend
 
 **Key Exports**:
+
 - `api` object - All API methods
 - Type definitions for all API requests/responses
 - `initializeApi()` - Load config from Rust backend
 
 **Authentication Pattern**:
+
 ```typescript
 // Two-level auth on every request
 headers: {
@@ -23,6 +26,7 @@ headers: {
 ```
 
 **Key Methods**:
+
 - `getTeachers()` - Fetch teacher list
 - `validateGlobalPIN(pin)` - Validate OGS global PIN
 - `validateTeacherPIN(pin, staffId)` - Validate individual teacher PIN
@@ -34,9 +38,11 @@ headers: {
 - `updateSessionActivity(pin)` - Prevent session timeout
 
 ### sessionStorage.ts
+
 **Purpose**: Persist session settings across app restarts via Tauri IPC
 
 **Pattern**:
+
 ```typescript
 import { safeInvoke } from '../utils/tauriContext';
 
@@ -52,6 +58,7 @@ export async function loadSessionSettings(): Promise<SessionSettings | null> {
 ```
 
 **Data Structure**:
+
 ```typescript
 interface SessionSettings {
   room_id: number | null;
@@ -61,19 +68,23 @@ interface SessionSettings {
 ```
 
 ### studentCache.ts
+
 **Purpose**: Cache student data for offline operation and instant RFID responses
 
 **Key Functions**:
+
 - `getCachedStudentData(tagId)` - Get cached student by RFID tag
 - `cacheStudentData(tagId, student)` - Cache student data
 - `clearStudentCache()` - Clear all cached data
 
 **Cache Strategy**:
+
 - Daily cache invalidation (new JSON file per day)
 - Stores: student ID, name, last action, last scan time, tag ID
 - Location: Platform-specific app data directory
 
 **Usage**:
+
 ```typescript
 // Check cache first (instant)
 const cached = getCachedStudentData(tagId);
@@ -87,19 +98,23 @@ if (cached) {
 ```
 
 ### syncQueue.ts
+
 **Purpose**: Queue failed operations for retry when network returns
 
 **Key Exports**:
+
 - `queueFailedScan(tagId, action, roomId, pin)` - Queue failed RFID scan
 - `processQueue()` - Process all queued operations
 - `getSyncQueueStatus()` - Get queue stats
 
 **Retry Strategy**:
+
 - Exponential backoff: 1s, 2s, 4s, 8s, 16s
 - Max retries: 5
 - Auto-retry on network quality improvement
 
 **Usage in Hook**:
+
 ```typescript
 try {
   const result = await api.processRfidScan(...);
@@ -113,7 +128,9 @@ try {
 ## Service Layer Patterns
 
 ### Error Handling
+
 All services throw errors, store layer catches:
+
 ```typescript
 // Service (throw)
 export async function getData(): Promise<Data> {
@@ -136,7 +153,9 @@ try {
 ```
 
 ### Logging
+
 All services use logger:
+
 ```typescript
 import { createLogger } from '../utils/logger';
 const logger = createLogger('ServiceName');
@@ -146,7 +165,9 @@ logger.error('Operation failed', { error });
 ```
 
 ### Tauri IPC Wrapper
+
 Always use `safeInvoke` from `tauriContext`:
+
 ```typescript
 import { safeInvoke } from '../utils/tauriContext';
 
@@ -160,6 +181,7 @@ const result = await invoke('command_name', { args });
 ## Adding New Service Method
 
 ### API Method Template
+
 ```typescript
 // 1. Add type definitions
 export interface NewDataType {
@@ -177,21 +199,19 @@ export const api = {
   // ... existing methods
 
   async getNewData(pin: string): Promise<NewDataType[]> {
-    const response = await apiCall<NewDataResponse>(
-      '/api/new-endpoint',
-      {
-        headers: {
-          Authorization: `Bearer ${DEVICE_API_KEY}`,
-          'X-Staff-PIN': pin,
-        }
-      }
-    );
+    const response = await apiCall<NewDataResponse>('/api/new-endpoint', {
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+    });
     return response.data;
-  }
+  },
 };
 ```
 
 ### Tauri IPC Service Template
+
 ```typescript
 // 1. Define Rust command in src-tauri/src/lib.rs
 #[tauri::command]
@@ -208,6 +228,7 @@ export async function doSomething(param: string): Promise<ReturnType> {
 ## Network Quality Tracking
 
 API service tracks call success/failure for quality monitoring:
+
 ```typescript
 // In api.ts
 let successfulCalls = 0;
@@ -227,12 +248,15 @@ Used by `useNetworkStatus` hook for UI indicator.
 ## Performance Considerations
 
 ### Caching
+
 - Always check cache before API call (instant UI)
 - Background sync to keep cache fresh
 - Daily cache invalidation (prevent stale data)
 
 ### Deduplication
+
 API service prevents duplicate concurrent fetches:
+
 ```typescript
 let fetchPromise: Promise<Data> | null = null;
 
@@ -252,7 +276,9 @@ export async function getData(): Promise<Data> {
 ```
 
 ### Timeout Prevention
+
 Session timeout prevention via keepalive:
+
 ```typescript
 // Send on every RFID scan
 await api.updateSessionActivity(pin);

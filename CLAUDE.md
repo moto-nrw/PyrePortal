@@ -50,6 +50,7 @@ cd src-tauri && cargo test --bin rfid_test  # Test RFID hardware
 **Why**: Network latency on Pi (200-500ms) vs cache (<10ms). Instant UI feedback is critical for UX.
 
 **Flow**:
+
 ```typescript
 // 1. Check cache FIRST (instant)
 const cachedStudent = getCachedStudentData(tagId);
@@ -67,6 +68,7 @@ if (cachedStudent) {
 ```
 
 **When modifying**:
+
 - Test rapid scans (<1s apart)
 - Verify offline → online transition
 - Check cache invalidation timing
@@ -82,6 +84,7 @@ if (cachedStudent) {
 3. **Student History**: Block opposite action if just performed
 
 **Implementation**:
+
 ```typescript
 canProcessTag(tagId) → checks all 3 layers
 recordTagScan(tagId) → updates layer 2
@@ -99,12 +102,13 @@ export const useUserStore = create<UserState>(
   loggerMiddleware(createUserStore, {
     name: 'UserStore',
     logLevel: LogLevel.DEBUG,
-    excludedActions: ['functionalUpdate'],  // Avoid noise
+    excludedActions: ['functionalUpdate'], // Avoid noise
   })
 );
 ```
 
 **Logs automatically capture**:
+
 - Action calls (with args)
 - State changes (before/after)
 - Component triggering the action
@@ -116,6 +120,7 @@ export const useUserStore = create<UserState>(
 **Why**: API keys must be changeable without rebuilding (different keys per Pi device).
 
 **Flow**:
+
 ```
 .env file (runtime)
   ↓
@@ -126,17 +131,19 @@ Frontend calls get_api_config()
 API client configured with device-specific credentials
 ```
 
-**Never** put API keys in VITE_* variables (baked into build).
+**Never** put API keys in VITE\_\* variables (baked into build).
 
 ### 5. Three-Layer Logging System
 
 **Layers** (in order of data flow):
 
 1. **Frontend Logger** (`src/utils/logger.ts`)
+
    - Browser console + in-memory buffer
    - Sends entries to Rust via IPC
 
 2. **Store Logger** (`src/utils/storeMiddleware.ts`)
+
    - Automatic Zustand action tracking
    - Middleware wraps store creation
 
@@ -147,6 +154,7 @@ API client configured with device-specific credentials
      - Linux: `~/.config/pyreportal/logs/`
 
 **Usage**:
+
 ```typescript
 const logger = createLogger('ComponentName');
 logger.info('Message', { contextData });
@@ -170,6 +178,7 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,... # Mock tags for testing
 ### Authentication Pattern
 
 **Two-level auth** (all requests):
+
 ```typescript
 headers: {
   'Authorization': `Bearer ${DEVICE_API_KEY}`,  // Device level
@@ -180,16 +189,17 @@ headers: {
 
 ### Key Endpoints
 
-| Endpoint | Purpose | Auth |
-|----------|---------|------|
-| `GET /api/iot/teachers` | Fetch staff list | Device only |
-| `POST /api/iot/ping` | Validate global PIN | Device + PIN |
-| `GET /api/iot/status` | Validate teacher PIN | Device + PIN + Staff ID |
-| `POST /api/iot/checkin` | Process RFID scan | Device + PIN |
-| `POST /api/iot/session/start` | Start activity session | Device + PIN |
-| `POST /api/iot/session/activity` | Prevent timeout | Device + PIN |
+| Endpoint                         | Purpose                | Auth                    |
+| -------------------------------- | ---------------------- | ----------------------- |
+| `GET /api/iot/teachers`          | Fetch staff list       | Device only             |
+| `POST /api/iot/ping`             | Validate global PIN    | Device + PIN            |
+| `GET /api/iot/status`            | Validate teacher PIN   | Device + PIN + Staff ID |
+| `POST /api/iot/checkin`          | Process RFID scan      | Device + PIN            |
+| `POST /api/iot/session/start`    | Start activity session | Device + PIN            |
+| `POST /api/iot/session/activity` | Prevent timeout        | Device + PIN            |
 
 **Error codes**:
+
 - 401: Invalid PIN
 - 423: Account locked (too many attempts)
 - 404: Not found
@@ -199,6 +209,7 @@ headers: {
 ### Adding API Endpoint
 
 1. **Define types** in `src/services/api.ts`:
+
    ```typescript
    export interface NewDataType {
      id: number;
@@ -207,6 +218,7 @@ headers: {
    ```
 
 2. **Add API method** in `src/services/api.ts`:
+
    ```typescript
    async getNewData(pin: string): Promise<NewDataType[]> {
      const response = await apiCall<{status: string; data: NewDataType[]}>(
@@ -218,6 +230,7 @@ headers: {
    ```
 
 3. **Add store action** in `src/store/userStore.ts`:
+
    ```typescript
    interface UserState {
      newData: NewDataType[];
@@ -236,13 +249,14 @@ headers: {
          logger.error('Failed to fetch data', { error });
          set({ error: 'User-friendly German message', isLoading: false });
        }
-     }
+     },
    });
    ```
 
 ### Adding Tauri Command
 
 1. **Define command** in `src-tauri/src/`:
+
    ```rust
    #[tauri::command]
    fn do_something(param: String) -> Result<ReturnType, String> {
@@ -252,6 +266,7 @@ headers: {
    ```
 
 2. **Register** in `src-tauri/src/lib.rs`:
+
    ```rust
    .invoke_handler(tauri::generate_handler![
        // ... existing
@@ -268,21 +283,26 @@ headers: {
 ## Working with RFID
 
 **Development** (no hardware):
+
 ```bash
 VITE_ENABLE_RFID=false  # in .env
 ```
+
 - Uses mock scanning (auto-generates scans every 3-5s)
 - Mock tags from `VITE_MOCK_RFID_TAGS`
 
 **Production** (Raspberry Pi):
+
 ```bash
 VITE_ENABLE_RFID=true  # in .env
 ```
+
 - Requires MFRC522 reader on SPI
 - Only compiles on ARM/ARM64 Linux
 - Test with: `cd src-tauri && ./test_rfid.sh`
 
 **Hook usage**:
+
 ```typescript
 const { isScanning, startScanning, stopScanning, currentScan, showModal } = useRfidScanning();
 ```
@@ -290,6 +310,7 @@ const { isScanning, startScanning, stopScanning, currentScan, showModal } = useR
 ## TypeScript Configuration (Strict Mode)
 
 **tsconfig.json** enforces:
+
 - `strict: true` (all strict checks)
 - `noUnusedLocals: true`
 - `noUnusedParameters: true`
@@ -297,6 +318,7 @@ const { isScanning, startScanning, stopScanning, currentScan, showModal } = useR
 - Null/undefined must be explicitly handled
 
 **ESLint** enforces:
+
 - Consistent type imports: `import { api, type Teacher } from ...`
 - Import order: external → internal → parent → sibling
 - React hooks rules (exhaustive deps)
@@ -305,8 +327,10 @@ const { isScanning, startScanning, stopScanning, currentScan, showModal } = useR
 ## Performance Optimization (Raspberry Pi)
 
 **Critical patterns**:
+
 - Use `React.memo` for expensive components
 - Batch Zustand `set()` calls (avoid cascading renders):
+
   ```typescript
   // ✅ GOOD
   set({ isLoading: true, error: null, data: result });
@@ -316,10 +340,12 @@ const { isScanning, startScanning, stopScanning, currentScan, showModal } = useR
   set({ error: null });
   set({ data: result });
   ```
+
 - Minimize Tauri IPC calls (batch when possible)
 - Use CSS transforms for animations (GPU-accelerated)
 
 **Expected performance**:
+
 - 64-bit Pi build: 30-45 FPS ✅
 - 32-bit Pi build: 15-25 FPS ❌
 
@@ -350,6 +376,7 @@ npm run tauri build
 ## Current Implementation Status
 
 ### ✅ Completed
+
 - Teacher authentication (PIN validation)
 - RFID scanning (cache-first, multi-layer duplicate prevention)
 - Session management (start/end with timeout prevention)
@@ -358,10 +385,12 @@ npm run tauri build
 - Three-layer logging system
 
 ### 🔧 In Progress
+
 - Attendance analytics
 - Session timeout UI warnings
 
 ### 📋 Planned
+
 - Biometric authentication
 - Advanced reporting dashboard
 
@@ -370,10 +399,12 @@ npm run tauri build
 **Recommended**: Native 64-bit build (see `docs/pi4-native-build.md`)
 
 **Performance gain**: 50-80% vs cross-compiled 32-bit
+
 - Build time: 15-30 min on Pi 4
 - Target: `aarch64-unknown-linux-gnu`
 
 **Deployment**:
+
 ```bash
 # On Pi
 DISPLAY=:0 TAURI_FULLSCREEN=true ./pyreportal

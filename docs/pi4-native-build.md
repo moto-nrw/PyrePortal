@@ -65,11 +65,11 @@ kill $PID
 
 ## Expected Performance
 
-| Platform | Expected FPS | Animation Quality |
-|----------|--------------|-------------------|
-| Pi 4 32-bit | 15-25 FPS | Stuttery, frame drops |
-| Pi 4 64-bit | 30-45 FPS | Smooth, occasional drops |
-| Pi 5 64-bit | 45-60 FPS | Very smooth, rare drops |
+| Platform    | Expected FPS | Animation Quality        |
+| ----------- | ------------ | ------------------------ |
+| Pi 4 32-bit | 15-25 FPS    | Stuttery, frame drops    |
+| Pi 4 64-bit | 30-45 FPS    | Smooth, occasional drops |
+| Pi 5 64-bit | 45-60 FPS    | Very smooth, rare drops  |
 
 ## Build Time
 
@@ -80,6 +80,7 @@ kill $PID
 ## Troubleshooting
 
 ### Build Fails with Memory Issues
+
 ```bash
 # Add swap space if you have <4GB RAM
 sudo dphys-swapfile swapoff
@@ -89,12 +90,14 @@ sudo dphys-swapfile swapon
 ```
 
 ### Missing Dependencies
+
 ```bash
 # Install additional dependencies if needed
 sudo apt install -y libudev-dev
 ```
 
 ### Rust Environment Issues
+
 ```bash
 # Reload Rust environment
 source ~/.cargo/env

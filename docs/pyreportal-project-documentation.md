@@ -1,6 +1,7 @@
 # PyrePortal Project Documentation
 
 ## 1. Project Overview
+
 - **Business Purpose**: PyrePortal is a Tauri-based desktop client for the Project Phoenix system, providing staff with tooling to manage room occupancy, create activities, and track attendance in educational or organizational programs via RFID workflows (`README.md:10-21`).
 - **Target Users/Audience**: Designed for on-site coordinators in OGS-style after-school programs and school administrators who need kiosk-like terminals for rapid student check-in/out (`README.md:10-21`, `WORKING_KIOSK_SETUP.md:5-12`).
 - **Key Features & Capabilities**:
@@ -12,6 +13,7 @@
 - **Current Development Stage**: Version 0.1.0 with core teacher integration delivered, ongoing work on PIN validation, room integration, RFID workflows, and offline improvements, and a roadmap for audit logging and advanced recovery (`package.json:2-55`, `README.md:23-48`).
 
 ## 2. Technical Architecture
+
 - **Tech Stack & Versions**:
   - Frontend: React 18.3.1, TypeScript ~5.6.2, React Router 7.6.0, Zustand 5.0.4, TailwindCSS 4.1.6, Vite 6.0.3 (`package.json:19-55`).
   - Native Shell: Tauri 2.5.1 runtime, Tauri CLI ^2, Tauri Plugin Opener 2.2.6 (`Cargo.lock:3701-3715`, `Cargo.toml:21-44`).
@@ -37,6 +39,7 @@
 ## 3. Codebase Patterns & Conventions
 
 ### TypeScript/JavaScript
+
 - **Compiler Settings**: ES2020 target and libs, ESNext modules, bundler resolution, JSX via `react-jsx`, strict mode with aggressive unused checks (`tsconfig.json:2-24`). Node-specific config stored separately for Vite (`tsconfig.node.json:1-11`).
 - **Type Definitions**: Extensive interfaces/enums for domain entities (activities, rooms, sessions, RFID states) within the store and API service ensuring strong typing across actions (`src/store/userStore.ts:34-200`, `src/services/api.ts:139-720`).
 - **Module System**: Pure ESM—`package.json` declares `"type": "module"` (`package.json:5`), enabling native `import` statements throughout `.ts/.tsx`.
@@ -44,6 +47,7 @@
 - **Naming Conventions**: PascalCase for React components (`ContentBox`, `NetworkStatus`), camelCase for hooks and utilities (`useNetworkStatus`, `safeInvoke`), uppercase enums (`ActivityCategory`) (`src/components/ui/ActionButton.tsx:1-43`, `src/utils/tauriContext.ts:8-80`).
 
 ### File Organization
+
 - **Components**: Shared UI primitives live under `src/components/ui`, while workflow-specific components (e.g., RFID initializer, session toggle) reside in `src/components` (`src/components/RfidServiceInitializer.tsx:1-30`).
 - **Pages**: Route-level layouts in `src/pages` encapsulate flows like landing, PIN entry, home dashboard, NFC scanning (`src/pages/HomeViewPage.tsx:1-214`).
 - **Services**: API access, session storage, student cache, and sync queue logic centralized under `src/services` (`src/services/api.ts:1-720`, `src/services/syncQueue.ts:1-260`).
@@ -52,12 +56,14 @@
 - **Tests**: No automated tests present; repo search shows no `.test.*` files and no npm test scripts (`package.json:6-17`).
 
 ### Code Style
+
 - **ESLint**: Powered by Flat config plus `typescript-eslint`, `react`, `react-hooks`, `import`, `jsx-a11y`, and `security` plugins with tailored rules (import ordering, hook enforcement, Tauri invoke guardrails) (`eslint.config.js:16-152`).
 - **Prettier**: 100-column width, 2-space indentation, semicolons enforced, single quotes for JS/TS, Tailwind class sorting via plugin (`prettier.config.js:1-25`).
 - **Formatting Preferences**: Tailwind content scanning limited to `index.html` and `src/**/*` for new JIT CLI (`tailwind.config.js:2-19`); postcss relies on `@tailwindcss/postcss` + autoprefixer (`postcss.config.js:1-5`).
 - **Import Ordering**: Alphabetized groups with blank lines between categories enforced via `import/order` rule (`eslint.config.js:51-60`).
 
 ## 4. Testing Strategy
+
 - **Frameworks**: None configured yet; `package.json` lacks test scripts, and repository has no Vitest/Jest setup (`package.json:6-17`).
 - **Structure & Organization**: No test directories or fixtures present; all validation performed manually per documentation.
 - **Coverage Requirements**: Not defined; no tooling for coverage tracking is configured.
@@ -66,6 +72,7 @@
 - **E2E Testing**: Not available—manual kiosk scripts cover deployment validation instead (`WORKING_KIOSK_SETUP.md:1-200`).
 
 ## 5. Build & Development
+
 - **Package Manager**: npm with lockfileVersion 3 (requires npm ≥9); continuous usage in scripts and Docker build (`package-lock.json`, `docker-build-pi.sh:69-72`).
 - **Build Tools**: Vite 6.0.3 bundling React and Tailwind; TypeScript compiler for type checks; Tauri CLI orchestrates Rust/Web build and packaging (`package.json:6-17`, `vite.config.ts:1-32`, `tsconfig.json:2-24`).
 - **Development Workflow**:
@@ -83,6 +90,7 @@
 - **Hot Reload/Watch Mode**: Vite dev server locked to port 1420 and custom HMR port 1421 for Tauri compatibility; watchers ignore `src-tauri` to avoid redundant restarts (`vite.config.ts:11-31`).
 
 ## 6. Dependencies & Integrations
+
 - **Critical Dependencies**:
   - React & ReactDOM for UI (`src/main.tsx:1-11`), React Router for navigation gating (`src/App.tsx:99-156`).
   - Zustand for centralized state with logging middleware (`src/store/userStore.ts:1-1551`, `src/utils/storeMiddleware.ts:283-360`).
@@ -106,6 +114,7 @@
   - Frontend RFID hook toggles between real hardware (via `safeInvoke`) and mock intervals for development (`src/hooks/useRfidScanning.ts:67-198`).
 
 ## 7. Common Workflows
+
 - **Adding a New Feature**:
   1. Scaffold route/page or component under `src/pages` or `src/components`, using existing design tokens (`src/styles/theme.ts:1-93`, `src/styles/designSystem.ts:1-140`).
   2. Add state to `useUserStore` if needed, ensuring actions are logged and optionally persisted or cached (`src/store/userStore.ts:140-1551`).
@@ -129,6 +138,7 @@
   - Performance tuning references available in `docs/performance-testing.md` for hardware validation.
 
 ## 8. Error Handling
+
 - **Patterns**:
   - Global React error boundary logs errors and renders fallback UI (`src/utils/errorBoundary.tsx:15-68`).
   - API layer wraps fetches, producing enriched error messages with status + detail and logging timings and quality (`src/services/api.ts:66-137`).
@@ -142,6 +152,7 @@
   - Manual performance data maintained in `docs/performance-testing.md:1-172`.
 
 ## 9. Project-Specific Quirks
+
 - **Architectural Decisions**:
   - **Tauri context detection** prevents invoking native commands when running pure web builds. Missing context surfaces explicit errors guiding developers to start `tauri dev` (`src/utils/tauriContext.ts:41-80`).
   - **Optimistic RFID UX** uses cache-first responses and background sync to deliver instant feedback, plus duplicate prevention via short-term maps and processing queues (`src/hooks/useRfidScanning.ts:91-198`, `src/store/userStore.ts:120-168`).
@@ -164,6 +175,7 @@
   - Student cache file formats shared between TS and Rust must remain in sync.
 
 ## 10. File Inventory
+
 - **Configuration Files**:
   - `package.json:2-55` – Project metadata, scripts, dependency versions.
   - `tsconfig.json:2-24`, `tsconfig.node.json:1-11` – TypeScript compiler config (browser & node contexts).

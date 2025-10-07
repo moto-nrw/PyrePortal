@@ -830,7 +830,7 @@ function RoomSelectionPage() {
 
       // Fetch and update current session to ensure state consistency
       await fetchCurrentSession();
-      
+
       // Auto-save this session for quick recreation
       await saveLastSessionData();
 
@@ -921,7 +921,7 @@ function RoomSelectionPage() {
 
       // Fetch and update current session to ensure state consistency
       await fetchCurrentSession();
-      
+
       // Auto-save this session for quick recreation
       await saveLastSessionData();
 

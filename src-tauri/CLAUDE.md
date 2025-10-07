@@ -5,22 +5,26 @@ This directory contains the Rust backend for PyrePortal, providing system access
 ## File Structure
 
 ### Core Files
+
 - `lib.rs` (98 lines) - Main entry point, command registration, app setup
 - `main.rs` (~10 lines) - Binary entry point (minimal, just calls lib.rs)
 
 ### Modules
+
 - `logging.rs` (~200 lines) - File-based logging with rotation
 - `rfid.rs` (~400 lines) - RFID hardware abstraction + mock implementation
 - `session_storage.rs` (~150 lines) - Session settings persistence
 - `student_cache.rs` (~200 lines) - Student data caching
 
 ### Binaries (Testing)
+
 - `bin/rfid_test.rs` - Single RFID scan test
 - `bin/rfid_test_persistent.rs` - Continuous RFID scanning
 
 ## Tauri Command Pattern
 
 ### Command Template
+
 ```rust
 #[tauri::command]
 fn command_name(param: String) -> Result<ReturnType, String> {
@@ -31,6 +35,7 @@ fn command_name(param: String) -> Result<ReturnType, String> {
 ```
 
 ### Registration (lib.rs)
+
 ```rust
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -50,6 +55,7 @@ pub fn run() {
 ```
 
 ### Frontend Usage
+
 ```typescript
 import { safeInvoke } from '../utils/tauriContext';
 
@@ -59,6 +65,7 @@ const result = await safeInvoke<ReturnType>('command_name', { param: 'value' });
 ## Key Commands
 
 ### Configuration (lib.rs:17-32)
+
 ```rust
 #[tauri::command]
 fn get_api_config() -> Result<ApiConfig, String> {
@@ -76,6 +83,7 @@ fn get_api_config() -> Result<ApiConfig, String> {
 ```
 
 ### Logging (logging.rs)
+
 ```rust
 #[tauri::command]
 fn write_log(entry: String) -> Result<(), String>
@@ -88,11 +96,13 @@ fn cleanup_old_logs(max_age_days: u64) -> Result<(), String>
 ```
 
 **Log File Locations:**
+
 - macOS: `~/Library/Logs/pyreportal/app_YYYYMMDD_HHMMSS.log`
 - Linux: `~/.config/pyreportal/logs/app_YYYYMMDD_HHMMSS.log`
 - Windows: `%APPDATA%\pyreportal\logs\app_YYYYMMDD_HHMMSS.log`
 
 ### RFID (rfid.rs)
+
 ```rust
 #[tauri::command]
 fn initialize_rfid_service() -> Result<(), String>
@@ -105,10 +115,12 @@ fn stop_rfid_scanning() -> Result<(), String>
 ```
 
 **Hardware Support:**
+
 - **Production**: MFRC522 reader via SPI (ARM/ARM64 Linux only)
 - **Development**: Mock scanning with `VITE_ENABLE_RFID=false`
 
 ### Session Storage (session_storage.rs)
+
 ```rust
 #[tauri::command]
 fn save_session_settings(settings: SessionSettings) -> Result<(), String>
@@ -121,6 +133,7 @@ fn clear_session() -> Result<(), String>
 ```
 
 ### Student Cache (student_cache.rs)
+
 ```rust
 #[tauri::command]
 fn cache_student(tag_id: String, student_data: StudentData) -> Result<(), String>
@@ -133,6 +146,7 @@ fn clear_student_cache() -> Result<(), String>
 ```
 
 **Cache Strategy:**
+
 - Daily JSON files: `student_cache_YYYYMMDD.json`
 - Automatic invalidation on date change
 - Platform-specific app data directory
@@ -140,6 +154,7 @@ fn clear_student_cache() -> Result<(), String>
 ## Error Handling
 
 ### Return Pattern
+
 ```rust
 // Always return Result<T, String>
 fn do_something() -> Result<DataType, String> {
@@ -151,6 +166,7 @@ fn do_something() -> Result<DataType, String> {
 ```
 
 ### Logging Errors
+
 ```rust
 fn do_something() -> Result<(), String> {
     match risky_operation() {
@@ -169,6 +185,7 @@ fn do_something() -> Result<(), String> {
 ## File System Operations
 
 ### App Data Directory
+
 ```rust
 use tauri::Manager;
 
@@ -180,6 +197,7 @@ fn get_app_data_dir(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 ```
 
 ### Writing JSON Files
+
 ```rust
 use serde::{Serialize, Deserialize};
 use std::fs;
@@ -202,6 +220,7 @@ fn save_settings(settings: &Settings, path: &Path) -> Result<(), String> {
 ```
 
 ### Reading JSON Files
+
 ```rust
 fn load_settings(path: &Path) -> Result<Settings, String> {
     if !path.exists() {
@@ -221,6 +240,7 @@ fn load_settings(path: &Path) -> Result<Settings, String> {
 ## RFID Hardware Integration
 
 ### Production (Raspberry Pi)
+
 ```rust
 // rfid.rs - ARM/ARM64 Linux only
 #[cfg(all(
@@ -247,6 +267,7 @@ fn init_hardware() -> Result<Mfrc522<...>, String> {
 ```
 
 ### Mock (Development)
+
 ```rust
 // Mock RFID scanning for non-ARM platforms
 #[cfg(not(all(
@@ -271,6 +292,7 @@ fn scan_rfid() -> Result<Option<String>, String> {
 ## Async Operations
 
 ### Using Tokio
+
 ```rust
 use tokio::time::{sleep, Duration};
 
@@ -284,6 +306,7 @@ async fn async_operation() -> Result<String, String> {
 ```
 
 ### Background Tasks
+
 ```rust
 use std::sync::OnceLock;
 use tokio::task;
@@ -311,6 +334,7 @@ fn initialize_rfid_service() -> Result<(), String> {
 ## Testing
 
 ### Unit Tests
+
 ```rust
 #[cfg(test)]
 mod tests {
@@ -333,6 +357,7 @@ mod tests {
 ```
 
 ### Running Tests
+
 ```bash
 cd src-tauri
 cargo test              # All tests
@@ -341,6 +366,7 @@ cargo test -- --nocapture  # Show println! output
 ```
 
 ### RFID Hardware Tests
+
 ```bash
 # Single scan test
 cd src-tauri
@@ -353,17 +379,20 @@ cd src-tauri
 ## Dependencies (Cargo.toml)
 
 ### Core
+
 - `tauri = "2"` - Desktop app framework
 - `serde = { version = "1", features = ["derive"] }` - Serialization
 - `serde_json = "1"` - JSON handling
 - `tokio = { version = "1", features = ["time", "rt", "rt-multi-thread", "sync"] }` - Async runtime
 
 ### Utilities
+
 - `chrono = { version = "0.4", features = ["serde"] }` - Date/time
 - `dotenvy = "0.15"` - .env file loading
 - `rand = "0.8"` - Random number generation
 
 ### Platform-Specific (ARM/ARM64 Linux)
+
 ```toml
 [target.'cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))'.dependencies]
 mfrc522 = { version = "0.8.0", features = ["eh02"] }
@@ -395,6 +424,7 @@ cargo run --bin rfid_test
 ## Adding New Command
 
 1. **Define command function**:
+
 ```rust
 #[tauri::command]
 fn my_command(param: String) -> Result<ReturnType, String> {
@@ -404,6 +434,7 @@ fn my_command(param: String) -> Result<ReturnType, String> {
 ```
 
 2. **Register in lib.rs**:
+
 ```rust
 .invoke_handler(tauri::generate_handler![
     // ... existing
@@ -412,6 +443,7 @@ fn my_command(param: String) -> Result<ReturnType, String> {
 ```
 
 3. **Use in frontend**:
+
 ```typescript
 const result = await safeInvoke<ReturnType>('my_command', { param: 'value' });
 ```

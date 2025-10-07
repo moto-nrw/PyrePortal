@@ -36,12 +36,14 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
 ### Key Features
 
 1. **Teacher Authentication**
+
    - PIN-based login system
    - Global OGS PIN for quick access
    - Individual teacher PINs with device binding
    - Automatic session timeout prevention
 
 2. **RFID-Based Check-In/Check-Out**
+
    - Hardware RFID reader integration (MFRC522 via SPI on Raspberry Pi)
    - Mock RFID scanning for development
    - Cache-first scanning (instant UI feedback, background sync)
@@ -49,12 +51,14 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
    - Offline operation with sync queue
 
 3. **Room & Activity Management**
+
    - Room selection with occupancy status
    - Activity creation and selection
    - Multi-supervisor support
    - Session management with timeout prevention
 
 4. **Comprehensive Logging**
+
    - Frontend logging (browser console + in-memory)
    - Zustand store action logging
    - Rust backend file logging with rotation
@@ -81,6 +85,7 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
 ### Tech Stack
 
 #### Frontend
+
 - **Framework**: React 18.3.1
 - **Language**: TypeScript 5.6.2 (strict mode)
 - **Build Tool**: Vite 6.0.3
@@ -91,6 +96,7 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
 - **Runtime**: Tauri v2.5.0 (desktop app framework)
 
 #### Backend (Rust)
+
 - **Framework**: Tauri 2.x
 - **Language**: Rust (2021 edition)
 - **Async Runtime**: Tokio 1.x with multi-thread support
@@ -99,6 +105,7 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
 - **Hardware**: RFID reader support via mfrc522, rppal, embedded-hal (ARM/ARM64 Linux only)
 
 #### External Services
+
 - **Backend API**: Project Phoenix (Node.js/Express backend)
 - **API Communication**: REST with device API key + staff PIN authentication
 
@@ -280,6 +287,7 @@ Pages
 ```
 
 **Key Dependencies:**
+
 - Pages depend on store actions
 - Store depends on services for side effects
 - Services depend on Tauri IPC or HTTP API
@@ -302,20 +310,20 @@ Pages
     "moduleResolution": "bundler",
 
     // Strictness
-    "strict": true,                      // ALL strict checks enabled
+    "strict": true, // ALL strict checks enabled
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
 
     // Bundler settings
-    "allowImportingTsExtensions": true,  // Allow .ts/.tsx in imports
+    "allowImportingTsExtensions": true, // Allow .ts/.tsx in imports
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "noEmit": true,                      // Vite handles compilation
-    "jsx": "react-jsx",                  // New JSX transform (no import React)
+    "noEmit": true, // Vite handles compilation
+    "jsx": "react-jsx", // New JSX transform (no import React)
 
     // Module behavior
-    "skipLibCheck": true,                // Skip lib .d.ts checking for speed
+    "skipLibCheck": true, // Skip lib .d.ts checking for speed
     "useDefineForClassFields": true
   },
   "include": ["src"]
@@ -323,6 +331,7 @@ Pages
 ```
 
 **Key Strictness Implications:**
+
 - All function parameters must be typed
 - No implicit `any` types allowed
 - Unused variables/imports cause errors
@@ -331,6 +340,7 @@ Pages
 #### Type Definition Patterns
 
 **Interface vs Type:**
+
 ```typescript
 // Interfaces for object shapes (preferred for extensibility)
 export interface Teacher {
@@ -346,6 +356,7 @@ export type ActivityCategory = 'Sport' | 'Wissenschaft' | 'Kunst' | 'Musik';
 ```
 
 **API Response Typing:**
+
 ```typescript
 // Generic wrapper pattern for API responses
 interface ApiResponse<T> {
@@ -361,6 +372,7 @@ const response = await apiCall<ApiResponse<Teacher[]>>('/api/iot/teachers');
 #### Module System
 
 **Type**: ES Modules (ESM) exclusively
+
 - Uses `import` / `export` syntax
 - No CommonJS (`require()`)
 - Package.json has `"type": "module"`
@@ -368,6 +380,7 @@ const response = await apiCall<ApiResponse<Teacher[]>>('/api/iot/teachers');
 #### Import/Export Patterns
 
 **Import Order** (enforced by ESLint):
+
 1. Built-in Node modules
 2. External packages (npm)
 3. Internal modules (absolute paths)
@@ -375,6 +388,7 @@ const response = await apiCall<ApiResponse<Teacher[]>>('/api/iot/teachers');
 5. Sibling modules (`./`)
 
 **Example:**
+
 ```typescript
 // 1. External
 import { useEffect, useCallback } from 'react';
@@ -390,6 +404,7 @@ import { safeInvoke } from '../utils/tauriContext';
 ```
 
 **Type Import Style** (enforced by ESLint):
+
 ```typescript
 // Inline type imports (preferred)
 import { api, type Teacher, type Room } from '../services/api';
@@ -401,18 +416,18 @@ import { api } from '../services/api';
 
 #### Naming Conventions
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Files (Components) | PascalCase | `ActivityScanningPage.tsx` |
-| Files (Utils) | camelCase | `tauriContext.ts` |
-| Files (Hooks) | camelCase + `use` prefix | `useRfidScanning.ts` |
-| React Components | PascalCase | `function ErrorModal() {}` |
-| Functions | camelCase | `async function processRfidScan() {}` |
-| Variables | camelCase | `const authenticatedUser = ...` |
-| Constants | UPPER_SNAKE_CASE | `const API_BASE_URL = ...` |
-| Interfaces | PascalCase | `interface UserState {}` |
-| Types | PascalCase | `type LogLevel = ...` |
-| Enums | PascalCase (keys UPPER) | `enum LogLevel { DEBUG = 0 }` |
+| Type               | Convention               | Example                               |
+| ------------------ | ------------------------ | ------------------------------------- |
+| Files (Components) | PascalCase               | `ActivityScanningPage.tsx`            |
+| Files (Utils)      | camelCase                | `tauriContext.ts`                     |
+| Files (Hooks)      | camelCase + `use` prefix | `useRfidScanning.ts`                  |
+| React Components   | PascalCase               | `function ErrorModal() {}`            |
+| Functions          | camelCase                | `async function processRfidScan() {}` |
+| Variables          | camelCase                | `const authenticatedUser = ...`       |
+| Constants          | UPPER_SNAKE_CASE         | `const API_BASE_URL = ...`            |
+| Interfaces         | PascalCase               | `interface UserState {}`              |
+| Types              | PascalCase               | `type LogLevel = ...`                 |
+| Enums              | PascalCase (keys UPPER)  | `enum LogLevel { DEBUG = 0 }`         |
 
 ### File Organization
 
@@ -430,6 +445,7 @@ import { api } from '../services/api';
 **Status**: Tests not yet implemented
 
 **Planned Pattern**:
+
 - Tests will be co-located: `Component.tsx` → `Component.test.tsx`
 - Test framework: Vitest + React Testing Library
 
@@ -440,6 +456,7 @@ import { api } from '../services/api';
 **Type**: Flat config (ESLint 9.x)
 
 **Plugins Used:**
+
 - `typescript-eslint` (recommended + strict presets)
 - `eslint-plugin-react`
 - `eslint-plugin-react-hooks`
@@ -501,24 +518,25 @@ import { api } from '../services/api';
 ```
 
 **Override for CSS/JSON:**
+
 ```javascript
 overrides: [
   {
     files: '*.{css,scss,json,html}',
-    options: { singleQuote: false }  // Use double quotes
-  }
-]
+    options: { singleQuote: false }, // Use double quotes
+  },
+];
 ```
 
 #### Import Ordering Example
 
 ```typescript
 // ✅ CORRECT ORDER (alphabetized within groups):
-import { useEffect } from 'react';                    // External
-import { create } from 'zustand';                     // External
+import { useEffect } from 'react'; // External
+import { create } from 'zustand'; // External
 
-import { api, type Teacher } from '../services/api';  // Internal
-import { createLogger } from '../utils/logger';       // Internal
+import { api, type Teacher } from '../services/api'; // Internal
+import { createLogger } from '../utils/logger'; // Internal
 ```
 
 ---
@@ -561,11 +579,13 @@ src/
 #### Testing Priorities (When Implemented)
 
 1. **Critical Path**:
+
    - RFID scan processing (`useRfidScanning.ts`)
    - API authentication (`api.ts` PIN validation)
    - Store actions (`userStore.ts`)
 
 2. **UI Components**:
+
    - Modal behavior
    - Form validation
    - Error states
@@ -589,6 +609,7 @@ src/
 #### Vite 6.0.3
 
 **Configuration** (`vite.config.ts`):
+
 ```typescript
 {
   plugins: [react()],
@@ -616,6 +637,7 @@ src/
 **Version**: `@tauri-apps/cli` v2
 
 **Key Commands**:
+
 - `tauri dev` → Starts Rust backend + Vite frontend
 - `tauri build` → Creates production installers
 - `tauri info` → Shows environment details
@@ -625,9 +647,11 @@ src/
 #### Starting Development
 
 **Option 1: Full App (Tauri + Frontend)**
+
 ```bash
 npm run tauri dev
 ```
+
 - Starts Rust backend (Tauri)
 - Starts Vite dev server (port 1420)
 - Opens application window
@@ -635,9 +659,11 @@ npm run tauri dev
 - Cargo watch for Rust changes
 
 **Option 2: Frontend Only (Faster UI Development)**
+
 ```bash
 npm run dev
 ```
+
 - Starts Vite dev server only
 - No Tauri backend (API calls will fail unless backend is running separately)
 - Faster startup
@@ -645,33 +671,33 @@ npm run dev
 
 #### Available npm Scripts
 
-| Script | Command | Purpose |
-|--------|---------|---------|
-| `dev` | `vite` | Frontend-only dev server |
-| `build` | `tsc && vite build` | Type check + production build |
-| `preview` | `vite preview` | Preview production build |
-| `tauri` | `tauri` | Tauri CLI wrapper |
-| `lint` | `eslint src --ext .ts,.tsx` | Run ESLint |
-| `lint:fix` | `eslint src --ext .ts,.tsx --fix` | Auto-fix ESLint issues |
-| `typecheck` | `tsc --noEmit` | Type check without emitting |
-| `check` | `eslint src --ext .ts,.tsx && tsc --noEmit` | Lint + type check |
-| `format` | `prettier --write "**/*.{ts,tsx,js,jsx,json,css,md}"` | Format all files |
-| `format:check` | `prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"` | Check formatting |
-| `clean:target` | `cd src-tauri && cargo clean` | Clean Rust build artifacts |
+| Script         | Command                                               | Purpose                       |
+| -------------- | ----------------------------------------------------- | ----------------------------- |
+| `dev`          | `vite`                                                | Frontend-only dev server      |
+| `build`        | `tsc && vite build`                                   | Type check + production build |
+| `preview`      | `vite preview`                                        | Preview production build      |
+| `tauri`        | `tauri`                                               | Tauri CLI wrapper             |
+| `lint`         | `eslint src --ext .ts,.tsx`                           | Run ESLint                    |
+| `lint:fix`     | `eslint src --ext .ts,.tsx --fix`                     | Auto-fix ESLint issues        |
+| `typecheck`    | `tsc --noEmit`                                        | Type check without emitting   |
+| `check`        | `eslint src --ext .ts,.tsx && tsc --noEmit`           | Lint + type check             |
+| `format`       | `prettier --write "**/*.{ts,tsx,js,jsx,json,css,md}"` | Format all files              |
+| `format:check` | `prettier --check "**/*.{ts,tsx,js,jsx,json,css,md}"` | Check formatting              |
+| `clean:target` | `cd src-tauri && cargo clean`                         | Clean Rust build artifacts    |
 
 #### Rust Development Commands
 
 **In `src-tauri/` directory:**
 
-| Command | Purpose |
-|---------|---------|
-| `cargo check` | Fast syntax/type checking (no codegen) |
-| `cargo clippy` | Rust linter (strict warnings) |
-| `cargo fmt` | Format Rust code |
-| `cargo test` | Run all Rust tests |
-| `cargo build --release` | Production Rust build |
-| `./test_rfid.sh` | Test RFID hardware (single scan) |
-| `./test_rfid_persistent.sh` | Test RFID hardware (continuous) |
+| Command                     | Purpose                                |
+| --------------------------- | -------------------------------------- |
+| `cargo check`               | Fast syntax/type checking (no codegen) |
+| `cargo clippy`              | Rust linter (strict warnings)          |
+| `cargo fmt`                 | Format Rust code                       |
+| `cargo test`                | Run all Rust tests                     |
+| `cargo build --release`     | Production Rust build                  |
+| `./test_rfid.sh`            | Test RFID hardware (single scan)       |
+| `./test_rfid_persistent.sh` | Test RFID hardware (continuous)        |
 
 ### Environment Setup
 
@@ -693,12 +719,14 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,04:A7:B3:C2:D1:E0:F5
 ```
 
 **Key Distinctions:**
+
 - `API_BASE_URL` / `DEVICE_API_KEY`: Read at **runtime** by Rust
 - `VITE_*` variables: Baked into **build** (frontend only)
 
 #### System Prerequisites
 
 **Development Machine:**
+
 - Node.js 18+ (for npm)
 - Rust 1.70+ (for Tauri)
 - Platform-specific Tauri dependencies:
@@ -707,6 +735,7 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,04:A7:B3:C2:D1:E0:F5
   - **Windows**: Visual Studio 2019+ with C++ tools
 
 **Raspberry Pi (Production):**
+
 - Raspberry Pi OS 64-bit (Bookworm recommended)
 - Rust cross-compilation or native build (see `docs/pi4-native-build.md`)
 - RFID reader hardware (MFRC522 connected via SPI)
@@ -714,11 +743,13 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,04:A7:B3:C2:D1:E0:F5
 ### Hot Reload / Watch Mode
 
 **Frontend (Vite HMR):**
+
 - ✅ Automatic: Saving `.tsx`/`.ts` files triggers instant reload
 - ✅ Preserves React state in most cases
 - ❌ Full reload on: route changes, store changes
 
 **Backend (Tauri)**:
+
 - ⚠️ **Partial**: Rust changes require manual restart (`Ctrl+C` → `npm run tauri dev`)
 - No cargo-watch integration by default
 
@@ -733,6 +764,7 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,04:A7:B3:C2:D1:E0:F5
 #### Frontend (package.json)
 
 **Core Framework:**
+
 ```json
 "react": "^18.3.1",
 "react-dom": "^18.3.1",
@@ -740,28 +772,35 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,04:A7:B3:C2:D1:E0:F5
 ```
 
 **State Management:**
+
 ```json
 "zustand": "^5.0.4"
 ```
+
 - **Why**: Lightweight, TypeScript-friendly state management
 - **Alternative considered**: Redux (too heavy), Context API (too verbose)
 
 **Desktop Runtime:**
+
 ```json
 "@tauri-apps/api": "^2.5.0",
 "@tauri-apps/plugin-opener": "^2"
 ```
+
 - **Why**: Provides Rust ↔ TypeScript IPC bridge
 
 **Styling:**
+
 ```json
 "@fortawesome/fontawesome-svg-core": "^6.7.2",
 "@fortawesome/free-solid-svg-icons": "^6.7.2",
 "@fortawesome/react-fontawesome": "^0.2.2"
 ```
+
 - **Why**: Icon library for UI consistency
 
 **Dev Tools:**
+
 ```json
 "vite": "^6.0.3",
 "@vitejs/plugin-react": "^4.3.4",
@@ -774,18 +813,21 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,04:A7:B3:C2:D1:E0:F5
 #### Backend (Cargo.toml)
 
 **Core Framework:**
+
 ```toml
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
 ```
 
 **Serialization:**
+
 ```toml
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ```
 
 **Utilities:**
+
 ```toml
 chrono = { version = "0.4", features = ["serde"] }  # Date/time handling
 tokio = { version = "1", features = ["time", "rt", "rt-multi-thread", "sync"] }  # Async runtime
@@ -794,6 +836,7 @@ dotenvy = "0.15"                                     # .env file loading
 ```
 
 **Platform-Specific (ARM/ARM64 Linux only):**
+
 ```toml
 [target.'cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))'.dependencies]
 mfrc522 = { version = "0.8.0", features = ["eh02"] }  # RFID reader driver
@@ -805,6 +848,7 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
 ### Internal Package Dependencies
 
 **Pattern**: Monolithic structure (not a monorepo)
+
 - All code in single package
 - No internal package dependencies
 - Shared types via TypeScript modules
@@ -817,28 +861,30 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
 **Default**: `http://localhost:8080`
 
 **Authentication**:
+
 - Device API key (Bearer token): `DEVICE_API_KEY`
 - Staff PIN (custom header): `X-Staff-PIN`
 
 **Key Endpoints** (from `src/services/api.ts`):
 
-| Method | Endpoint | Purpose | Auth Required |
-|--------|----------|---------|---------------|
-| GET | `/api/iot/teachers` | Fetch teacher list | Device API key |
-| POST | `/api/iot/ping` | Validate global PIN | Device API key + PIN |
-| GET | `/api/iot/status` | Validate teacher PIN | Device API key + PIN + Staff ID |
-| GET | `/api/iot/activities` | Get teacher's activities | Device API key + PIN |
-| GET | `/api/iot/rooms/available` | Get available rooms | Device API key + PIN |
-| POST | `/api/iot/session/start` | Start activity session | Device API key + PIN |
-| GET | `/api/iot/session/current` | Get current session | Device API key + PIN |
-| POST | `/api/iot/session/end` | End session | Device API key + PIN |
-| POST | `/api/iot/checkin` | Process RFID check-in/out | Device API key + PIN |
-| POST | `/api/iot/session/activity` | Update session activity (prevent timeout) | Device API key + PIN |
-| GET | `/api/iot/students` | Get students for teachers | Device API key + PIN |
-| GET | `/api/iot/rfid/{tagId}` | Check tag assignment | Device API key + PIN |
-| POST | `/api/students/{id}/rfid` | Assign RFID tag | Device API key + PIN |
+| Method | Endpoint                    | Purpose                                   | Auth Required                   |
+| ------ | --------------------------- | ----------------------------------------- | ------------------------------- |
+| GET    | `/api/iot/teachers`         | Fetch teacher list                        | Device API key                  |
+| POST   | `/api/iot/ping`             | Validate global PIN                       | Device API key + PIN            |
+| GET    | `/api/iot/status`           | Validate teacher PIN                      | Device API key + PIN + Staff ID |
+| GET    | `/api/iot/activities`       | Get teacher's activities                  | Device API key + PIN            |
+| GET    | `/api/iot/rooms/available`  | Get available rooms                       | Device API key + PIN            |
+| POST   | `/api/iot/session/start`    | Start activity session                    | Device API key + PIN            |
+| GET    | `/api/iot/session/current`  | Get current session                       | Device API key + PIN            |
+| POST   | `/api/iot/session/end`      | End session                               | Device API key + PIN            |
+| POST   | `/api/iot/checkin`          | Process RFID check-in/out                 | Device API key + PIN            |
+| POST   | `/api/iot/session/activity` | Update session activity (prevent timeout) | Device API key + PIN            |
+| GET    | `/api/iot/students`         | Get students for teachers                 | Device API key + PIN            |
+| GET    | `/api/iot/rfid/{tagId}`     | Check tag assignment                      | Device API key + PIN            |
+| POST   | `/api/students/{id}/rfid`   | Assign RFID tag                           | Device API key + PIN            |
 
 **Error Handling**:
+
 - 401: Invalid PIN
 - 403: Forbidden (no permission)
 - 404: Resource not found
@@ -849,6 +895,7 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
 **Two-Level Authentication:**
 
 1. **Device Level** (all requests):
+
    ```typescript
    headers: {
      'Authorization': `Bearer ${DEVICE_API_KEY}`
@@ -864,11 +911,13 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
    ```
 
 **PIN Storage**:
+
 - Stored in Zustand store: `authenticatedUser.pin`
 - Used for all authenticated API calls
 - Not persisted (cleared on logout)
 
 **Security Features**:
+
 - Rate limiting on PIN validation (backend)
 - Account lockout after failed attempts (backend)
 - No PIN transmitted in URL/query params (always in headers)
@@ -878,11 +927,13 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
 **PyrePortal Side**: None (all data from API)
 
 **Backend Side** (Project Phoenix):
+
 - PostgreSQL database
 - Accessed via backend API only
 - Schema owned by backend
 
 **Local Storage** (Tauri File System):
+
 - Session settings: JSON file in app data directory
 - Student cache: JSON file in app data directory
 - Logs: Text files in logs directory
@@ -896,6 +947,7 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
 **Example**: Adding a "Student Photo Display" feature
 
 1. **Define Types** (`src/services/api.ts`)
+
    ```typescript
    export interface StudentPhoto {
      student_id: number;
@@ -905,6 +957,7 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
    ```
 
 2. **Add API Method** (`src/services/api.ts`)
+
    ```typescript
    async getStudentPhoto(pin: string, studentId: number): Promise<StudentPhoto> {
      const response = await apiCall<{status: string; data: StudentPhoto}>(
@@ -916,6 +969,7 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
    ```
 
 3. **Add Store Action** (`src/store/userStore.ts`)
+
    ```typescript
    interface UserState {
      // ... existing state
@@ -936,16 +990,17 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
        try {
          const photo = await api.getStudentPhoto(authenticatedUser.pin, studentId);
          set(state => ({
-           studentPhotos: new Map(state.studentPhotos).set(studentId, photo)
+           studentPhotos: new Map(state.studentPhotos).set(studentId, photo),
          }));
        } catch (error) {
          logger.error('Failed to fetch student photo', { error, studentId });
        }
-     }
+     },
    });
    ```
 
 4. **Create UI Component** (`src/components/StudentPhoto.tsx`)
+
    ```typescript
    import { useEffect } from 'react';
    import { useUserStore } from '../store/userStore';
@@ -967,6 +1022,7 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
    ```
 
 5. **Add to Page** (`src/pages/ActivityScanningPage.tsx`)
+
    ```typescript
    import { StudentPhoto } from '../components/StudentPhoto';
 
@@ -977,6 +1033,7 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
    ```
 
 6. **Add Logging**
+
    ```typescript
    storeLogger.info('Student photo fetched', { studentId, photoUrl: photo.photo_url });
    ```
@@ -1012,6 +1069,7 @@ linux-embedded-hal = "0.3.2"                          # Linux HAL implementation
 **Status**: ⚠️ No tests currently implemented
 
 **Planned Commands**:
+
 ```bash
 npm test              # Run all tests
 npm test -- --watch   # Watch mode
@@ -1019,6 +1077,7 @@ npm test -- --coverage # Coverage report
 ```
 
 **Rust Tests**:
+
 ```bash
 cd src-tauri
 cargo test            # Run Rust unit tests
@@ -1031,6 +1090,7 @@ cargo test            # Run Rust unit tests
 ```bash
 npm run tauri dev
 ```
+
 - No optimization
 - Debug symbols included
 - Console logging active
@@ -1042,6 +1102,7 @@ npm run tauri build
 ```
 
 **Process:**
+
 1. Runs `npm run build` (TypeScript check + Vite build)
 2. Compiles Rust in release mode (`--release`)
 3. Bundles frontend assets
@@ -1051,6 +1112,7 @@ npm run tauri build
    - **Windows**: `.msi`, `.exe` in `src-tauri/target/release/bundle/`
 
 **Build Artifacts**:
+
 - Frontend: `dist/` (HTML, JS, CSS)
 - Rust binary: `src-tauri/target/release/pyreportal`
 - Installers: `src-tauri/target/release/bundle/<type>/`
@@ -1068,6 +1130,7 @@ npm run tauri build
 #### Commit Conventions
 
 **Format** (not strict, but common pattern):
+
 ```
 type: description
 
@@ -1075,6 +1138,7 @@ type: description
 ```
 
 **Types observed**:
+
 - `feat:` New feature
 - `fix:` Bug fix
 - `docs:` Documentation
@@ -1082,6 +1146,7 @@ type: description
 - `perf:` Performance improvement
 
 **Recent Examples**:
+
 ```
 feat: cache-first RFID scanning
 feat: replace text with transparent arrow image on scanning page
@@ -1097,6 +1162,7 @@ docs: add verified working kiosk setup documentation
 #### Raspberry Pi Kiosk Deployment
 
 1. **Build on Development Machine**:
+
    ```bash
    # Option 1: Cross-compile (faster, more complex)
    # See CLAUDE.md for cross-compilation setup
@@ -1106,11 +1172,13 @@ docs: add verified working kiosk setup documentation
    ```
 
 2. **Transfer Binary** (if cross-compiled):
+
    ```bash
    scp src-tauri/target/aarch64-unknown-linux-gnu/release/pyreportal pi@<ip>:/home/pi/
    ```
 
 3. **Setup Environment** on Pi:
+
    ```bash
    cd /home/pi/pyreportal
    cp .env.example .env
@@ -1118,6 +1186,7 @@ docs: add verified working kiosk setup documentation
    ```
 
 4. **Run Application**:
+
    ```bash
    DISPLAY=:0 ./pyreportal
    ```
@@ -1127,6 +1196,7 @@ docs: add verified working kiosk setup documentation
    - Ensure kiosk mode is enabled (`TAURI_FULLSCREEN=true`)
 
 **Performance Notes** (from `docs/pi4-native-build.md`):
+
 - **Cross-compiled 32-bit**: 15-25 FPS
 - **Native 64-bit**: 30-45 FPS (recommended)
 
@@ -1147,7 +1217,7 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!response.ok) {
     let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
     try {
-      const errorData = await response.json() as { message?: string; error?: string };
+      const errorData = (await response.json()) as { message?: string; error?: string };
       if (errorData.message) {
         errorMessage = `${errorMessage}: ${errorData.message}`;
       }
@@ -1162,6 +1232,7 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
 ```
 
 **Characteristics**:
+
 - Status code included in error message
 - Server error details extracted from JSON
 - All errors thrown as `Error` instances
@@ -1185,12 +1256,13 @@ fetchTeachers: async () => {
       error: 'Fehler beim Laden der Lehrer. Bitte versuchen Sie es erneut.',
       isLoading: false,
     });
-    throw error;  // Re-throw for component-level handling
+    throw error; // Re-throw for component-level handling
   }
-}
+};
 ```
 
 **Characteristics**:
+
 - Logs error with context
 - Sets user-friendly German error message in store
 - Re-throws error for optional UI-level handling
@@ -1220,6 +1292,7 @@ class ErrorBoundary extends React.Component<Props, State> {
 ```
 
 **Store Error Display**:
+
 ```typescript
 const { error } = useUserStore();
 
@@ -1258,6 +1331,7 @@ try {
 ```
 
 **Characteristics**:
+
 - Logs error
 - Queues failed operation
 - Shows user feedback
@@ -1268,11 +1342,13 @@ try {
 #### Three-Layer Logging System
 
 1. **Frontend Logger** (`src/utils/logger.ts`)
+
    - **Purpose**: Browser-side logging with levels
    - **Output**: Console + in-memory buffer
    - **Persistence**: Sends to Rust backend via IPC
 
    **Usage**:
+
    ```typescript
    import { createLogger } from '../utils/logger';
    const logger = createLogger('ComponentName');
@@ -1284,25 +1360,29 @@ try {
    ```
 
    **Levels** (enum):
+
    ```typescript
    enum LogLevel {
-     DEBUG = 0,  // Verbose diagnostic info
-     INFO = 1,   // General info (API calls, state changes)
-     WARN = 2,   // Warnings (recoverable issues)
-     ERROR = 3,  // Errors (failures)
-     NONE = 4,   // Disable logging
+     DEBUG = 0, // Verbose diagnostic info
+     INFO = 1, // General info (API calls, state changes)
+     WARN = 2, // Warnings (recoverable issues)
+     ERROR = 3, // Errors (failures)
+     NONE = 4, // Disable logging
    }
    ```
 
    **Configuration**:
+
    - Development: `DEBUG` level, console output
    - Production: `WARN` level, persistence enabled
 
 2. **Store Logger** (`src/utils/storeLogger.ts` + `storeMiddleware.ts`)
+
    - **Purpose**: Zustand store action tracking
    - **Output**: Console + frontend logger
 
    **Usage** (automatic via middleware):
+
    ```typescript
    export const useUserStore = create<UserState>(
      loggerMiddleware(createUserStore, {
@@ -1317,20 +1397,24 @@ try {
    ```
 
    **Logged Events**:
+
    - Action calls (function name + arguments)
    - State changes (before/after snapshots)
    - Action source (which component triggered)
 
 3. **Rust Backend Logger** (`src-tauri/src/logging.rs`)
+
    - **Purpose**: Persistent file-based logging
    - **Output**: Log files with rotation
 
    **Log Locations**:
+
    - **macOS**: `~/Library/Logs/pyreportal/app_YYYYMMDD_HHMMSS.log`
    - **Linux**: `~/.config/pyreportal/logs/app_YYYYMMDD_HHMMSS.log`
    - **Windows**: `%APPDATA%\pyreportal\logs\app_YYYYMMDD_HHMMSS.log`
 
    **Commands**:
+
    ```rust
    #[tauri::command]
    fn write_log(entry: String) -> Result<(), String>
@@ -1345,11 +1429,13 @@ try {
 #### Log Format
 
 **Frontend/Store Logs**:
+
 ```
 [2025-10-02T14:32:15.123Z] [ComponentName] Message here
 ```
 
 **Rust Logs**:
+
 ```json
 {
   "timestamp": "2025-10-02T14:32:15.123Z",
@@ -1365,11 +1451,13 @@ try {
 **Current Status**: Local logging only (no cloud monitoring)
 
 **Available Tools**:
+
 - In-app log viewer (`src/utils/logViewer.tsx`)
 - File-based logs on device
 - Browser DevTools console
 
 **Planned** (not implemented):
+
 - Error aggregation service (e.g., Sentry)
 - Usage analytics
 - Performance monitoring
@@ -1385,11 +1473,13 @@ try {
 **Decision**: Check local student cache before API call
 
 **Rationale**:
+
 - Network latency on Raspberry Pi: 200-500ms
 - Cache hit provides <10ms response time
 - Better UX for repeat scans (same students during session)
 
 **Implementation** (`src/hooks/useRfidScanning.ts:118-215`):
+
 ```typescript
 // 1. Check cache first
 const cachedStudent = getCachedStudentData(tagId);
@@ -1407,6 +1497,7 @@ if (cachedStudent) {
 ```
 
 **Trade-offs**:
+
 - Pro: Instant feedback
 - Con: Potential cache staleness (mitigated by background sync)
 
@@ -1415,11 +1506,13 @@ if (cachedStudent) {
 **Decision**: Single Zustand store with custom logging middleware instead of Redux
 
 **Rationale**:
+
 - Zustand: 95% less boilerplate than Redux
 - Custom middleware: Full visibility into state changes
 - TypeScript-friendly: No need for action creators
 
 **Implementation**:
+
 ```typescript
 export const useUserStore = create<UserState>(
   loggerMiddleware(createUserStore, { ... })
@@ -1427,6 +1520,7 @@ export const useUserStore = create<UserState>(
 ```
 
 **Logging Output**:
+
 ```
 [UserStore] Action: fetchTeachers
 [UserStore] State changed: users (0 → 15 items)
@@ -1437,11 +1531,13 @@ export const useUserStore = create<UserState>(
 **Decision**: Load API credentials from Rust backend, not frontend .env
 
 **Rationale**:
+
 - Frontend .env is baked into build (insecure for API keys)
 - Rust can read `.env` at runtime (allows changing keys without rebuild)
 - Device-specific configuration (different keys per Pi)
 
 **Implementation** (`src-tauri/src/lib.rs:17-32`):
+
 ```rust
 #[tauri::command]
 fn get_api_config() -> Result<ApiConfig, String> {
@@ -1456,6 +1552,7 @@ fn get_api_config() -> Result<ApiConfig, String> {
 ```
 
 **Usage** (`src/services/api.ts:25-54`):
+
 ```typescript
 const config = await safeInvoke<ApiConfig>('get_api_config');
 API_BASE_URL = config.api_base_url;
@@ -1467,16 +1564,19 @@ DEVICE_API_KEY = config.device_api_key;
 **Decision**: Three separate mechanisms to prevent duplicate RFID scans
 
 **Rationale**:
+
 - RFID readers can emit multiple events for single scan (hardware quirk)
 - Users may accidentally scan twice
 - Network latency creates race conditions
 
 **Layers** (`src/store/userStore.ts:1117-1201`):
+
 1. **Processing Queue**: Blocks tag if currently being processed
 2. **Recent Tag Scans**: Blocks tag if scanned within 2 seconds
 3. **Student History**: Blocks opposite action if student just performed action
 
 **Code**:
+
 ```typescript
 canProcessTag: (tagId: string) => {
   if (rfid.processingQueue.has(tagId)) return false;
@@ -1490,7 +1590,7 @@ canProcessTag: (tagId: string) => {
   }
 
   return true;
-}
+};
 ```
 
 ### Known Issues or Workarounds
@@ -1500,6 +1600,7 @@ canProcessTag: (tagId: string) => {
 **Issue**: RFID reader takes 2-3 seconds to initialize on Raspberry Pi
 
 **Workaround**: Pre-initialize service on app startup
+
 ```typescript
 // src/components/RfidServiceInitializer.tsx
 useEffect(() => {
@@ -1514,6 +1615,7 @@ useEffect(() => {
 **Issue**: Tauri IPC errors don't provide detailed stack traces
 
 **Workaround**: Extensive logging in Rust commands
+
 ```rust
 #[tauri::command]
 fn some_command() -> Result<T, String> {
@@ -1532,6 +1634,7 @@ fn some_command() -> Result<T, String> {
 **Issue**: Backend closes sessions after 30 minutes of inactivity
 
 **Workaround**: Send keepalive on every RFID scan
+
 ```typescript
 // src/hooks/useRfidScanning.ts:290-296
 try {
@@ -1551,11 +1654,13 @@ try {
 **Issue**: Limited CPU/GPU compared to desktop
 
 **Optimizations**:
+
 - Minimize React re-renders (use `React.memo`, avoid inline functions)
 - Lazy load non-critical images
 - Use CSS transforms for animations (GPU-accelerated)
 
 **Measured Performance**:
+
 - 32-bit build: 15-25 FPS
 - 64-bit build: 30-45 FPS (recommended)
 
@@ -1575,7 +1680,7 @@ set({ data: result });
 set({
   isLoading: true,
   error: null,
-  data: result
+  data: result,
 });
 ```
 
@@ -1584,6 +1689,7 @@ set({
 **Pattern**: Prevent duplicate fetches with closure-based locking
 
 **Example** (`src/store/userStore.ts:721-793`):
+
 ```typescript
 fetchActivities: (() => {
   let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
@@ -1600,13 +1706,13 @@ fetchActivities: (() => {
         const activitiesData = await api.getActivities(pin);
         return activitiesData;
       } finally {
-        fetchPromise = null;  // Clear when done
+        fetchPromise = null; // Clear when done
       }
     })();
 
     return fetchPromise;
   };
-})()
+})();
 ```
 
 **Benefit**: Multiple rapid calls share single fetch
@@ -1618,6 +1724,7 @@ fetchActivities: (() => {
 **Rule**: Never send PINs in URL/query parameters
 
 **Implementation**:
+
 ```typescript
 // ✅ CORRECT
 headers: { 'X-Staff-PIN': pin }
@@ -1631,6 +1738,7 @@ fetch(`/api/validate?pin=${pin}`)  // Logged in server access logs
 **Rule**: Never commit API keys to git
 
 **Implementation**:
+
 - `.env` file in `.gitignore`
 - `.env.example` template with fake values
 - Runtime loading from environment
@@ -1640,12 +1748,14 @@ fetch(`/api/validate?pin=${pin}`)  // Logged in server access logs
 **Rule**: Validate all user inputs (even from trusted API)
 
 **Example** (`eslint.config.js:136`):
+
 ```javascript
 // ESLint rule for file system operations
 'security/detect-non-literal-fs-filename': 'error'
 ```
 
 **Rust Side**:
+
 ```rust
 // Path traversal prevention
 fn sanitize_path(path: &str) -> Result<PathBuf, String> {
@@ -1667,6 +1777,7 @@ fn sanitize_path(path: &str) -> Result<PathBuf, String> {
 **Why**: Complex state machine with race conditions
 
 **Checklist when modifying**:
+
 - [ ] Test with rapid successive scans (< 1 second apart)
 - [ ] Test with same tag scanned multiple times
 - [ ] Test offline → online transition
@@ -1674,6 +1785,7 @@ fn sanitize_path(path: &str) -> Result<PathBuf, String> {
 - [ ] Check for memory leaks in event listeners
 
 **Critical Section**:
+
 ```typescript
 // Lines 82-373: processScan function
 // Multi-layer duplicate prevention + cache logic
@@ -1684,6 +1796,7 @@ fn sanitize_path(path: &str) -> Result<PathBuf, String> {
 **Why**: Single source of truth for app state
 
 **Checklist when modifying**:
+
 - [ ] Add logging to new actions
 - [ ] Update TypeScript types
 - [ ] Batch state updates (avoid multiple `set()` calls)
@@ -1691,6 +1804,7 @@ fn sanitize_path(path: &str) -> Result<PathBuf, String> {
 - [ ] Consider offline scenarios
 
 **Critical Sections**:
+
 - Lines 354-386: `fetchTeachers` (template for API calls)
 - Lines 1433-1523: `validateAndRecreateSession` (complex validation)
 
@@ -1699,12 +1813,14 @@ fn sanitize_path(path: &str) -> Result<PathBuf, String> {
 **Why**: All backend communication flows through here
 
 **Checklist when modifying**:
+
 - [ ] Update TypeScript interfaces for request/response
 - [ ] Add error handling for new status codes
 - [ ] Log important calls (PIN validation, scans)
 - [ ] Update network quality tracking if adding critical endpoint
 
 **Pattern to Follow**:
+
 ```typescript
 async getSomething(pin: string): Promise<SomeType> {
   const response = await apiCall<{status: string; data: SomeType}>(
@@ -1725,6 +1841,7 @@ async getSomething(pin: string): Promise<SomeType> {
 **Why**: Bridge between frontend and system resources
 
 **Checklist when adding command**:
+
 - [ ] Add `#[tauri::command]` annotation
 - [ ] Register in `invoke_handler![]` macro
 - [ ] Return `Result<T, String>` for error handling
@@ -1732,6 +1849,7 @@ async getSomething(pin: string): Promise<SomeType> {
 - [ ] Handle errors gracefully (don't panic)
 
 **Template**:
+
 ```rust
 #[tauri::command]
 fn do_something(param: String) -> Result<ReturnType, String> {
@@ -1753,74 +1871,75 @@ fn do_something(param: String) -> Result<ReturnType, String> {
 
 ### Configuration Files
 
-| File | Purpose | Key Settings |
-|------|---------|-------------|
-| **package.json** | Node dependencies + npm scripts | `"type": "module"`, React 18.3.1, Zustand 5.0.4 |
-| **tsconfig.json** | TypeScript compiler config | `strict: true`, `target: ES2020`, `jsx: "react-jsx"` |
-| **tsconfig.node.json** | TypeScript for build scripts | `moduleResolution: "bundler"` |
-| **vite.config.ts** | Vite build tool config | Port 1420, HMR on 1421, ignore src-tauri |
-| **eslint.config.js** | ESLint linting rules | Flat config, TypeScript + React plugins, security rules |
-| **prettier.config.js** | Code formatting | `printWidth: 100`, `singleQuote: true`, Tailwind plugin |
-| **tailwind.config.js** | Tailwind CSS theme | Custom colors (primary: #24c8db), custom shadows |
-| **postcss.config.js** | PostCSS config | Tailwind + Autoprefixer |
-| **.env.example** | Environment template | API_BASE_URL, DEVICE_API_KEY, RFID settings |
-| **.gitignore** | Git ignore patterns | node_modules, dist, target, .env |
-| **src-tauri/Cargo.toml** | Rust dependencies | Tauri 2, Serde, Tokio, RFID libs (ARM only) |
-| **src-tauri/tauri.conf.json** | Tauri app config | App name, window settings, bundle config |
-| **.cargo/config.toml** | Cargo build config | Cross-compilation targets (ARM) |
+| File                          | Purpose                         | Key Settings                                            |
+| ----------------------------- | ------------------------------- | ------------------------------------------------------- |
+| **package.json**              | Node dependencies + npm scripts | `"type": "module"`, React 18.3.1, Zustand 5.0.4         |
+| **tsconfig.json**             | TypeScript compiler config      | `strict: true`, `target: ES2020`, `jsx: "react-jsx"`    |
+| **tsconfig.node.json**        | TypeScript for build scripts    | `moduleResolution: "bundler"`                           |
+| **vite.config.ts**            | Vite build tool config          | Port 1420, HMR on 1421, ignore src-tauri                |
+| **eslint.config.js**          | ESLint linting rules            | Flat config, TypeScript + React plugins, security rules |
+| **prettier.config.js**        | Code formatting                 | `printWidth: 100`, `singleQuote: true`, Tailwind plugin |
+| **tailwind.config.js**        | Tailwind CSS theme              | Custom colors (primary: #24c8db), custom shadows        |
+| **postcss.config.js**         | PostCSS config                  | Tailwind + Autoprefixer                                 |
+| **.env.example**              | Environment template            | API_BASE_URL, DEVICE_API_KEY, RFID settings             |
+| **.gitignore**                | Git ignore patterns             | node_modules, dist, target, .env                        |
+| **src-tauri/Cargo.toml**      | Rust dependencies               | Tauri 2, Serde, Tokio, RFID libs (ARM only)             |
+| **src-tauri/tauri.conf.json** | Tauri app config                | App name, window settings, bundle config                |
+| **.cargo/config.toml**        | Cargo build config              | Cross-compilation targets (ARM)                         |
 
 ### Key Source Directories
 
 #### src/ (Frontend)
 
-| Directory | Contents | Purpose |
-|-----------|----------|---------|
-| **assets/** | `react.svg` | Static assets (minimal, most in public/) |
-| **components/** | React components | Feature-specific components |
-| **components/ui/** | 13 UI components | Reusable buttons, modals, inputs |
-| **hooks/** | 2 custom hooks | `useRfidScanning`, `useNetworkStatus` |
-| **pages/** | 12 page components | Route-level components |
-| **services/** | 4 service files | API, storage, cache, sync queue |
-| **store/** | `userStore.ts` | Zustand state management |
-| **styles/** | `designSystem.ts`, `theme.ts` | Design tokens, theme config |
-| **utils/** | 7 utility files | Logger, error boundary, Tauri helpers |
+| Directory          | Contents                      | Purpose                                  |
+| ------------------ | ----------------------------- | ---------------------------------------- |
+| **assets/**        | `react.svg`                   | Static assets (minimal, most in public/) |
+| **components/**    | React components              | Feature-specific components              |
+| **components/ui/** | 13 UI components              | Reusable buttons, modals, inputs         |
+| **hooks/**         | 2 custom hooks                | `useRfidScanning`, `useNetworkStatus`    |
+| **pages/**         | 12 page components            | Route-level components                   |
+| **services/**      | 4 service files               | API, storage, cache, sync queue          |
+| **store/**         | `userStore.ts`                | Zustand state management                 |
+| **styles/**        | `designSystem.ts`, `theme.ts` | Design tokens, theme config              |
+| **utils/**         | 7 utility files               | Logger, error boundary, Tauri helpers    |
 
 #### src-tauri/src/ (Backend)
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| **lib.rs** | 98 | Main entry, command registration |
-| **main.rs** | ~10 | Binary entry point (minimal) |
-| **logging.rs** | ~200 | File-based logging with rotation |
-| **rfid.rs** | ~400 | RFID hardware abstraction + mock |
-| **session_storage.rs** | ~150 | Session settings persistence |
-| **student_cache.rs** | ~200 | Student data caching |
-| **bin/rfid_test.rs** | ~100 | RFID hardware test utility |
-| **bin/rfid_test_persistent.rs** | ~150 | Continuous RFID test |
+| File                            | Lines | Purpose                          |
+| ------------------------------- | ----- | -------------------------------- |
+| **lib.rs**                      | 98    | Main entry, command registration |
+| **main.rs**                     | ~10   | Binary entry point (minimal)     |
+| **logging.rs**                  | ~200  | File-based logging with rotation |
+| **rfid.rs**                     | ~400  | RFID hardware abstraction + mock |
+| **session_storage.rs**          | ~150  | Session settings persistence     |
+| **student_cache.rs**            | ~200  | Student data caching             |
+| **bin/rfid_test.rs**            | ~100  | RFID hardware test utility       |
+| **bin/rfid_test_persistent.rs** | ~150  | Continuous RFID test             |
 
 ### Generated/Build Directories to Ignore
 
-| Directory | Generated By | Purpose | Git Status |
-|-----------|--------------|---------|------------|
-| **node_modules/** | npm install | Node dependencies | Ignored |
-| **dist/** | npm run build | Frontend production build | Ignored |
-| **src-tauri/target/** | cargo build | Rust compilation output | Ignored |
-| **src-tauri/gen/** | Tauri CLI | Generated Tauri schemas | Committed |
+| Directory             | Generated By  | Purpose                   | Git Status |
+| --------------------- | ------------- | ------------------------- | ---------- |
+| **node_modules/**     | npm install   | Node dependencies         | Ignored    |
+| **dist/**             | npm run build | Frontend production build | Ignored    |
+| **src-tauri/target/** | cargo build   | Rust compilation output   | Ignored    |
+| **src-tauri/gen/**    | Tauri CLI     | Generated Tauri schemas   | Committed  |
 
 ### Files Containing or Potentially Containing Sensitive Data
 
-| File | Sensitivity | Reason | Git Status |
-|------|-------------|--------|------------|
-| **.env** | 🔴 **HIGH** | Contains DEVICE_API_KEY (production secret) | **IGNORED** |
-| **.env.example** | ✅ Safe | Template with fake values | Committed |
-| **src/services/api.ts** | ⚠️ Low | API_BASE_URL hardcoded fallback (not secret) | Committed |
-| **CLAUDE.local.md** | 🟡 Medium | Private development notes | **IGNORED** |
-| **package-lock.json** | ✅ Safe | Dependency lock (no secrets) | Committed |
-| **Cargo.lock** | ✅ Safe | Dependency lock (no secrets) | Committed |
-| **rfid-dev.log** | 🟡 Medium | May contain scanned RFID tags (PII) | **IGNORED** |
-| **src-tauri/target/release/** | 🟡 Medium | Compiled binaries (may leak .env if built with it) | **IGNORED** |
+| File                          | Sensitivity | Reason                                             | Git Status  |
+| ----------------------------- | ----------- | -------------------------------------------------- | ----------- |
+| **.env**                      | 🔴 **HIGH** | Contains DEVICE_API_KEY (production secret)        | **IGNORED** |
+| **.env.example**              | ✅ Safe     | Template with fake values                          | Committed   |
+| **src/services/api.ts**       | ⚠️ Low      | API_BASE_URL hardcoded fallback (not secret)       | Committed   |
+| **CLAUDE.local.md**           | 🟡 Medium   | Private development notes                          | **IGNORED** |
+| **package-lock.json**         | ✅ Safe     | Dependency lock (no secrets)                       | Committed   |
+| **Cargo.lock**                | ✅ Safe     | Dependency lock (no secrets)                       | Committed   |
+| **rfid-dev.log**              | 🟡 Medium   | May contain scanned RFID tags (PII)                | **IGNORED** |
+| **src-tauri/target/release/** | 🟡 Medium   | Compiled binaries (may leak .env if built with it) | **IGNORED** |
 
 **Security Notes**:
+
 - Never commit `.env` files
 - API keys should be changed if accidentally committed (revoke + regenerate)
 - RFID tag IDs are considered PII (don't commit in logs)
@@ -1894,6 +2013,6 @@ npm run tauri build
 
 **Document End**
 
-*Last Updated: 2025-10-02*
-*Maintainer: Development Team*
-*For questions or corrections, update this document via git commit*
+_Last Updated: 2025-10-02_
+_Maintainer: Development Team_
+_For questions or corrections, update this document via git commit_

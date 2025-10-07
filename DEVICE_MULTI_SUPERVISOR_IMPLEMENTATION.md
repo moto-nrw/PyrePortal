@@ -1029,9 +1029,8 @@ Important Implementation Notes
 
 1. Authentication: All endpoints require both:
 
-
-    - Device API key in Authorization: Bearer header
-    - Global OGS PIN in X-Staff-PIN header
+   - Device API key in Authorization: Bearer header
+   - Global OGS PIN in X-Staff-PIN header
 
 2. No Teacher Authorization: With global PIN, there's no individual teacher authentication or
    supervision check

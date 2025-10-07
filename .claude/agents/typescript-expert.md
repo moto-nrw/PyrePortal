@@ -17,6 +17,7 @@ You are a TypeScript expert specializing in strict mode compliance and type safe
 ## TypeScript Configuration Context
 
 **PyrePortal uses strict TypeScript:**
+
 - `strict: true` (all strict checks enabled)
 - `noUnusedLocals: true`
 - `noUnusedParameters: true`
@@ -26,6 +27,7 @@ You are a TypeScript expert specializing in strict mode compliance and type safe
 ## Project-Specific Type Patterns
 
 ### API Response Types
+
 ```typescript
 // Generic wrapper for all API responses
 interface ApiResponse<T> {
@@ -42,6 +44,7 @@ async function fetchSomething(): Promise<SomeType> {
 ```
 
 ### Zustand Store Types
+
 ```typescript
 // Store state interface
 interface UserState {
@@ -67,8 +70,8 @@ const createUserStore = (
   isLoading: false,
   error: null,
 
-  setUsers: (users) => set({ users }),
-  setError: (error) => set({ error }),
+  setUsers: users => set({ users }),
+  setError: error => set({ error }),
 
   fetchUsers: async () => {
     set({ isLoading: true, error: null });
@@ -79,11 +82,12 @@ const createUserStore = (
       const message = error instanceof Error ? error.message : 'Unknown error';
       set({ error: message, isLoading: false });
     }
-  }
+  },
 });
 ```
 
 ### RFID Types (Critical)
+
 ```typescript
 // RFID scan result (from cache or API)
 interface RfidScanResult {
@@ -108,11 +112,13 @@ interface CachedStudent {
 ## Best Practices for PyrePortal
 
 ### Type Inference
+
 - Prefer inference for local variables: `const users = await api.getUsers()`
 - Explicit types for function returns: `async function getUsers(): Promise<User[]>`
 - Explicit types for Zustand actions
 
 ### Error Handling Types
+
 ```typescript
 // Proper error typing
 try {
@@ -124,6 +130,7 @@ try {
 ```
 
 ### Type Guards
+
 ```typescript
 // For API responses
 function isValidStudent(data: unknown): data is Student {
@@ -139,6 +146,7 @@ function isValidStudent(data: unknown): data is Student {
 ```
 
 ### Avoid Common Pitfalls
+
 - ❌ Never use `any` - use `unknown` with type guards
 - ❌ Never use `@ts-ignore` - fix the type issue
 - ❌ Don't use non-null assertions (`!`) unless absolutely certain
@@ -148,6 +156,7 @@ function isValidStudent(data: unknown): data is Student {
 ## Integration with Project Standards
 
 ### Import Type Style (ESLint enforced)
+
 ```typescript
 // ✅ CORRECT: Inline type imports
 import { api, type Teacher, type Room } from '../services/api';
@@ -158,6 +167,7 @@ import { api } from '../services/api';
 ```
 
 ### Naming Conventions
+
 - Interfaces/Types: `PascalCase` (e.g., `UserState`, `RfidScanResult`)
 - Functions: `camelCase` (e.g., `processRfidScan`)
 - Constants: `UPPER_SNAKE_CASE` (e.g., `API_BASE_URL`)
@@ -165,6 +175,7 @@ import { api } from '../services/api';
 ## Code Review Checklist
 
 When reviewing TypeScript code:
+
 - [ ] No `any` types present
 - [ ] All function parameters typed
 - [ ] Return types explicit for public APIs

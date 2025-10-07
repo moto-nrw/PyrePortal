@@ -16,16 +16,16 @@ import { logNavigation, logUserAction } from '../utils/logger';
  * Displays after successful PIN validation
  */
 function HomeViewPage() {
-  const { 
-    authenticatedUser, 
-    currentSession, 
-    logout, 
-    fetchCurrentSession, 
+  const {
+    authenticatedUser,
+    currentSession,
+    logout,
+    fetchCurrentSession,
     selectedSupervisors,
     sessionSettings,
     loadSessionSettings,
     validateAndRecreateSession,
-    isValidatingLastSession
+    isValidatingLastSession,
   } = useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
@@ -74,7 +74,7 @@ function HomeViewPage() {
     if (sessionSettings?.use_last_session && sessionSettings.last_session) {
       logUserAction('Attempting to recreate last session');
       const success = await validateAndRecreateSession();
-      
+
       if (success) {
         // Show confirmation modal with session details
         setShowConfirmModal(true);
@@ -100,45 +100,45 @@ function HomeViewPage() {
     logNavigation('Home View', '/team-management');
     void navigate('/team-management');
   };
-  
+
   const handleConfirmRecreation = async () => {
     if (!authenticatedUser || !sessionSettings?.last_session) return;
-    
+
     try {
       const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
-      
+
       if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
         setErrorMessage('Fehler bei der Validierung der gespeicherten Sitzung');
         setShowErrorModal(true);
         setShowConfirmModal(false);
         return;
       }
-      
+
       logUserAction('Confirming session recreation', {
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
         supervisorCount: selectedSupervisors.length,
       });
-      
+
       // Start the session
       const sessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id,
         supervisor_ids: selectedSupervisors.map(s => s.id),
       };
-      
+
       const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
-      
+
       logUserAction('Session recreated successfully', {
         sessionId: sessionResponse.active_group_id,
       });
-      
+
       // Save the new session data
       await useUserStore.getState().saveLastSessionData();
-      
+
       // Fetch current session to update state
       await fetchCurrentSession();
-      
+
       // Navigate to NFC scanning
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');
@@ -161,7 +161,7 @@ function HomeViewPage() {
 
     // Check for existing session when component mounts
     void fetchCurrentSession();
-    
+
     // Load session settings
     void loadSessionSettings();
   }, [authenticatedUser, navigate, fetchCurrentSession, loadSessionSettings]);
@@ -389,7 +389,10 @@ function HomeViewPage() {
                   justifyContent: 'center',
                   gap: '16px',
                   transform: touchedButton === 'activity' ? designSystem.scales.active : 'scale(1)',
-                  boxShadow: touchedButton === 'activity' ? designSystem.shadows.card : designSystem.shadows.cardHover,
+                  boxShadow:
+                    touchedButton === 'activity'
+                      ? designSystem.shadows.card
+                      : designSystem.shadows.cardHover,
                   opacity: isValidatingLastSession ? 0.7 : 1,
                   cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
                 }}
@@ -472,8 +475,8 @@ function HomeViewPage() {
                     {currentSession
                       ? (currentSession.activity_name ?? 'Aktivität')
                       : sessionSettings?.use_last_session && sessionSettings.last_session
-                      ? 'Aktivität wiederholen'
-                      : 'Neue Aktivität'}
+                        ? 'Aktivität wiederholen'
+                        : 'Neue Aktivität'}
                   </h3>
                   <p
                     style={{
@@ -483,54 +486,71 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {currentSession 
-                      ? 'Fortsetzen' 
+                    {currentSession
+                      ? 'Fortsetzen'
                       : sessionSettings?.use_last_session && sessionSettings.last_session
-                      ? sessionSettings.last_session.activity_name
-                      : 'Starten'}
+                        ? sessionSettings.last_session.activity_name
+                        : 'Starten'}
                   </p>
-                  
+
                   {/* Show room and supervisor info for saved session */}
-                  {!currentSession && sessionSettings?.use_last_session && sessionSettings.last_session && (
-                    <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      <div style={{ 
-                        display: 'flex', 
-                        gap: '8px', 
-                        justifyContent: 'center',
-                        flexWrap: 'wrap'
-                      }}>
-                        <span style={{
-                          fontSize: '13px',
-                          backgroundColor: '#E0E7FF',
-                          color: '#4C1D95',
-                          padding: '4px 12px',
-                          borderRadius: '9999px',
+                  {!currentSession &&
+                    sessionSettings?.use_last_session &&
+                    sessionSettings.last_session && (
+                      <div
+                        style={{
+                          marginTop: '16px',
                           display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          📍 {sessionSettings.last_session.room_name}
-                        </span>
-                        <span style={{
-                          fontSize: '13px',
-                          backgroundColor: '#D1FAE5',
-                          color: '#065F46',
-                          padding: '4px 12px',
-                          borderRadius: '9999px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          👥 {selectedSupervisors.length > 0 && selectedSupervisors.length !== sessionSettings.last_session.supervisor_names.length
-                            ? `${selectedSupervisors.length} Betreuer (gespeichert: ${sessionSettings.last_session.supervisor_names.length})`
-                            : selectedSupervisors.length > 0
-                            ? `${selectedSupervisors.length} Betreuer`
-                            : `${sessionSettings.last_session.supervisor_names.length} Betreuer`
-                          }
-                        </span>
+                          flexDirection: 'column',
+                          gap: '8px',
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'flex',
+                            gap: '8px',
+                            justifyContent: 'center',
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontSize: '13px',
+                              backgroundColor: '#E0E7FF',
+                              color: '#4C1D95',
+                              padding: '4px 12px',
+                              borderRadius: '9999px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            📍 {sessionSettings.last_session.room_name}
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '13px',
+                              backgroundColor: '#D1FAE5',
+                              color: '#065F46',
+                              padding: '4px 12px',
+                              borderRadius: '9999px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            👥{' '}
+                            {selectedSupervisors.length > 0 &&
+                            selectedSupervisors.length !==
+                              sessionSettings.last_session.supervisor_names.length
+                              ? `${selectedSupervisors.length} Betreuer (gespeichert: ${sessionSettings.last_session.supervisor_names.length})`
+                              : selectedSupervisors.length > 0
+                                ? `${selectedSupervisors.length} Betreuer`
+                                : `${sessionSettings.last_session.supervisor_names.length} Betreuer`}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
                 </div>
               </button>
 
@@ -556,7 +576,10 @@ function HomeViewPage() {
                   justifyContent: 'center',
                   gap: '16px',
                   transform: touchedButton === 'team' ? designSystem.scales.active : 'scale(1)',
-                  boxShadow: touchedButton === 'team' ? designSystem.shadows.card : designSystem.shadows.cardHover,
+                  boxShadow:
+                    touchedButton === 'team'
+                      ? designSystem.shadows.card
+                      : designSystem.shadows.cardHover,
                 }}
               >
                 {/* Gradient border */}
@@ -638,7 +661,7 @@ function HomeViewPage() {
             </div>
           </div>
         </div>
-        
+
         {/* Last Session Toggle - only show when no current session */}
         {!currentSession && <LastSessionToggle />}
       </div>
@@ -667,7 +690,7 @@ function HomeViewPage() {
         message={errorMessage}
         autoCloseDelay={3000}
       />
-      
+
       {/* Confirmation Modal for Recreation */}
       {showConfirmModal && sessionSettings?.last_session && (
         <div
@@ -684,7 +707,7 @@ function HomeViewPage() {
             zIndex: 1000,
             backdropFilter: 'blur(4px)',
           }}
-          onClick={(e) => {
+          onClick={e => {
             if (e.target === e.currentTarget) {
               setShowConfirmModal(false);
             }
@@ -698,7 +721,8 @@ function HomeViewPage() {
               maxWidth: '480px',
               width: '90%',
               textAlign: 'center',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+              boxShadow:
+                '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
               border: '1px solid rgba(255, 255, 255, 0.2)',
               position: 'relative',
               overflow: 'hidden',
@@ -765,14 +789,31 @@ function HomeViewPage() {
                 >
                   <div style={{ marginBottom: '8px' }}>
                     <span style={{ color: '#6B7280', fontSize: '14px' }}>Raum:</span>
-                    <span style={{ color: '#1F2937', fontSize: '14px', fontWeight: 500, marginLeft: '8px' }}>
+                    <span
+                      style={{
+                        color: '#1F2937',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        marginLeft: '8px',
+                      }}
+                    >
                       {useUserStore.getState().selectedRoom?.name}
                     </span>
                   </div>
                   <div>
                     <span style={{ color: '#6B7280', fontSize: '14px' }}>Betreuer:</span>
-                    <span style={{ color: '#1F2937', fontSize: '14px', fontWeight: 500, marginLeft: '8px' }}>
-                      {useUserStore.getState().selectedSupervisors.map(s => s.name).join(', ')}
+                    <span
+                      style={{
+                        color: '#1F2937',
+                        fontSize: '14px',
+                        fontWeight: 500,
+                        marginLeft: '8px',
+                      }}
+                    >
+                      {useUserStore
+                        .getState()
+                        .selectedSupervisors.map(s => s.name)
+                        .join(', ')}
                     </span>
                   </div>
                 </div>
@@ -817,7 +858,9 @@ function HomeViewPage() {
                   cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
                   transition: 'all 200ms',
                   outline: 'none',
-                  boxShadow: isValidatingLastSession ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
+                  boxShadow: isValidatingLastSession
+                    ? 'none'
+                    : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
                   opacity: isValidatingLastSession ? 0.6 : 1,
                 }}
               >
@@ -827,7 +870,6 @@ function HomeViewPage() {
           </div>
         </div>
       )}
-      
     </ContentBox>
   );
 }
