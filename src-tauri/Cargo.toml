@@ -38,13 +38,3 @@ linux-embedded-hal = { version = "0.3.2", optional = true }
 [features]
 rfid = ["mfrc522", "rppal", "embedded-hal", "linux-embedded-hal"]
 
-[[bin]]
-name = "rfid_test"
-path = "src/bin/rfid_test.rs"
-required-features = ["rfid"]
-
-[[bin]]
-name = "rfid_test_persistent"
-path = "src/bin/rfid_test_persistent.rs"
-required-features = ["rfid"]
-

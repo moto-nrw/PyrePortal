@@ -16,10 +16,10 @@ This directory contains the Rust backend for PyrePortal, providing system access
 - `session_storage.rs` (~150 lines) - Session settings persistence
 - `student_cache.rs` (~200 lines) - Student data caching
 
-### Binaries (Testing)
+### Test Binaries (Not Bundled)
 
-- `bin/rfid_test.rs` - Single RFID scan test
-- `bin/rfid_test_persistent.rs` - Continuous RFID scanning
+- `bin/rfid_test.rs` - Single RFID scan test (compile manually with test scripts)
+- `bin/rfid_test_persistent.rs` - Continuous RFID scanning (compile manually with test scripts)
 
 ## Tauri Command Pattern
 
@@ -417,8 +417,9 @@ cargo fmt
 cargo build                 # Debug
 cargo build --release      # Production
 
-# Run standalone binary
-cargo run --bin rfid_test
+# Run RFID test binaries (compile on-demand, not bundled)
+./test_rfid.sh              # Single scan test
+./test_rfid_persistent.sh   # Continuous scanning test
 ```
 
 ## Adding New Command

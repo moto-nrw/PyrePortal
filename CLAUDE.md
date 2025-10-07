@@ -38,7 +38,7 @@ npm test -- <test-file-pattern>
 
 # Rust tests
 cd src-tauri && cargo test <test-name>
-cd src-tauri && cargo test --bin rfid_test  # Test RFID hardware
+cd src-tauri && ./test_rfid.sh  # Test RFID hardware (compiles and runs test binary)
 ```
 
 ## Critical Architecture Patterns
@@ -299,8 +299,7 @@ VITE_ENABLE_RFID=true  # in .env
 
 - Requires MFRC522 reader on SPI
 - Only compiles on ARM/ARM64 Linux with `--features rfid`
-- Build: `cargo build --features rfid`
-- Test with: `cd src-tauri && cargo run --bin rfid_test --features rfid`
+- Test with: `cd src-tauri && ./test_rfid.sh` (compiles and runs automatically)
 
 **Hook usage**:
 

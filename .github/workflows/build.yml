@@ -30,18 +30,39 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup Tauri environment
         uses: ./.github/actions/setup-tauri-environment
-        
+
       - name: Build frontend
         run: npm run build
-        
+
       - name: Build Tauri app (debug)
         run: npm run tauri build -- --debug
-        
+
       - name: Upload Linux build
         uses: actions/upload-artifact@v4
         with:
           name: pyreportal-linux-${{github.sha}}
+          path: src-tauri/target/debug/bundle/deb
+
+  build-linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Tauri environment
+        uses: ./.github/actions/setup-tauri-environment
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri app (debug)
+        run: npm run tauri build -- --debug
+
+      - name: Upload Linux ARM64 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: pyreportal-linux-arm64-${{github.sha}}
           path: src-tauri/target/debug/bundle/deb
