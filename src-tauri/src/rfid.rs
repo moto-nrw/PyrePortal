@@ -753,14 +753,14 @@ mod mock_platform {
         if let Some((last_tag, last_time)) = &*last_scan {
             if last_time.elapsed() < Duration::from_secs(2) {
                 // 90% chance return same tag (card still present), 10% card was removed
-                if rand::random::<u8>() % 10 != 0 {
+                if !rand::random::<u8>().is_multiple_of(10) {
                     return Ok(last_tag.clone());
                 }
             }
         }
 
         // 5% error rate (more realistic than 10%)
-        if rand::random::<u8>() % 20 == 0 {
+        if rand::random::<u8>().is_multiple_of(20) {
             return Err("Scan timeout - no card detected".to_string());
         }
 

@@ -35,7 +35,7 @@ function StudentSelectionPage() {
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
 
-  const logger = createLogger('StudentSelectionPage');
+  const logger = useMemo(() => createLogger('StudentSelectionPage'), []);
 
   // Redirect if not authenticated or no tag data
   useEffect(() => {
@@ -49,7 +49,7 @@ function StudentSelectionPage() {
       user: authenticatedUser.staffName,
       scannedTag: state.scannedTag,
     });
-  }, [authenticatedUser, state, navigate]);
+  }, [authenticatedUser, state, navigate, logger]);
 
   // Fetch students
   useEffect(() => {
@@ -73,7 +73,7 @@ function StudentSelectionPage() {
         logger.debug('Teacher IDs for student fetch', { teacherIds });
 
         const studentList = await api.getStudents(authenticatedUser.pin, teacherIds);
-        console.log('API Response - Students:', studentList);
+        logger.debug('API Response - Students', { count: studentList.length, studentList });
         setStudents(studentList);
         logger.info('Students fetched successfully', { count: studentList.length });
       } catch (err) {
@@ -92,7 +92,7 @@ function StudentSelectionPage() {
     if (authenticatedUser) {
       void fetchStudents();
     }
-  }, [authenticatedUser, selectedSupervisors]);
+  }, [authenticatedUser, selectedSupervisors, logger]);
 
   // Calculate pagination
   const totalPages = Math.ceil(students.length / STUDENTS_PER_PAGE);
