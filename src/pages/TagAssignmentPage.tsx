@@ -73,23 +73,23 @@ function TagAssignmentPage() {
       scannedTag?: string;
       tagAssignment?: TagAssignmentCheck;
     } | null;
-    
+
     if (locationState?.assignmentSuccess) {
       const { studentName, previousTag, scannedTag, tagAssignment } = locationState;
-      
+
       // Restore tag data if coming back from student selection
       if (scannedTag && tagAssignment) {
         setScannedTag(scannedTag);
         setTagAssignment(tagAssignment);
       }
-      
+
       let successMessage = `Tag erfolgreich zugewiesen an ${studentName ?? 'Schüler'}`;
       if (previousTag) {
         successMessage += ` (Vorheriger Tag: ${previousTag})`;
       }
-      
+
       setSuccess(successMessage);
-      
+
       // Clear location state to prevent showing success on page refresh
       window.history.replaceState({}, document.title);
     }

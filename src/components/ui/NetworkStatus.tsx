@@ -18,11 +18,7 @@ interface NetworkStatusProps {
 /**
  * Network status indicator component with WiFi signal strength visualization
  */
-const NetworkStatus: React.FC<NetworkStatusProps> = ({
-  status,
-  size = 'md',
-  showText = false,
-}) => {
+const NetworkStatus: React.FC<NetworkStatusProps> = ({ status, size = 'md', showText = false }) => {
   // Determine icon style based on network quality
   const getIconStyle = () => {
     const baseStyle = {
@@ -85,16 +81,8 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({
 
   return (
     <div style={containerStyle} title={`Network ${getStatusText()} - ${status.responseTime}ms`}>
-      <FontAwesomeIcon
-        icon={faWifi}
-        size={sizeMap[size]}
-        style={getIconStyle()}
-      />
-      {showText && (
-        <span style={textStyle}>
-          {getStatusText()}
-        </span>
-      )}
+      <FontAwesomeIcon icon={faWifi} size={sizeMap[size]} style={getIconStyle()} />
+      {showText && <span style={textStyle}>{getStatusText()}</span>}
     </div>
   );
 };

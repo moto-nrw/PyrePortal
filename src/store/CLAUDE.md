@@ -5,6 +5,7 @@
 PyrePortal uses **one centralized Zustand store** (`userStore.ts` - 1552 lines) for all application state.
 
 **Why single store:**
+
 - Simpler than Redux (no actions/reducers/dispatchers)
 - Better TypeScript integration
 - Automatic logging via middleware
@@ -13,18 +14,22 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts` - 1552 lines) 
 ## Store Structure
 
 ### State Categories
+
 1. **Authentication State** (lines 82-185)
+
    - `authenticatedUser` - Current logged-in staff member
    - `users` - Available teachers
    - `isLoading` - Loading indicator
    - `error` - Error message
 
 2. **Session State** (lines 186-395)
+
    - `currentSession` - Active session details
    - `activities` - Teacher's activities
    - `rooms` - Available rooms
 
 3. **RFID State** (lines 1117-1201)
+
    - `rfid.processingQueue` - Tags currently being processed
    - `rfid.recentTagScans` - Recent scans (duplicate prevention)
    - `rfid.tagToStudentMap` - Tag → Student mapping
@@ -34,17 +39,21 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts` - 1552 lines) 
    - `scanResult` - Last RFID scan result
 
 ### Action Categories
+
 1. **Teacher Management** (lines 354-450)
+
    - `fetchTeachers()` - Load teacher list
    - `selectUser(userId)` - Select teacher
    - `setPin(pin)` - Set PIN
 
 2. **Authentication** (lines 489-629)
+
    - `validateGlobalPIN(pin)` - Validate OGS PIN
    - `validateTeacherPIN(pin, staffId)` - Validate teacher PIN
    - `logout()` - Clear auth state
 
 3. **Session Management** (lines 721-1116)
+
    - `fetchActivities()` - Load activities
    - `fetchRooms()` - Load available rooms
    - `startSession(...)` - Start activity session
@@ -59,6 +68,7 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts` - 1552 lines) 
 ## Logging Middleware
 
 Store is wrapped with custom logging middleware:
+
 ```typescript
 export const useUserStore = create<UserState>(
   loggerMiddleware(createUserStore, {
@@ -70,11 +80,13 @@ export const useUserStore = create<UserState>(
 ```
 
 **Logged Events:**
+
 - Action calls with arguments
 - State changes (before/after)
 - Action source (which component)
 
 **Example Log Output:**
+
 ```
 [UserStore] Action: fetchTeachers
 [UserStore] State changed: users (0 → 15 items)
@@ -84,7 +96,9 @@ export const useUserStore = create<UserState>(
 ## Critical Store Patterns
 
 ### 1. Batch State Updates
+
 **Always batch to prevent cascading renders:**
+
 ```typescript
 // ✅ GOOD: Single render
 set({ isLoading: true, error: null, data: result });
@@ -96,6 +110,7 @@ set({ data: result });
 ```
 
 ### 2. Error Handling Pattern
+
 ```typescript
 actionName: async () => {
   set({ isLoading: true, error: null });
@@ -107,7 +122,7 @@ actionName: async () => {
     logger.error('Action failed', { error: message });
     set({ error: 'Benutzerfreundliche deutsche Nachricht', isLoading: false });
   }
-}
+};
 ```
 
 ### 3. Multi-Layer Duplicate Prevention (RFID)
@@ -115,6 +130,7 @@ actionName: async () => {
 **Three defensive layers** (lines 1117-1201):
 
 **Layer 1: Processing Queue**
+
 ```typescript
 canProcessTag: (tagId: string) => {
   if (get().rfid.processingQueue.has(tagId)) {
@@ -122,10 +138,11 @@ canProcessTag: (tagId: string) => {
     return false;
   }
   // ... continue checks
-}
+};
 ```
 
 **Layer 2: Recent Scans (2-second window)**
+
 ```typescript
 const recentScan = get().rfid.recentTagScans.get(tagId);
 if (recentScan && Date.now() - recentScan.timestamp < 2000) {
@@ -135,6 +152,7 @@ if (recentScan && Date.now() - recentScan.timestamp < 2000) {
 ```
 
 **Layer 3: Student History (prevent opposite action)**
+
 ```typescript
 isValidStudentScan: (studentId: number, requestedAction: 'checkin' | 'checkout') => {
   const recentStudentAction = get().rfid.recentStudentActions.get(studentId);
@@ -151,12 +169,13 @@ isValidStudentScan: (studentId: number, requestedAction: 'checkin' | 'checkout')
   }
 
   return true;
-}
+};
 ```
 
 ### 4. Deduplication Pattern (API Calls)
 
 **Prevents concurrent duplicate fetches:**
+
 ```typescript
 fetchActivities: (() => {
   let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
@@ -178,12 +197,13 @@ fetchActivities: (() => {
 
     return fetchPromise;
   };
-})()
+})();
 ```
 
 ## Using Store in Components
 
 ### Select Specific State (Optimized)
+
 ```typescript
 function MyComponent() {
   // ✅ GOOD: Only re-renders when users or isLoading change
@@ -195,6 +215,7 @@ function MyComponent() {
 ```
 
 ### Select All State (Less Optimal)
+
 ```typescript
 function MyComponent() {
   // ⚠️ OK but not optimal: Re-renders on any store change
@@ -203,6 +224,7 @@ function MyComponent() {
 ```
 
 ### Call Actions
+
 ```typescript
 function MyComponent() {
   const { fetchTeachers } = useUserStore();
@@ -214,6 +236,7 @@ function MyComponent() {
 ```
 
 ### Direct State Updates (Rare)
+
 ```typescript
 // For simple UI state only
 useUserStore.setState({ showModal: false });
@@ -222,6 +245,7 @@ useUserStore.setState({ showModal: false });
 ## Adding Store Actions
 
 ### Template for Async Action
+
 ```typescript
 actionName: async (param: ParamType): Promise<void> => {
   const { authenticatedUser } = get();
@@ -257,31 +281,35 @@ actionName: async (param: ParamType): Promise<void> => {
       isLoading: false,
     });
   }
-}
+};
 ```
 
 ### Template for Sync Action
+
 ```typescript
 actionName: (param: ParamType) => {
   storeLogger.info('Setting value', { param });
   set({ value: param });
-}
+};
 ```
 
 ## Performance Tips
 
 ### Avoid Re-renders
+
 1. Use selector functions for specific state
 2. Memoize expensive computations outside store
 3. Don't create new objects/arrays in selectors
 
 ### Logging Performance
+
 - Exclude high-frequency actions from logging: `excludedActions: ['functionalUpdate']`
 - Use `LogLevel.WARN` in production to reduce overhead
 
 ## Common Pitfalls
 
 ### ❌ Creating Objects in Set
+
 ```typescript
 // BAD: Creates new object every time
 set({ user: { ...get().user, name: 'New' } });
@@ -293,12 +321,13 @@ if (get().user.name !== newName) {
 ```
 
 ### ❌ Not Handling Errors
+
 ```typescript
 // BAD: Error crashes component
 actionName: async () => {
   const result = await api.doSomething();
   set({ result });
-}
+};
 
 // GOOD: Error handled gracefully
 actionName: async () => {
@@ -308,10 +337,11 @@ actionName: async () => {
   } catch (error) {
     set({ error: 'Fehler' });
   }
-}
+};
 ```
 
 ### ❌ Forgetting to Clear Loading State
+
 ```typescript
 // BAD: Loading state stuck on error
 try {

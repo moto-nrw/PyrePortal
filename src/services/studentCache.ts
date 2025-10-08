@@ -68,7 +68,8 @@ function validateCacheData(data: unknown): data is StudentCacheData {
   if (!obj.metadata || typeof obj.metadata !== 'object') return false;
   const metadata = obj.metadata as Record<string, unknown>;
   if (typeof metadata.version !== 'number' || metadata.version !== CACHE_VERSION) return false;
-  if (typeof metadata.dateCreated !== 'string' || metadata.dateCreated !== getTodayDateKey()) return false;
+  if (typeof metadata.dateCreated !== 'string' || metadata.dateCreated !== getTodayDateKey())
+    return false;
   return true;
 }
 
@@ -171,10 +172,7 @@ export async function saveStudentCache(cacheData: StudentCacheData): Promise<voi
 /**
  * Get cached student data for a specific RFID tag
  */
-export function getCachedStudent(
-  cache: StudentCacheData,
-  rfidTag: string
-): CachedStudent | null {
+export function getCachedStudent(cache: StudentCacheData, rfidTag: string): CachedStudent | null {
   const student = cache.students[rfidTag];
 
   if (!student) {

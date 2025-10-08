@@ -401,7 +401,9 @@ function TeamManagementPage() {
                           width: '24px',
                           height: '24px',
                           borderRadius: '50%',
-                          backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
+                          backgroundColor: isSelected
+                            ? designSystem.colors.primaryGreen
+                            : '#E5E7EB',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',

@@ -1,4 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -e
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Change to project root
+cd "$PROJECT_ROOT"
 
 # Read JSON input from stdin
 input=$(cat)
@@ -6,8 +14,8 @@ input=$(cat)
 # Extract file path
 file_path=$(echo "$input" | jq -r '.tool_input.file_path')
 
-# Only process TypeScript/JavaScript files
-if [[ ! "$file_path" =~ \.(ts|tsx|js|jsx)$ ]]; then
+# Only process files that Prettier supports
+if [[ ! "$file_path" =~ \.(ts|tsx|js|jsx|json|css|md)$ ]]; then
   exit 0
 fi
 

@@ -145,7 +145,6 @@ export async function processSyncQueue(): Promise<{
 
       results.successful++;
       successfulOperations.push(operation.id);
-
     } catch (error) {
       logger.warn('Queued operation sync failed', {
         operationId: operation.id,

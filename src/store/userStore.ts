@@ -13,7 +13,7 @@ import {
   type SessionSettings,
   saveSessionSettings,
   loadSessionSettings,
-  clearLastSession
+  clearLastSession,
 } from '../services/sessionStorage';
 import {
   type StudentCacheData,
@@ -115,6 +115,7 @@ interface RecentTagScan {
   timestamp: number;
   studentId?: string;
   result?: RfidScanResult;
+  syncPromise?: Promise<void>; // Background sync promise (for race condition prevention)
 }
 
 // RFID scanning state
@@ -231,7 +232,7 @@ interface UserState {
   getCachedStudentId: (tagId: string) => string | undefined;
   clearOldTagScans: () => void;
   isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
-  
+
   // Session settings actions
   loadSessionSettings: () => Promise<void>;
   toggleUseLastSession: (enabled: boolean) => Promise<void>;
@@ -246,8 +247,15 @@ interface UserState {
   // Student cache actions
   loadStudentCache: () => Promise<void>;
   getCachedStudentData: (rfidTag: string) => CachedStudent | null;
-  cacheStudentData: (rfidTag: string, scanResult: RfidScanResult, additionalData?: { room?: string; activity?: string }) => Promise<void>;
-  updateCachedStudentStatus: (rfidTag: string, status: 'checked_in' | 'checked_out') => Promise<void>;
+  cacheStudentData: (
+    rfidTag: string,
+    scanResult: RfidScanResult,
+    additionalData?: { room?: string; activity?: string }
+  ) => Promise<void>;
+  updateCachedStudentStatus: (
+    rfidTag: string,
+    status: 'checked_in' | 'checked_out'
+  ) => Promise<void>;
   clearStudentCache: () => Promise<void>;
 }
 
@@ -311,7 +319,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     recentTagScans: new Map<string, RecentTagScan>(),
     tagToStudentMap: new Map<string, string>(),
   },
-  
+
   // Session settings initial state
   sessionSettings: null,
   isValidatingLastSession: false,
@@ -1233,7 +1241,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
       set({
         studentCache: cache,
-        isCacheLoading: false
+        isCacheLoading: false,
       });
 
       storeLogger.info('Student cache loaded successfully', {
@@ -1244,7 +1252,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to load student cache', { error });
       set({
         studentCache: null,
-        isCacheLoading: false
+        isCacheLoading: false,
       });
     }
   },
@@ -1362,7 +1370,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     try {
       storeLogger.debug('Loading session settings');
       const settings = await loadSessionSettings();
-      
+
       if (settings) {
         set({ sessionSettings: settings });
         storeLogger.info('Session settings loaded', {
@@ -1374,16 +1382,16 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to load session settings', { error });
     }
   },
-  
+
   toggleUseLastSession: async (enabled: boolean) => {
     const { sessionSettings } = get();
-    
+
     const newSettings: SessionSettings = {
       use_last_session: enabled,
       auto_save_enabled: true,
       last_session: sessionSettings?.last_session ?? null,
     };
-    
+
     try {
       await saveSessionSettings(newSettings);
       set({ sessionSettings: newSettings });
@@ -1392,15 +1400,15 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to save session settings', { error });
     }
   },
-  
+
   saveLastSessionData: async () => {
     const { selectedActivity, selectedRoom, selectedSupervisors, sessionSettings } = get();
-    
+
     if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
       storeLogger.warn('Cannot save session data: missing required fields');
       return;
     }
-    
+
     const lastSessionConfig = {
       activity_id: selectedActivity.id,
       room_id: selectedRoom.id,
@@ -1410,13 +1418,13 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       room_name: selectedRoom.name,
       supervisor_names: selectedSupervisors.map(s => s.name),
     };
-    
+
     const newSettings: SessionSettings = {
       use_last_session: sessionSettings?.use_last_session ?? false,
       auto_save_enabled: true,
       last_session: lastSessionConfig,
     };
-    
+
     try {
       await saveSessionSettings(newSettings);
       set({ sessionSettings: newSettings });
@@ -1429,49 +1437,49 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to save last session data', { error });
     }
   },
-  
+
   validateAndRecreateSession: async () => {
     const { sessionSettings, authenticatedUser } = get();
-    
+
     if (!sessionSettings?.last_session || !authenticatedUser?.pin) {
       storeLogger.warn('Cannot recreate session: no saved session or authentication');
       return false;
     }
-    
+
     set({ isValidatingLastSession: true, error: null });
-    
+
     try {
       // Validate activity exists
       const activities = await api.getActivities(authenticatedUser.pin);
       const activity = activities.find(a => a.id === sessionSettings.last_session!.activity_id);
-      
+
       if (!activity) {
         throw new Error('Gespeicherte Aktivität nicht mehr verfügbar');
       }
-      
+
       // Validate room is available
       const rooms = await api.getRooms(authenticatedUser.pin);
       const room = rooms.find(r => r.id === sessionSettings.last_session!.room_id);
-      
+
       if (!room) {
         throw new Error('Gespeicherter Raum nicht verfügbar');
       }
-      
+
       // Check supervisors - use current if already selected, otherwise validate saved ones
       const { selectedSupervisors, users } = get();
       let supervisors = selectedSupervisors;
-      
+
       if (supervisors.length === 0) {
         // Ensure we have teachers loaded first
         if (users.length === 0) {
           storeLogger.debug('Loading teachers to validate supervisors');
           await get().fetchTeachers();
           const updatedUsers = get().users;
-          
+
           if (updatedUsers.length === 0) {
             throw new Error('Fehler beim Laden der Betreuer');
           }
-          
+
           // Now try to find supervisors with loaded users
           supervisors = sessionSettings.last_session.supervisor_ids
             .map(id => updatedUsers.find(u => u.id === id))
@@ -1482,7 +1490,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
             .map(id => users.find(u => u.id === id))
             .filter((u): u is User => u !== undefined);
         }
-          
+
         if (supervisors.length === 0) {
           storeLogger.warn('No valid supervisors found', {
             savedIds: sessionSettings.last_session.supervisor_ids,
@@ -1491,7 +1499,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           throw new Error('Keine gültigen Betreuer gefunden');
         }
       }
-      
+
       // Set validated data in store
       set({
         selectedActivity: activity,
@@ -1499,18 +1507,18 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         selectedSupervisors: supervisors,
         isValidatingLastSession: false,
       });
-      
+
       storeLogger.info('Session validation successful', {
         activityId: activity.id,
         roomId: room.id,
         supervisorCount: supervisors.length,
       });
-      
+
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
       storeLogger.error('Session validation failed', { error: errorMessage });
-      
+
       // Clear invalid session data
       await clearLastSession();
       set({
@@ -1518,17 +1526,19 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         isValidatingLastSession: false,
         error: errorMessage,
       });
-      
+
       return false;
     }
   },
-  
+
   clearSessionSettings: async () => {
     try {
       await clearLastSession();
       const { sessionSettings } = get();
       set({
-        sessionSettings: sessionSettings ? { ...sessionSettings, last_session: null, use_last_session: false } : null,
+        sessionSettings: sessionSettings
+          ? { ...sessionSettings, last_session: null, use_last_session: false }
+          : null,
       });
       storeLogger.info('Session settings cleared');
     } catch (error) {

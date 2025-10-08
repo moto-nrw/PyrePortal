@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { ContentBox } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
-import { api } from '../services/api';
+import { api, type RfidScanResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 
@@ -17,7 +17,7 @@ const ActivityScanningPage: React.FC = () => {
 
   // Get access to the store's RFID functions
   const { recentTagScans } = useUserStore(state => state.rfid);
-  const { hideScanModal } = useUserStore();
+  const { hideScanModal, setScanResult, showScanModal } = useUserStore();
 
   // Debug logging for selectedActivity
   useEffect(() => {
@@ -62,6 +62,16 @@ const ActivityScanningPage: React.FC = () => {
     studentName: string;
     showingFarewell: boolean;
   } | null>(null);
+
+  // State for checkout destination selection (Schulhof or Raumwechsel)
+  const [checkoutDestinationState, setCheckoutDestinationState] = useState<{
+    rfid: string;
+    studentName: string;
+    studentId: number;
+  } | null>(null);
+
+  // Schulhof room ID (discovered dynamically from server)
+  const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
 
   // Start scanning when component mounts
   useEffect(() => {
@@ -118,6 +128,38 @@ const ActivityScanningPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticatedUser?.pin]); // fetchSessionInfo is stable within this component lifecycle
 
+  // Fetch Schulhof room ID once on page mount
+  useEffect(() => {
+    const fetchSchulhofRoom = async () => {
+      if (!authenticatedUser?.pin) return;
+
+      try {
+        logger.debug('Fetching rooms to find Schulhof');
+        const rooms = await api.getRooms(authenticatedUser.pin);
+
+        // Find Schulhof room by category
+        const schulhofRoom = rooms.find(r => r.category === 'Schulhof');
+
+        if (schulhofRoom) {
+          setSchulhofRoomId(schulhofRoom.id);
+          logger.info('Found Schulhof room', {
+            id: schulhofRoom.id,
+            name: schulhofRoom.name,
+            category: schulhofRoom.category,
+          });
+        } else {
+          logger.warn('No Schulhof room found in available rooms - Schulhof button will not work');
+          // Don't fail - just won't show Schulhof option
+        }
+      } catch (error) {
+        logger.error('Failed to fetch Schulhof room', { error });
+        // Non-critical error - continue without Schulhof functionality
+      }
+    };
+
+    void fetchSchulhofRoom();
+  }, [authenticatedUser?.pin]);
+
   // Update student count based on scan result
   useEffect(() => {
     if (currentScan && showModal) {
@@ -135,6 +177,22 @@ const ActivityScanningPage: React.FC = () => {
         if (currentScan.action === 'checked_in') {
           setStudentCount(prev => prev + 1);
         } else if (currentScan.action === 'checked_out') {
+          // Find the RFID tag from recent scans
+          let rfidTag = '';
+          for (const [tag, scan] of recentTagScans.entries()) {
+            if (scan.result?.student_id === currentScan.student_id) {
+              rfidTag = tag;
+              break;
+            }
+          }
+
+          // Show destination selection modal
+          setCheckoutDestinationState({
+            rfid: rfidTag,
+            studentName: currentScan.student_name,
+            studentId: currentScan.student_id,
+          });
+
           setStudentCount(prev => Math.max(0, prev - 1));
         } else if ((currentScan.action as string) === 'checked_out_daily') {
           // Handle daily checkout - find the RFID tag from recent scans
@@ -191,6 +249,18 @@ const ActivityScanningPage: React.FC = () => {
     }
   }, [showModal, currentScan, rfid.modalDisplayTime, dailyCheckoutState]);
 
+  // Auto-close destination modal after 10 seconds
+  useEffect(() => {
+    if (checkoutDestinationState) {
+      const timer = setTimeout(() => {
+        logger.info('Destination modal auto-dismissed after timeout');
+        setCheckoutDestinationState(null);
+        hideScanModal();
+      }, 10000); // 10 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [checkoutDestinationState, hideScanModal]);
+
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
     return (
@@ -244,6 +314,95 @@ const ActivityScanningPage: React.FC = () => {
       setDailyCheckoutState(null);
       hideScanModal();
     }
+  };
+
+  // Handle checkout destination selection (Schulhof or Raumwechsel)
+  const handleDestinationSelect = async (destination: 'schulhof' | 'raumwechsel') => {
+    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+
+    if (destination === 'schulhof') {
+      // Check if Schulhof room ID is available
+      if (!schulhofRoomId) {
+        logger.error('Cannot check into Schulhof: room ID not available');
+        // Show error or just close modal
+        setCheckoutDestinationState(null);
+        hideScanModal();
+        return;
+      }
+
+      try {
+        logger.info('Checking student into Schulhof', {
+          rfid: checkoutDestinationState.rfid,
+          studentName: checkoutDestinationState.studentName,
+          schulhofRoomId,
+        });
+
+        // CRITICAL: Wait for background checkout sync to complete
+        // This prevents race condition where check-in happens before checkout
+        const recentScan = recentTagScans.get(checkoutDestinationState.rfid);
+        if (recentScan?.syncPromise) {
+          logger.debug('Waiting for background checkout sync to complete');
+          await recentScan.syncPromise;
+          logger.debug('Background sync completed, proceeding with Schulhof check-in');
+        }
+
+        // Now safe to check into Schulhof
+        const result = await api.processRfidScan(
+          {
+            student_rfid: checkoutDestinationState.rfid,
+            action: 'checkin',
+            room_id: schulhofRoomId,
+          },
+          authenticatedUser.pin
+        );
+
+        logger.info('Schulhof check-in successful', {
+          action: result.action,
+          room: result.room_name,
+        });
+
+        // Show special Schulhof success modal with custom message
+        const firstName = checkoutDestinationState.studentName.split(' ')[0];
+        const schulhofResult = {
+          ...result,
+          message: `Viel Spaß auf dem Schulhof, ${firstName}!`,
+          isSchulhof: true, // Flag for special yellow styling
+        } as RfidScanResult & { isSchulhof: boolean };
+
+        setScanResult(schulhofResult);
+
+        showScanModal();
+
+        // Auto-close after display time
+        setTimeout(() => {
+          hideScanModal();
+        }, rfid.modalDisplayTime);
+      } catch (error) {
+        logger.error('Failed to check into Schulhof', { error });
+
+        // Show error modal
+        const errorResult: Partial<RfidScanResult> & { showAsError: boolean } = {
+          student_name: 'Schulhof Check-in fehlgeschlagen',
+          student_id: checkoutDestinationState.studentId,
+          action: 'checked_out', // Use valid action type
+          message: 'Bitte versuche es erneut oder wende dich an einen Betreuer',
+          showAsError: true,
+        };
+
+        setScanResult(errorResult as RfidScanResult);
+
+        showScanModal();
+
+        setTimeout(() => {
+          hideScanModal();
+        }, rfid.modalDisplayTime);
+      }
+    }
+    // else: destination === 'raumwechsel'
+    // Do nothing - student will scan at destination room
+
+    // Clear destination state
+    setCheckoutDestinationState(null);
   };
 
   return (
@@ -414,6 +573,8 @@ const ActivityScanningPage: React.FC = () => {
               backgroundColor: (() => {
                 // Check for daily checkout state
                 if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
+                // Check for Schulhof check-in (special yellow)
+                if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
                 // Check for error or info states
                 if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
                 if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
@@ -667,6 +828,11 @@ const ActivityScanningPage: React.FC = () => {
                 }}
               >
                 {(() => {
+                  // Special handling for Schulhof - no additional content needed
+                  if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
+                    return ''; // Empty content - title message is enough
+                  }
+
                   switch (currentScan.action) {
                     case 'checked_in':
                       return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
@@ -683,6 +849,166 @@ const ActivityScanningPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Checkout Destination Selection Modal */}
+      {showModal &&
+        currentScan &&
+        currentScan.action === 'checked_out' &&
+        checkoutDestinationState &&
+        !dailyCheckoutState && (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
+            }}
+            onClick={() => {
+              // Allow clicking backdrop to dismiss (same as timeout)
+              setCheckoutDestinationState(null);
+              hideScanModal();
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: '#f87C10', // Orange like checkout
+                borderRadius: '32px',
+                padding: '64px',
+                maxWidth: '800px',
+                width: '90%',
+                textAlign: 'center',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
+                position: 'relative',
+              }}
+              onClick={e => e.stopPropagation()} // Prevent closing when clicking inside
+            >
+              {/* Background gradient */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background:
+                    'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                  pointerEvents: 'none',
+                  borderRadius: '32px',
+                }}
+              />
+
+              <h2
+                style={{
+                  fontSize: '48px',
+                  fontWeight: 800,
+                  marginBottom: '24px',
+                  color: '#FFFFFF',
+                  lineHeight: 1.2,
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              >
+                Wohin gehst du?
+              </h2>
+
+              <p
+                style={{
+                  fontSize: '32px',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                  marginBottom: '48px',
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              >
+                {checkoutDestinationState.studentName}
+              </p>
+
+              <div
+                style={{
+                  display: 'flex',
+                  gap: '24px',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              >
+                <button
+                  onClick={() => handleDestinationSelect('raumwechsel')}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                    border: '2px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '16px',
+                    color: '#FFFFFF',
+                    fontSize: '28px',
+                    fontWeight: 700,
+                    padding: '20px 48px',
+                    cursor: 'pointer',
+                    transition: 'all 200ms',
+                    outline: 'none',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  Raumwechsel
+                </button>
+
+                {schulhofRoomId && (
+                  <button
+                    onClick={() => handleDestinationSelect('schulhof')}
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                      border: '2px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '16px',
+                      color: '#FFFFFF',
+                      fontSize: '28px',
+                      fontWeight: 700,
+                      padding: '20px 48px',
+                      cursor: 'pointer',
+                      transition: 'all 200ms',
+                      outline: 'none',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                      e.currentTarget.style.transform = 'scale(1.05)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    Schulhof
+                  </button>
+                )}
+              </div>
+
+              {!schulhofRoomId && (
+                <p
+                  style={{
+                    marginTop: '16px',
+                    fontSize: '18px',
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  (Schulhof derzeit nicht verfügbar)
+                </p>
+              )}
+            </div>
+          </div>
+        )}
     </>
   );
 };

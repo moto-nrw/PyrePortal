@@ -21,6 +21,7 @@ You are a refactoring specialist for PyrePortal, focused on improving code quali
 **When**: Store actions become too complex (>50 lines)
 
 **Before** (complex action):
+
 ```typescript
 processRfidScan: async (tagId: string) => {
   const { authenticatedUser, currentSession } = get();
@@ -66,6 +67,7 @@ processRfidScan: async (tagId: string) => {
 ```
 
 **After** (extracted helpers):
+
 ```typescript
 // Helper validators
 canProcessScan: (tagId: string) => {
@@ -101,6 +103,7 @@ processRfidScan: async (tagId: string) => {
 **When**: Deep nesting makes code hard to follow
 
 **Before**:
+
 ```typescript
 if (authenticatedUser) {
   if (authenticatedUser.pin) {
@@ -124,6 +127,7 @@ if (authenticatedUser) {
 ```
 
 **After**:
+
 ```typescript
 if (!authenticatedUser) {
   throw new Error('Not authenticated');
@@ -146,6 +150,7 @@ return result;
 **When**: Component has complex state/effect logic
 
 **Before** (in component):
+
 ```typescript
 function ActivityScanningPage() {
   const [scanResult, setScanResult] = useState<RfidScanResult | null>(null);
@@ -166,6 +171,7 @@ function ActivityScanningPage() {
 ```
 
 **After** (extracted hook):
+
 ```typescript
 // src/hooks/useRfidScanning.ts
 function useRfidScanning() {
@@ -193,6 +199,7 @@ function ActivityScanningPage() {
 **When**: Multiple `set()` calls cause cascading renders
 
 **Before** (3 renders):
+
 ```typescript
 fetchData: async () => {
   set({ isLoading: true });
@@ -206,10 +213,11 @@ fetchData: async () => {
     set({ error: error.message });
     set({ isLoading: false });
   }
-}
+};
 ```
 
 **After** (1 render):
+
 ```typescript
 fetchData: async () => {
   set({ isLoading: true, error: null });
@@ -220,7 +228,7 @@ fetchData: async () => {
   } catch (error) {
     set({ error: error.message, isLoading: false });
   }
-}
+};
 ```
 
 ### 5. Replace Magic Numbers with Named Constants
@@ -228,6 +236,7 @@ fetchData: async () => {
 **When**: Unexplained values appear in code
 
 **Before**:
+
 ```typescript
 if (Date.now() - lastScan < 2000) {
   return false;
@@ -237,6 +246,7 @@ const quality = successCount / totalCalls > 0.8 ? 'good' : 'poor';
 ```
 
 **After**:
+
 ```typescript
 const DUPLICATE_SCAN_WINDOW_MS = 2000;
 const NETWORK_QUALITY_THRESHOLD = 0.8;
@@ -253,6 +263,7 @@ const quality = successCount / totalCalls > NETWORK_QUALITY_THRESHOLD ? 'good' :
 **When**: Try-catch blocks are repetitive
 
 **Before**:
+
 ```typescript
 fetchActivities: async () => {
   set({ isLoading: true, error: null });
@@ -280,6 +291,7 @@ fetchRooms: async () => {
 ```
 
 **After** (extracted helper):
+
 ```typescript
 // Helper for async operations
 withErrorHandling: async <T>(
@@ -319,28 +331,34 @@ fetchRooms: async () => {
 ## Code Smell Detection (PyrePortal-Specific)
 
 ### Long Method
+
 - **Indicator**: Store action >50 lines
 - **Fix**: Extract helper methods in same store
 
 ### Prop Drilling
+
 - **Indicator**: Passing props through 3+ component levels
 - **Fix**: Use Zustand store or React Context
 
 ### Duplicate Cache Logic
+
 - **Indicator**: Similar cache patterns in multiple places
 - **Fix**: Extract to `src/services/studentCache.ts`
 
 ### Complex Conditional
+
 - **Indicator**: Nested if/else >3 levels
 - **Fix**: Guard clauses or strategy pattern
 
 ### Repetitive API Calls
+
 - **Indicator**: Same fetch pattern in multiple actions
 - **Fix**: Create generic fetch wrapper (see pattern 6 above)
 
 ## Performance Refactorings (Raspberry Pi)
 
 ### 1. Memoize Expensive Computations
+
 ```typescript
 // Before
 const sortedStudents = students.sort((a, b) => a.name.localeCompare(b.name));
@@ -353,6 +371,7 @@ const sortedStudents = useMemo(
 ```
 
 ### 2. Debounce Frequent Operations
+
 ```typescript
 // Before
 const handleSearch = (query: string) => {
@@ -360,13 +379,11 @@ const handleSearch = (query: string) => {
 };
 
 // After
-const handleSearch = useMemo(
-  () => debounce((query: string) => fetchResults(query), 300),
-  []
-);
+const handleSearch = useMemo(() => debounce((query: string) => fetchResults(query), 300), []);
 ```
 
 ### 3. Lazy Load Images
+
 ```typescript
 // Before
 <img src={student.photo_url} alt={student.name} />
@@ -392,6 +409,7 @@ const handleSearch = useMemo(
 ## Safety Checklist
 
 Before refactoring:
+
 - [ ] Read the full file to understand context
 - [ ] Identify external dependencies (store, hooks, API)
 - [ ] Check for logging that might break
@@ -399,6 +417,7 @@ Before refactoring:
 - [ ] Plan the refactoring steps
 
 After refactoring:
+
 - [ ] Run `npm run check` (ESLint + TypeScript)
 - [ ] Run `npm run format` (Prettier)
 - [ ] Manually test the affected feature

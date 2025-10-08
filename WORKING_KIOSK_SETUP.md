@@ -3,12 +3,14 @@
 **SUCCESS CONFIRMED** ✅ - This configuration works perfectly!
 
 ## Hardware Configuration
+
 - **Device**: Raspberry Pi 5 Model B Rev 1.1
 - **Display**: ILI9881 7-inch DSI touchscreen (720x1280 native portrait)
 - **OS**: Raspberry Pi OS Bookworm 64-bit
 - **Target**: Boot directly to PyrePortal in landscape mode with working touch
 
 ## The Problem We Solved
+
 After many attempts with Wayland compositors (labwc, Cage), the solution was to use **X11 with proper display rotation and touch calibration**. The key insight was that hardware rotation alone wasn't enough - we needed software rotation via `xrandr` plus correct touch coordinate transformation.
 
 ---
@@ -16,13 +18,14 @@ After many attempts with Wayland compositors (labwc, Cage), the solution was to 
 ## Complete Step-by-Step Implementation
 
 ### Step 1: Clean Up Previous Attempts
+
 Remove all previous configuration attempts:
 
 ```bash
 # Switch to X11 from Wayland
 sudo raspi-config nonint do_wayland W1
 
-# Set Console Autologin  
+# Set Console Autologin
 sudo raspi-config nonint do_boot_behaviour B2
 
 # Remove old config files
@@ -34,6 +37,7 @@ sudo rm -f /etc/X11/xorg.conf.d/99-calibration.conf
 ```
 
 ### Step 2: Install Required Packages
+
 Install all necessary packages for X11 kiosk operation:
 
 ```bash
@@ -53,6 +57,7 @@ sudo apt install libwebkit2gtk-4.1-dev \
 ```
 
 ### Step 3: Configure Display Hardware
+
 **File**: `/boot/firmware/config.txt`
 
 Ensure the display overlay is configured with 90-degree rotation:
@@ -70,6 +75,7 @@ dtoverlay=disable-bt
 ```
 
 ### Step 4: Create Touch Input Configuration
+
 **File**: `/etc/X11/xorg.conf.d/99-calibration.conf` (create this file)
 
 ```bash
@@ -85,7 +91,8 @@ EOF'
 
 **Critical**: This matrix `"0 -1 1 1 0 0 0 0 1"` is for left rotation (landscape mode).
 
-### Step 5: Configure Boot Message Suppression  
+### Step 5: Configure Boot Message Suppression
+
 **File**: `/boot/firmware/cmdline.txt`
 
 Modify to redirect console and disable boot messages:
@@ -97,11 +104,13 @@ sudo sed -i 's/console=tty1/console=tty3/' /boot/firmware/cmdline.txt
 ```
 
 Final cmdline.txt should look like:
+
 ```
 console=serial0,115200 console=tty3 root=PARTUUID=e78649fb-02 rootfstype=ext4 fsck.repair=yes rootwait quiet splash plymouth.ignore-serial-consoles plymouth.enable=0 systemd.show_status=no cfg80211.ieee80211_regdom=DE quiet loglevel=0 vt.global_cursor_default=0 consoleblank=0 logo.nologo
 ```
 
 ### Step 6: Create Kiosk Startup Script
+
 **File**: `/home/moto/start-tauri-kiosk.sh` (create this file)
 
 ```bash
@@ -138,7 +147,7 @@ sleep 3
 while true; do
     cd /home/moto/PyrePortal
     ./src-tauri/target/release/pyreportal
-    
+
     # If app exits, wait a moment before restarting
     sleep 1
 done
@@ -148,6 +157,7 @@ chmod +x /home/moto/start-tauri-kiosk.sh
 ```
 
 ### Step 7: Create X11 Initialization File
+
 **File**: `/home/moto/.xinitrc` (create this file)
 
 ```bash
@@ -158,6 +168,7 @@ EOF
 ```
 
 ### Step 8: Configure Auto X11 Startup
+
 **File**: `/home/moto/.bash_profile` (create this file)
 
 ```bash
@@ -169,6 +180,7 @@ EOF
 ```
 
 ### Step 9: Suppress Login Messages
+
 **File**: `/home/moto/.hushlogin` (create this file)
 
 ```bash
@@ -176,6 +188,7 @@ touch /home/moto/.hushlogin
 ```
 
 ### Step 10: Configure Silent Getty Autologin
+
 **File**: `/etc/systemd/system/getty@tty1.service.d/autologin.conf` (create this file)
 
 ```bash
@@ -190,6 +203,7 @@ sudo systemctl daemon-reload
 ```
 
 ### Step 11: Disable Unnecessary Services
+
 Optimize boot time by disabling unused services:
 
 ```bash
@@ -197,6 +211,7 @@ sudo systemctl disable bluetooth.service avahi-daemon.service ModemManager.servi
 ```
 
 ### Step 12: Final Reboot
+
 ```bash
 sudo reboot
 ```
@@ -206,24 +221,28 @@ sudo reboot
 ## What Each Fix Does
 
 ### 🖥️ Display Rotation Fix
+
 - **Hardware rotation**: `dtoverlay=vc4-kms-dsi-ili9881-7inch,rotation=90` rotates the framebuffer
 - **Software rotation**: `xrandr --output DSI-1 --rotate left` ensures X11 applications see landscape
 - **Result**: Display appears in proper landscape orientation (1280x720 logical)
 
-### 👆 Touch Input Fix  
+### 👆 Touch Input Fix
+
 - **Transformation matrix**: `"0 -1 1 1 0 0 0 0 1"` maps touch coordinates for left rotation
 - **No SwapXY**: Removed conflicting SwapXY option that was causing coordinate issues
 - **Result**: Touch coordinates perfectly aligned with landscape display
 
 ### 🚫 Console Suppression Fix
+
 - **Console redirect**: `console=tty3` moves boot messages away from main display
-- **Plymouth disable**: `plymouth.enable=0` prevents splash screen interference  
+- **Plymouth disable**: `plymouth.enable=0` prevents splash screen interference
 - **Systemd silence**: `systemd.show_status=no` hides service startup messages
 - **Getty silence**: `--skip-login --noissue --noclear` prevents login prompts
 - **Hushlogin**: `.hushlogin` suppresses login welcome messages
 - **Result**: No console text visible at any point
 
 ### 🔄 App Respawn Fix
+
 - **Infinite loop**: `while true; do ... done` restarts PyrePortal if it exits
 - **Result**: App automatically restarts, user never sees console
 
@@ -235,7 +254,7 @@ These WebKit environment variables are critical for Tauri stability:
 
 ```bash
 export GDK_BACKEND=x11                        # Force X11 backend
-export XDG_SESSION_TYPE=x11                   # Tell session it's X11  
+export XDG_SESSION_TYPE=x11                   # Tell session it's X11
 export WEBKIT_DISABLE_COMPOSITING_MODE=1      # Disable GPU compositing
 export WEBKIT_DISABLE_DMABUF_RENDERER=1       # Disable problematic renderer
 ```
@@ -245,14 +264,16 @@ export WEBKIT_DISABLE_DMABUF_RENDERER=1       # Disable problematic renderer
 ## File Summary
 
 ### Files Created:
+
 - `/home/moto/start-tauri-kiosk.sh` - Main kiosk startup script
-- `/home/moto/.xinitrc` - X11 initialization 
+- `/home/moto/.xinitrc` - X11 initialization
 - `/home/moto/.bash_profile` - Auto-start X11 on login
 - `/home/moto/.hushlogin` - Suppress login messages
 - `/etc/X11/xorg.conf.d/99-calibration.conf` - Touch calibration
 - `/etc/systemd/system/getty@tty1.service.d/autologin.conf` - Silent login
 
 ### Files Modified:
+
 - `/boot/firmware/config.txt` - Added boot optimizations
 - `/boot/firmware/cmdline.txt` - Console redirection and message suppression
 
@@ -261,12 +282,14 @@ export WEBKIT_DISABLE_DMABUF_RENDERER=1       # Disable problematic renderer
 ## Why This Works vs Previous Attempts
 
 ### ❌ What Didn't Work:
+
 - **Wayland + labwc**: Inconsistent rotation support
 - **Wayland + Cage**: No rotation support in version 0.2.0
 - **Hardware rotation only**: Applications still rendered in portrait
 - **Wrong touch matrices**: Coordinates misaligned with display
 
 ### ✅ What Works:
+
 - **X11 + matchbox-window-manager**: Stable, reliable window management
 - **Combined rotation**: Hardware (90°) + Software (left) = perfect landscape
 - **Correct touch matrix**: `"0 -1 1 1 0 0 0 0 1"` for left rotation
@@ -278,6 +301,7 @@ export WEBKIT_DISABLE_DMABUF_RENDERER=1       # Disable problematic renderer
 ## Final Result
 
 🎉 **Perfect kiosk mode achieved:**
+
 - ✅ Boots directly to PyrePortal in 5-10 seconds
 - ✅ Display in proper landscape orientation (1280x720)
 - ✅ Touch input perfectly aligned with display

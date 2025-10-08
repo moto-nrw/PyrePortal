@@ -82,19 +82,20 @@ function App() {
     <ErrorBoundary>
       <RfidServiceInitializer />
       {/* Network Status Indicator - only shown when poor/offline */}
-      {isFullyAuthenticated && (networkStatus.quality === 'poor' || networkStatus.quality === 'offline') && (
-        <div
-          style={{
-            position: 'fixed',
-            top: '8px',
-            right: '8px',
-            zIndex: 1000,
-            pointerEvents: 'none', // Doesn't interfere with interactions
-          }}
-        >
-          <NetworkStatus status={networkStatus} size="sm" />
-        </div>
-      )}
+      {isFullyAuthenticated &&
+        (networkStatus.quality === 'poor' || networkStatus.quality === 'offline') && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '8px',
+              right: '8px',
+              zIndex: 1000,
+              pointerEvents: 'none', // Doesn't interfere with interactions
+            }}
+          >
+            <NetworkStatus status={networkStatus} size="sm" />
+          </div>
+        )}
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">
         <BrowserRouter>
           <Routes>
@@ -111,7 +112,9 @@ function App() {
             />
             <Route
               path="/student-selection"
-              element={isFullyAuthenticated ? <StudentSelectionPage /> : <Navigate to="/" replace />}
+              element={
+                isFullyAuthenticated ? <StudentSelectionPage /> : <Navigate to="/" replace />
+              }
             />
             <Route
               path="/activity-selection"

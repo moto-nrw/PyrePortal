@@ -56,18 +56,6 @@ fn get_student_cache_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
     Ok(app_data_dir.join(get_cache_filename()))
 }
 
-/// Create empty cache structure for today
-fn create_empty_cache() -> StudentCacheData {
-    StudentCacheData {
-        students: HashMap::new(),
-        metadata: CacheMetadata {
-            last_sync: chrono::Utc::now().to_rfc3339(),
-            version: 1,
-            date_created: get_today_date_key(),
-        },
-    }
-}
-
 /// Validate cache data structure and check if it's for today
 fn is_cache_valid(cache: &StudentCacheData) -> bool {
     // Check if cache is for today

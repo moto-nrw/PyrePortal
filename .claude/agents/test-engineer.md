@@ -12,6 +12,7 @@ You are a test engineering specialist for PyrePortal, focused on creating compre
 **⚠️ IMPORTANT**: PyrePortal currently has **NO test suite**. All tests must be created from scratch.
 
 **Planned Stack:**
+
 - Unit Tests: Vitest (Vite-native)
 - Component Tests: React Testing Library
 - Integration Tests: Playwright or Cypress
@@ -20,9 +21,11 @@ You are a test engineering specialist for PyrePortal, focused on creating compre
 ## Testing Priorities (Order of Importance)
 
 ### 1. Critical Path - RFID Scanning
+
 **Location**: `src/hooks/useRfidScanning.ts`
 
 **Test Coverage Needed:**
+
 - Cache-first logic (instant UI with background sync)
 - Duplicate prevention (3-layer system)
 - Offline queue behavior
@@ -30,6 +33,7 @@ You are a test engineering specialist for PyrePortal, focused on creating compre
 - Error recovery
 
 **Example Test Structure:**
+
 ```typescript
 describe('useRfidScanning', () => {
   describe('cache-first scanning', () => {
@@ -109,15 +113,18 @@ describe('useRfidScanning', () => {
 ```
 
 ### 2. Store Actions - Zustand State Management
+
 **Location**: `src/store/userStore.ts`
 
 **Test Coverage Needed:**
+
 - API call success/failure handling
 - State updates (loading, error, data)
 - PIN validation flow
 - Session management
 
 **Example Test Structure:**
+
 ```typescript
 describe('userStore', () => {
   beforeEach(() => {
@@ -139,9 +146,7 @@ describe('userStore', () => {
     });
 
     it('should update users on successful fetch', async () => {
-      const mockTeachers = [
-        { staff_id: 1, first_name: 'John', last_name: 'Doe' }
-      ];
+      const mockTeachers = [{ staff_id: 1, first_name: 'John', last_name: 'Doe' }];
       api.getTeachers.mockResolvedValue(mockTeachers);
 
       await useUserStore.getState().fetchTeachers();
@@ -163,15 +168,18 @@ describe('userStore', () => {
 ```
 
 ### 3. API Service Layer
+
 **Location**: `src/services/api.ts`
 
 **Test Coverage Needed:**
+
 - Request construction (headers, auth)
 - Response parsing
 - Error handling (401, 404, 423, etc.)
 - Network quality tracking
 
 **Example Test Structure:**
+
 ```typescript
 describe('API Service', () => {
   describe('processRfidScan', () => {
@@ -182,10 +190,10 @@ describe('API Service', () => {
         expect.any(String),
         expect.objectContaining({
           headers: {
-            'Authorization': `Bearer ${DEVICE_API_KEY}`,
+            Authorization: `Bearer ${DEVICE_API_KEY}`,
             'X-Staff-PIN': '1234',
             'Content-Type': 'application/json',
-          }
+          },
         })
       );
     });
@@ -195,27 +203,30 @@ describe('API Service', () => {
         ok: false,
         status: 401,
         statusText: 'Unauthorized',
-        json: async () => ({ message: 'Invalid PIN' })
+        json: async () => ({ message: 'Invalid PIN' }),
       });
 
-      await expect(
-        api.processRfidScan('tag123', 'checkin', 1, '9999')
-      ).rejects.toThrow('Invalid PIN');
+      await expect(api.processRfidScan('tag123', 'checkin', 1, '9999')).rejects.toThrow(
+        'Invalid PIN'
+      );
     });
   });
 });
 ```
 
 ### 4. React Components
+
 **Location**: `src/components/`, `src/pages/`
 
 **Test Coverage Needed:**
+
 - User interactions (button clicks, form input)
 - Conditional rendering (loading states, errors)
 - Modal behavior
 - Navigation
 
 **Example Test Structure:**
+
 ```typescript
 describe('ErrorModal', () => {
   it('should render when error is present', () => {
@@ -249,6 +260,7 @@ describe('ErrorModal', () => {
 ## Mock Strategies
 
 ### API Mocking
+
 ```typescript
 // Mock entire API module
 jest.mock('../services/api', () => ({
@@ -256,11 +268,12 @@ jest.mock('../services/api', () => ({
     getTeachers: jest.fn(),
     processRfidScan: jest.fn(),
     validatePIN: jest.fn(),
-  }
+  },
 }));
 ```
 
 ### Tauri IPC Mocking
+
 ```typescript
 // Mock Tauri invoke
 jest.mock('@tauri-apps/api/core', () => ({
@@ -273,6 +286,7 @@ import { invoke } from '@tauri-apps/api/core';
 ```
 
 ### Zustand Store Mocking
+
 ```typescript
 // Reset store between tests
 import { useUserStore } from '../store/userStore';
@@ -314,12 +328,14 @@ const createMockRfidResult = (overrides?: Partial<RfidScanResult>): RfidScanResu
 **Location**: `src-tauri/src/`
 
 **Coverage Needed:**
+
 - RFID reader initialization
 - File logging
 - Session storage persistence
 - Student cache operations
 
 **Example:**
+
 ```rust
 #[cfg(test)]
 mod tests {

@@ -135,9 +135,12 @@ export const useRfidScanning = () => {
         const cachedResult: RfidScanResult = {
           student_id: cachedStudent.id,
           student_name: cachedStudent.name,
-          action: cachedStudent.room === selectedRoom.name
-            ? (cachedStudent.status === 'checked_in' ? 'checked_out' : 'checked_in')
-            : 'checked_in',
+          action:
+            cachedStudent.room === selectedRoom.name
+              ? cachedStudent.status === 'checked_in'
+                ? 'checked_out'
+                : 'checked_in'
+              : 'checked_in',
           room_name: selectedRoom.name,
           processed_at: new Date().toISOString(),
           message: undefined,
@@ -146,10 +149,13 @@ export const useRfidScanning = () => {
         setScanResult(cachedResult);
         showScanModal();
 
-        logger.info('Instant UI update completed with cached data', { responseTime: Date.now() - startTime });
+        logger.info('Instant UI update completed with cached data', {
+          responseTime: Date.now() - startTime,
+        });
 
         // 2. BACKGROUND SYNC WITH SERVER (don't block UI)
-        void (async () => {
+        // Store the promise so it can be awaited later (prevents race conditions)
+        const syncPromise = (async () => {
           try {
             logger.debug('Starting background sync for cached student');
 
@@ -189,7 +195,6 @@ export const useRfidScanning = () => {
             } catch (error) {
               logger.warn('Failed to update session activity during sync', { error });
             }
-
           } catch (syncError) {
             logger.warn('Background sync failed, queuing for retry', {
               error: syncError instanceof Error ? syncError.message : String(syncError),
@@ -208,11 +213,21 @@ export const useRfidScanning = () => {
           }
         })();
 
+        // Execute the promise in background (don't block)
+        void syncPromise;
+
+        // Update the tag scan record with the sync promise (for race condition prevention)
+        recordTagScan(tagId, {
+          timestamp: Date.now(),
+          studentId: cachedStudent.id.toString(),
+          result: cachedResult,
+          syncPromise,
+        });
+
         // Clean up modal after display time
         setTimeout(() => {
           hideScanModal();
         }, rfid.modalDisplayTime);
-
       } else {
         // CACHE MISS - Use existing network-based flow but add to cache
         logger.info('CACHE MISS: No cached data found, using network call', {
@@ -300,7 +315,6 @@ export const useRfidScanning = () => {
             hideScanModal();
             removeOptimisticScan(scanId);
           }, rfid.modalDisplayTime);
-
         } catch (error) {
           logger.error('Failed to process RFID scan', { error });
 
@@ -321,7 +335,6 @@ export const useRfidScanning = () => {
               isInfo: true,
             };
             setScanResult(infoResult as RfidScanResult);
-
           } else {
             // Real error
             updateOptimisticScan(scanId, 'failed');

@@ -1,6 +1,6 @@
 /**
  * Design System Constants based on UI_DESIGN_SYSTEM_FLO.md
- * 
+ *
  * This file contains all the style constants from Flo's design system
  * to ensure visual consistency across the application while using inline styles.
  */
@@ -8,11 +8,11 @@
 export const designSystem = {
   // Border Radius System (matching Tailwind classes from design guide)
   borderRadius: {
-    sm: '8px',      // rounded-sm - Small elements
-    md: '12px',     // rounded-md - Buttons, inputs  
-    lg: '16px',     // rounded-lg - Cards
-    xl: '24px',     // rounded-3xl - Modals, large cards
-    '2xl': '32px',  // rounded-2xl - Hero sections
+    sm: '8px', // rounded-sm - Small elements
+    md: '12px', // rounded-md - Buttons, inputs
+    lg: '16px', // rounded-lg - Cards
+    xl: '24px', // rounded-3xl - Modals, large cards
+    '2xl': '32px', // rounded-2xl - Hero sections
     full: '9999px', // rounded-full - Pills, circular elements
   },
 
@@ -21,12 +21,12 @@ export const designSystem = {
     // Base shadows
     soft: '0 8px 30px rgb(0,0,0,0.12)',
     elevated: '0 20px 50px rgb(0,0,0,0.15)',
-    
+
     // Colored shadows
     green: '0 8px 40px rgb(131,205,45,0.3)',
     blue: '0 8px 40px rgb(80,128,216,0.3)',
     teal: '0 8px 40px rgb(20,184,166,0.3)',
-    
+
     // Component-specific shadows
     button: '0 4px 14px 0 rgba(0,0,0,0.1)',
     buttonHover: '0 8px 20px 0 rgba(0,0,0,0.15)',
@@ -41,12 +41,12 @@ export const designSystem = {
     background: 'rgba(255,255,255,0.9)',
     backgroundStrong: 'rgba(255,255,255,0.95)',
     backgroundLight: 'rgba(255,255,255,0.8)',
-    
+
     // Backdrop filters
     blur: 'blur(20px)',
-    blurMedium: 'blur(12px)', 
+    blurMedium: 'blur(12px)',
     blurLight: 'blur(8px)',
-    
+
     // Combined effect helpers
     cardStyle: {
       background: 'rgba(255,255,255,0.9)',
@@ -61,13 +61,13 @@ export const designSystem = {
     primaryBlue: '#5080D8',
     primaryGreen: '#83CD2D',
     secondaryGreen: '#70B525',
-    
+
     // Semantic colors
     success: '#10B981',
     warning: '#F59E0B',
     error: '#EF4444',
     info: '#3B82F6',
-    
+
     // Text colors
     textPrimary: '#1F2937',
     textSecondary: '#374151',
@@ -81,15 +81,15 @@ export const designSystem = {
     green: 'linear-gradient(135deg, #83CD2D, #70B525)',
     blue: 'linear-gradient(135deg, #5080D8, #4A70C8)',
     brand: 'linear-gradient(135deg, #5080D8, #83CD2D)',
-    
+
     // Direction variants
     greenRight: 'linear-gradient(to right, #83CD2D, #70B525)',
     blueRight: 'linear-gradient(to right, #5080D8, #4A70C8)',
-    
+
     // Background gradients
     light: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)',
     gray: 'linear-gradient(to bottom right, #F9FAFB, #F8FAFC)',
-    
+
     // Overlay gradients
     blueOverlay: 'linear-gradient(to bottom right, rgba(80,128,216,0.03), rgba(96,165,250,0.03))',
     greenOverlay: 'linear-gradient(to bottom right, rgba(131,205,45,0.03), rgba(112,181,37,0.03))',
@@ -101,7 +101,7 @@ export const designSystem = {
     base: 'all 200ms ease-out',
     smooth: 'all 300ms ease-out',
     complex: 'all 500ms ease-out',
-    
+
     // Easing functions
     easeOut: 'cubic-bezier(0, 0, 0.2, 1)',
     easeInOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
@@ -111,7 +111,7 @@ export const designSystem = {
   // Transform scales for interactions
   scales: {
     hover: 'scale(1.01)',
-    hoverLarge: 'scale(1.02)', 
+    hoverLarge: 'scale(1.02)',
     active: 'scale(0.98)',
     activeSmall: 'scale(0.95)',
   },
@@ -129,7 +129,7 @@ export const designSystem = {
       boxShadow: '0 8px 30px rgb(0,0,0,0.12)',
       transition: 'all 500ms ease-out',
     },
-    
+
     // Primary action button
     buttonPrimary: {
       background: 'linear-gradient(to right, #83CD2D, #70B525)',
@@ -143,7 +143,7 @@ export const designSystem = {
       transition: 'all 300ms ease-out',
       cursor: 'pointer',
     },
-    
+
     // Back button style
     backButton: {
       height: '56px',
