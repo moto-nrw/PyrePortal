@@ -174,6 +174,18 @@ export const useRfidScanning = () => {
               syncTime: Date.now() - startTime,
             });
 
+            // Check if this is a supervisor scan
+            if (syncResult.action === 'supervisor_authenticated') {
+              // Update UI with supervisor result (not student cache)
+              setScanResult(syncResult);
+              logger.info('Supervisor authenticated (cache-first path)', {
+                supervisorName: syncResult.student_name,
+                message: syncResult.message,
+              });
+              // Don't cache supervisor data or update student history
+              return;
+            }
+
             // Update cache with fresh server data (silently)
             void cacheStudentData(tagId, syncResult, {
               room: syncResult.room_name ?? selectedRoom.name,
@@ -276,6 +288,24 @@ export const useRfidScanning = () => {
           // 3. UPDATE UI WITH REAL RESULTS
           updateOptimisticScan(scanId, 'success');
           setScanResult(result);
+
+          // Check if this is a supervisor scan
+          if (result.action === 'supervisor_authenticated') {
+            // Supervisor scan - show result, no caching/history
+            logger.info('Supervisor authenticated (network path)', {
+              supervisorName: result.student_name,
+              message: result.message,
+            });
+
+            // Clean up after modal display time
+            setTimeout(() => {
+              hideScanModal();
+              removeOptimisticScan(scanId);
+            }, rfid.modalDisplayTime);
+
+            // Skip student-specific logic
+            return;
+          }
 
           // 4. ADD TO CACHE for future instant access
           void cacheStudentData(tagId, result, {
