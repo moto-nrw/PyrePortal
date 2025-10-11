@@ -666,6 +666,59 @@ export const api = {
   },
 
   /**
+   * Assign RFID tag to staff member
+   * Endpoint: POST /api/iot/staff/{staffId}/rfid
+   */
+  async assignStaffTag(pin: string, staffId: number, tagId: string): Promise<TagAssignmentResult> {
+    const response = await apiCall<{
+      status: string;
+      data?: {
+        success: boolean;
+        staff_id: number;
+        staff_name: string;
+        rfid_tag: string;
+        previous_tag?: string;
+        message?: string;
+      };
+      message?: string;
+    }>(`/api/iot/staff/${staffId}/rfid`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
+      },
+      body: JSON.stringify({
+        rfid_tag: tagId,
+      }),
+    });
+
+    return {
+      success: response.data?.success ?? response.status === 'success',
+      message: response.data?.message ?? response.message ?? 'Tag erfolgreich zugewiesen',
+      student_id: response.data?.staff_id,
+      student_name: response.data?.staff_name,
+      rfid_tag: response.data?.rfid_tag,
+      previous_tag: response.data?.previous_tag,
+    };
+  },
+
+  /**
+   * Remove RFID tag from staff member
+   * Endpoint: DELETE /api/iot/staff/{staffId}/rfid
+   */
+  async unassignStaffTag(pin: string, staffId: number): Promise<void> {
+    await apiCall(`/api/iot/staff/${staffId}/rfid`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
+      },
+    });
+  },
+
+  /**
    * Process RFID check-in/check-out
    * Endpoint: POST /api/iot/checkin
    */
@@ -863,7 +916,7 @@ export interface TagAssignmentResult {
 export interface RfidScanResult {
   student_id: number;
   student_name: string;
-  action: 'checked_in' | 'checked_out' | 'transferred';
+  action: 'checked_in' | 'checked_out' | 'transferred' | 'supervisor_authenticated';
   greeting?: string;
   visit_id?: number;
   room_name?: string;

@@ -575,6 +575,8 @@ const ActivityScanningPage: React.FC = () => {
                 if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
                 // Check for Schulhof check-in (special yellow)
                 if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
+                // Check for supervisor authentication
+                if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
                 // Check for error or info states
                 if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
                 if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
@@ -656,6 +658,21 @@ const ActivityScanningPage: React.FC = () => {
                       />
                     );
                   }
+                }
+                // Supervisor authentication icon
+                if (currentScan.action === 'supervisor_authenticated') {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="white"
+                      stroke="white"
+                      strokeWidth="2"
+                    >
+                      <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1.41 16L7 13.41 8.41 12l2.17 2.17 5.59-5.59L17.59 10l-7 7z" />
+                    </svg>
+                  );
                 }
                 // Error state - X icon
                 if ((currentScan as { showAsError?: boolean }).showAsError) {

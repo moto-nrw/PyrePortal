@@ -2,13 +2,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { ContentBox, ErrorModal } from '../components/ui';
-import { api, type Student } from '../services/api';
+import { api, type Student, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { createLogger, logUserAction } from '../utils/logger';
 
-const STUDENTS_PER_PAGE = 10; // 5x2 grid to use full width
+const ENTITIES_PER_PAGE = 10; // 5x2 grid to use full width
+
+// Union type for assignable entities (students and teachers)
+type AssignableEntity = { type: 'student'; data: Student } | { type: 'teacher'; data: Teacher };
 
 interface LocationState {
   scannedTag: string;
@@ -27,8 +30,8 @@ function StudentSelectionPage() {
   const location = useLocation();
   const state = location.state as LocationState;
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [entities, setEntities] = useState<AssignableEntity[]>([]);
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null); // Format: "student-{id}" or "teacher-{id}"
   const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -51,18 +54,16 @@ function StudentSelectionPage() {
     });
   }, [authenticatedUser, state, navigate, logger]);
 
-  // Fetch students
+  // Fetch students and teachers
   useEffect(() => {
-    const fetchStudents = async () => {
+    const fetchEntities = async () => {
       if (!authenticatedUser?.pin) return;
 
       try {
         setIsLoading(true);
-        logger.debug('Fetching students', {
+        logger.debug('Fetching students and teachers', {
           supervisorCount: selectedSupervisors.length,
-          supervisors: selectedSupervisors,
           authenticatedUserId: authenticatedUser.staffId,
-          authenticatedUserName: authenticatedUser.staffName,
         });
 
         // If no supervisors selected, use authenticated user's ID
@@ -71,19 +72,31 @@ function StudentSelectionPage() {
             ? selectedSupervisors.map(supervisor => supervisor.id)
             : [authenticatedUser.staffId];
 
-        logger.debug('Teacher IDs for student fetch', { teacherIds });
+        // Fetch both students and teachers in parallel
+        const [studentList, teacherList] = await Promise.all([
+          api.getStudents(authenticatedUser.pin, teacherIds),
+          api.getTeachers(),
+        ]);
 
-        const studentList = await api.getStudents(authenticatedUser.pin, teacherIds);
-        logger.debug('API Response - Students', { count: studentList.length, studentList });
-        setStudents(studentList);
-        logger.info('Students fetched successfully', { count: studentList.length });
+        // Combine into unified entity list
+        const combinedEntities: AssignableEntity[] = [
+          ...studentList.map(s => ({ type: 'student' as const, data: s })),
+          ...teacherList.map(t => ({ type: 'teacher' as const, data: t })),
+        ];
+
+        setEntities(combinedEntities);
+        logger.info('Entities fetched successfully', {
+          students: studentList.length,
+          teachers: teacherList.length,
+          total: combinedEntities.length,
+        });
       } catch (err) {
         const error = err instanceof Error ? err : new Error(String(err));
-        logger.error('Failed to fetch students', {
+        logger.error('Failed to fetch entities', {
           error: error.message,
           stack: error.stack,
         });
-        setError(`Fehler beim Laden der Schüler: ${error.message}`);
+        setError(`Fehler beim Laden: ${error.message}`);
         setShowErrorModal(true);
       } finally {
         setIsLoading(false);
@@ -91,81 +104,115 @@ function StudentSelectionPage() {
     };
 
     if (authenticatedUser) {
-      void fetchStudents();
+      void fetchEntities();
     }
   }, [authenticatedUser, selectedSupervisors, logger]);
 
   // Calculate pagination
-  const totalPages = Math.ceil(students.length / STUDENTS_PER_PAGE);
-  const paginatedStudents = useMemo(() => {
-    const start = currentPage * STUDENTS_PER_PAGE;
-    const end = start + STUDENTS_PER_PAGE;
-    return students.slice(start, end);
-  }, [students, currentPage]);
+  const totalPages = Math.ceil(entities.length / ENTITIES_PER_PAGE);
+  const paginatedEntities = useMemo(() => {
+    const start = currentPage * ENTITIES_PER_PAGE;
+    const end = start + ENTITIES_PER_PAGE;
+    return entities.slice(start, end);
+  }, [entities, currentPage]);
 
   // Calculate empty slots to maintain grid layout
   const emptySlots = useMemo(() => {
-    const studentsOnPage = paginatedStudents.length;
-    if (studentsOnPage < STUDENTS_PER_PAGE) {
-      return STUDENTS_PER_PAGE - studentsOnPage;
+    const entitiesOnPage = paginatedEntities.length;
+    if (entitiesOnPage < ENTITIES_PER_PAGE) {
+      return ENTITIES_PER_PAGE - entitiesOnPage;
     }
     return 0;
-  }, [paginatedStudents]);
+  }, [paginatedEntities]);
 
-  const handleStudentSelect = (student: Student) => {
-    logger.info('Student selected', {
-      studentName: `${student.first_name} ${student.last_name}`,
-      studentId: student.student_id,
+  const handleEntitySelect = (entity: AssignableEntity) => {
+    const entityId =
+      entity.type === 'student'
+        ? `student-${entity.data.student_id}`
+        : `teacher-${entity.data.staff_id}`;
+
+    const entityName =
+      entity.type === 'student'
+        ? `${entity.data.first_name} ${entity.data.last_name}`
+        : entity.data.display_name;
+
+    logger.info('Entity selected', {
+      type: entity.type,
+      name: entityName,
+      id: entityId,
     });
 
-    setSelectedStudentId(student.student_id);
+    setSelectedEntityId(entityId);
 
-    logUserAction('student_selection', {
-      studentName: `${student.first_name} ${student.last_name}`,
-      studentId: student.student_id,
+    logUserAction('entity_selection', {
+      type: entity.type,
+      name: entityName,
       tagId: state.scannedTag,
     });
   };
 
   const handleAssignTag = async () => {
-    if (!selectedStudentId || !authenticatedUser?.pin || !state?.scannedTag) {
+    if (!selectedEntityId || !authenticatedUser?.pin || !state?.scannedTag) {
       logger.warn('Invalid assignment attempt');
-      setError('Bitte wählen Sie einen Schüler aus.');
+      setError('Bitte wählen Sie eine Person aus.');
       setShowErrorModal(true);
       return;
     }
 
     setIsSaving(true);
-    const selectedStudent = students.find(s => s.student_id === selectedStudentId);
+
+    // Find selected entity
+    const selectedEntity = entities.find(e => {
+      const id =
+        e.type === 'student' ? `student-${e.data.student_id}` : `teacher-${e.data.staff_id}`;
+      return id === selectedEntityId;
+    });
+
+    if (!selectedEntity) {
+      setError('Ungültige Auswahl');
+      setShowErrorModal(true);
+      setIsSaving(false);
+      return;
+    }
 
     try {
-      logger.info('Assigning tag to student', {
+      const entityName =
+        selectedEntity.type === 'student'
+          ? `${selectedEntity.data.first_name} ${selectedEntity.data.last_name}`
+          : selectedEntity.data.display_name;
+
+      logger.info('Assigning tag to entity', {
+        type: selectedEntity.type,
         tagId: state.scannedTag,
-        studentId: selectedStudentId,
+        entityName,
       });
 
-      const result = await api.assignTag(
-        authenticatedUser.pin,
-        selectedStudentId,
-        state.scannedTag
-      );
+      // Route to correct endpoint based on entity type
+      const result =
+        selectedEntity.type === 'teacher'
+          ? await api.assignStaffTag(
+              authenticatedUser.pin,
+              selectedEntity.data.staff_id,
+              state.scannedTag
+            )
+          : await api.assignTag(
+              authenticatedUser.pin,
+              selectedEntity.data.student_id,
+              state.scannedTag
+            );
 
       if (result.success) {
         logUserAction('tag_assignment_complete', {
+          type: selectedEntity.type,
           tagId: state.scannedTag,
-          studentId: selectedStudentId,
-          studentName: selectedStudent
-            ? `${selectedStudent.first_name} ${selectedStudent.last_name}`
-            : 'Unknown',
+          entityName,
         });
 
-        // Navigate back with success message and tag data
+        // Navigate back with success message
         void navigate('/tag-assignment', {
           state: {
             assignmentSuccess: true,
-            studentName: selectedStudent
-              ? `${selectedStudent.first_name} ${selectedStudent.last_name}`
-              : 'Unknown',
+            studentName: entityName,
             previousTag: result.previous_tag,
             scannedTag: state.scannedTag,
             tagAssignment: state.tagAssignment,
@@ -314,9 +361,9 @@ function StudentSelectionPage() {
                 animation: 'spin 1s linear infinite',
               }}
             />
-            <p style={{ color: '#6B7280', fontSize: '16px' }}>Lade Schüler...</p>
+            <p style={{ color: '#6B7280', fontSize: '16px' }}>Lade Personen...</p>
           </div>
-        ) : students.length === 0 ? (
+        ) : entities.length === 0 ? (
           <div
             style={{
               textAlign: 'center',
@@ -340,15 +387,13 @@ function StudentSelectionPage() {
               <line x1="1" y1="1" x2="23" y2="23" />
             </svg>
             <p style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>
-              Keine Schüler gefunden
+              Keine Personen gefunden
             </p>
-            <p style={{ fontSize: '16px' }}>
-              Es sind keine Schüler für die ausgewählten Betreuer verfügbar.
-            </p>
+            <p style={{ fontSize: '16px' }}>Es sind keine Schüler oder Betreuer verfügbar.</p>
           </div>
         ) : (
           <>
-            {/* Student Grid */}
+            {/* Entity Grid (Students + Teachers) */}
             <div
               style={{
                 display: 'grid',
@@ -359,11 +404,16 @@ function StudentSelectionPage() {
                 alignContent: 'start',
               }}
             >
-              {paginatedStudents.map(student => {
-                const isSelected = selectedStudentId === student.student_id;
+              {paginatedEntities.map(entity => {
+                const entityId =
+                  entity.type === 'student'
+                    ? `student-${entity.data.student_id}`
+                    : `teacher-${entity.data.staff_id}`;
+                const isSelected = selectedEntityId === entityId;
+
                 return (
                   <div
-                    key={student.student_id}
+                    key={entityId}
                     style={{
                       background: isSelected
                         ? designSystem.gradients.green
@@ -377,7 +427,7 @@ function StudentSelectionPage() {
                     }}
                   >
                     <button
-                      onClick={() => handleStudentSelect(student)}
+                      onClick={() => handleEntitySelect(entity)}
                       style={{
                         width: '100%',
                         height: '160px',
@@ -462,7 +512,7 @@ function StudentSelectionPage() {
                         </svg>
                       </div>
 
-                      {/* Student Name */}
+                      {/* Entity Name */}
                       <span
                         style={{
                           fontSize: '16px',
@@ -472,18 +522,25 @@ function StudentSelectionPage() {
                           color: '#1F2937',
                         }}
                       >
-                        {student.first_name} {student.last_name}
+                        {entity.type === 'student'
+                          ? `${entity.data.first_name} ${entity.data.last_name}`
+                          : entity.data.display_name}
                       </span>
 
-                      {/* Class */}
+                      {/* Role Badge or Class */}
                       <span
                         style={{
-                          fontSize: '14px',
-                          color: '#6B7280',
-                          fontWeight: 500,
+                          fontSize: '12px',
+                          padding: '4px 12px',
+                          borderRadius: '12px',
+                          backgroundColor: entity.type === 'teacher' ? '#3B82F6' : '#83cd2d',
+                          color: 'white',
+                          fontWeight: 600,
                         }}
                       >
-                        {student.school_class ?? 'N/A'}
+                        {entity.type === 'teacher'
+                          ? 'Betreuer'
+                          : (entity.data.school_class ?? 'Schüler')}
                       </span>
                     </button>
                   </div>
@@ -575,7 +632,7 @@ function StudentSelectionPage() {
             >
               <button
                 onClick={handleAssignTag}
-                disabled={!selectedStudentId || isSaving}
+                disabled={!selectedEntityId || isSaving}
                 style={{
                   height: '56px',
                   padding: '0 48px',
@@ -583,16 +640,16 @@ function StudentSelectionPage() {
                   fontWeight: 600,
                   color: '#FFFFFF',
                   background:
-                    !selectedStudentId || isSaving
+                    !selectedEntityId || isSaving
                       ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
                       : designSystem.gradients.greenRight,
                   border: 'none',
                   borderRadius: designSystem.borderRadius.full,
-                  cursor: !selectedStudentId || isSaving ? 'not-allowed' : 'pointer',
+                  cursor: !selectedEntityId || isSaving ? 'not-allowed' : 'pointer',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  boxShadow: !selectedStudentId || isSaving ? 'none' : designSystem.shadows.green,
-                  opacity: !selectedStudentId || isSaving ? 0.6 : 1,
+                  boxShadow: !selectedEntityId || isSaving ? 'none' : designSystem.shadows.green,
+                  opacity: !selectedEntityId || isSaving ? 0.6 : 1,
                 }}
               >
                 {isSaving ? 'Zuweisen...' : 'Tag zuweisen'}
