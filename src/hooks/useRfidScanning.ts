@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 import { api } from '../services/api';
 import type { RfidScanResult } from '../services/api';
@@ -32,6 +33,8 @@ let mockScanInterval: ReturnType<typeof setInterval> | null = null;
 const logger = createLogger('useRfidScanning');
 
 export const useRfidScanning = () => {
+  const navigate = useNavigate();
+
   const {
     rfid,
     authenticatedUser,
@@ -63,6 +66,7 @@ export const useRfidScanning = () => {
 
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
+  const scannedSupervisorsRef = useRef<Set<number>>(new Set());
 
   // Initialize RFID service on mount
   const initializeService = useCallback(async () => {
@@ -176,12 +180,36 @@ export const useRfidScanning = () => {
 
             // Check if this is a supervisor scan
             if (syncResult.action === 'supervisor_authenticated') {
-              // Update UI with supervisor result (not student cache)
+              const staffId = syncResult.student_id; // Actually staff_id
+
+              // Update UI with supervisor result
               setScanResult(syncResult);
-              logger.info('Supervisor authenticated (cache-first path)', {
+
+              // Check if supervisor has already scanned
+              if (scannedSupervisorsRef.current.has(staffId)) {
+                // Second+ scan - navigate to home after brief display
+                logger.info('Supervisor second scan - navigating to home (cache path)', {
+                  supervisorName: syncResult.student_name,
+                  staffId,
+                });
+
+                setTimeout(() => {
+                  hideScanModal();
+                  // Navigate to home - scanning will be stopped by page unmount
+                  void navigate('/home');
+                }, 1500); // Show modal briefly before navigating
+
+                return;
+              }
+
+              // First scan - show modal and track
+              scannedSupervisorsRef.current.add(staffId);
+              logger.info('Supervisor first scan - showing modal (cache path)', {
                 supervisorName: syncResult.student_name,
                 message: syncResult.message,
+                staffId,
               });
+
               // Don't cache supervisor data or update student history
               return;
             }
@@ -291,10 +319,32 @@ export const useRfidScanning = () => {
 
           // Check if this is a supervisor scan
           if (result.action === 'supervisor_authenticated') {
-            // Supervisor scan - show result, no caching/history
-            logger.info('Supervisor authenticated (network path)', {
+            const staffId = result.student_id; // Actually staff_id
+
+            // Check if supervisor has already scanned
+            if (scannedSupervisorsRef.current.has(staffId)) {
+              // Second+ scan - navigate to home
+              logger.info('Supervisor second scan - navigating to home', {
+                supervisorName: result.student_name,
+                staffId,
+              });
+
+              // Clean up immediately
+              hideScanModal();
+              removeOptimisticScan(scanId);
+
+              // Navigate to home - scanning will be stopped by page unmount
+              void navigate('/home');
+
+              return;
+            }
+
+            // First scan - show modal and track
+            scannedSupervisorsRef.current.add(staffId);
+            logger.info('Supervisor first scan - showing modal', {
               supervisorName: result.student_name,
               message: result.message,
+              staffId,
             });
 
             // Clean up after modal display time
@@ -412,6 +462,7 @@ export const useRfidScanning = () => {
       cacheStudentData,
       rfid.modalDisplayTime,
       rfid.recentTagScans,
+      navigate,
     ]
   );
 
