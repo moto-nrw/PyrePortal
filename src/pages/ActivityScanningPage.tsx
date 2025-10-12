@@ -599,8 +599,8 @@ const ActivityScanningPage: React.FC = () => {
             zIndex: 1000,
           }}
           onClick={() => {
-            // Allow clicking backdrop to dismiss daily checkout modal
-            if (dailyCheckoutState) {
+            // Allow clicking backdrop to dismiss daily checkout modal (but NOT during feedback)
+            if (dailyCheckoutState && !showFeedbackPrompt) {
               setDailyCheckoutState(null);
               hideScanModal();
             }
@@ -883,7 +883,7 @@ const ActivityScanningPage: React.FC = () => {
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
                   >
-                    <FontAwesomeIcon icon={faFaceSmile} />
+                    <FontAwesomeIcon icon={faFaceSmile} size="4x" />
                     <span style={{ fontSize: '24px', fontWeight: 700 }}>Gut</span>
                   </button>
 
@@ -914,7 +914,7 @@ const ActivityScanningPage: React.FC = () => {
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
                   >
-                    <FontAwesomeIcon icon={faFaceMeh} />
+                    <FontAwesomeIcon icon={faFaceMeh} size="4x" />
                     <span style={{ fontSize: '24px', fontWeight: 700 }}>Okay</span>
                   </button>
 
@@ -945,7 +945,7 @@ const ActivityScanningPage: React.FC = () => {
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
                   >
-                    <FontAwesomeIcon icon={faFaceFrown} />
+                    <FontAwesomeIcon icon={faFaceFrown} size="4x" />
                     <span style={{ fontSize: '24px', fontWeight: 700 }}>Schlecht</span>
                   </button>
                 </div>
