@@ -871,6 +871,37 @@ export const api = {
       throw error;
     }
   },
+
+  /**
+   * Submit daily feedback when student checks out for the day
+   * Endpoint: POST /api/iot/feedback
+   */
+  async submitDailyFeedback(
+    pin: string,
+    feedback: DailyFeedbackRequest
+  ): Promise<DailyFeedbackResponse> {
+    try {
+      const response = await apiCall<DailyFeedbackResponse>('/api/iot/feedback', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+        },
+        body: JSON.stringify(feedback),
+      });
+
+      return response;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('404')) {
+        throw new Error('Feedback-Service nicht verfügbar');
+      }
+      if (errorMessage.includes('403')) {
+        throw new Error('Keine Berechtigung für Feedback-Übermittlung');
+      }
+      throw error;
+    }
+  },
 };
 
 /**
@@ -988,6 +1019,35 @@ export interface AttendanceToggleResponse {
     message: string;
   };
   message: string;
+}
+
+/**
+ * Daily feedback rating type - matches backend enum validation
+ */
+export type DailyFeedbackRating = 'positive' | 'neutral' | 'negative';
+
+/**
+ * Feedback submission request for POST /api/iot/feedback
+ */
+export interface DailyFeedbackRequest {
+  student_id: number;
+  value: DailyFeedbackRating;
+}
+
+/**
+ * Feedback submission response from POST /api/iot/feedback
+ */
+export interface DailyFeedbackResponse {
+  status: string;
+  message: string;
+  data?: {
+    id: number;
+    student_id: number;
+    value: string;
+    day: string; // "2025-10-12"
+    time: string; // "15:30:45"
+    created_at: string; // ISO 8601
+  };
 }
 
 /**

@@ -1,13 +1,72 @@
+import { faFaceSmile, faFaceMeh, faFaceFrown } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { ContentBox } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
-import { api, type RfidScanResult } from '../services/api';
+import { api, type RfidScanResult, type DailyFeedbackRating } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
+
+// Button style constants for consistent styling
+const FEEDBACK_BUTTON_STYLES = {
+  base: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    border: '3px solid rgba(255, 255, 255, 0.5)',
+    borderRadius: '24px',
+    color: '#FFFFFF',
+    fontSize: '80px',
+    padding: '32px 48px',
+    cursor: 'pointer',
+    transition: 'all 200ms',
+    outline: 'none',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center' as const,
+    gap: '16px',
+  },
+  hover: {
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    transform: 'scale(1.1)',
+  },
+  normal: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    transform: 'scale(1)',
+  },
+};
+
+const DESTINATION_BUTTON_STYLES = {
+  base: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    border: '2px solid rgba(255, 255, 255, 0.5)',
+    borderRadius: '16px',
+    color: '#FFFFFF',
+    fontSize: '28px',
+    fontWeight: 700,
+    padding: '20px 48px',
+    cursor: 'pointer',
+    transition: 'all 200ms',
+    outline: 'none',
+  },
+  hover: {
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    transform: 'scale(1.05)',
+  },
+  normal: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    transform: 'scale(1)',
+  },
+};
+
+// Button configuration arrays
+const feedbackButtons = [
+  { rating: 'positive' as DailyFeedbackRating, icon: faFaceSmile, label: 'Gut' },
+  { rating: 'neutral' as DailyFeedbackRating, icon: faFaceMeh, label: 'Okay' },
+  { rating: 'negative' as DailyFeedbackRating, icon: faFaceFrown, label: 'Schlecht' },
+];
 
 const ActivityScanningPage: React.FC = () => {
   const navigate = useNavigate();
@@ -69,6 +128,9 @@ const ActivityScanningPage: React.FC = () => {
     studentName: string;
     studentId: number;
   } | null>(null);
+
+  // Feedback prompt state
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
 
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
@@ -300,6 +362,34 @@ const ActivityScanningPage: React.FC = () => {
 
       logger.info('Daily checkout attendance toggle successful');
 
+      // Show feedback prompt instead of farewell
+      setShowFeedbackPrompt(true);
+    } catch (error) {
+      logger.error('Failed to toggle attendance', { error });
+      // On error, just close modal (student stays logged in)
+      setDailyCheckoutState(null);
+      setShowFeedbackPrompt(false);
+      hideScanModal();
+    }
+  };
+
+  // Handle feedback submission
+  const handleFeedbackSubmit = async (rating: DailyFeedbackRating) => {
+    if (!dailyCheckoutState || !currentScan) return;
+
+    const { submitDailyFeedback } = useUserStore.getState();
+
+    logger.info('Submitting feedback', {
+      studentId: currentScan.student_id,
+      rating,
+    });
+
+    const success = await submitDailyFeedback(currentScan.student_id, rating);
+
+    if (success) {
+      logger.info('Feedback submitted successfully', { rating });
+      setShowFeedbackPrompt(false);
+
       // Show farewell message
       setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
 
@@ -308,11 +398,16 @@ const ActivityScanningPage: React.FC = () => {
         setDailyCheckoutState(null);
         hideScanModal();
       }, 2000);
-    } catch (error) {
-      logger.error('Failed to toggle attendance', { error });
-      // On error, just close modal (student stays logged in)
-      setDailyCheckoutState(null);
-      hideScanModal();
+    } else {
+      // On error, still show farewell (don't block user from leaving)
+      logger.warn('Feedback submission failed but continuing with checkout');
+      setShowFeedbackPrompt(false);
+      setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+
+      setTimeout(() => {
+        setDailyCheckoutState(null);
+        hideScanModal();
+      }, 2000);
     }
   };
 
@@ -561,8 +656,8 @@ const ActivityScanningPage: React.FC = () => {
             zIndex: 1000,
           }}
           onClick={() => {
-            // Allow clicking backdrop to dismiss daily checkout modal
-            if (dailyCheckoutState) {
+            // Allow clicking backdrop to dismiss daily checkout modal (but NOT during feedback)
+            if (dailyCheckoutState && !showFeedbackPrompt) {
               setDailyCheckoutState(null);
               hideScanModal();
             }
@@ -757,6 +852,11 @@ const ActivityScanningPage: React.FC = () => {
               }}
             >
               {(() => {
+                // Feedback prompt
+                if (showFeedbackPrompt) {
+                  return 'Wie war dein Tag?';
+                }
+
                 // Daily checkout state
                 if (dailyCheckoutState) {
                   if (dailyCheckoutState.showingFarewell) {
@@ -787,7 +887,55 @@ const ActivityScanningPage: React.FC = () => {
             </h2>
 
             {/* Content area for message or button */}
-            {dailyCheckoutState ? (
+            {showFeedbackPrompt ? (
+              // Feedback prompt UI
+              <div
+                style={{
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '32px',
+                    color: 'rgba(255, 255, 255, 0.95)',
+                    fontWeight: 600,
+                    marginBottom: '32px',
+                  }}
+                >
+                  {dailyCheckoutState?.studentName}
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '32px',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {feedbackButtons.map(({ rating, icon, label }) => (
+                    <button
+                      key={rating}
+                      onClick={() => handleFeedbackSubmit(rating)}
+                      style={FEEDBACK_BUTTON_STYLES.base}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor =
+                          FEEDBACK_BUTTON_STYLES.hover.backgroundColor;
+                        e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor =
+                          FEEDBACK_BUTTON_STYLES.normal.backgroundColor;
+                        e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
+                      }}
+                    >
+                      <FontAwesomeIcon icon={icon} size="4x" />
+                      <span style={{ fontSize: '24px', fontWeight: 700 }}>{label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : dailyCheckoutState ? (
               <>
                 {!dailyCheckoutState.showingFarewell && (
                   <>
@@ -955,59 +1103,35 @@ const ActivityScanningPage: React.FC = () => {
                   zIndex: 2,
                 }}
               >
-                <button
-                  onClick={() => handleDestinationSelect('raumwechsel')}
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                    border: '2px solid rgba(255, 255, 255, 0.5)',
-                    borderRadius: '16px',
-                    color: '#FFFFFF',
-                    fontSize: '28px',
-                    fontWeight: 700,
-                    padding: '20px 48px',
-                    cursor: 'pointer',
-                    transition: 'all 200ms',
-                    outline: 'none',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  Raumwechsel
-                </button>
-
-                {schulhofRoomId && (
-                  <button
-                    onClick={() => handleDestinationSelect('schulhof')}
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                      border: '2px solid rgba(255, 255, 255, 0.5)',
-                      borderRadius: '16px',
-                      color: '#FFFFFF',
-                      fontSize: '28px',
-                      fontWeight: 700,
-                      padding: '20px 48px',
-                      cursor: 'pointer',
-                      transition: 'all 200ms',
-                      outline: 'none',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                      e.currentTarget.style.transform = 'scale(1.05)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }}
-                  >
-                    Schulhof
-                  </button>
-                )}
+                {[
+                  { destination: 'raumwechsel' as const, label: 'Raumwechsel', condition: true },
+                  {
+                    destination: 'schulhof' as const,
+                    label: 'Schulhof',
+                    condition: Boolean(schulhofRoomId),
+                  },
+                ]
+                  .filter(btn => btn.condition)
+                  .map(({ destination, label }) => (
+                    <button
+                      key={destination}
+                      onClick={() => handleDestinationSelect(destination)}
+                      style={DESTINATION_BUTTON_STYLES.base}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor =
+                          DESTINATION_BUTTON_STYLES.hover.backgroundColor;
+                        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor =
+                          DESTINATION_BUTTON_STYLES.normal.backgroundColor;
+                        e.currentTarget.style.transform =
+                          DESTINATION_BUTTON_STYLES.normal.transform;
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
               </div>
 
               {!schulhofRoomId && (

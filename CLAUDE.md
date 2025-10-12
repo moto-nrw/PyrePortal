@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 PyrePortal is a **Raspberry Pi kiosk application** for German after-school care (OGS) that uses RFID scanning for student check-in/check-out. Built with Tauri v2, React 18, and TypeScript 5.6 in strict mode.
 
-**Target deployment**: Raspberry Pi 4 (64-bit), fullscreen kiosk mode, physical RFID reader hardware.
+**Target deployment**: Raspberry Pi 5 (64-bit), fullscreen kiosk mode, physical RFID reader hardware.
 
 ## Development Commands
 
@@ -394,13 +394,13 @@ npm run tauri build
 - Biometric authentication
 - Advanced reporting dashboard
 
-## Platform-Specific: Raspberry Pi 4
+## Platform-Specific: Raspberry Pi 5
 
-**Recommended**: Native 64-bit build (see `docs/pi4-native-build.md`)
+**Recommended**: Native 64-bit build (see `docs/pi5-native-build.md`)
 
 **Performance gain**: 50-80% vs cross-compiled 32-bit
 
-- Build time: 15-30 min on Pi 4
+- Build time: 7-15 min on Pi 5
 - Target: `aarch64-unknown-linux-gnu`
 
 **Deployment**:

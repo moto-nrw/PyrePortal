@@ -1,17 +1,17 @@
-# Raspberry Pi 4 Native 64-bit Build Instructions
+# Raspberry Pi 5 Native 64-bit Build Instructions
 
-This guide provides instructions for building PyrePortal natively on Raspberry Pi 4 with 64-bit Raspberry Pi OS (Bookworm) for optimal performance.
+This guide provides instructions for building PyrePortal natively on Raspberry Pi 5 with 64-bit Raspberry Pi OS (Bookworm) for optimal performance.
 
 ## Prerequisites
 
-- Raspberry Pi 4 Model B (4GB+ RAM recommended)
+- Raspberry Pi 5 Model B (4GB+ RAM recommended)
 - 64-bit Raspberry Pi OS (Bookworm or later)
 - Internet connection
 - At least 4GB free disk space
 
 ## Build Commands
 
-Run these commands on your Raspberry Pi 4:
+Run these commands on your Raspberry Pi 5:
 
 ```bash
 # Install build dependencies
@@ -73,7 +73,7 @@ kill $PID
 
 ## Build Time
 
-- **Expected build time**: 15-30 minutes
+- **Expected build time**: 7-15 minutes
 - **Peak memory usage**: ~2-3GB during compilation
 - **Final binary size**: ~12-15MB
 
@@ -118,7 +118,7 @@ source ~/.bashrc
 
 ## Performance Optimization
 
-For maximum performance on Pi 4:
+For maximum performance on Pi 5:
 
 ```bash
 # GPU memory split (in /boot/firmware/config.txt)
@@ -131,7 +131,7 @@ echo performance | sudo tee /sys/devices/system/cpu/cpu*/cpufreq/scaling_governo
 
 ## Notes
 
-- This builds a native AArch64 (64-bit ARM) binary optimized for Pi 4
+- This builds a native AArch64 (64-bit ARM) binary optimized for Pi 5
 - No cross-compilation required - builds directly on the target hardware
 - Resulting binary will have better performance than the 32-bit cross-compiled version
 - RFID functionality requires appropriate hardware connected via GPIO
