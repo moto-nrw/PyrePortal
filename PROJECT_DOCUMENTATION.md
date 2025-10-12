@@ -31,7 +31,7 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
 
 1. **Primary Users**: OGS staff (teachers/supervisors) who manage student activities
 2. **Secondary Users**: Students (passive - they scan RFID cards)
-3. **Deployment Environment**: Raspberry Pi 4 kiosks in school rooms, running in fullscreen kiosk mode
+3. **Deployment Environment**: Raspberry Pi 5 kiosks in school rooms, running in fullscreen kiosk mode
 
 ### Key Features
 
@@ -737,7 +737,7 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,04:A7:B3:C2:D1:E0:F5
 **Raspberry Pi (Production):**
 
 - Raspberry Pi OS 64-bit (Bookworm recommended)
-- Rust cross-compilation or native build (see `docs/pi4-native-build.md`)
+- Rust cross-compilation or native build (see `docs/pi5-native-build.md`)
 - RFID reader hardware (MFRC522 connected via SPI)
 
 ### Hot Reload / Watch Mode
@@ -1168,7 +1168,7 @@ docs: add verified working kiosk setup documentation
    # See CLAUDE.md for cross-compilation setup
 
    # Option 2: Native build on Pi (slower, reliable)
-   # See docs/pi4-native-build.md
+   # See docs/pi5-native-build.md
    ```
 
 2. **Transfer Binary** (if cross-compiled):
@@ -1195,10 +1195,11 @@ docs: add verified working kiosk setup documentation
    - Create systemd service or desktop autostart entry
    - Ensure kiosk mode is enabled (`TAURI_FULLSCREEN=true`)
 
-**Performance Notes** (from `docs/pi4-native-build.md`):
+**Performance Notes** (from `docs/pi5-native-build.md`):
 
 - **Cross-compiled 32-bit**: 15-25 FPS
-- **Native 64-bit**: 30-45 FPS (recommended)
+- **Pi 4 Native 64-bit**: 30-45 FPS
+- **Pi 5 Native 64-bit**: 45-60 FPS (recommended)
 
 ---
 
@@ -1649,7 +1650,7 @@ try {
 
 ### Performance Considerations
 
-#### 1. Raspberry Pi 4 Limitations
+#### 1. Raspberry Pi Performance
 
 **Issue**: Limited CPU/GPU compared to desktop
 
@@ -1662,7 +1663,8 @@ try {
 **Measured Performance**:
 
 - 32-bit build: 15-25 FPS
-- 64-bit build: 30-45 FPS (recommended)
+- Pi 4 64-bit build: 30-45 FPS
+- Pi 5 64-bit build: 45-60 FPS (recommended)
 
 **Source**: `docs/performance-testing.md`
 
