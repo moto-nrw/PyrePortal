@@ -11,6 +11,63 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
 
+// Button style constants for consistent styling
+const FEEDBACK_BUTTON_STYLES = {
+  base: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    border: '3px solid rgba(255, 255, 255, 0.5)',
+    borderRadius: '24px',
+    color: '#FFFFFF',
+    fontSize: '80px',
+    padding: '32px 48px',
+    cursor: 'pointer',
+    transition: 'all 200ms',
+    outline: 'none',
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center' as const,
+    gap: '16px',
+  },
+  hover: {
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    transform: 'scale(1.1)',
+  },
+  normal: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    transform: 'scale(1)',
+  },
+};
+
+const DESTINATION_BUTTON_STYLES = {
+  base: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    border: '2px solid rgba(255, 255, 255, 0.5)',
+    borderRadius: '16px',
+    color: '#FFFFFF',
+    fontSize: '28px',
+    fontWeight: 700,
+    padding: '20px 48px',
+    cursor: 'pointer',
+    transition: 'all 200ms',
+    outline: 'none',
+  },
+  hover: {
+    backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    transform: 'scale(1.05)',
+  },
+  normal: {
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    transform: 'scale(1)',
+  },
+};
+
+// Button configuration arrays
+const feedbackButtons = [
+  { rating: 'positive' as DailyFeedbackRating, icon: faFaceSmile, label: 'Gut' },
+  { rating: 'neutral' as DailyFeedbackRating, icon: faFaceMeh, label: 'Okay' },
+  { rating: 'negative' as DailyFeedbackRating, icon: faFaceFrown, label: 'Schlecht' },
+];
+
 const ActivityScanningPage: React.FC = () => {
   const navigate = useNavigate();
   const { selectedActivity, selectedRoom, authenticatedUser, rfid } = useUserStore();
@@ -856,98 +913,26 @@ const ActivityScanningPage: React.FC = () => {
                     justifyContent: 'center',
                   }}
                 >
-                  {/* Positive Button */}
-                  <button
-                    onClick={() => handleFeedbackSubmit('positive')}
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                      border: '3px solid rgba(255, 255, 255, 0.5)',
-                      borderRadius: '24px',
-                      color: '#FFFFFF',
-                      fontSize: '80px',
-                      padding: '32px 48px',
-                      cursor: 'pointer',
-                      transition: 'all 200ms',
-                      outline: 'none',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '16px',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                      e.currentTarget.style.transform = 'scale(1.1)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }}
-                  >
-                    <FontAwesomeIcon icon={faFaceSmile} size="4x" />
-                    <span style={{ fontSize: '24px', fontWeight: 700 }}>Gut</span>
-                  </button>
-
-                  {/* Neutral Button */}
-                  <button
-                    onClick={() => handleFeedbackSubmit('neutral')}
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                      border: '3px solid rgba(255, 255, 255, 0.5)',
-                      borderRadius: '24px',
-                      color: '#FFFFFF',
-                      fontSize: '80px',
-                      padding: '32px 48px',
-                      cursor: 'pointer',
-                      transition: 'all 200ms',
-                      outline: 'none',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '16px',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                      e.currentTarget.style.transform = 'scale(1.1)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }}
-                  >
-                    <FontAwesomeIcon icon={faFaceMeh} size="4x" />
-                    <span style={{ fontSize: '24px', fontWeight: 700 }}>Okay</span>
-                  </button>
-
-                  {/* Negative Button */}
-                  <button
-                    onClick={() => handleFeedbackSubmit('negative')}
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                      border: '3px solid rgba(255, 255, 255, 0.5)',
-                      borderRadius: '24px',
-                      color: '#FFFFFF',
-                      fontSize: '80px',
-                      padding: '32px 48px',
-                      cursor: 'pointer',
-                      transition: 'all 200ms',
-                      outline: 'none',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '16px',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                      e.currentTarget.style.transform = 'scale(1.1)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }}
-                  >
-                    <FontAwesomeIcon icon={faFaceFrown} size="4x" />
-                    <span style={{ fontSize: '24px', fontWeight: 700 }}>Schlecht</span>
-                  </button>
+                  {feedbackButtons.map(({ rating, icon, label }) => (
+                    <button
+                      key={rating}
+                      onClick={() => handleFeedbackSubmit(rating)}
+                      style={FEEDBACK_BUTTON_STYLES.base}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor =
+                          FEEDBACK_BUTTON_STYLES.hover.backgroundColor;
+                        e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor =
+                          FEEDBACK_BUTTON_STYLES.normal.backgroundColor;
+                        e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
+                      }}
+                    >
+                      <FontAwesomeIcon icon={icon} size="4x" />
+                      <span style={{ fontSize: '24px', fontWeight: 700 }}>{label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : dailyCheckoutState ? (
@@ -1118,59 +1103,35 @@ const ActivityScanningPage: React.FC = () => {
                   zIndex: 2,
                 }}
               >
-                <button
-                  onClick={() => handleDestinationSelect('raumwechsel')}
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                    border: '2px solid rgba(255, 255, 255, 0.5)',
-                    borderRadius: '16px',
-                    color: '#FFFFFF',
-                    fontSize: '28px',
-                    fontWeight: 700,
-                    padding: '20px 48px',
-                    cursor: 'pointer',
-                    transition: 'all 200ms',
-                    outline: 'none',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  Raumwechsel
-                </button>
-
-                {schulhofRoomId && (
-                  <button
-                    onClick={() => handleDestinationSelect('schulhof')}
-                    style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                      border: '2px solid rgba(255, 255, 255, 0.5)',
-                      borderRadius: '16px',
-                      color: '#FFFFFF',
-                      fontSize: '28px',
-                      fontWeight: 700,
-                      padding: '20px 48px',
-                      cursor: 'pointer',
-                      transition: 'all 200ms',
-                      outline: 'none',
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                      e.currentTarget.style.transform = 'scale(1.05)';
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                      e.currentTarget.style.transform = 'scale(1)';
-                    }}
-                  >
-                    Schulhof
-                  </button>
-                )}
+                {[
+                  { destination: 'raumwechsel' as const, label: 'Raumwechsel', condition: true },
+                  {
+                    destination: 'schulhof' as const,
+                    label: 'Schulhof',
+                    condition: Boolean(schulhofRoomId),
+                  },
+                ]
+                  .filter(btn => btn.condition)
+                  .map(({ destination, label }) => (
+                    <button
+                      key={destination}
+                      onClick={() => handleDestinationSelect(destination)}
+                      style={DESTINATION_BUTTON_STYLES.base}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor =
+                          DESTINATION_BUTTON_STYLES.hover.backgroundColor;
+                        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor =
+                          DESTINATION_BUTTON_STYLES.normal.backgroundColor;
+                        e.currentTarget.style.transform =
+                          DESTINATION_BUTTON_STYLES.normal.transform;
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
               </div>
 
               {!schulhofRoomId && (
