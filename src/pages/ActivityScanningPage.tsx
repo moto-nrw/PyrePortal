@@ -1,3 +1,5 @@
+import { faFaceSmile, faFaceMeh, faFaceFrown } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -881,7 +883,7 @@ const ActivityScanningPage: React.FC = () => {
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
                   >
-                    <span>😊</span>
+                    <FontAwesomeIcon icon={faFaceSmile} />
                     <span style={{ fontSize: '24px', fontWeight: 700 }}>Gut</span>
                   </button>
 
@@ -912,7 +914,7 @@ const ActivityScanningPage: React.FC = () => {
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
                   >
-                    <span>😐</span>
+                    <FontAwesomeIcon icon={faFaceMeh} />
                     <span style={{ fontSize: '24px', fontWeight: 700 }}>Okay</span>
                   </button>
 
@@ -943,7 +945,7 @@ const ActivityScanningPage: React.FC = () => {
                       e.currentTarget.style.transform = 'scale(1)';
                     }}
                   >
-                    <span>😞</span>
+                    <FontAwesomeIcon icon={faFaceFrown} />
                     <span style={{ fontSize: '24px', fontWeight: 700 }}>Schlecht</span>
                   </button>
                 </div>
