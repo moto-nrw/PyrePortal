@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { ContentBox } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
-import { api, type RfidScanResult } from '../services/api';
+import { api, type RfidScanResult, type DailyFeedbackRating } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 
@@ -69,6 +69,9 @@ const ActivityScanningPage: React.FC = () => {
     studentName: string;
     studentId: number;
   } | null>(null);
+
+  // Feedback prompt state
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
 
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
@@ -300,6 +303,34 @@ const ActivityScanningPage: React.FC = () => {
 
       logger.info('Daily checkout attendance toggle successful');
 
+      // Show feedback prompt instead of farewell
+      setShowFeedbackPrompt(true);
+    } catch (error) {
+      logger.error('Failed to toggle attendance', { error });
+      // On error, just close modal (student stays logged in)
+      setDailyCheckoutState(null);
+      setShowFeedbackPrompt(false);
+      hideScanModal();
+    }
+  };
+
+  // Handle feedback submission
+  const handleFeedbackSubmit = async (rating: DailyFeedbackRating) => {
+    if (!dailyCheckoutState || !currentScan) return;
+
+    const { submitDailyFeedback } = useUserStore.getState();
+
+    logger.info('Submitting feedback', {
+      studentId: currentScan.student_id,
+      rating,
+    });
+
+    const success = await submitDailyFeedback(currentScan.student_id, rating);
+
+    if (success) {
+      logger.info('Feedback submitted successfully', { rating });
+      setShowFeedbackPrompt(false);
+
       // Show farewell message
       setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
 
@@ -308,11 +339,16 @@ const ActivityScanningPage: React.FC = () => {
         setDailyCheckoutState(null);
         hideScanModal();
       }, 2000);
-    } catch (error) {
-      logger.error('Failed to toggle attendance', { error });
-      // On error, just close modal (student stays logged in)
-      setDailyCheckoutState(null);
-      hideScanModal();
+    } else {
+      // On error, still show farewell (don't block user from leaving)
+      logger.warn('Feedback submission failed but continuing with checkout');
+      setShowFeedbackPrompt(false);
+      setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+
+      setTimeout(() => {
+        setDailyCheckoutState(null);
+        hideScanModal();
+      }, 2000);
     }
   };
 
@@ -757,6 +793,11 @@ const ActivityScanningPage: React.FC = () => {
               }}
             >
               {(() => {
+                // Feedback prompt
+                if (showFeedbackPrompt) {
+                  return 'Wie war dein Tag?';
+                }
+
                 // Daily checkout state
                 if (dailyCheckoutState) {
                   if (dailyCheckoutState.showingFarewell) {
@@ -787,7 +828,127 @@ const ActivityScanningPage: React.FC = () => {
             </h2>
 
             {/* Content area for message or button */}
-            {dailyCheckoutState ? (
+            {showFeedbackPrompt ? (
+              // Feedback prompt UI
+              <div
+                style={{
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: '32px',
+                    color: 'rgba(255, 255, 255, 0.95)',
+                    fontWeight: 600,
+                    marginBottom: '32px',
+                  }}
+                >
+                  {dailyCheckoutState?.studentName}
+                </div>
+
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '32px',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {/* Positive Button */}
+                  <button
+                    onClick={() => handleFeedbackSubmit('positive')}
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                      border: '3px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
+                      color: '#FFFFFF',
+                      fontSize: '80px',
+                      padding: '32px 48px',
+                      cursor: 'pointer',
+                      transition: 'all 200ms',
+                      outline: 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                      e.currentTarget.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    <span>😊</span>
+                    <span style={{ fontSize: '24px', fontWeight: 700 }}>Gut</span>
+                  </button>
+
+                  {/* Neutral Button */}
+                  <button
+                    onClick={() => handleFeedbackSubmit('neutral')}
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                      border: '3px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
+                      color: '#FFFFFF',
+                      fontSize: '80px',
+                      padding: '32px 48px',
+                      cursor: 'pointer',
+                      transition: 'all 200ms',
+                      outline: 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                      e.currentTarget.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    <span>😐</span>
+                    <span style={{ fontSize: '24px', fontWeight: 700 }}>Okay</span>
+                  </button>
+
+                  {/* Negative Button */}
+                  <button
+                    onClick={() => handleFeedbackSubmit('negative')}
+                    style={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                      border: '3px solid rgba(255, 255, 255, 0.5)',
+                      borderRadius: '24px',
+                      color: '#FFFFFF',
+                      fontSize: '80px',
+                      padding: '32px 48px',
+                      cursor: 'pointer',
+                      transition: 'all 200ms',
+                      outline: 'none',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '16px',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                      e.currentTarget.style.transform = 'scale(1.1)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                      e.currentTarget.style.transform = 'scale(1)';
+                    }}
+                  >
+                    <span>😞</span>
+                    <span style={{ fontSize: '24px', fontWeight: 700 }}>Schlecht</span>
+                  </button>
+                </div>
+              </div>
+            ) : dailyCheckoutState ? (
               <>
                 {!dailyCheckoutState.showingFarewell && (
                   <>
