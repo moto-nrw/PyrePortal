@@ -3,8 +3,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
-import { ContentBox, ErrorModal } from '../components/ui';
+import { ErrorModal } from '../components/ui';
 import { api, type SessionStartRequest } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -174,23 +175,15 @@ function HomeViewPage() {
   // const firstName = authenticatedUser.staffName.split(' ')[0];
 
   return (
-    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
+    <BackgroundWrapper>
+      <div className="w-screen h-screen p-8 overflow-auto">
         {/* NFC Scan button - Top Left */}
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             top: '20px',
             left: '20px',
-            zIndex: 10,
+            zIndex: 50,
           }}
         >
           <button
@@ -260,10 +253,10 @@ function HomeViewPage() {
         {/* Modern logout button - Top Right */}
         <div
           style={{
-            position: 'absolute',
+            position: 'fixed',
             top: '20px',
             right: '20px',
-            zIndex: 10,
+            zIndex: 50,
           }}
         >
           <button
@@ -328,19 +321,20 @@ function HomeViewPage() {
           </button>
         </div>
 
-        {/* Welcome Header */}
+        {/* Welcome Header - Larger for Accessibility */}
         <div
           style={{
             textAlign: 'center',
-            marginBottom: '32px',
+            marginTop: '40px',
+            marginBottom: '48px',
           }}
         >
           <h1
             style={{
-              fontSize: '48px',
-              fontWeight: theme.fonts.weight.bold,
+              fontSize: '56px',
+              fontWeight: 700,
               margin: 0,
-              color: theme.colors.text.primary,
+              color: '#111827',
               lineHeight: 1.2,
             }}
           >
@@ -348,81 +342,55 @@ function HomeViewPage() {
           </h1>
         </div>
 
-        {/* Main Content - Centered */}
+        {/* Main Content - Positioned Higher */}
         <div
           style={{
-            flex: 1,
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-start',
             justifyContent: 'center',
+            paddingTop: '60px',
           }}
         >
-          <div style={{ width: '100%', maxWidth: '720px' }}>
+          <div style={{ width: '100%', maxWidth: '800px' }}>
             {/* Primary Actions Grid */}
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(2, 1fr)',
-                gap: '20px',
+                gap: '24px',
                 marginBottom: '24px',
               }}
             >
-              {/* Activity Button */}
+              {/* Activity Button - Phoenix Clean Style */}
               <button
                 onClick={currentSession ? handleContinueActivity : handleStartActivity}
                 onTouchStart={() => setTouchedButton('activity')}
                 onTouchEnd={() => setTouchedButton(null)}
                 disabled={isValidatingLastSession}
                 style={{
-                  position: 'relative',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  borderRadius: designSystem.borderRadius.xl,
+                  backgroundColor: '#FFFFFF',
+                  border: '2px solid #E5E7EB',
+                  borderRadius: '24px',
                   padding: '32px',
-                  transition: designSystem.transitions.smooth,
+                  transition: 'all 300ms ease-out',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '300px',
+                  minHeight: '280px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '16px',
-                  transform: touchedButton === 'activity' ? designSystem.scales.active : 'scale(1)',
-                  boxShadow:
-                    touchedButton === 'activity'
-                      ? designSystem.shadows.card
-                      : designSystem.shadows.cardHover,
+                  transform: touchedButton === 'activity' ? 'scale(0.98)' : 'scale(1)',
+                  boxShadow: touchedButton === 'activity'
+                    ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+                    : '0 8px 30px rgba(0, 0, 0, 0.12)',
                   opacity: isValidatingLastSession ? 0.7 : 1,
                   cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
                 }}
               >
-                {/* Gradient border */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    borderRadius: designSystem.borderRadius.xl,
-                    background: designSystem.gradients.green,
-                    zIndex: 0,
-                  }}
-                />
-
-                {/* Inner content */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: '3px',
-                    borderRadius: `calc(${designSystem.borderRadius.xl} - 3px)`,
-                    background: designSystem.gradients.light,
-                    backdropFilter: designSystem.glass.blur,
-                    WebkitBackdropFilter: designSystem.glass.blur,
-                    zIndex: 1,
-                  }}
-                />
-
                 {/* Content */}
-                <div style={{ position: 'relative', zIndex: 2 }}>
+                <div>
                   <div
                     style={{
                       width: '80px',
@@ -436,6 +404,18 @@ function HomeViewPage() {
                     }}
                   >
                     {currentSession ? (
+                      // Play/Continue Icon
+                      <svg
+                        width="48"
+                        height="48"
+                        viewBox="0 0 24 24"
+                        fill="#83cd2d"
+                        stroke="none"
+                      >
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    ) : sessionSettings?.use_last_session && sessionSettings.last_session ? (
+                      // Repeat/Replay Icon
                       <svg
                         width="48"
                         height="48"
@@ -443,11 +423,16 @@ function HomeViewPage() {
                         fill="none"
                         stroke="#83cd2d"
                         strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        <circle cx="12" cy="12" r="10" />
-                        <polygon points="10,8 16,12 10,16" fill="#83cd2d" />
+                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                        <path d="M21 3v5h-5" />
+                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                        <path d="M3 21v-5h5" />
                       </svg>
                     ) : (
+                      // Plus Icon
                       <svg
                         width="48"
                         height="48"
@@ -522,10 +507,14 @@ function HomeViewPage() {
                               borderRadius: '9999px',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px',
+                              gap: '6px',
                             }}
                           >
-                            📍 {sessionSettings.last_session.room_name}
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                              <circle cx="12" cy="10" r="3" />
+                            </svg>
+                            {sessionSettings.last_session.room_name}
                           </span>
                           <span
                             style={{
@@ -536,10 +525,15 @@ function HomeViewPage() {
                               borderRadius: '9999px',
                               display: 'flex',
                               alignItems: 'center',
-                              gap: '4px',
+                              gap: '6px',
                             }}
                           >
-                            👥{' '}
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                              <circle cx="9" cy="7" r="4" />
+                              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                            </svg>
                             {selectedSupervisors.length > 0 &&
                             selectedSupervisors.length !==
                               sessionSettings.last_session.supervisor_names.length
@@ -554,60 +548,34 @@ function HomeViewPage() {
                 </div>
               </button>
 
-              {/* Team Management Button */}
+              {/* Team Management Button - Phoenix Clean Style */}
               <button
                 onClick={handleTeamManagement}
                 onTouchStart={() => setTouchedButton('team')}
                 onTouchEnd={() => setTouchedButton(null)}
                 style={{
-                  position: 'relative',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  borderRadius: designSystem.borderRadius.xl,
+                  backgroundColor: '#FFFFFF',
+                  border: '2px solid #E5E7EB',
+                  borderRadius: '24px',
                   padding: '32px',
                   cursor: 'pointer',
-                  transition: designSystem.transitions.smooth,
+                  transition: 'all 300ms ease-out',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '300px',
+                  minHeight: '280px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '16px',
-                  transform: touchedButton === 'team' ? designSystem.scales.active : 'scale(1)',
-                  boxShadow:
-                    touchedButton === 'team'
-                      ? designSystem.shadows.card
-                      : designSystem.shadows.cardHover,
+                  transform: touchedButton === 'team' ? 'scale(0.98)' : 'scale(1)',
+                  boxShadow: touchedButton === 'team'
+                    ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+                    : '0 8px 30px rgba(0, 0, 0, 0.12)',
                 }}
               >
-                {/* Gradient border */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    borderRadius: designSystem.borderRadius.xl,
-                    background: 'linear-gradient(135deg, #9333EA, #7C3AED)',
-                    zIndex: 0,
-                  }}
-                />
-
-                {/* Inner content */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    inset: '3px',
-                    borderRadius: `calc(${designSystem.borderRadius.xl} - 3px)`,
-                    background: designSystem.gradients.light,
-                    backdropFilter: designSystem.glass.blur,
-                    WebkitBackdropFilter: designSystem.glass.blur,
-                    zIndex: 1,
-                  }}
-                />
-
                 {/* Content */}
-                <div style={{ position: 'relative', zIndex: 2 }}>
+                <div>
                   <div
                     style={{
                       width: '80px',
@@ -870,7 +838,7 @@ function HomeViewPage() {
           </div>
         </div>
       )}
-    </ContentBox>
+    </BackgroundWrapper>
   );
 }
 

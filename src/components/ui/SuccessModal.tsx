@@ -57,13 +57,14 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
           style={{
             width: '80px',
             height: '80px',
-            backgroundColor: '#D1FAE5',
+            backgroundColor: '#EFF9E5',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto',
             marginBottom: theme.spacing.lg,
+            boxShadow: '0 4px 12px rgba(131, 205, 45, 0.25)',
           }}
         >
           <svg
@@ -71,7 +72,7 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
             height="40"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#065F46"
+            stroke="#83CD2D"
             strokeWidth="3"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -84,7 +85,7 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
             fontSize: theme.fonts.size.xl,
             fontWeight: theme.fonts.weight.bold,
             marginBottom: theme.spacing.lg,
-            color: '#065F46',
+            color: '#83CD2D',
           }}
         >
           Erfolgreich!
