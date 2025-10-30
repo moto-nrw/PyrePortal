@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox, ErrorModal, SuccessModal } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
+import { ErrorModal, SuccessModal } from '../components/ui';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -201,11 +202,11 @@ function TeamManagementPage() {
   }
 
   return (
-    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+    <BackgroundWrapper>
       <div
         style={{
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100vh',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
@@ -277,11 +278,12 @@ function TeamManagementPage() {
 
         <h1
           style={{
-            fontSize: '36px',
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: '48px',
+            fontSize: '56px',
+            fontWeight: 700,
+            marginTop: '40px',
+            marginBottom: '20px',
             textAlign: 'center',
-            color: theme.colors.text.primary,
+            color: '#111827',
           }}
         >
           Team anpassen
@@ -294,7 +296,7 @@ function TeamManagementPage() {
               color: '#DC2626',
               padding: theme.spacing.md,
               borderRadius: theme.borders.radius.md,
-              marginBottom: theme.spacing.lg,
+              marginBottom: '12px',
               textAlign: 'center',
               fontSize: '16px',
             }}
@@ -331,67 +333,49 @@ function TeamManagementPage() {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(5, 1fr)',
                 gap: '14px',
-                marginBottom: '24px',
-                flex: 1,
+                marginTop: '24px',
+                marginBottom: '0px',
+                // Remove flex expansion so controls sit closer underneath
                 alignContent: 'start',
               }}
             >
               {paginatedUsers.map(user => {
                 const isSelected = isUserSelected(user.id);
                 return (
-                  <div
+                  <button
                     key={user.id}
-                    style={{
-                      background: isSelected
-                        ? designSystem.gradients.green
-                        : designSystem.gradients.blue,
-                      borderRadius: designSystem.borderRadius.xl,
-                      padding: '3px',
-                      cursor: 'pointer',
-                      transition: designSystem.transitions.base,
-                      boxShadow: isSelected
-                        ? designSystem.shadows.green
-                        : designSystem.shadows.blue,
-                    }}
+                    onClick={() => handleUserToggle(user)}
                     onTouchStart={e => {
-                      e.currentTarget.style.transform = designSystem.scales.activeSmall;
-                      e.currentTarget.style.boxShadow = isSelected
-                        ? designSystem.shadows.green
-                        : designSystem.shadows.blue;
+                      e.currentTarget.style.transform = 'scale(0.98)';
                     }}
                     onTouchEnd={e => {
                       setTimeout(() => {
                         if (e.currentTarget) {
                           e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.boxShadow = isSelected
-                            ? designSystem.shadows.green
-                            : designSystem.shadows.blue;
                         }
-                      }, 150);
+                      }, 50);
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '160px',
+                      backgroundColor: '#FFFFFF',
+                      border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
+                      borderRadius: '24px',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '16px',
+                      position: 'relative',
+                      transition: 'all 150ms ease-out',
+                      boxShadow: isSelected
+                        ? '0 8px 30px rgba(131, 205, 45, 0.2)'
+                        : '0 4px 12px rgba(0, 0, 0, 0.08)',
                     }}
                   >
-                    <button
-                      onClick={() => handleUserToggle(user)}
-                      style={{
-                        width: '100%',
-                        height: '160px',
-                        backgroundColor: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: `calc(${designSystem.borderRadius.xl} - 3px)`,
-                        cursor: 'pointer',
-                        outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '16px',
-                        background: designSystem.gradients.light,
-                        backdropFilter: designSystem.glass.blur,
-                        WebkitBackdropFilter: designSystem.glass.blur,
-                        position: 'relative',
-                      }}
-                    >
                       {/* Selection indicator */}
                       <div
                         style={{
@@ -424,23 +408,16 @@ function TeamManagementPage() {
                         )}
                       </div>
 
-                      {/* User Icon with modern glass effect */}
+                      {/* User Icon - Clean solid color */}
                       <div
                         style={{
                           width: '64px',
                           height: '64px',
-                          background: isSelected
-                            ? designSystem.gradients.green
-                            : designSystem.gradients.blue,
+                          backgroundColor: isSelected ? '#DCFCE7' : '#DBEAFE',
                           borderRadius: '50%',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          boxShadow: isSelected
-                            ? designSystem.shadows.green
-                            : designSystem.shadows.blue,
-                          position: 'relative',
-                          overflow: 'hidden',
                         }}
                       >
                         <svg
@@ -448,18 +425,17 @@ function TeamManagementPage() {
                           height="36"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="#FFFFFF"
-                          strokeWidth="2"
+                          stroke={isSelected ? '#16A34A' : '#2563EB'}
+                          strokeWidth="2.5"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          style={{ position: 'relative', zIndex: 1 }}
                         >
                           <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                           <circle cx="12" cy="7" r="4" />
                         </svg>
                       </div>
 
-                      {/* User Name with gradient text */}
+                      {/* User Name - Clean black */}
                       <span
                         style={{
                           fontSize: '18px',
@@ -468,16 +444,12 @@ function TeamManagementPage() {
                           maxWidth: '100%',
                           wordBreak: 'break-word',
                           textAlign: 'center',
-                          background: 'linear-gradient(135deg, #1F2937, #374151)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
+                          color: '#111827',
                         }}
                       >
                         {user.name}
                       </span>
-                    </button>
-                  </div>
+                  </button>
                 );
               })}
 
@@ -541,7 +513,9 @@ function TeamManagementPage() {
                   display: 'flex',
                   justifyContent: 'space-between',
                   alignItems: 'center',
-                  marginTop: '12px',
+                  // Balance spacing with heading → cards gap
+                  marginTop: '24px',
+                  marginBottom: '0px',
                 }}
               >
                 <button
@@ -604,11 +578,12 @@ function TeamManagementPage() {
               </div>
             )}
 
-            {/* Save button */}
+            {/* Save button - Larger */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'center',
+                // Increase separation from pagination for clearer grouping
                 marginTop: '24px',
               }}
             >
@@ -616,17 +591,17 @@ function TeamManagementPage() {
                 onClick={handleSave}
                 disabled={selectedSupervisors.length === 0 || isSaving}
                 style={{
-                  height: '56px',
-                  padding: '0 48px',
-                  fontSize: '18px',
-                  fontWeight: 600,
+                  height: '72px',
+                  padding: '0 64px',
+                  fontSize: '24px',
+                  fontWeight: 700,
                   color: '#FFFFFF',
-                  background:
+                  backgroundColor:
                     selectedSupervisors.length === 0 || isSaving
-                      ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                      : designSystem.gradients.greenRight,
+                      ? '#9CA3AF'
+                      : '#83CD2D',
                   border: 'none',
-                  borderRadius: designSystem.borderRadius.full,
+                  borderRadius: '9999px',
                   cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',
                   transition: designSystem.transitions.base,
                   outline: 'none',
@@ -684,7 +659,7 @@ function TeamManagementPage() {
         `}
         </style>
       </div>
-    </ContentBox>
+    </BackgroundWrapper>
   );
 }
 
