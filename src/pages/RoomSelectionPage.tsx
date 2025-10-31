@@ -43,32 +43,36 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
       style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'rgba(0, 0, 0, 0.45)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        backdropFilter: 'blur(4px)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        padding: '16px',
       }}
     >
       <div
         style={{
           backgroundColor: '#FFFFFF',
-          borderRadius: '24px',
-          padding: '32px',
-          maxWidth: '480px',
-          width: '90%',
+          borderRadius: designSystem.borderRadius.xl,
+          padding: '28px',
+          maxWidth: '560px',
+          width: '92%',
           textAlign: 'center',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          boxShadow:
+            '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          border: '1px solid rgba(229,231,235,0.5)',
           position: 'relative',
-          overflow: 'hidden',
         }}
       >
         {/* Header Icon */}
@@ -102,9 +106,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
         <h2
           style={{
-            fontSize: '28px',
+            fontSize: '32px',
             fontWeight: 700,
-            marginBottom: '16px',
+            marginBottom: '12px',
             color: '#1F2937',
             lineHeight: 1.2,
           }}
@@ -117,9 +121,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           style={{
             backgroundColor: '#F8FAFC',
             borderRadius: designSystem.borderRadius.lg,
-            padding: '24px',
-            marginBottom: '32px',
-            border: '1px solid #E2E8F0',
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #E5E7EB',
           }}
         >
           <div
@@ -127,14 +131,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '24px',
-              marginBottom: '12px',
+              gap: '16px',
+              marginBottom: '8px',
             }}
           >
             <div
               style={{
-                fontSize: '20px',
-                fontWeight: 600,
+                fontSize: '18px',
+                fontWeight: 700,
                 color: '#1F2937',
                 display: 'flex',
                 alignItems: 'center',
@@ -159,7 +163,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
             <div
               style={{
-                fontSize: '16px',
+                fontSize: '14px',
                 fontWeight: 600,
                 color: '#9CA3AF',
               }}
@@ -180,7 +184,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#f87C10"
+                stroke="#4f46e5"
                 strokeWidth="2"
               >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
@@ -195,8 +199,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             <div
               style={{
                 fontSize: '14px',
-                color: '#9CA3AF',
-                marginBottom: '4px',
+                color: '#6B7280',
+                marginBottom: '0px',
               }}
             >
               Typ: {room.room_type}
@@ -207,18 +211,18 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         {/* Supervisors */}
         <div
           style={{
-            backgroundColor: '#F0F9FF',
+            backgroundColor: '#F9FAFB',
             borderRadius: designSystem.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '32px',
-            border: '1px solid #BAE6FD',
+            padding: '16px',
+            marginBottom: '20px',
+            border: '1px solid #E5E7EB',
           }}
         >
           <div
             style={{
               fontSize: '14px',
-              fontWeight: 600,
-              color: '#0369A1',
+              fontWeight: 700,
+              color: '#374151',
               marginBottom: '12px',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -238,12 +242,12 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 key={supervisor.id}
                 style={{
                   backgroundColor: '#FFFFFF',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
+                  padding: '8px 12px',
+                  borderRadius: '16px',
                   fontSize: '14px',
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: '#1F2937',
-                  border: '1px solid #E0E7FF',
+                  border: '1px solid #E5E7EB',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
@@ -273,8 +277,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             disabled={isLoading}
             style={{
               flex: 1,
-              height: '52px',
-              fontSize: '16px',
+              height: '64px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#6B7280',
               backgroundColor: 'transparent',
@@ -307,8 +311,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             disabled={isLoading}
             style={{
               flex: 1,
-              height: '52px',
-              fontSize: '16px',
+              height: '64px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#FFFFFF',
               background: isLoading
@@ -623,8 +627,8 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
             disabled={isLoading}
             style={{
               flex: 1,
-              height: '52px',
-              fontSize: '16px',
+              height: '64px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#6B7280',
               backgroundColor: 'transparent',
@@ -657,8 +661,8 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
             disabled={isLoading}
             style={{
               flex: 1,
-              height: '52px',
-              fontSize: '16px',
+              height: '64px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#FFFFFF',
               background: isLoading
@@ -686,7 +690,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
               }
             }}
           >
-            {isLoading ? 'Überschreibe...' : 'Session überschreiben'}
+            {isLoading ? 'Starte...' : 'Trotzdem starten'}
           </button>
         </div>
       </div>
