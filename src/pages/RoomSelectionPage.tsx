@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
 import { api, type Room, type SessionStartRequest, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -1024,11 +1024,11 @@ function RoomSelectionPage() {
   }
 
   return (
-    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+    <BackgroundWrapper>
       <div
         style={{
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100vh',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
@@ -1100,11 +1100,12 @@ function RoomSelectionPage() {
 
         <h1
           style={{
-            fontSize: '36px',
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: '48px',
+            fontSize: '56px',
+            fontWeight: 700,
+            marginTop: '40px',
+            marginBottom: '20px',
             textAlign: 'center',
-            color: theme.colors.text.primary,
+            color: '#111827',
           }}
         >
           Raum auswählen
@@ -1201,90 +1202,95 @@ function RoomSelectionPage() {
                   display: 'grid',
                   gridTemplateColumns: 'repeat(5, 1fr)',
                   gap: '14px',
-                  marginBottom: '12px',
-                  flex: 1,
+                  marginTop: '24px',
+                  marginBottom: '0px',
                   alignContent: 'start',
                 }}
               >
                 {paginatedRooms.map(room => {
                   const isOccupied = room.is_occupied;
+                  const isSelected = selectedRoom?.id === room.id;
                   return (
                     <button
                       key={room.id}
                       onClick={() => !isOccupied && handleRoomSelect(room)}
                       disabled={isOccupied}
                       style={{
+                        width: '100%',
                         height: '160px',
-                        padding: '16px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        borderRadius: designSystem.borderRadius.xl,
-                        fontSize: '18px',
-                        fontWeight: 600,
-                        color: isOccupied ? '#9CA3AF' : designSystem.colors.textPrimary,
+                        backgroundColor: '#FFFFFF',
+                        border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
+                        borderRadius: '24px',
                         cursor: isOccupied ? 'not-allowed' : 'pointer',
-                        transition: designSystem.transitions.smooth,
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        textAlign: 'center',
-                        outline: 'none',
+                        gap: '16px',
                         position: 'relative',
-                        overflow: 'hidden',
-                        minWidth: '0',
-                        gap: '12px',
-                        WebkitTapHighlightColor: 'transparent',
+                        transition: 'all 150ms ease-out',
+                        boxShadow: isSelected
+                          ? '0 8px 30px rgba(131, 205, 45, 0.2)'
+                          : '0 4px 12px rgba(0, 0, 0, 0.08)',
                         opacity: isOccupied ? 0.6 : 1,
-                        boxShadow: designSystem.shadows.card,
                       }}
                       onTouchStart={e => {
-                        if (!isOccupied) {
-                          e.currentTarget.style.transform = designSystem.scales.active;
-                          e.currentTarget.style.boxShadow = designSystem.shadows.card;
-                        }
+                        if (!isOccupied) e.currentTarget.style.transform = 'scale(0.98)';
                       }}
                       onTouchEnd={e => {
-                        if (!isOccupied) {
+                        if (!isOccupied)
                           setTimeout(() => {
-                            if (e.currentTarget) {
-                              e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.boxShadow = designSystem.shadows.card;
-                            }
-                          }, 150);
-                        }
+                            if (e.currentTarget) e.currentTarget.style.transform = 'scale(1)';
+                          }, 50);
                       }}
                     >
-                      {/* Gradient border wrapper - Orange for available, gray for occupied */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          borderRadius: designSystem.borderRadius.xl,
-                          background: isOccupied
-                            ? 'linear-gradient(135deg, #9CA3AF, #6B7280)'
-                            : 'linear-gradient(135deg, #f87C10, #e06c0a)',
-                          zIndex: 0,
-                        }}
-                      />
+                      {/* Selection indicator */}
+                      {!isOccupied && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            backgroundColor: isSelected
+                              ? designSystem.colors.primaryGreen
+                              : '#E5E7EB',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 200ms',
+                          }}
+                        >
+                          {isSelected && (
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="#FFFFFF"
+                              strokeWidth="3"
+                            >
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      )}
 
-                      {/* Inner content wrapper for border effect */}
+                      {/* Room Icon - circle tint + dark indigo icon */}
                       <div
                         style={{
-                          position: 'absolute',
-                          inset: '2px',
-                          borderRadius: `calc(${designSystem.borderRadius.xl} - 2px)`,
-                          background: designSystem.gradients.light,
-                          backdropFilter: designSystem.glass.blur,
-                          WebkitBackdropFilter: designSystem.glass.blur,
-                          zIndex: 1,
-                        }}
-                      />
-
-                      {/* Room Icon */}
-                      <div
-                        style={{
-                          color: isOccupied ? '#9CA3AF' : '#f87C10',
+                          width: '64px',
+                          height: '64px',
+                          backgroundColor: isOccupied ? '#F3F4F6' : 'rgba(99,102,241,0.15)',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: isOccupied ? '#9CA3AF' : '#4f46e5',
                           position: 'relative',
                           zIndex: 2,
                         }}
@@ -1296,13 +1302,12 @@ function RoomSelectionPage() {
                       <span
                         style={{
                           fontSize: '18px',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           lineHeight: '1.2',
                           maxWidth: '100%',
                           wordBreak: 'break-word',
-                          color: '#1F2937',
-                          position: 'relative',
-                          zIndex: 2,
+                          textAlign: 'center',
+                          color: '#111827',
                         }}
                       >
                         {room.name}
@@ -1310,42 +1315,10 @@ function RoomSelectionPage() {
 
                       {/* Room capacity info */}
                       {room.capacity && (
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            color: '#6B7280',
-                            position: 'relative',
-                            zIndex: 2,
-                          }}
-                        >
+                        <div style={{ fontSize: '12px', color: '#6B7280' }}>
                           {room.capacity} Plätze
                         </div>
                       )}
-
-                      {/* Availability Badge */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          backgroundColor: isOccupied ? '#EF4444' : '#10B981',
-                          color: '#FFFFFF',
-                          padding: '4px 8px',
-                          borderRadius: designSystem.borderRadius.md,
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          zIndex: 3,
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                        }}
-                      >
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="12" r="10" />
-                        </svg>
-                        {isOccupied ? 'Belegt' : 'Verfügbar'}
-                      </div>
                     </button>
                   );
                 })}
@@ -1409,10 +1382,11 @@ function RoomSelectionPage() {
             {totalPages > 1 && (
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto 1fr',
                   alignItems: 'center',
-                  marginTop: '12px',
+                  marginTop: '24px',
+                  width: '100%',
                 }}
               >
                 <button
@@ -1434,6 +1408,7 @@ function RoomSelectionPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: 'none',
+                    justifySelf: 'start',
                   }}
                 >
                   ← Vorherige
@@ -1444,6 +1419,7 @@ function RoomSelectionPage() {
                     fontSize: '18px',
                     color: theme.colors.text.secondary,
                     fontWeight: 500,
+                    justifySelf: 'center',
                   }}
                 >
                   Seite {currentPage + 1} von {totalPages}
@@ -1468,6 +1444,7 @@ function RoomSelectionPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: 'none',
+                    justifySelf: 'end',
                   }}
                 >
                   Nächste →
@@ -1512,7 +1489,7 @@ function RoomSelectionPage() {
         onCancel={handleConflictCancel}
         isLoading={isStartingSession}
       />
-    </ContentBox>
+    </BackgroundWrapper>
   );
 }
 

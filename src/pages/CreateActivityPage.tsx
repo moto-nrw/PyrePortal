@@ -495,21 +495,21 @@ function CreateActivityPage() {
                         )}
                       </div>
 
-                      {/* Activity Icon - clean solid circle (Moto green when selected) */}
+                      {/* Activity Icon - circle tint + dark icon color per spec */}
                       <div
                         style={{
                           width: '64px',
                           height: '64px',
                           backgroundColor: isSelected
                             ? 'rgba(131,205,45,0.15)'
-                            : '#DBEAFE',
+                            : 'rgba(255,49,48,0.15)',
                           borderRadius: '50%',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           color: isSelected
                             ? designSystem.colors.primaryGreen
-                            : '#2563EB',
+                            : '#e02020',
                         }}
                       >
                         {getCategoryIcon()}
