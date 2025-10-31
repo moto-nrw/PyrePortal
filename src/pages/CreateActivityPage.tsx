@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -11,8 +11,15 @@ import { createLogger, logNavigation, logUserAction, logError } from '../utils/l
 const ACTIVITIES_PER_PAGE = 10; // 5x2 grid to match UserSelectionPage
 
 function CreateActivityPage() {
-  const { authenticatedUser, isLoading, error, logout, fetchActivities, setSelectedActivity } =
-    useUserStore();
+  const {
+    authenticatedUser,
+    isLoading,
+    error,
+    logout,
+    fetchActivities,
+    setSelectedActivity,
+    selectedActivity,
+  } = useUserStore();
 
   const [activities, setActivities] = useState<ActivityResponse[]>([]);
   const [isFetching, setIsFetching] = useState(false);
@@ -130,7 +137,7 @@ function CreateActivityPage() {
     };
   }, [authenticatedUser, navigate, logger, fetchActivitiesData]);
 
-  // Handle activity selection
+  // Handle activity selection (no immediate navigation; mirror Team auswählen flow)
   const handleActivitySelect = (activity: ActivityResponse) => {
     try {
       logger.info('Activity selected', {
@@ -147,21 +154,25 @@ function CreateActivityPage() {
         roomName: activity.room_name,
       });
 
-      // Store the selected activity for the room selection page
+      // Store the selected activity; navigation happens on Continue
       setSelectedActivity(activity);
-
-      // Navigate to staff selection with selected activity
-      logNavigation('CreateActivityPage', 'StaffSelectionPage', {
-        reason: 'activity_selected',
-        activityId: activity.id,
-      });
-      void navigate('/staff-selection');
     } catch (error) {
       logError(
         error instanceof Error ? error : new Error(String(error)),
         'CreateActivityPage.handleActivitySelect'
       );
     }
+  };
+
+  // Continue to team selection (requires selectedActivity)
+  const handleContinue = () => {
+    if (!selectedActivity) return;
+
+    logNavigation('CreateActivityPage', 'StaffSelectionPage', {
+      reason: 'activity_confirmed',
+      activityId: selectedActivity.id,
+    });
+    void navigate('/staff-selection');
   };
 
   // Handle back button - navigate to home
@@ -220,11 +231,11 @@ function CreateActivityPage() {
   }
 
   return (
-    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+    <BackgroundWrapper>
       <div
         style={{
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100vh',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
@@ -296,11 +307,12 @@ function CreateActivityPage() {
 
         <h1
           style={{
-            fontSize: '36px',
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: '48px',
+            fontSize: '56px',
+            fontWeight: 700,
+            marginTop: '40px',
+            marginBottom: '20px',
             textAlign: 'center',
-            color: theme.colors.text.primary,
+            color: '#111827',
           }}
         >
           Aktivität auswählen
@@ -398,47 +410,44 @@ function CreateActivityPage() {
                   display: 'grid',
                   gridTemplateColumns: 'repeat(5, 1fr)',
                   gap: '14px',
-                  marginBottom: '12px',
-                  flex: 1,
+                  marginTop: '24px',
+                  marginBottom: '0px',
+                  // Remove flex expansion so controls sit closer underneath
                   alignContent: 'start',
                 }}
               >
                 {paginatedActivities.map(activity => {
                   const isActive = activity.is_active;
+                  const isSelected = selectedActivity?.id === activity.id;
                   return (
                     <button
                       key={activity.id}
                       onClick={() => !isActive && handleActivitySelect(activity)}
                       disabled={isActive}
                       style={{
+                        width: '100%',
                         height: '160px',
-                        padding: '16px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        borderRadius: designSystem.borderRadius.xl,
-                        fontSize: '18px',
-                        fontWeight: 600,
-                        color: designSystem.colors.textPrimary,
+                        backgroundColor: '#FFFFFF',
+                        border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
+                        borderRadius: '24px',
                         cursor: isActive ? 'not-allowed' : 'pointer',
-                        transition: designSystem.transitions.smooth,
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        textAlign: 'center',
-                        outline: 'none',
+                        gap: '16px',
                         position: 'relative',
-                        overflow: 'hidden',
-                        minWidth: '0',
-                        gap: '12px',
-                        WebkitTapHighlightColor: 'transparent',
+                        transition: 'all 150ms ease-out',
+                        boxShadow: isSelected
+                          ? '0 8px 30px rgba(131, 205, 45, 0.2)'
+                          : '0 4px 12px rgba(0, 0, 0, 0.08)',
                         opacity: isActive ? 0.6 : 1,
-                        boxShadow: designSystem.shadows.card,
                       }}
                       onTouchStart={e => {
                         if (!isActive) {
-                          e.currentTarget.style.transform = designSystem.scales.active;
-                          e.currentTarget.style.boxShadow = designSystem.shadows.card;
+                          e.currentTarget.style.transform = 'scale(0.98)';
                         }
                       }}
                       onTouchEnd={e => {
@@ -446,44 +455,61 @@ function CreateActivityPage() {
                           setTimeout(() => {
                             if (e.currentTarget) {
                               e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.boxShadow = designSystem.shadows.card;
                             }
                           }, 150);
                         }
                       }}
                     >
-                      {/* Gradient border wrapper - Gray for active, Blue for available */}
+                      {/* Removed gradient wrappers to match Team cards */}
+
+                      {/* Selection indicator */}
                       <div
                         style={{
                           position: 'absolute',
-                          inset: 0,
-                          borderRadius: designSystem.borderRadius.xl,
-                          background: isActive
-                            ? 'linear-gradient(135deg, #9CA3AF, #6B7280)'
-                            : designSystem.gradients.blue,
-                          zIndex: 0,
-                        }}
-                      />
-
-                      {/* Inner content wrapper for border effect */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: '2px',
-                          borderRadius: `calc(${designSystem.borderRadius.xl} - 2px)`,
-                          background: designSystem.gradients.light,
-                          backdropFilter: designSystem.glass.blur,
-                          WebkitBackdropFilter: designSystem.glass.blur,
-                          zIndex: 1,
-                        }}
-                      />
-
-                      {/* Activity Icon */}
-                      <div
-                        style={{
-                          color: designSystem.colors.primaryBlue,
-                          position: 'relative',
+                          top: '12px',
+                          right: '12px',
+                          width: '24px',
+                          height: '24px',
+                          borderRadius: '50%',
+                          backgroundColor: isSelected
+                            ? designSystem.colors.primaryGreen
+                            : '#E5E7EB',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          transition: 'all 200ms',
                           zIndex: 2,
+                        }}
+                      >
+                        {isSelected && (
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="#FFFFFF"
+                            strokeWidth="3"
+                          >
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                        )}
+                      </div>
+
+                      {/* Activity Icon - clean solid circle (Moto green when selected) */}
+                      <div
+                        style={{
+                          width: '64px',
+                          height: '64px',
+                          backgroundColor: isSelected
+                            ? 'rgba(131,205,45,0.15)'
+                            : '#DBEAFE',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: isSelected
+                            ? designSystem.colors.primaryGreen
+                            : '#2563EB',
                         }}
                       >
                         {getCategoryIcon()}
@@ -505,45 +531,7 @@ function CreateActivityPage() {
                         {activity.name}
                       </span>
 
-                      {/* Enrollment info - only show if data is available */}
-                      {activity.enrollment_count !== undefined &&
-                        activity.max_participants !== undefined && (
-                          <div
-                            style={{
-                              fontSize: '12px',
-                              color: '#6B7280',
-                              position: 'relative',
-                              zIndex: 2,
-                            }}
-                          >
-                            {activity.enrollment_count}/{activity.max_participants}
-                          </div>
-                        )}
-
-                      {/* Activity Status Badge */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          backgroundColor: isActive ? '#EF4444' : '#10B981',
-                          color: '#FFFFFF',
-                          padding: '4px 8px',
-                          borderRadius: '12px',
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          zIndex: 3,
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                        }}
-                      >
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="12" r="10" />
-                        </svg>
-                        {isActive ? 'Aktiv' : 'Verfügbar'}
-                      </div>
+                      {/* No extra info lines or status badge to match Team cards */}
                     </button>
                   );
                 })}
@@ -608,10 +596,12 @@ function CreateActivityPage() {
             {totalPages > 1 && (
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto 1fr',
                   alignItems: 'center',
-                  marginTop: '12px',
+                  // Match Team page spacing
+                  marginTop: '24px',
+                  width: '100%',
                 }}
               >
                 <button
@@ -633,6 +623,7 @@ function CreateActivityPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: 'none',
+                    justifySelf: 'start',
                   }}
                 >
                   ← Vorherige
@@ -643,6 +634,7 @@ function CreateActivityPage() {
                     fontSize: '18px',
                     color: theme.colors.text.secondary,
                     fontWeight: 500,
+                    justifySelf: 'center',
                   }}
                 >
                   Seite {currentPage + 1} von {totalPages}
@@ -667,12 +659,60 @@ function CreateActivityPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: 'none',
+                    justifySelf: 'end',
                   }}
                 >
                   Nächste →
                 </button>
               </div>
             )}
+
+            {/* Continue button */}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                // Match Team page spacing
+                marginTop: '24px',
+              }}
+            >
+              <button
+                onClick={handleContinue}
+                disabled={!selectedActivity}
+                style={{
+                  height: '56px',
+                  padding: '0 48px',
+                  fontSize: '24px',
+                  fontWeight: 600,
+                  color: '#FFFFFF',
+                  background: !selectedActivity
+                    ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                    : designSystem.gradients.greenRight,
+                  border: 'none',
+                  borderRadius: designSystem.borderRadius.full,
+                  cursor: !selectedActivity ? 'not-allowed' : 'pointer',
+                  transition: designSystem.transitions.base,
+                  outline: 'none',
+                  WebkitTapHighlightColor: 'transparent',
+                  boxShadow: !selectedActivity ? 'none' : designSystem.shadows.green,
+                  opacity: !selectedActivity ? 0.6 : 1,
+                }}
+                onTouchStart={e => {
+                  if (selectedActivity) {
+                    e.currentTarget.style.transform = designSystem.scales.active;
+                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
+                  }
+                }}
+                onTouchEnd={e => {
+                  if (selectedActivity) {
+                    e.currentTarget.style.transform = 'scale(1)';
+                    e.currentTarget.style.boxShadow = designSystem.shadows.green;
+                  }
+                }}
+              >
+                Weiter
+              </button>
+            </div>
           </>
         )}
 
@@ -686,7 +726,7 @@ function CreateActivityPage() {
           `}
         </style>
       </div>
-    </ContentBox>
+    </BackgroundWrapper>
   );
 }
 
