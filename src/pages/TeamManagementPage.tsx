@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
@@ -28,6 +28,9 @@ function TeamManagementPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  // Track selection order so selected supervisors can be shown first (chronologically)
+  const [selectionOrder, setSelectionOrder] = useState<Map<number, number>>(new Map());
+  const orderCounter = useRef(0);
   const navigate = useNavigate();
 
   // Create logger instance for this component
@@ -89,13 +92,40 @@ function TeamManagementPage() {
     logger,
   ]);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(users.length / USERS_PER_PAGE);
+  // Initialize selection order from existing selected supervisors (e.g., from session)
+  useEffect(() => {
+    if (selectionOrder.size === 0 && selectedSupervisors.length > 0) {
+      const map = new Map<number, number>();
+      selectedSupervisors.forEach((s, idx) => map.set(s.id, idx + 1));
+      setSelectionOrder(map);
+      orderCounter.current = selectedSupervisors.length;
+    }
+  }, [selectedSupervisors, selectionOrder.size]);
+
+  // Sort users: selected first (by chronological selection), then others alphabetically
+  const sortedUsers = useMemo(() => {
+    const selectedIds = new Set(selectedSupervisors.map(s => s.id));
+    return [...users].sort((a, b) => {
+      const aSel = selectedIds.has(a.id);
+      const bSel = selectedIds.has(b.id);
+      if (aSel && !bSel) return -1;
+      if (!aSel && bSel) return 1;
+      if (aSel && bSel) {
+        const ao = selectionOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const bo = selectionOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        return ao - bo;
+      }
+      return a.name.localeCompare(b.name, 'de');
+    });
+  }, [users, selectedSupervisors, selectionOrder]);
+
+  // Calculate pagination based on sorted list
+  const totalPages = Math.ceil(sortedUsers.length / USERS_PER_PAGE);
   const paginatedUsers = useMemo(() => {
     const start = currentPage * USERS_PER_PAGE;
     const end = start + USERS_PER_PAGE;
-    return users.slice(start, end);
-  }, [users, currentPage]);
+    return sortedUsers.slice(start, end);
+  }, [sortedUsers, currentPage]);
 
   // Calculate empty slots to maintain grid layout
   const emptySlots = useMemo(() => {
@@ -112,6 +142,23 @@ function TeamManagementPage() {
       userId: user.id,
       wasSelected: selectedSupervisors.some(s => s.id === user.id),
     });
+
+    const wasSelected = selectedSupervisors.some(s => s.id === user.id);
+    if (wasSelected) {
+      // Remove from selection order map
+      if (selectionOrder.has(user.id)) {
+        const next = new Map(selectionOrder);
+        next.delete(user.id);
+        setSelectionOrder(next);
+      }
+    } else {
+      // Add with next chronological order
+      const next = new Map(selectionOrder);
+      next.set(user.id, ++orderCounter.current);
+      setSelectionOrder(next);
+      // Jump to page 1 to reveal selected at the front
+      setCurrentPage(0);
+    }
 
     toggleSupervisor(user);
 
