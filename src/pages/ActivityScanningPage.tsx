@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import { api, type RfidScanResult, type DailyFeedbackRating } from '../services/api';
 import { useUserStore } from '../store/userStore';
@@ -502,7 +502,17 @@ const ActivityScanningPage: React.FC = () => {
 
   return (
     <>
-      <ContentBox centered shadow="md" rounded="lg">
+      <BackgroundWrapper>
+        <div
+          style={{
+            width: '100vw',
+            height: '100vh',
+            padding: '16px',
+            display: 'flex',
+            flexDirection: 'column',
+            position: 'relative',
+          }}
+        >
         {/* Anmelden Button - Top Right of ContentBox */}
         <button
           onClick={handleAnmelden}
@@ -570,13 +580,19 @@ const ActivityScanningPage: React.FC = () => {
           }}
         >
           {/* Header Section */}
-          <div style={{ textAlign: 'center', marginTop: '-40px', marginBottom: '48px' }}>
+          <div
+            style={{
+              textAlign: 'center',
+              marginTop: '40px',
+              marginBottom: '20px',
+            }}
+          >
             <h1
               style={{
                 fontSize: '56px',
                 fontWeight: 700,
-                color: '#1F2937',
-                margin: '0 0 20px 0',
+                color: '#111827',
+                margin: 0,
                 lineHeight: 1.2,
               }}
             >
@@ -638,7 +654,8 @@ const ActivityScanningPage: React.FC = () => {
             />
           </div>
         </div>
-      </ContentBox>
+        </div>
+      </BackgroundWrapper>
 
       {/* Check-in/Check-out Modal */}
       {showModal && currentScan && (
