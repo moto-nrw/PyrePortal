@@ -8,6 +8,7 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
+import { designSystem } from '../styles/designSystem';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
 
@@ -511,20 +512,41 @@ function TagAssignmentPage() {
                   onClick={handleStartScanning}
                   disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
                   style={{
-                    height: '60px',
-                    padding: '0 48px',
-                    fontSize: '20px',
-                    fontWeight: 600,
-                    backgroundColor: '#5080D8',
-                    color: 'white',
+                    height: '72px',
+                    padding: '0 64px',
+                    fontSize: '24px',
+                    fontWeight: 700,
+                    color: '#FFFFFF',
+                    background:
+                      isLoading || (!scannerStatus?.is_available && isTauriContext())
+                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                        : designSystem.gradients.greenRight,
                     border: 'none',
-                    borderRadius: '30px',
-                    cursor: 'pointer',
+                    borderRadius: designSystem.borderRadius.full,
+                    cursor:
+                      isLoading || (!scannerStatus?.is_available && isTauriContext())
+                        ? 'not-allowed'
+                        : 'pointer',
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
-                    boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
+                    boxShadow:
+                      isLoading || (!scannerStatus?.is_available && isTauriContext())
+                        ? 'none'
+                        : designSystem.shadows.green,
                     opacity:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.5 : 1,
+                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.6 : 1,
+                  }}
+                  onTouchStart={e => {
+                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                      e.currentTarget.style.transform = designSystem.scales.active;
+                      e.currentTarget.style.boxShadow = designSystem.shadows.button;
+                    }
+                  }}
+                  onTouchEnd={e => {
+                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = designSystem.shadows.green;
+                    }
                   }}
                 >
                   Schüler auswählen
@@ -694,17 +716,32 @@ function TagAssignmentPage() {
                     disabled={isLoading}
                     style={{
                       flex: 1,
-                      height: '56px',
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      backgroundColor: '#5080D8',
-                      color: 'white',
+                      height: '64px',
+                      fontSize: '24px',
+                      fontWeight: 700,
+                      color: '#FFFFFF',
+                      background: isLoading
+                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                        : designSystem.gradients.greenRight,
                       border: 'none',
-                      borderRadius: '28px',
-                      cursor: 'pointer',
+                      borderRadius: designSystem.borderRadius.full,
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
+                      boxShadow: isLoading ? 'none' : designSystem.shadows.green,
+                      opacity: isLoading ? 0.6 : 1,
+                    }}
+                    onTouchStart={e => {
+                      if (!isLoading) {
+                        e.currentTarget.style.transform = designSystem.scales.active;
+                        e.currentTarget.style.boxShadow = designSystem.shadows.button;
+                      }
+                    }}
+                    onTouchEnd={e => {
+                      if (!isLoading) {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = designSystem.shadows.green;
+                      }
                     }}
                   >
                     {tagAssignment.assigned ? 'Neuen Schüler zuweisen' : 'Schüler auswählen'}
@@ -713,16 +750,24 @@ function TagAssignmentPage() {
                     onClick={handleScanAnother}
                     style={{
                       flex: 1,
-                      height: '56px',
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      backgroundColor: 'white',
+                      height: '64px',
+                      fontSize: '24px',
+                      fontWeight: 700,
+                      backgroundColor: '#FFFFFF',
                       color: '#374151',
                       border: '2px solid #E5E7EB',
-                      borderRadius: '28px',
+                      borderRadius: designSystem.borderRadius.full,
                       cursor: 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
+                    }}
+                    onTouchStart={e => {
+                      e.currentTarget.style.backgroundColor = '#F9FAFB';
+                      e.currentTarget.style.borderColor = '#D1D5DB';
+                    }}
+                    onTouchEnd={e => {
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      e.currentTarget.style.borderColor = '#E5E7EB';
                     }}
                   >
                     Neuer Scan
