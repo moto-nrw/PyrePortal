@@ -520,7 +520,7 @@ function TagAssignmentPage() {
                     background:
                       isLoading || (!scannerStatus?.is_available && isTauriContext())
                         ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                        : designSystem.gradients.greenRight,
+                        : designSystem.gradients.blueRight,
                     border: 'none',
                     borderRadius: designSystem.borderRadius.full,
                     cursor:
@@ -532,7 +532,7 @@ function TagAssignmentPage() {
                     boxShadow:
                       isLoading || (!scannerStatus?.is_available && isTauriContext())
                         ? 'none'
-                        : designSystem.shadows.green,
+                        : designSystem.shadows.blue,
                     opacity:
                       isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.6 : 1,
                   }}
@@ -545,7 +545,7 @@ function TagAssignmentPage() {
                   onTouchEnd={e => {
                     if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
                       e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = designSystem.shadows.green;
+                      e.currentTarget.style.boxShadow = designSystem.shadows.blue;
                     }
                   }}
                 >
@@ -722,13 +722,13 @@ function TagAssignmentPage() {
                       color: '#FFFFFF',
                       background: isLoading
                         ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                        : designSystem.gradients.greenRight,
+                        : designSystem.gradients.blueRight,
                       border: 'none',
                       borderRadius: designSystem.borderRadius.full,
                       cursor: isLoading ? 'not-allowed' : 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: isLoading ? 'none' : designSystem.shadows.green,
+                      boxShadow: isLoading ? 'none' : designSystem.shadows.blue,
                       opacity: isLoading ? 0.6 : 1,
                     }}
                     onTouchStart={e => {
@@ -740,7 +740,7 @@ function TagAssignmentPage() {
                     onTouchEnd={e => {
                       if (!isLoading) {
                         e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = designSystem.shadows.green;
+                        e.currentTarget.style.boxShadow = designSystem.shadows.blue;
                       }
                     }}
                   >
