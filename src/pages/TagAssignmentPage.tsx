@@ -582,51 +582,47 @@ function TagAssignmentPage() {
             {/* Tag Scanned - Show Assignment Options */}
             {scannedTag && tagAssignment && !isLoading && !success && (
               <div style={{ width: '100%', maxWidth: '600px' }}>
-                {/* Tag Display Card */}
+                {/* Tag Display Card - modern clean style */}
                 <div
                   style={{
-                    background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
+                    backgroundColor: '#FFFFFF',
+                    border: '2px solid #E5E7EB',
                     borderRadius: '24px',
-                    padding: '3px',
-                    marginBottom: '32px',
+                    padding: '24px',
+                    textAlign: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    marginBottom: '24px',
                   }}
                 >
+                  {/* Tag chip */}
                   <div
                     style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '21px',
-                      padding: '32px',
-                      textAlign: 'center',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '10px 20px',
+                      backgroundColor: '#EFF6FF',
+                      borderRadius: '9999px',
+                      marginBottom: '16px',
                     }}
                   >
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px 24px',
-                        backgroundColor: '#F3F4F6',
-                        borderRadius: '16px',
-                        marginBottom: '20px',
-                      }}
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#5080D8"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
-                      <svg
-                        width="24"
-                        height="24"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#5080D8"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                        <polyline points="22 4 12 14.01 9 11.01" />
-                      </svg>
-                      <span style={{ fontSize: '18px', fontWeight: 600, color: '#374151' }}>
-                        Tag: {scannedTag}
-                      </span>
-                    </div>
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                      <polyline points="22 4 12 14.01 9 11.01" />
+                    </svg>
+                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#1F2937' }}>
+                      Tag: {scannedTag}
+                    </span>
+                  </div>
 
                     {/* Current Assignment Status */}
                     {tagAssignment.assigned && tagAssignment.student ? (
@@ -660,46 +656,37 @@ function TagAssignmentPage() {
                         </p>
                       </div>
                     ) : (
-                      <div>
-                        <div
-                          style={{
-                            width: '60px',
-                            height: '60px',
-                            backgroundColor: '#FEF3C7',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 16px',
-                          }}
+                      <div
+                        style={{
+                          backgroundColor: '#FEF3C7',
+                          border: '1px solid #FCD34D',
+                          borderRadius: '16px',
+                          padding: '16px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '10px',
+                        }}
+                      >
+                        <svg
+                          width="24"
+                          height="24"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#F59E0B"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
                         >
-                          <svg
-                            width="32"
-                            height="32"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#F59E0B"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="8" x2="12" y2="12" />
-                            <line x1="12" y1="16" x2="12.01" y2="16" />
-                          </svg>
-                        </div>
-                        <p
-                          style={{
-                            fontSize: '20px',
-                            color: '#6B7280',
-                            fontWeight: 500,
-                          }}
-                        >
+                          <circle cx="12" cy="12" r="10" />
+                          <line x1="12" y1="8" x2="12" y2="12" />
+                          <line x1="12" y1="16" x2="12.01" y2="16" />
+                        </svg>
+                        <span style={{ fontSize: '18px', color: '#92400E', fontWeight: 700 }}>
                           Tag ist nicht zugewiesen
-                        </p>
+                        </span>
                       </div>
                     )}
-                  </div>
                 </div>
 
                 {/* Action Buttons */}
