@@ -594,6 +594,34 @@ function TagAssignmentPage() {
                     marginBottom: '24px',
                   }}
                 >
+                  {/* Success message */}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 14px',
+                      backgroundColor: '#E7F7DF',
+                      borderRadius: '9999px',
+                      marginBottom: '12px',
+                    }}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#83CD2D"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#166534' }}>
+                      Tag erkannt
+                    </span>
+                  </div>
                   {/* Tag chip */}
                   <div
                     style={{
