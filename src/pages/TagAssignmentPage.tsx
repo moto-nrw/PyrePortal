@@ -594,21 +594,22 @@ function TagAssignmentPage() {
                     marginBottom: '24px',
                   }}
                 >
-                  {/* Success message */}
+                  {/* Success heading */}
                   <div
                     style={{
-                      display: 'inline-flex',
+                      display: 'flex',
                       alignItems: 'center',
+                      justifyContent: 'center',
                       gap: '8px',
-                      padding: '8px 14px',
-                      backgroundColor: '#E7F7DF',
-                      borderRadius: '9999px',
                       marginBottom: '12px',
+                      color: '#83CD2D',
+                      fontSize: '22px',
+                      fontWeight: 700,
                     }}
                   >
                     <svg
-                      width="18"
-                      height="18"
+                      width="20"
+                      height="20"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="#83CD2D"
@@ -618,38 +619,25 @@ function TagAssignmentPage() {
                     >
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
-                    <span style={{ fontSize: '14px', fontWeight: 700, color: '#166534' }}>
-                      Tag erkannt
-                    </span>
+                    <span>Tag erkannt</span>
                   </div>
-                  {/* Tag chip */}
+                  {/* Tag ID label */}
                   <div
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: '10px',
-                      padding: '10px 20px',
+                      gap: '8px',
+                      padding: '8px 12px',
                       backgroundColor: '#EFF6FF',
+                      border: '1px solid #DBEAFE',
                       borderRadius: '9999px',
                       marginBottom: '16px',
+                      color: '#1F2937',
+                      fontSize: '14px',
+                      fontWeight: 700,
                     }}
                   >
-                    <svg
-                      width="22"
-                      height="22"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="#5080D8"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                      <polyline points="22 4 12 14.01 9 11.01" />
-                    </svg>
-                    <span style={{ fontSize: '16px', fontWeight: 700, color: '#1F2937' }}>
-                      Tag: {scannedTag}
-                    </span>
+                    {scannedTag}
                   </div>
 
                     {/* Current Assignment Status */}
@@ -686,10 +674,10 @@ function TagAssignmentPage() {
                     ) : (
                       <div
                         style={{
-                          backgroundColor: '#FEF3C7',
-                          border: '1px solid #FCD34D',
+                          backgroundColor: '#F9FAFB',
+                          border: '1px solid #E5E7EB',
                           borderRadius: '16px',
-                          padding: '16px',
+                          padding: '12px 16px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -697,12 +685,12 @@ function TagAssignmentPage() {
                         }}
                       >
                         <svg
-                          width="24"
-                          height="24"
+                          width="22"
+                          height="22"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="#F59E0B"
-                          strokeWidth="2.5"
+                          stroke="#9CA3AF"
+                          strokeWidth="2.2"
                           strokeLinecap="round"
                           strokeLinejoin="round"
                         >
@@ -710,7 +698,7 @@ function TagAssignmentPage() {
                           <line x1="12" y1="8" x2="12" y2="12" />
                           <line x1="12" y1="16" x2="12.01" y2="16" />
                         </svg>
-                        <span style={{ fontSize: '18px', color: '#92400E', fontWeight: 700 }}>
+                        <span style={{ fontSize: '16px', color: '#6B7280', fontWeight: 600 }}>
                           Tag ist nicht zugewiesen
                         </span>
                       </div>
