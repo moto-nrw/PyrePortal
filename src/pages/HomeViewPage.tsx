@@ -9,7 +9,6 @@ import { ErrorModal } from '../components/ui';
 import { api, type SessionStartRequest } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import theme from '../styles/theme';
 import { logNavigation, logUserAction } from '../utils/logger';
 
 /**

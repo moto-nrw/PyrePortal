@@ -72,7 +72,7 @@ const ActivityScanningPage: React.FC = () => {
   const navigate = useNavigate();
   const { selectedActivity, selectedRoom, authenticatedUser, rfid } = useUserStore();
 
-  const { isScanning, currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
+  const { currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
 
   // Get access to the store's RFID functions
   const { recentTagScans } = useUserStore(state => state.rfid);
@@ -112,8 +112,7 @@ const ActivityScanningPage: React.FC = () => {
 
   // Track student count based on check-ins
   const [studentCount, setStudentCount] = useState(0);
-  // Add initial loading state to prevent emoji flicker
-  const [isInitializing, setIsInitializing] = useState(true);
+  // Removed initial loading indicator (arrow removed)
 
   // State for daily checkout flow
   const [dailyCheckoutState, setDailyCheckoutState] = useState<{
@@ -142,7 +141,6 @@ const ActivityScanningPage: React.FC = () => {
     // Start scanning and clear initializing state
     const initializeScanning = async () => {
       await startScanning();
-      setIsInitializing(false);
     };
 
     void initializeScanning();
@@ -298,7 +296,7 @@ const ActivityScanningPage: React.FC = () => {
   useEffect(() => {
     if (showModal && currentScan) {
       // Use 10 seconds for daily checkout, otherwise use default modal display time
-      const timeout = dailyCheckoutState ? 10000 : rfid.modalDisplayTime;
+      const timeout = dailyCheckoutState ? 15000 : rfid.modalDisplayTime; // extended for checkout
 
       const timer = setTimeout(() => {
         // For daily checkout, clean up state if no action taken
@@ -311,14 +309,14 @@ const ActivityScanningPage: React.FC = () => {
     }
   }, [showModal, currentScan, rfid.modalDisplayTime, dailyCheckoutState]);
 
-  // Auto-close destination modal after 10 seconds
+  // Auto-close destination modal after 15 seconds
   useEffect(() => {
     if (checkoutDestinationState) {
       const timer = setTimeout(() => {
         logger.info('Destination modal auto-dismissed after timeout');
         setCheckoutDestinationState(null);
         hideScanModal();
-      }, 10000); // 10 seconds
+      }, 15000); // 15 seconds
       return () => clearTimeout(timer);
     }
   }, [checkoutDestinationState, hideScanModal]);
@@ -617,16 +615,18 @@ const ActivityScanningPage: React.FC = () => {
               alignItems: 'center',
               justifyContent: 'center',
               textAlign: 'center',
+              flex: 1,
             }}
           >
             <div>
               <div
                 style={{
-                  fontSize: '160px',
+                  fontSize: '220px',
                   fontWeight: 800,
                   color: '#83cd2d',
                   lineHeight: 1,
                   marginBottom: '0px',
+                  marginTop: '-12px',
                 }}
               >
                 {studentCount ?? 0}
@@ -634,31 +634,12 @@ const ActivityScanningPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Scan Arrow Image */}
-          <div
-            style={{
-              textAlign: 'center',
-              paddingTop: '0px',
-              paddingBottom: '0',
-            }}
-          >
-            <img
-              src="/img/scan_arrow_transparent.png"
-              alt="Scan hier"
-              style={{
-                width: '800px',
-                height: '225px',
-                opacity: isInitializing ? 0.3 : isScanning ? 1 : 0.5,
-                transition: 'opacity 300ms ease',
-              }}
-            />
-          </div>
         </div>
         </div>
       </BackgroundWrapper>
 
       {/* Check-in/Check-out Modal */}
-      {showModal && currentScan && (
+      {showModal && currentScan && !(currentScan.action === 'checked_out' && checkoutDestinationState && !dailyCheckoutState) && (
         <div
           style={{
             position: 'fixed',
@@ -741,35 +722,21 @@ const ActivityScanningPage: React.FC = () => {
               {(() => {
                 // Daily checkout state - Question or Farewell icon
                 if (dailyCheckoutState) {
-                  if (dailyCheckoutState.showingFarewell) {
-                    // Home icon for farewell
-                    return (
-                      <img
-                        src="/img/home.png"
-                        alt="Home"
-                        width="80"
-                        height="80"
-                        style={{
-                          filter: 'brightness(0) invert(1)', // Make it white to match other icons
-                          objectFit: 'contain',
-                        }}
-                      />
-                    );
-                  } else {
-                    // Home icon for asking if going home
-                    return (
-                      <img
-                        src="/img/home.png"
-                        alt="Home"
-                        width="80"
-                        height="80"
-                        style={{
-                          filter: 'brightness(0) invert(1)', // Make it white to match other icons
-                          objectFit: 'contain',
-                        }}
-                      />
-                    );
-                  }
+                  // Home icon (outline) for daily checkout states
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  );
                 }
                 // Supervisor authentication icon
                 if (currentScan.action === 'supervisor_authenticated') {
@@ -984,6 +951,9 @@ const ActivityScanningPage: React.FC = () => {
                         position: 'relative',
                         zIndex: 2,
                         outline: 'none',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
                       }}
                       onMouseEnter={e => {
                         e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
@@ -994,6 +964,18 @@ const ActivityScanningPage: React.FC = () => {
                         e.currentTarget.style.transform = 'scale(1)';
                       }}
                     >
+                      <svg
+                        width="28"
+                        height="28"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                      </svg>
                       Ja
                     </button>
                   </>
@@ -1133,7 +1115,14 @@ const ActivityScanningPage: React.FC = () => {
                     <button
                       key={destination}
                       onClick={() => handleDestinationSelect(destination)}
-                      style={DESTINATION_BUTTON_STYLES.base}
+                      style={{
+                        ...DESTINATION_BUTTON_STYLES.base,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '12px',
+                        minWidth: '220px',
+                      }}
                       onMouseEnter={e => {
                         e.currentTarget.style.backgroundColor =
                           DESTINATION_BUTTON_STYLES.hover.backgroundColor;
@@ -1146,7 +1135,24 @@ const ActivityScanningPage: React.FC = () => {
                           DESTINATION_BUTTON_STYLES.normal.transform;
                       }}
                     >
-                      {label}
+                      {destination === 'raumwechsel' ? (
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                          <polyline points="16 17 21 12 16 7" />
+                          <line x1="21" y1="12" x2="9" y2="12" />
+                        </svg>
+                      ) : (
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <path d="M12 12a8 8 0 008 4" />
+                          <path d="M7.5 13.5a12 12 0 008.5 6.5" />
+                          <path d="M12 12a8 8 0 00-7.464 4.928" />
+                          <path d="M12.951 7.353a12 12 0 00-9.88 4.111" />
+                          <path d="M12 12a8 8 0 00-.536-8.928" />
+                          <path d="M15.549 15.147a12 12 0 001.38-10.611" />
+                        </svg>
+                      )}
+                      <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>{label}</span>
                     </button>
                   ))}
               </div>
