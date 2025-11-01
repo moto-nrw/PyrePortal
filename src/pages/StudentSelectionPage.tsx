@@ -137,6 +137,7 @@ function StudentSelectionPage() {
   }, [entities, selectedClass]);
 
   // Calculate pagination on filtered list
+  // Fallback to 1 to avoid 0 pages when list is empty
   const totalPages = Math.ceil(filteredEntities.length / ENTITIES_PER_PAGE) || 1;
   const paginatedEntities = useMemo(() => {
     const start = currentPage * ENTITIES_PER_PAGE;
