@@ -5,7 +5,6 @@ import { RfidServiceInitializer } from './components/RfidServiceInitializer';
 import NetworkStatus from './components/ui/NetworkStatus';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import ActivityScanningPage from './pages/ActivityScanningPage';
-import AttendancePage from './pages/AttendancePage';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
 import LandingPage from './pages/LandingPage';
@@ -149,10 +148,6 @@ function App() {
                   <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
                 )
               }
-            />
-            <Route
-              path="/attendance"
-              element={isFullyAuthenticated ? <AttendancePage /> : <Navigate to="/" replace />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
