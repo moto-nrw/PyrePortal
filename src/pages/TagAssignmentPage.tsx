@@ -3,7 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import { ContentBox, ErrorModal } from '../components/ui';
+import { ErrorModal } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -268,14 +269,15 @@ function TagAssignmentPage() {
 
   return (
     <>
-      <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+      <BackgroundWrapper>
         <div
           style={{
-            width: '100%',
-            height: '100%',
+            width: '100vw',
+            height: '100vh',
             padding: '16px',
             display: 'flex',
             flexDirection: 'column',
+            position: 'relative',
           }}
         >
           {/* Modern back button */}
@@ -337,11 +339,12 @@ function TagAssignmentPage() {
           {/* Title */}
           <h1
             style={{
-              fontSize: '36px',
-              fontWeight: theme.fonts.weight.bold,
-              marginBottom: '48px',
+              fontSize: '56px',
+              fontWeight: 700,
+              marginTop: '40px',
+              marginBottom: '20px',
               textAlign: 'center',
-              color: theme.colors.text.primary,
+              color: '#111827',
             }}
           >
             Tag zuweisen
@@ -825,7 +828,7 @@ function TagAssignmentPage() {
             )}
           </div>
         </div>
-      </ContentBox>
+      </BackgroundWrapper>
 
       {/* Error Modal */}
       <ErrorModal
