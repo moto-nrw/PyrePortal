@@ -688,7 +688,7 @@ function StudentSelectionPage() {
                     justifySelf: 'center',
                   }}
                 >
-                  Seite {Math.min(currentPage + 1, totalPages)} von {totalPages}
+                  Seite {currentPage + 1} von {totalPages}
                 </span>
 
                 <button
