@@ -423,79 +423,77 @@ function TeamManagementPage() {
                         : '0 4px 12px rgba(0, 0, 0, 0.08)',
                     }}
                   >
-                      {/* Selection indicator */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '12px',
-                          right: '12px',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          backgroundColor: isSelected
-                            ? designSystem.colors.primaryGreen
-                            : '#E5E7EB',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 200ms',
-                        }}
-                      >
-                        {isSelected && (
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#FFFFFF"
-                            strokeWidth="3"
-                          >
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                        )}
-                      </div>
-
-                      {/* User Icon - Clean solid color */}
-                      <div
-                        style={{
-                          width: '64px',
-                          height: '64px',
-                          backgroundColor: isSelected ? '#DCFCE7' : '#DBEAFE',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
+                    {/* Selection indicator */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 200ms',
+                      }}
+                    >
+                      {isSelected && (
                         <svg
-                          width="36"
-                          height="36"
+                          width="16"
+                          height="16"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke={isSelected ? '#16A34A' : '#2563EB'}
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                          stroke="#FFFFFF"
+                          strokeWidth="3"
                         >
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
+                          <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* User Name - Clean black */}
-                      <span
-                        style={{
-                          fontSize: '18px',
-                          fontWeight: 700,
-                          lineHeight: '1.2',
-                          maxWidth: '100%',
-                          wordBreak: 'break-word',
-                          textAlign: 'center',
-                          color: '#111827',
-                        }}
+                    {/* User Icon - Clean solid color */}
+                    <div
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        backgroundColor: isSelected ? '#DCFCE7' : '#DBEAFE',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <svg
+                        width="36"
+                        height="36"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={isSelected ? '#16A34A' : '#2563EB'}
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        {user.name}
-                      </span>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+
+                    {/* User Name - Clean black */}
+                    <span
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        lineHeight: '1.2',
+                        maxWidth: '100%',
+                        wordBreak: 'break-word',
+                        textAlign: 'center',
+                        color: '#111827',
+                      }}
+                    >
+                      {user.name}
+                    </span>
                   </button>
                 );
               })}
@@ -644,9 +642,7 @@ function TeamManagementPage() {
                   fontWeight: 700,
                   color: '#FFFFFF',
                   backgroundColor:
-                    selectedSupervisors.length === 0 || isSaving
-                      ? '#9CA3AF'
-                      : '#83CD2D',
+                    selectedSupervisors.length === 0 || isSaving ? '#9CA3AF' : '#83CD2D',
                   border: 'none',
                   borderRadius: '9999px',
                   cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',

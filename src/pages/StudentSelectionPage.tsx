@@ -128,8 +128,10 @@ function StudentSelectionPage() {
     });
 
     return byClass.sort((a, b) => {
-      const an = a.type === 'student' ? `${a.data.last_name} ${a.data.first_name}` : a.data.display_name;
-      const bn = b.type === 'student' ? `${b.data.last_name} ${b.data.first_name}` : b.data.display_name;
+      const an =
+        a.type === 'student' ? `${a.data.last_name} ${a.data.first_name}` : a.data.display_name;
+      const bn =
+        b.type === 'student' ? `${b.data.last_name} ${b.data.first_name}` : b.data.display_name;
       return an.localeCompare(bn, 'de');
     });
   }, [entities, selectedClass]);
@@ -490,16 +492,16 @@ function StudentSelectionPage() {
         ) : (
           <>
             {/* Entity Grid (Students + Teachers) */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
-              gap: '14px',
-              marginTop: '24px',
-              marginBottom: '0px',
-              alignContent: 'start',
-            }}
-          >
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(5, 1fr)',
+                gap: '14px',
+                marginTop: '24px',
+                marginBottom: '0px',
+                alignContent: 'start',
+              }}
+            >
               {paginatedEntities.map(entity => {
                 const entityId =
                   entity.type === 'student'
@@ -540,98 +542,96 @@ function StudentSelectionPage() {
                         : '0 4px 12px rgba(0, 0, 0, 0.08)',
                     }}
                   >
-                      {/* Selection indicator */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '12px',
-                          right: '12px',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          backgroundColor: isSelected
-                            ? designSystem.colors.primaryGreen
-                            : '#E5E7EB',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {isSelected && (
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#FFFFFF"
-                            strokeWidth="3"
-                          >
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                        )}
-                      </div>
-
-                      {/* Student Icon */}
-                      <div
-                        style={{
-                          width: '64px',
-                          height: '64px',
-                          backgroundColor: isSelected ? 'rgba(131,205,45,0.15)' : '#DBEAFE',
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: isSelected ? designSystem.colors.primaryGreen : '#2563EB',
-                        }}
-                      >
+                    {/* Selection indicator */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {isSelected && (
                         <svg
-                          width="36"
-                          height="36"
+                          width="16"
+                          height="16"
                           viewBox="0 0 24 24"
                           fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                          stroke="#FFFFFF"
+                          strokeWidth="3"
                         >
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
+                          <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Entity Name */}
-                      <span
-                        style={{
-                          fontSize: '18px',
-                          fontWeight: 700,
-                          lineHeight: '1.2',
-                          textAlign: 'center',
-                          color: '#111827',
-                        }}
+                    {/* Student Icon */}
+                    <div
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        backgroundColor: isSelected ? 'rgba(131,205,45,0.15)' : '#DBEAFE',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isSelected ? designSystem.colors.primaryGreen : '#2563EB',
+                      }}
+                    >
+                      <svg
+                        width="36"
+                        height="36"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        {entity.type === 'student'
-                          ? `${entity.data.first_name} ${entity.data.last_name}`
-                          : entity.data.display_name}
-                      </span>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
 
-                      {/* Role Badge or Class */}
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          padding: '4px 12px',
-                          borderRadius: '12px',
-                          backgroundColor: entity.type === 'teacher' ? '#3B82F6' : '#83cd2d',
-                          color: 'white',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {entity.type === 'teacher'
-                          ? 'Betreuer'
-                          : (entity.data.school_class ?? 'Schüler')}
-                      </span>
-                    </button>
-                  );
-                })}
+                    {/* Entity Name */}
+                    <span
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        lineHeight: '1.2',
+                        textAlign: 'center',
+                        color: '#111827',
+                      }}
+                    >
+                      {entity.type === 'student'
+                        ? `${entity.data.first_name} ${entity.data.last_name}`
+                        : entity.data.display_name}
+                    </span>
+
+                    {/* Role Badge or Class */}
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        backgroundColor: entity.type === 'teacher' ? '#3B82F6' : '#83cd2d',
+                        color: 'white',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {entity.type === 'teacher'
+                        ? 'Betreuer'
+                        : (entity.data.school_class ?? 'Schüler')}
+                    </span>
+                  </button>
+                );
+              })}
 
               {/* Empty placeholder slots */}
               {emptySlots > 0 &&

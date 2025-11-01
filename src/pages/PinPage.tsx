@@ -247,70 +247,70 @@ function PinPage() {
         }}
       >
         <button
-            type="button"
-            onClick={handleBack}
+          type="button"
+          onClick={handleBack}
+          style={{
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            padding: '0 28px',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: '28px',
+            cursor: 'pointer',
+            transition: 'all 200ms',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            position: 'relative',
+            overflow: 'hidden',
+            backdropFilter: 'blur(8px)',
+          }}
+          onTouchStart={e => {
+            e.currentTarget.style.transform = 'scale(0.95)';
+            e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+          }}
+          onTouchEnd={e => {
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              }
+            }, 150);
+          }}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#374151"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          <span
             style={{
-              height: '56px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              padding: '0 28px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: '28px',
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              position: 'relative',
-              overflow: 'hidden',
-              backdropFilter: 'blur(8px)',
-            }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                }
-              }, 150);
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#374151',
             }}
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#374151"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M19 12H5" />
-              <path d="M12 19l-7-7 7-7" />
-            </svg>
-            <span
-              style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#374151',
-              }}
-            >
-              Zurück
-            </span>
-          </button>
-        </div>
+            Zurück
+          </span>
+        </button>
+      </div>
 
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center">
         {/* White container - Use grid layout for true full width */}
-        <div className="w-screen h-screen bg-white/90 backdrop-blur-md p-8 overflow-auto">
+        <div className="h-screen w-screen overflow-auto bg-white/90 p-8 backdrop-blur-md">
           {/* Header - 7-inch optimized */}
           <div
             style={{

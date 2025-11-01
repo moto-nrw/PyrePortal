@@ -511,462 +511,227 @@ const ActivityScanningPage: React.FC = () => {
             position: 'relative',
           }}
         >
-        {/* Anmelden Button - Top Right of ContentBox */}
-        <button
-          onClick={handleAnmelden}
-          style={{
-            position: 'absolute',
-            top: '20px',
-            right: '20px',
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            padding: '0 28px',
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
-            borderRadius: '28px',
-            cursor: 'pointer',
-            transition: 'all 200ms',
-            outline: 'none',
-            WebkitTapHighlightColor: 'transparent',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            backdropFilter: 'blur(8px)',
-            fontSize: '18px',
-            fontWeight: 600,
-            color: '#374151',
-            zIndex: 10,
-          }}
-          onTouchStart={e => {
-            e.currentTarget.style.transform = 'scale(0.95)';
-            e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
-          }}
-          onTouchEnd={e => {
-            setTimeout(() => {
-              if (e.currentTarget) {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-              }
-            }, 150);
-          }}
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-          >
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-          Anmelden
-        </button>
-
-        <div
-          style={{
-            width: '100%',
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
-            padding: '24px',
-          }}
-        >
-          {/* Header Section */}
-          <div
+          {/* Anmelden Button - Top Right of ContentBox */}
+          <button
+            onClick={handleAnmelden}
             style={{
-              textAlign: 'center',
-              marginTop: '40px',
-              marginBottom: '20px',
-            }}
-          >
-            <h1
-              style={{
-                fontSize: '56px',
-                fontWeight: 700,
-                color: '#111827',
-                margin: 0,
-                lineHeight: 1.2,
-              }}
-            >
-              {selectedActivity.name}
-            </h1>
-            <p
-              style={{
-                fontSize: '32px',
-                color: '#6B7280',
-                margin: 0,
-                fontWeight: 500,
-              }}
-            >
-              {selectedRoom?.name || 'Unbekannt'}
-            </p>
-          </div>
-
-          {/* Main Student Count Display */}
-          <div
-            style={{
+              position: 'absolute',
+              top: '20px',
+              right: '20px',
+              height: '56px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              textAlign: 'center',
-              flex: 1,
+              gap: '10px',
+              padding: '0 28px',
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              border: '1px solid rgba(0, 0, 0, 0.1)',
+              borderRadius: '28px',
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              WebkitTapHighlightColor: 'transparent',
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              backdropFilter: 'blur(8px)',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#374151',
+              zIndex: 10,
+            }}
+            onTouchStart={e => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+            }}
+            onTouchEnd={e => {
+              setTimeout(() => {
+                if (e.currentTarget) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                }
+              }, 150);
             }}
           >
-            <div>
-              <div
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            Anmelden
+          </button>
+
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative',
+              padding: '24px',
+            }}
+          >
+            {/* Header Section */}
+            <div
+              style={{
+                textAlign: 'center',
+                marginTop: '40px',
+                marginBottom: '20px',
+              }}
+            >
+              <h1
                 style={{
-                  fontSize: '220px',
-                  fontWeight: 800,
-                  color: '#83cd2d',
-                  lineHeight: 1,
-                  marginBottom: '0px',
-                  marginTop: '-12px',
+                  fontSize: '56px',
+                  fontWeight: 700,
+                  color: '#111827',
+                  margin: 0,
+                  lineHeight: 1.2,
                 }}
               >
-                {studentCount ?? 0}
+                {selectedActivity.name}
+              </h1>
+              <p
+                style={{
+                  fontSize: '32px',
+                  color: '#6B7280',
+                  margin: 0,
+                  fontWeight: 500,
+                }}
+              >
+                {selectedRoom?.name || 'Unbekannt'}
+              </p>
+            </div>
+
+            {/* Main Student Count Display */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center',
+                flex: 1,
+              }}
+            >
+              <div>
+                <div
+                  style={{
+                    fontSize: '220px',
+                    fontWeight: 800,
+                    color: '#83cd2d',
+                    lineHeight: 1,
+                    marginBottom: '0px',
+                    marginTop: '-12px',
+                  }}
+                >
+                  {studentCount ?? 0}
+                </div>
               </div>
             </div>
           </div>
-
-        </div>
         </div>
       </BackgroundWrapper>
 
       {/* Check-in/Check-out Modal */}
-      {showModal && currentScan && !(currentScan.action === 'checked_out' && checkoutDestinationState && !dailyCheckoutState) && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => {
-            // Allow clicking backdrop to dismiss daily checkout modal (but NOT during feedback)
-            if (dailyCheckoutState && !showFeedbackPrompt) {
-              setDailyCheckoutState(null);
-              hideScanModal();
-            }
-          }}
-        >
+      {showModal &&
+        currentScan &&
+        !(
+          currentScan.action === 'checked_out' &&
+          checkoutDestinationState &&
+          !dailyCheckoutState
+        ) && (
           <div
             style={{
-              backgroundColor: (() => {
-                // Check for daily checkout state
-                if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
-                // Check for Schulhof check-in (special yellow)
-                if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
-                // Check for supervisor authentication
-                if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
-                // Check for error or info states
-                if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
-                if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
-                // Original logic for success states
-                return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
-                  ? '#83cd2d'
-                  : '#f87C10';
-              })(),
-              borderRadius: '32px',
-              padding: '64px',
-              maxWidth: '700px',
-              width: '90%',
-              textAlign: 'center',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-              position: 'relative',
-              overflow: 'hidden',
-              transform: 'scale(1)',
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 1000,
             }}
-            onClick={e => e.stopPropagation()} // Prevent closing when clicking inside modal
+            onClick={() => {
+              // Allow clicking backdrop to dismiss daily checkout modal (but NOT during feedback)
+              if (dailyCheckoutState && !showFeedbackPrompt) {
+                setDailyCheckoutState(null);
+                hideScanModal();
+              }
+            }}
           >
-            {/* Background pattern for visual interest */}
             <div
               style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background:
-                  'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                pointerEvents: 'none',
-              }}
-            />
-
-            {/* Icon container with background circle */}
-            <div
-              style={{
-                width: '120px',
-                height: '120px',
-                backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 32px',
+                backgroundColor: (() => {
+                  // Check for daily checkout state
+                  if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
+                  // Check for Schulhof check-in (special yellow)
+                  if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
+                  // Check for supervisor authentication
+                  if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
+                  // Check for error or info states
+                  if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
+                  if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
+                  // Original logic for success states
+                  return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
+                    ? '#83cd2d'
+                    : '#f87C10';
+                })(),
+                borderRadius: '32px',
+                padding: '64px',
+                maxWidth: '700px',
+                width: '90%',
+                textAlign: 'center',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
                 position: 'relative',
-                zIndex: 2,
+                overflow: 'hidden',
+                transform: 'scale(1)',
               }}
+              onClick={e => e.stopPropagation()} // Prevent closing when clicking inside modal
             >
-              {(() => {
-                // Daily checkout state - Question or Farewell icon
-                if (dailyCheckoutState) {
-                  // Home icon (outline) for daily checkout states
-                  return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                  );
-                }
-                // Supervisor authentication icon
-                if (currentScan.action === 'supervisor_authenticated') {
-                  return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="white"
-                      stroke="white"
-                      strokeWidth="2"
-                    >
-                      <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1.41 16L7 13.41 8.41 12l2.17 2.17 5.59-5.59L17.59 10l-7 7z" />
-                    </svg>
-                  );
-                }
-                // Error state - X icon
-                if ((currentScan as { showAsError?: boolean }).showAsError) {
-                  return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  );
-                }
-                // Info state - Info icon
-                if ((currentScan as { isInfo?: boolean }).isInfo) {
-                  return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="16" x2="12" y2="12"></line>
-                      <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                    </svg>
-                  );
-                }
-                // Success states
-                return currentScan.action === 'checked_in' ||
-                  currentScan.action === 'transferred' ? (
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
-                );
-              })()}
-            </div>
-
-            <h2
-              style={{
-                fontSize: '48px',
-                fontWeight: 800,
-                marginBottom: '24px',
-                color: '#FFFFFF',
-                lineHeight: 1.2,
-                position: 'relative',
-                zIndex: 2,
-              }}
-            >
-              {(() => {
-                // Feedback prompt
-                if (showFeedbackPrompt) {
-                  return 'Wie war dein Tag?';
-                }
-
-                // Daily checkout state
-                if (dailyCheckoutState) {
-                  if (dailyCheckoutState.showingFarewell) {
-                    // Extract first name from full name
-                    const firstName = dailyCheckoutState.studentName.split(' ')[0];
-                    return `Auf Wiedersehen, ${firstName}!`;
-                  } else {
-                    return 'Gehst du nach Hause?';
-                  }
-                }
-
-                // Show custom message if available
-                if (currentScan.message) return currentScan.message;
-
-                // Error/Info states use student_name as the title
-                if (
-                  (currentScan as { showAsError?: boolean }).showAsError ||
-                  (currentScan as { isInfo?: boolean }).isInfo
-                ) {
-                  return currentScan.student_name;
-                }
-
-                // Normal greeting
-                return currentScan.action === 'checked_in'
-                  ? `Hallo, ${currentScan.student_name}!`
-                  : `Tschüss, ${currentScan.student_name}!`;
-              })()}
-            </h2>
-
-            {/* Content area for message or button */}
-            {showFeedbackPrompt ? (
-              // Feedback prompt UI
+              {/* Background pattern for visual interest */}
               <div
                 style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background:
+                    'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                  pointerEvents: 'none',
+                }}
+              />
+
+              {/* Icon container with background circle */}
+              <div
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 32px',
                   position: 'relative',
                   zIndex: 2,
                 }}
               >
-                <div
-                  style={{
-                    fontSize: '32px',
-                    color: 'rgba(255, 255, 255, 0.95)',
-                    fontWeight: 600,
-                    marginBottom: '32px',
-                  }}
-                >
-                  {dailyCheckoutState?.studentName}
-                </div>
-
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '32px',
-                    justifyContent: 'center',
-                  }}
-                >
-                  {feedbackButtons.map(({ rating, icon, label }) => (
-                    <button
-                      key={rating}
-                      onClick={() => handleFeedbackSubmit(rating)}
-                      style={FEEDBACK_BUTTON_STYLES.base}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor =
-                          FEEDBACK_BUTTON_STYLES.hover.backgroundColor;
-                        e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor =
-                          FEEDBACK_BUTTON_STYLES.normal.backgroundColor;
-                        e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
-                      }}
-                    >
-                      <FontAwesomeIcon icon={icon} size="4x" />
-                      <span style={{ fontSize: '24px', fontWeight: 700 }}>{label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : dailyCheckoutState ? (
-              <>
-                {!dailyCheckoutState.showingFarewell && (
-                  <>
-                    <div
-                      style={{
-                        fontSize: '32px',
-                        color: 'rgba(255, 255, 255, 0.95)',
-                        fontWeight: 600,
-                        marginBottom: '32px',
-                        position: 'relative',
-                        zIndex: 2,
-                      }}
-                    >
-                      {dailyCheckoutState.studentName}
-                    </div>
-
-                    <button
-                      onClick={handleDailyCheckoutConfirm}
-                      style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                        border: '2px solid rgba(255, 255, 255, 0.5)',
-                        borderRadius: '16px',
-                        color: '#FFFFFF',
-                        fontSize: '24px',
-                        fontWeight: 700,
-                        padding: '16px 48px',
-                        cursor: 'pointer',
-                        transition: 'all 200ms',
-                        position: 'relative',
-                        zIndex: 2,
-                        outline: 'none',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                        e.currentTarget.style.transform = 'scale(1.05)';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                        e.currentTarget.style.transform = 'scale(1)';
-                      }}
-                    >
+                {(() => {
+                  // Daily checkout state - Question or Farewell icon
+                  if (dailyCheckoutState) {
+                    // Home icon (outline) for daily checkout states
+                    return (
                       <svg
-                        width="28"
-                        height="28"
+                        width="80"
+                        height="80"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="white"
@@ -976,43 +741,283 @@ const ActivityScanningPage: React.FC = () => {
                       >
                         <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                       </svg>
-                      Ja
-                    </button>
-                  </>
-                )}
-              </>
-            ) : (
-              <div
+                    );
+                  }
+                  // Supervisor authentication icon
+                  if (currentScan.action === 'supervisor_authenticated') {
+                    return (
+                      <svg
+                        width="80"
+                        height="80"
+                        viewBox="0 0 24 24"
+                        fill="white"
+                        stroke="white"
+                        strokeWidth="2"
+                      >
+                        <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1.41 16L7 13.41 8.41 12l2.17 2.17 5.59-5.59L17.59 10l-7 7z" />
+                      </svg>
+                    );
+                  }
+                  // Error state - X icon
+                  if ((currentScan as { showAsError?: boolean }).showAsError) {
+                    return (
+                      <svg
+                        width="80"
+                        height="80"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                      </svg>
+                    );
+                  }
+                  // Info state - Info icon
+                  if ((currentScan as { isInfo?: boolean }).isInfo) {
+                    return (
+                      <svg
+                        width="80"
+                        height="80"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="white"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                      </svg>
+                    );
+                  }
+                  // Success states
+                  return currentScan.action === 'checked_in' ||
+                    currentScan.action === 'transferred' ? (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  ) : (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                  );
+                })()}
+              </div>
+
+              <h2
                 style={{
-                  fontSize: '28px',
-                  color: 'rgba(255, 255, 255, 0.95)',
-                  fontWeight: 600,
+                  fontSize: '48px',
+                  fontWeight: 800,
+                  marginBottom: '24px',
+                  color: '#FFFFFF',
+                  lineHeight: 1.2,
                   position: 'relative',
                   zIndex: 2,
                 }}
               >
                 {(() => {
-                  // Special handling for Schulhof - no additional content needed
-                  if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
-                    return ''; // Empty content - title message is enough
+                  // Feedback prompt
+                  if (showFeedbackPrompt) {
+                    return 'Wie war dein Tag?';
                   }
 
-                  switch (currentScan.action) {
-                    case 'checked_in':
-                      return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
-                    case 'checked_out':
-                      return 'Du bist jetzt ausgecheckt';
-                    case 'transferred':
-                      return 'Raumwechsel erfolgreich';
-                    default:
-                      return '';
+                  // Daily checkout state
+                  if (dailyCheckoutState) {
+                    if (dailyCheckoutState.showingFarewell) {
+                      // Extract first name from full name
+                      const firstName = dailyCheckoutState.studentName.split(' ')[0];
+                      return `Auf Wiedersehen, ${firstName}!`;
+                    } else {
+                      return 'Gehst du nach Hause?';
+                    }
                   }
+
+                  // Show custom message if available
+                  if (currentScan.message) return currentScan.message;
+
+                  // Error/Info states use student_name as the title
+                  if (
+                    (currentScan as { showAsError?: boolean }).showAsError ||
+                    (currentScan as { isInfo?: boolean }).isInfo
+                  ) {
+                    return currentScan.student_name;
+                  }
+
+                  // Normal greeting
+                  return currentScan.action === 'checked_in'
+                    ? `Hallo, ${currentScan.student_name}!`
+                    : `Tschüss, ${currentScan.student_name}!`;
                 })()}
-              </div>
-            )}
+              </h2>
+
+              {/* Content area for message or button */}
+              {showFeedbackPrompt ? (
+                // Feedback prompt UI
+                <div
+                  style={{
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '32px',
+                      color: 'rgba(255, 255, 255, 0.95)',
+                      fontWeight: 600,
+                      marginBottom: '32px',
+                    }}
+                  >
+                    {dailyCheckoutState?.studentName}
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: '32px',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {feedbackButtons.map(({ rating, icon, label }) => (
+                      <button
+                        key={rating}
+                        onClick={() => handleFeedbackSubmit(rating)}
+                        style={FEEDBACK_BUTTON_STYLES.base}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.backgroundColor =
+                            FEEDBACK_BUTTON_STYLES.hover.backgroundColor;
+                          e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.backgroundColor =
+                            FEEDBACK_BUTTON_STYLES.normal.backgroundColor;
+                          e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
+                        }}
+                      >
+                        <FontAwesomeIcon icon={icon} size="4x" />
+                        <span style={{ fontSize: '24px', fontWeight: 700 }}>{label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : dailyCheckoutState ? (
+                <>
+                  {!dailyCheckoutState.showingFarewell && (
+                    <>
+                      <div
+                        style={{
+                          fontSize: '32px',
+                          color: 'rgba(255, 255, 255, 0.95)',
+                          fontWeight: 600,
+                          marginBottom: '32px',
+                          position: 'relative',
+                          zIndex: 2,
+                        }}
+                      >
+                        {dailyCheckoutState.studentName}
+                      </div>
+
+                      <button
+                        onClick={handleDailyCheckoutConfirm}
+                        style={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                          border: '2px solid rgba(255, 255, 255, 0.5)',
+                          borderRadius: '16px',
+                          color: '#FFFFFF',
+                          fontSize: '24px',
+                          fontWeight: 700,
+                          padding: '16px 48px',
+                          cursor: 'pointer',
+                          transition: 'all 200ms',
+                          position: 'relative',
+                          zIndex: 2,
+                          outline: 'none',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
+                      >
+                        <svg
+                          width="28"
+                          height="28"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        Ja
+                      </button>
+                    </>
+                  )}
+                </>
+              ) : (
+                <div
+                  style={{
+                    fontSize: '28px',
+                    color: 'rgba(255, 255, 255, 0.95)',
+                    fontWeight: 600,
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  {(() => {
+                    // Special handling for Schulhof - no additional content needed
+                    if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
+                      return ''; // Empty content - title message is enough
+                    }
+
+                    switch (currentScan.action) {
+                      case 'checked_in':
+                        return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
+                      case 'checked_out':
+                        return 'Du bist jetzt ausgecheckt';
+                      case 'transferred':
+                        return 'Raumwechsel erfolgreich';
+                      default:
+                        return '';
+                    }
+                  })()}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Checkout Destination Selection Modal */}
       {showModal &&
@@ -1136,13 +1141,31 @@ const ActivityScanningPage: React.FC = () => {
                       }}
                     >
                       {destination === 'raumwechsel' ? (
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <svg
+                          width="48"
+                          height="48"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                           <polyline points="16 17 21 12 16 7" />
                           <line x1="21" y1="12" x2="9" y2="12" />
                         </svg>
                       ) : (
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg
+                          width="48"
+                          height="48"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="white"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
                           <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                           <path d="M12 12a8 8 0 008 4" />
                           <path d="M7.5 13.5a12 12 0 008.5 6.5" />
@@ -1152,7 +1175,9 @@ const ActivityScanningPage: React.FC = () => {
                           <path d="M15.549 15.147a12 12 0 001.38-10.611" />
                         </svg>
                       )}
-                      <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>{label}</span>
+                      <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
+                        {label}
+                      </span>
                     </button>
                   ))}
               </div>

@@ -324,9 +324,7 @@ function StaffSelectionPage() {
                         width: '24px',
                         height: '24px',
                         borderRadius: '50%',
-                        backgroundColor: isSelected
-                          ? designSystem.colors.primaryGreen
-                          : '#E5E7EB',
+                        backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -359,9 +357,7 @@ function StaffSelectionPage() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        color: isSelected
-                          ? designSystem.colors.primaryGreen
-                          : '#e57a00',
+                        color: isSelected ? designSystem.colors.primaryGreen : '#e57a00',
                       }}
                     >
                       <svg
@@ -551,8 +547,7 @@ function StaffSelectionPage() {
                   transition: designSystem.transitions.base,
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  boxShadow:
-                    selectedSupervisors.length === 0 ? 'none' : designSystem.shadows.green,
+                  boxShadow: selectedSupervisors.length === 0 ? 'none' : designSystem.shadows.green,
                   opacity: selectedSupervisors.length === 0 ? 0.6 : 1,
                 }}
                 onTouchStart={e => {

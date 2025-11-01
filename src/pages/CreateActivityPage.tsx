@@ -507,9 +507,7 @@ function CreateActivityPage() {
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          color: isSelected
-                            ? designSystem.colors.primaryGreen
-                            : '#e02020',
+                          color: isSelected ? designSystem.colors.primaryGreen : '#e02020',
                         }}
                       >
                         {getCategoryIcon()}

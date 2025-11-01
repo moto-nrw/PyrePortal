@@ -640,69 +640,69 @@ function TagAssignmentPage() {
                     {scannedTag}
                   </div>
 
-                    {/* Current Assignment Status */}
-                    {tagAssignment.assigned && tagAssignment.student ? (
-                      <div>
-                        <p
-                          style={{
-                            fontSize: '16px',
-                            color: '#6B7280',
-                            marginBottom: '8px',
-                          }}
-                        >
-                          Aktuell zugewiesen an:
-                        </p>
-                        <p
-                          style={{
-                            fontSize: '24px',
-                            fontWeight: 700,
-                            color: '#1F2937',
-                            marginBottom: '4px',
-                          }}
-                        >
-                          {tagAssignment.student.name}
-                        </p>
-                        <p
-                          style={{
-                            fontSize: '18px',
-                            color: '#6B7280',
-                          }}
-                        >
-                          {tagAssignment.student.group}
-                        </p>
-                      </div>
-                    ) : (
-                      <div
+                  {/* Current Assignment Status */}
+                  {tagAssignment.assigned && tagAssignment.student ? (
+                    <div>
+                      <p
                         style={{
-                          backgroundColor: '#F9FAFB',
-                          border: '1px solid #E5E7EB',
-                          borderRadius: '16px',
-                          padding: '12px 16px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '10px',
+                          fontSize: '16px',
+                          color: '#6B7280',
+                          marginBottom: '8px',
                         }}
                       >
-                        <svg
-                          width="22"
-                          height="22"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#9CA3AF"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <circle cx="12" cy="12" r="10" />
-                          <line x1="12" y1="8" x2="12" y2="12" />
-                          <line x1="12" y1="16" x2="12.01" y2="16" />
-                        </svg>
-                        <span style={{ fontSize: '16px', color: '#6B7280', fontWeight: 600 }}>
-                          Tag ist nicht zugewiesen
-                        </span>
-                      </div>
-                    )}
+                        Aktuell zugewiesen an:
+                      </p>
+                      <p
+                        style={{
+                          fontSize: '24px',
+                          fontWeight: 700,
+                          color: '#1F2937',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        {tagAssignment.student.name}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: '18px',
+                          color: '#6B7280',
+                        }}
+                      >
+                        {tagAssignment.student.group}
+                      </p>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        backgroundColor: '#F9FAFB',
+                        border: '1px solid #E5E7EB',
+                        borderRadius: '16px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                      }}
+                    >
+                      <svg
+                        width="22"
+                        height="22"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="#9CA3AF"
+                        strokeWidth="2.2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                      <span style={{ fontSize: '16px', color: '#6B7280', fontWeight: 600 }}>
+                        Tag ist nicht zugewiesen
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}

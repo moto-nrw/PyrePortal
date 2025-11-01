@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from 'react';
 
 /**
  * Static background with colored bubbles (Phoenix style, no animation)
@@ -10,7 +10,7 @@ export function AnimatedBackground() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
     // Set canvas size
@@ -25,10 +25,10 @@ export function AnimatedBackground() {
 
       // Vibrant colors
       const colors = [
-        "#FF8080", // red
-        "#80D8FF", // blue
-        "#A5D6A7", // green
-        "#FFA726", // orange
+        '#FF8080', // red
+        '#80D8FF', // blue
+        '#A5D6A7', // green
+        '#FFA726', // orange
       ];
 
       const bubbles = [
@@ -37,47 +37,47 @@ export function AnimatedBackground() {
           x: canvas.width * 0.2,
           y: canvas.height * 0.2,
           radius: Math.min(canvas.width, canvas.height) * 0.4,
-          color: colors[0] ?? "#FF8080",
+          color: colors[0] ?? '#FF8080',
         },
         // Top right - Blue
         {
           x: canvas.width * 0.8,
           y: canvas.height * 0.2,
           radius: Math.min(canvas.width, canvas.height) * 0.35,
-          color: colors[1] ?? "#80D8FF",
+          color: colors[1] ?? '#80D8FF',
         },
         // Bottom left - Green
         {
           x: canvas.width * 0.25,
           y: canvas.height * 0.8,
           radius: Math.min(canvas.width, canvas.height) * 0.38,
-          color: colors[2] ?? "#A5D6A7",
+          color: colors[2] ?? '#A5D6A7',
         },
         // Bottom right - Orange
         {
           x: canvas.width * 0.8,
           y: canvas.height * 0.85,
           radius: Math.min(canvas.width, canvas.height) * 0.45,
-          color: colors[3] ?? "#FFA726",
+          color: colors[3] ?? '#FFA726',
         },
       ];
 
       // Apply blur to the whole canvas
-      ctx.filter = "blur(40px)";
+      ctx.filter = 'blur(40px)';
 
       // Draw each bubble
-      bubbles.forEach((bubble) => {
+      bubbles.forEach(bubble => {
         const gradient = ctx.createRadialGradient(
           bubble.x,
           bubble.y,
           0,
           bubble.x,
           bubble.y,
-          bubble.radius,
+          bubble.radius
         );
 
         gradient.addColorStop(0, bubble.color);
-        gradient.addColorStop(1, "rgba(255,255,255,0)");
+        gradient.addColorStop(1, 'rgba(255,255,255,0)');
 
         ctx.beginPath();
         ctx.arc(bubble.x, bubble.y, bubble.radius, 0, Math.PI * 2);
@@ -87,7 +87,7 @@ export function AnimatedBackground() {
       });
 
       // Reset filter
-      ctx.filter = "none";
+      ctx.filter = 'none';
     };
 
     // Initialize
@@ -100,19 +100,13 @@ export function AnimatedBackground() {
       drawBubbles();
     };
 
-    window.addEventListener("resize", handleResize);
+    window.addEventListener('resize', handleResize);
 
     // Cleanup
     return () => {
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 h-full w-full"
-      style={{ zIndex: -10 }}
-    />
-  );
+  return <canvas ref={canvasRef} className="fixed inset-0 h-full w-full" style={{ zIndex: -10 }} />;
 }

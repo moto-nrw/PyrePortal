@@ -1,4 +1,4 @@
-import { AnimatedBackground } from "./animated-background";
+import { AnimatedBackground } from './animated-background';
 
 interface BackgroundWrapperProps {
   children: React.ReactNode;

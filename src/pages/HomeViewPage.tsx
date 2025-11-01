@@ -175,7 +175,7 @@ function HomeViewPage() {
 
   return (
     <BackgroundWrapper>
-      <div className="w-screen h-screen p-8 overflow-auto">
+      <div className="h-screen w-screen overflow-auto p-8">
         {/* NFC Scan button - Top Left */}
         <div
           style={{
@@ -381,9 +381,10 @@ function HomeViewPage() {
                   justifyContent: 'center',
                   gap: '16px',
                   transform: touchedButton === 'activity' ? 'scale(0.98)' : 'scale(1)',
-                  boxShadow: touchedButton === 'activity'
-                    ? '0 4px 12px rgba(0, 0, 0, 0.1)'
-                    : '0 8px 30px rgba(0, 0, 0, 0.12)',
+                  boxShadow:
+                    touchedButton === 'activity'
+                      ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+                      : '0 8px 30px rgba(0, 0, 0, 0.12)',
                   opacity: isValidatingLastSession ? 0.7 : 1,
                   cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
                 }}
@@ -404,13 +405,7 @@ function HomeViewPage() {
                   >
                     {currentSession ? (
                       // Play/Continue Icon
-                      <svg
-                        width="48"
-                        height="48"
-                        viewBox="0 0 24 24"
-                        fill="#83cd2d"
-                        stroke="none"
-                      >
+                      <svg width="48" height="48" viewBox="0 0 24 24" fill="#83cd2d" stroke="none">
                         <path d="M8 5v14l11-7z" />
                       </svg>
                     ) : sessionSettings?.use_last_session && sessionSettings.last_session ? (
@@ -509,7 +504,14 @@ function HomeViewPage() {
                               gap: '6px',
                             }}
                           >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                            >
                               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                               <circle cx="12" cy="10" r="3" />
                             </svg>
@@ -527,7 +529,14 @@ function HomeViewPage() {
                               gap: '6px',
                             }}
                           >
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2.5"
+                            >
                               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                               <circle cx="9" cy="7" r="4" />
                               <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -568,9 +577,10 @@ function HomeViewPage() {
                   justifyContent: 'center',
                   gap: '16px',
                   transform: touchedButton === 'team' ? 'scale(0.98)' : 'scale(1)',
-                  boxShadow: touchedButton === 'team'
-                    ? '0 4px 12px rgba(0, 0, 0, 0.1)'
-                    : '0 8px 30px rgba(0, 0, 0, 0.12)',
+                  boxShadow:
+                    touchedButton === 'team'
+                      ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+                      : '0 8px 30px rgba(0, 0, 0, 0.12)',
                 }}
               >
                 {/* Content */}

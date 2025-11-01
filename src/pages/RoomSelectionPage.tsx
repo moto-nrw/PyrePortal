@@ -69,8 +69,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           maxWidth: '560px',
           width: '92%',
           textAlign: 'center',
-          boxShadow:
-            '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
           border: '1px solid rgba(229,231,235,0.5)',
           position: 'relative',
         }}
