@@ -29,7 +29,16 @@ function TeamManagementPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   // Track selection order so selected supervisors can be shown first (chronologically)
+  /**
+   * Tracks the chronological order in which supervisors are selected.
+   * Map key: supervisor user ID; Map value: 1..N selection order.
+   * Example: If IDs 5 then 8 are selected, Map will be { 5 => 1, 8 => 2 }.
+   */
   const [selectionOrder, setSelectionOrder] = useState<Map<number, number>>(new Map());
+  /**
+   * Counter used to assign a unique, incrementing order value to each selection.
+   * Increment before storing into `selectionOrder` to preserve chronology.
+   */
   const orderCounter = useRef(0);
   const navigate = useNavigate();
 

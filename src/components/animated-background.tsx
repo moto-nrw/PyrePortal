@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 
+import { designSystem } from '../styles/designSystem';
+
 /**
  * Static background with colored bubbles (Phoenix style, no animation)
  */
@@ -23,13 +25,8 @@ export function AnimatedBackground() {
     const drawBubbles = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Vibrant colors
-      const colors = [
-        '#FF8080', // red
-        '#80D8FF', // blue
-        '#A5D6A7', // green
-        '#FFA726', // orange
-      ];
+      // Use design system bubble colors for consistency
+      const colors = designSystem.bubbleColors;
 
       const bubbles = [
         // Top left - Red
@@ -37,28 +34,28 @@ export function AnimatedBackground() {
           x: canvas.width * 0.2,
           y: canvas.height * 0.2,
           radius: Math.min(canvas.width, canvas.height) * 0.4,
-          color: colors[0] ?? '#FF8080',
+          color: colors[0],
         },
         // Top right - Blue
         {
           x: canvas.width * 0.8,
           y: canvas.height * 0.2,
           radius: Math.min(canvas.width, canvas.height) * 0.35,
-          color: colors[1] ?? '#80D8FF',
+          color: colors[1],
         },
         // Bottom left - Green
         {
           x: canvas.width * 0.25,
           y: canvas.height * 0.8,
           radius: Math.min(canvas.width, canvas.height) * 0.38,
-          color: colors[2] ?? '#A5D6A7',
+          color: colors[2],
         },
         // Bottom right - Orange
         {
           x: canvas.width * 0.8,
           y: canvas.height * 0.85,
           radius: Math.min(canvas.width, canvas.height) * 0.45,
-          color: colors[3] ?? '#FFA726',
+          color: colors[3],
         },
       ];
 

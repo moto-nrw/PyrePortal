@@ -10,7 +10,12 @@ import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
-const DAILY_CHECKOUT_TIMEOUT_MS = 15000; // extended duration for daily checkout/destination modals
+/**
+ * Timeout duration (in milliseconds) for daily checkout/destination modals.
+ * 15 seconds gives students enough time to read and choose (vs. shorter
+ * confirmation/error dialogs) without feeling rushed on a 7" tablet.
+ */
+const DAILY_CHECKOUT_TIMEOUT_MS = 15000;
 
 // Button style constants for consistent styling
 const FEEDBACK_BUTTON_STYLES = {
@@ -499,6 +504,11 @@ const ActivityScanningPage: React.FC = () => {
     setCheckoutDestinationState(null);
   };
 
+  const shouldShowCheckModal =
+    showModal &&
+    !!currentScan &&
+    !(currentScan.action === 'checked_out' && checkoutDestinationState && !dailyCheckoutState);
+
   return (
     <>
       <BackgroundWrapper>
@@ -638,19 +648,9 @@ const ActivityScanningPage: React.FC = () => {
         </div>
       </BackgroundWrapper>
 
+      {/**/}
       {/* Check-in/Check-out Modal */}
-      {(() => {
-        const shouldShowCheckModal =
-          showModal &&
-          Boolean(currentScan) &&
-          !(
-            currentScan &&
-            currentScan.action === 'checked_out' &&
-            checkoutDestinationState &&
-            !dailyCheckoutState
-          );
-        return shouldShowCheckModal;
-      })() && (
+      {shouldShowCheckModal && currentScan && (
         <div
           style={{
             position: 'fixed',
@@ -680,12 +680,12 @@ const ActivityScanningPage: React.FC = () => {
                 // Check for Schulhof check-in (special yellow)
                 if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
                 // Check for supervisor authentication
-                if (currentScan!.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
+                if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
                 // Check for error or info states
                 if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
                 if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
                 // Original logic for success states
-                return currentScan!.action === 'checked_in' || currentScan!.action === 'transferred'
+                return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
                   ? '#83cd2d'
                   : '#f87C10';
               })(),
@@ -750,7 +750,7 @@ const ActivityScanningPage: React.FC = () => {
                   );
                 }
                 // Supervisor authentication icon
-                if (currentScan!.action === 'supervisor_authenticated') {
+                if (currentScan.action === 'supervisor_authenticated') {
                   return (
                     <svg
                       width="80"
@@ -802,8 +802,8 @@ const ActivityScanningPage: React.FC = () => {
                   );
                 }
                 // Success states
-                return currentScan!.action === 'checked_in' ||
-                  currentScan!.action === 'transferred' ? (
+                return currentScan.action === 'checked_in' ||
+                  currentScan.action === 'transferred' ? (
                   <svg
                     width="80"
                     height="80"
@@ -864,7 +864,7 @@ const ActivityScanningPage: React.FC = () => {
                 }
 
                 // Show custom message if available
-                const msg = currentScan!.message;
+                const msg = currentScan.message;
                 if (msg) return msg;
 
                 // Error/Info states use student_name as the title
@@ -872,13 +872,13 @@ const ActivityScanningPage: React.FC = () => {
                   (currentScan as { showAsError?: boolean }).showAsError ||
                   (currentScan as { isInfo?: boolean }).isInfo
                 ) {
-                  return currentScan!.student_name;
+                  return currentScan.student_name;
                 }
 
                 // Normal greeting
-                return currentScan!.action === 'checked_in'
-                  ? `Hallo, ${currentScan!.student_name}!`
-                  : `Tschüss, ${currentScan!.student_name}!`;
+                return currentScan.action === 'checked_in'
+                  ? `Hallo, ${currentScan.student_name}!`
+                  : `Tschüss, ${currentScan.student_name}!`;
               })()}
             </h2>
 
@@ -1009,9 +1009,9 @@ const ActivityScanningPage: React.FC = () => {
                     return ''; // Empty content - title message is enough
                   }
 
-                  switch (currentScan!.action) {
+                  switch (currentScan.action) {
                     case 'checked_in':
-                      return `Du bist jetzt in ${currentScan!.room_name ?? 'diesem Raum'} eingecheckt`;
+                      return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
                     case 'checked_out':
                       return 'Du bist jetzt ausgecheckt';
                     case 'transferred':
