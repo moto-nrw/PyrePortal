@@ -3,12 +3,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import { ErrorModal } from '../components/ui';
 import { BackgroundWrapper } from '../components/background-wrapper';
+import { ErrorModal } from '../components/ui';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import theme from '../styles/theme';
 import { designSystem } from '../styles/designSystem';
+import theme from '../styles/theme';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
 

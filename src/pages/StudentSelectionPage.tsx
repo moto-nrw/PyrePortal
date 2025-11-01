@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import { ErrorModal } from '../components/ui';
 import { BackgroundWrapper } from '../components/background-wrapper';
+import { ErrorModal } from '../components/ui';
 import { api, type Student, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';

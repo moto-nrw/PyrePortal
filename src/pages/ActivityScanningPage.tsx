@@ -864,7 +864,8 @@ const ActivityScanningPage: React.FC = () => {
                 }
 
                 // Show custom message if available
-                if (currentScan!.message) return currentScan!.message as string;
+                const msg = currentScan!.message;
+                if (msg) return msg;
 
                 // Error/Info states use student_name as the title
                 if (
