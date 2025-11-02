@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
@@ -142,11 +142,11 @@ function StaffSelectionPage() {
   }
 
   return (
-    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+    <BackgroundWrapper>
       <div
         style={{
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100vh',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
@@ -218,11 +218,12 @@ function StaffSelectionPage() {
 
         <h1
           style={{
-            fontSize: '36px',
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: '48px',
+            fontSize: '56px',
+            fontWeight: 700,
+            marginTop: '40px',
+            marginBottom: '20px',
             textAlign: 'center',
-            color: theme.colors.text.primary,
+            color: '#111827',
           }}
         >
           Betreuer auswählen
@@ -266,159 +267,129 @@ function StaffSelectionPage() {
           </div>
         ) : (
           <>
-            {/* User Grid */}
+            {/* User Grid (Team-style cards) */}
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(5, 1fr)',
                 gap: '14px',
-                marginBottom: '24px',
-                flex: 1,
+                marginTop: '24px',
+                marginBottom: '0px',
                 alignContent: 'start',
               }}
             >
               {paginatedUsers.map(user => {
                 const isSelected = isUserSelected(user.id);
                 return (
-                  <div
+                  <button
                     key={user.id}
-                    style={{
-                      background: isSelected
-                        ? designSystem.gradients.green
-                        : designSystem.gradients.blue,
-                      borderRadius: designSystem.borderRadius.xl,
-                      padding: '3px',
-                      cursor: 'pointer',
-                      transition: designSystem.transitions.base,
-                      boxShadow: isSelected
-                        ? designSystem.shadows.green
-                        : designSystem.shadows.blue,
-                    }}
+                    onClick={() => handleUserToggle(user)}
                     onTouchStart={e => {
-                      e.currentTarget.style.transform = designSystem.scales.activeSmall;
-                      e.currentTarget.style.boxShadow = isSelected
-                        ? designSystem.shadows.green
-                        : designSystem.shadows.blue;
+                      e.currentTarget.style.transform = 'scale(0.98)';
                     }}
                     onTouchEnd={e => {
                       setTimeout(() => {
                         if (e.currentTarget) {
                           e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.boxShadow = isSelected
-                            ? designSystem.shadows.green
-                            : designSystem.shadows.blue;
                         }
-                      }, 150);
+                      }, 50);
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '160px',
+                      backgroundColor: '#FFFFFF',
+                      border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
+                      borderRadius: '24px',
+                      cursor: 'pointer',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '16px',
+                      position: 'relative',
+                      transition: 'all 150ms ease-out',
+                      boxShadow: isSelected
+                        ? '0 8px 30px rgba(131, 205, 45, 0.2)'
+                        : '0 4px 12px rgba(0, 0, 0, 0.08)',
                     }}
                   >
-                    <button
-                      onClick={() => handleUserToggle(user)}
+                    {/* Selection indicator */}
+                    <div
                       style={{
-                        width: '100%',
-                        height: '160px',
-                        backgroundColor: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: `calc(${designSystem.borderRadius.xl} - 3px)`,
-                        cursor: 'pointer',
-                        outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '16px',
-                        background: designSystem.gradients.light,
-                        backdropFilter: designSystem.glass.blur,
-                        WebkitBackdropFilter: designSystem.glass.blur,
-                        position: 'relative',
+                        transition: 'all 200ms',
                       }}
                     >
-                      {/* Selection indicator */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '12px',
-                          right: '12px',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          backgroundColor: isSelected
-                            ? designSystem.colors.primaryGreen
-                            : '#E5E7EB',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 200ms',
-                        }}
-                      >
-                        {isSelected && (
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#FFFFFF"
-                            strokeWidth="3"
-                          >
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                        )}
-                      </div>
-
-                      {/* User Icon with modern glass effect */}
-                      <div
-                        style={{
-                          width: '64px',
-                          height: '64px',
-                          background: isSelected
-                            ? designSystem.gradients.green
-                            : designSystem.gradients.blue,
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: isSelected
-                            ? designSystem.shadows.green
-                            : designSystem.shadows.blue,
-                          position: 'relative',
-                          overflow: 'hidden',
-                        }}
-                      >
+                      {isSelected && (
                         <svg
-                          width="36"
-                          height="36"
+                          width="16"
+                          height="16"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="#FFFFFF"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          style={{ position: 'relative', zIndex: 1 }}
+                          strokeWidth="3"
                         >
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
+                          <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* User Name with gradient text */}
-                      <span
-                        style={{
-                          fontSize: '18px',
-                          fontWeight: 700,
-                          lineHeight: '1.2',
-                          maxWidth: '100%',
-                          wordBreak: 'break-word',
-                          textAlign: 'center',
-                          background: 'linear-gradient(135deg, #1F2937, #374151)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
-                        }}
+                    {/* User Icon - circle tint + dark icon color per spec */}
+                    <div
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        backgroundColor: isSelected
+                          ? 'rgba(131,205,45,0.15)'
+                          : 'rgba(247,140,16,0.15)',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isSelected ? designSystem.colors.primaryGreen : '#e57a00',
+                      }}
+                    >
+                      <svg
+                        width="36"
+                        height="36"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        {user.name}
-                      </span>
-                    </button>
-                  </div>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
+
+                    {/* User Name - Clean black */}
+                    <span
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        lineHeight: '1.2',
+                        maxWidth: '100%',
+                        wordBreak: 'break-word',
+                        textAlign: 'center',
+                        color: '#111827',
+                      }}
+                    >
+                      {user.name}
+                    </span>
+                  </button>
                 );
               })}
 
@@ -479,10 +450,11 @@ function StaffSelectionPage() {
             {totalPages > 1 && (
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto 1fr',
                   alignItems: 'center',
-                  marginTop: '12px',
+                  marginTop: '24px',
+                  width: '100%',
                 }}
               >
                 <button
@@ -504,6 +476,7 @@ function StaffSelectionPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: 'none',
+                    justifySelf: 'start',
                   }}
                 >
                   ← Vorherige
@@ -514,6 +487,7 @@ function StaffSelectionPage() {
                     fontSize: '18px',
                     color: theme.colors.text.secondary,
                     fontWeight: 500,
+                    justifySelf: 'center',
                   }}
                 >
                   Seite {currentPage + 1} von {totalPages}
@@ -538,6 +512,7 @@ function StaffSelectionPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: 'none',
+                    justifySelf: 'end',
                   }}
                 >
                   Nächste →
@@ -559,7 +534,7 @@ function StaffSelectionPage() {
                 style={{
                   height: '56px',
                   padding: '0 48px',
-                  fontSize: '18px',
+                  fontSize: '24px',
                   fontWeight: 600,
                   color: '#FFFFFF',
                   background:
@@ -588,7 +563,7 @@ function StaffSelectionPage() {
                   }
                 }}
               >
-                Weiter zum Raum auswählen
+                Weiter
               </button>
             </div>
           </>
@@ -619,7 +594,7 @@ function StaffSelectionPage() {
         `}
         </style>
       </div>
-    </ContentBox>
+    </BackgroundWrapper>
   );
 }
 

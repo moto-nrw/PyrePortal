@@ -95,6 +95,9 @@ export const designSystem = {
     greenOverlay: 'linear-gradient(to bottom right, rgba(131,205,45,0.03), rgba(112,181,37,0.03))',
   },
 
+  // Background bubble colors used by AnimatedBackground
+  bubbleColors: ['#FF8080', '#80D8FF', '#A5D6A7', '#FFA726'],
+
   // Animation & Transitions
   transitions: {
     // Duration-based

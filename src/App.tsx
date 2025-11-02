@@ -5,7 +5,6 @@ import { RfidServiceInitializer } from './components/RfidServiceInitializer';
 import NetworkStatus from './components/ui/NetworkStatus';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import ActivityScanningPage from './pages/ActivityScanningPage';
-import AttendancePage from './pages/AttendancePage';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
 import LandingPage from './pages/LandingPage';
@@ -15,7 +14,6 @@ import StaffSelectionPage from './pages/StaffSelectionPage';
 import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
-import UserSelectionPage from './pages/UserSelectionPage';
 import { initializeApi } from './services/api';
 import { startAutoSync } from './services/syncQueue';
 import { useUserStore } from './store/userStore';
@@ -100,7 +98,6 @@ function App() {
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LandingPage />} />
-            <Route path="/user-selection" element={<UserSelectionPage />} />
             <Route path="/pin" element={<PinPage />} />
             <Route
               path="/home"
@@ -151,10 +148,6 @@ function App() {
                   <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
                 )
               }
-            />
-            <Route
-              path="/attendance"
-              element={isFullyAuthenticated ? <AttendancePage /> : <Navigate to="/" replace />}
             />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

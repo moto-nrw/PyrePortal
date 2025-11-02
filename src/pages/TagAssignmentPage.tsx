@@ -3,9 +3,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import { ContentBox, ErrorModal } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
+import { ErrorModal } from '../components/ui';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
@@ -268,14 +270,15 @@ function TagAssignmentPage() {
 
   return (
     <>
-      <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+      <BackgroundWrapper>
         <div
           style={{
-            width: '100%',
-            height: '100%',
+            width: '100vw',
+            height: '100vh',
             padding: '16px',
             display: 'flex',
             flexDirection: 'column',
+            position: 'relative',
           }}
         >
           {/* Modern back button */}
@@ -337,11 +340,12 @@ function TagAssignmentPage() {
           {/* Title */}
           <h1
             style={{
-              fontSize: '36px',
-              fontWeight: theme.fonts.weight.bold,
-              marginBottom: '48px',
+              fontSize: '56px',
+              fontWeight: 700,
+              marginTop: '40px',
+              marginBottom: '20px',
               textAlign: 'center',
-              color: theme.colors.text.primary,
+              color: '#111827',
             }}
           >
             Tag zuweisen
@@ -508,20 +512,41 @@ function TagAssignmentPage() {
                   onClick={handleStartScanning}
                   disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
                   style={{
-                    height: '60px',
-                    padding: '0 48px',
-                    fontSize: '20px',
-                    fontWeight: 600,
-                    backgroundColor: '#5080D8',
-                    color: 'white',
+                    height: '72px',
+                    padding: '0 64px',
+                    fontSize: '24px',
+                    fontWeight: 700,
+                    color: '#FFFFFF',
+                    background:
+                      isLoading || (!scannerStatus?.is_available && isTauriContext())
+                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                        : designSystem.gradients.blueRight,
                     border: 'none',
-                    borderRadius: '30px',
-                    cursor: 'pointer',
+                    borderRadius: designSystem.borderRadius.full,
+                    cursor:
+                      isLoading || (!scannerStatus?.is_available && isTauriContext())
+                        ? 'not-allowed'
+                        : 'pointer',
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
-                    boxShadow: '0 6px 20px rgba(80, 128, 216, 0.3)',
+                    boxShadow:
+                      isLoading || (!scannerStatus?.is_available && isTauriContext())
+                        ? 'none'
+                        : designSystem.shadows.blue,
                     opacity:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.5 : 1,
+                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.6 : 1,
+                  }}
+                  onTouchStart={e => {
+                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                      e.currentTarget.style.transform = designSystem.scales.active;
+                      e.currentTarget.style.boxShadow = designSystem.shadows.button;
+                    }
+                  }}
+                  onTouchEnd={e => {
+                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                      e.currentTarget.style.transform = 'scale(1)';
+                      e.currentTarget.style.boxShadow = designSystem.shadows.blue;
+                    }
                   }}
                 >
                   Schüler auswählen
@@ -557,124 +582,127 @@ function TagAssignmentPage() {
             {/* Tag Scanned - Show Assignment Options */}
             {scannedTag && tagAssignment && !isLoading && !success && (
               <div style={{ width: '100%', maxWidth: '600px' }}>
-                {/* Tag Display Card */}
+                {/* Tag Display Card - modern clean style */}
                 <div
                   style={{
-                    background: 'linear-gradient(to right, #5080D8, #3f6bc4)',
+                    backgroundColor: '#FFFFFF',
+                    border: '2px solid #E5E7EB',
                     borderRadius: '24px',
-                    padding: '3px',
-                    marginBottom: '32px',
+                    padding: '24px',
+                    textAlign: 'center',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    marginBottom: '24px',
                   }}
                 >
+                  {/* Success heading */}
                   <div
                     style={{
-                      backgroundColor: '#FFFFFF',
-                      borderRadius: '21px',
-                      padding: '32px',
-                      textAlign: 'center',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      marginBottom: '12px',
+                      color: '#83CD2D',
+                      fontSize: '22px',
+                      fontWeight: 700,
                     }}
                   >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#83CD2D"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    <span>Tag erkannt</span>
+                  </div>
+                  {/* Tag ID label */}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '8px 12px',
+                      backgroundColor: '#EFF6FF',
+                      border: '1px solid #DBEAFE',
+                      borderRadius: '9999px',
+                      marginBottom: '16px',
+                      color: '#1F2937',
+                      fontSize: '14px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    {scannedTag}
+                  </div>
+
+                  {/* Current Assignment Status */}
+                  {tagAssignment.assigned && tagAssignment.student ? (
+                    <div>
+                      <p
+                        style={{
+                          fontSize: '16px',
+                          color: '#6B7280',
+                          marginBottom: '8px',
+                        }}
+                      >
+                        Aktuell zugewiesen an:
+                      </p>
+                      <p
+                        style={{
+                          fontSize: '24px',
+                          fontWeight: 700,
+                          color: '#1F2937',
+                          marginBottom: '4px',
+                        }}
+                      >
+                        {tagAssignment.student.name}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: '18px',
+                          color: '#6B7280',
+                        }}
+                      >
+                        {tagAssignment.student.group}
+                      </p>
+                    </div>
+                  ) : (
                     <div
                       style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        padding: '12px 24px',
-                        backgroundColor: '#F3F4F6',
+                        backgroundColor: '#F9FAFB',
+                        border: '1px solid #E5E7EB',
                         borderRadius: '16px',
-                        marginBottom: '20px',
+                        padding: '12px 16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
                       }}
                     >
                       <svg
-                        width="24"
-                        height="24"
+                        width="22"
+                        height="22"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#5080D8"
-                        strokeWidth="2.5"
+                        stroke="#9CA3AF"
+                        strokeWidth="2.2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
                       >
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                        <polyline points="22 4 12 14.01 9 11.01" />
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
-                      <span style={{ fontSize: '18px', fontWeight: 600, color: '#374151' }}>
-                        Tag: {scannedTag}
+                      <span style={{ fontSize: '16px', color: '#6B7280', fontWeight: 600 }}>
+                        Tag ist nicht zugewiesen
                       </span>
                     </div>
-
-                    {/* Current Assignment Status */}
-                    {tagAssignment.assigned && tagAssignment.student ? (
-                      <div>
-                        <p
-                          style={{
-                            fontSize: '16px',
-                            color: '#6B7280',
-                            marginBottom: '8px',
-                          }}
-                        >
-                          Aktuell zugewiesen an:
-                        </p>
-                        <p
-                          style={{
-                            fontSize: '24px',
-                            fontWeight: 700,
-                            color: '#1F2937',
-                            marginBottom: '4px',
-                          }}
-                        >
-                          {tagAssignment.student.name}
-                        </p>
-                        <p
-                          style={{
-                            fontSize: '18px',
-                            color: '#6B7280',
-                          }}
-                        >
-                          {tagAssignment.student.group}
-                        </p>
-                      </div>
-                    ) : (
-                      <div>
-                        <div
-                          style={{
-                            width: '60px',
-                            height: '60px',
-                            backgroundColor: '#FEF3C7',
-                            borderRadius: '50%',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 16px',
-                          }}
-                        >
-                          <svg
-                            width="32"
-                            height="32"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#F59E0B"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          >
-                            <circle cx="12" cy="12" r="10" />
-                            <line x1="12" y1="8" x2="12" y2="12" />
-                            <line x1="12" y1="16" x2="12.01" y2="16" />
-                          </svg>
-                        </div>
-                        <p
-                          style={{
-                            fontSize: '20px',
-                            color: '#6B7280',
-                            fontWeight: 500,
-                          }}
-                        >
-                          Tag ist nicht zugewiesen
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
@@ -691,17 +719,32 @@ function TagAssignmentPage() {
                     disabled={isLoading}
                     style={{
                       flex: 1,
-                      height: '56px',
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      backgroundColor: '#5080D8',
-                      color: 'white',
+                      height: '64px',
+                      fontSize: '24px',
+                      fontWeight: 700,
+                      color: '#FFFFFF',
+                      background: isLoading
+                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                        : designSystem.gradients.blueRight,
                       border: 'none',
-                      borderRadius: '28px',
-                      cursor: 'pointer',
+                      borderRadius: designSystem.borderRadius.full,
+                      cursor: isLoading ? 'not-allowed' : 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
-                      boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
+                      boxShadow: isLoading ? 'none' : designSystem.shadows.blue,
+                      opacity: isLoading ? 0.6 : 1,
+                    }}
+                    onTouchStart={e => {
+                      if (!isLoading) {
+                        e.currentTarget.style.transform = designSystem.scales.active;
+                        e.currentTarget.style.boxShadow = designSystem.shadows.button;
+                      }
+                    }}
+                    onTouchEnd={e => {
+                      if (!isLoading) {
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = designSystem.shadows.blue;
+                      }
                     }}
                   >
                     {tagAssignment.assigned ? 'Neuen Schüler zuweisen' : 'Schüler auswählen'}
@@ -710,16 +753,24 @@ function TagAssignmentPage() {
                     onClick={handleScanAnother}
                     style={{
                       flex: 1,
-                      height: '56px',
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      backgroundColor: 'white',
+                      height: '64px',
+                      fontSize: '24px',
+                      fontWeight: 700,
+                      backgroundColor: '#FFFFFF',
                       color: '#374151',
                       border: '2px solid #E5E7EB',
-                      borderRadius: '28px',
+                      borderRadius: designSystem.borderRadius.full,
                       cursor: 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
+                    }}
+                    onTouchStart={e => {
+                      e.currentTarget.style.backgroundColor = '#F9FAFB';
+                      e.currentTarget.style.borderColor = '#D1D5DB';
+                    }}
+                    onTouchEnd={e => {
+                      e.currentTarget.style.backgroundColor = '#FFFFFF';
+                      e.currentTarget.style.borderColor = '#E5E7EB';
                     }}
                   >
                     Neuer Scan
@@ -825,7 +876,7 @@ function TagAssignmentPage() {
             )}
           </div>
         </div>
-      </ContentBox>
+      </BackgroundWrapper>
 
       {/* Error Modal */}
       <ErrorModal

@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import { ContentBox, ErrorModal } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
+import { ErrorModal } from '../components/ui';
 import { api, type Student, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -37,6 +38,7 @@ function StudentSelectionPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
 
   const logger = useMemo(() => createLogger('StudentSelectionPage'), []);
 
@@ -108,13 +110,40 @@ function StudentSelectionPage() {
     }
   }, [authenticatedUser, selectedSupervisors, logger]);
 
-  // Calculate pagination
-  const totalPages = Math.ceil(entities.length / ENTITIES_PER_PAGE);
+  // Distinct classes from students for quick class filter
+  const availableClasses = useMemo(() => {
+    const classSet = new Set<string>();
+    entities.forEach(e => {
+      if (e.type === 'student' && e.data.school_class) classSet.add(e.data.school_class);
+    });
+    return Array.from(classSet).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [entities]);
+
+  // Apply filter by OGS-Gruppe (class). If a class is selected, hide teachers.
+  const filteredEntities = useMemo(() => {
+    const byClass = entities.filter(e => {
+      if (!selectedClass) return true;
+      if (e.type !== 'student') return false;
+      return (e.data.school_class ?? '') === selectedClass;
+    });
+
+    return byClass.sort((a, b) => {
+      const an =
+        a.type === 'student' ? `${a.data.last_name} ${a.data.first_name}` : a.data.display_name;
+      const bn =
+        b.type === 'student' ? `${b.data.last_name} ${b.data.first_name}` : b.data.display_name;
+      return an.localeCompare(bn, 'de');
+    });
+  }, [entities, selectedClass]);
+
+  // Calculate pagination on filtered list
+  // Fallback to 1 to avoid 0 pages when list is empty
+  const totalPages = Math.ceil(filteredEntities.length / ENTITIES_PER_PAGE) || 1;
   const paginatedEntities = useMemo(() => {
     const start = currentPage * ENTITIES_PER_PAGE;
     const end = start + ENTITIES_PER_PAGE;
-    return entities.slice(start, end);
-  }, [entities, currentPage]);
+    return filteredEntities.slice(start, end);
+  }, [filteredEntities, currentPage]);
 
   // Calculate empty slots to maintain grid layout
   const emptySlots = useMemo(() => {
@@ -124,6 +153,12 @@ function StudentSelectionPage() {
     }
     return 0;
   }, [paginatedEntities]);
+
+  // Reset pagination and selection when filter changes
+  useEffect(() => {
+    setCurrentPage(0);
+    setSelectedEntityId(null);
+  }, [selectedClass]);
 
   const handleEntitySelect = (entity: AssignableEntity) => {
     const entityId =
@@ -254,14 +289,15 @@ function StudentSelectionPage() {
   }
 
   return (
-    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+    <BackgroundWrapper>
       <div
         style={{
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100vh',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
+          position: 'relative',
         }}
       >
         {/* Back button */}
@@ -314,11 +350,12 @@ function StudentSelectionPage() {
 
         <h1
           style={{
-            fontSize: '36px',
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: '48px',
+            fontSize: '56px',
+            fontWeight: 700,
+            marginTop: '40px',
+            marginBottom: '20px',
             textAlign: 'center',
-            color: theme.colors.text.primary,
+            color: '#111827',
           }}
         >
           Schüler auswählen
@@ -337,6 +374,68 @@ function StudentSelectionPage() {
             }}
           >
             {error}
+          </div>
+        )}
+
+        {/* OGS-Gruppe Filter (chips wrap, no scrolling) */}
+        {availableClasses.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '8px',
+              marginTop: '8px',
+            }}
+          >
+            <div style={{ color: '#6B7280', fontSize: '14px', fontWeight: 600 }}>OGS‑Gruppe:</div>
+            <div
+              style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                justifyContent: 'center',
+                gap: '8px',
+                maxWidth: '100%',
+              }}
+            >
+              <button
+                onClick={() => setSelectedClass(null)}
+                style={{
+                  height: '40px',
+                  padding: '0 14px',
+                  borderRadius: designSystem.borderRadius.full,
+                  border: selectedClass === null ? 'none' : '1px solid #E5E7EB',
+                  background: selectedClass === null ? designSystem.gradients.blueRight : '#FFFFFF',
+                  color: selectedClass === null ? '#FFFFFF' : '#374151',
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  boxShadow: selectedClass === null ? designSystem.shadows.blue : 'none',
+                }}
+              >
+                Alle
+              </button>
+              {availableClasses.map(cls => {
+                const active = selectedClass === cls;
+                return (
+                  <button
+                    key={cls}
+                    onClick={() => setSelectedClass(cls)}
+                    style={{
+                      height: '40px',
+                      padding: '0 14px',
+                      borderRadius: designSystem.borderRadius.full,
+                      border: active ? 'none' : '1px solid #E5E7EB',
+                      background: active ? designSystem.gradients.blueRight : '#FFFFFF',
+                      color: active ? '#FFFFFF' : '#374151',
+                      fontSize: '14px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {cls}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -399,8 +498,8 @@ function StudentSelectionPage() {
                 display: 'grid',
                 gridTemplateColumns: 'repeat(5, 1fr)',
                 gap: '14px',
-                marginBottom: '24px',
-                flex: 1,
+                marginTop: '24px',
+                marginBottom: '0px',
                 alignContent: 'start',
               }}
             >
@@ -412,138 +511,126 @@ function StudentSelectionPage() {
                 const isSelected = selectedEntityId === entityId;
 
                 return (
-                  <div
+                  <button
                     key={entityId}
+                    onClick={() => handleEntitySelect(entity)}
+                    onTouchStart={e => {
+                      e.currentTarget.style.transform = 'scale(0.98)';
+                    }}
+                    onTouchEnd={e => {
+                      setTimeout(() => {
+                        if (e.currentTarget) e.currentTarget.style.transform = 'scale(1)';
+                      }, 50);
+                    }}
                     style={{
-                      background: isSelected
-                        ? designSystem.gradients.green
-                        : designSystem.gradients.blue,
-                      borderRadius: designSystem.borderRadius.xl,
-                      padding: '3px',
+                      width: '100%',
+                      height: '160px',
+                      backgroundColor: '#FFFFFF',
+                      border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
+                      borderRadius: '24px',
                       cursor: 'pointer',
+                      outline: 'none',
+                      WebkitTapHighlightColor: 'transparent',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '12px',
+                      position: 'relative',
+                      transition: 'all 150ms ease-out',
                       boxShadow: isSelected
-                        ? designSystem.shadows.green
-                        : designSystem.shadows.blue,
+                        ? '0 8px 30px rgba(131, 205, 45, 0.2)'
+                        : '0 4px 12px rgba(0, 0, 0, 0.08)',
                     }}
                   >
-                    <button
-                      onClick={() => handleEntitySelect(entity)}
+                    {/* Selection indicator */}
+                    <div
                       style={{
-                        width: '100%',
-                        height: '160px',
-                        backgroundColor: '#FFFFFF',
-                        border: 'none',
-                        borderRadius: `calc(${designSystem.borderRadius.xl} - 3px)`,
-                        cursor: 'pointer',
-                        outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
                         display: 'flex',
-                        flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px',
-                        background: designSystem.gradients.light,
-                        backdropFilter: designSystem.glass.blur,
-                        WebkitBackdropFilter: designSystem.glass.blur,
-                        position: 'relative',
-                        padding: '12px',
                       }}
                     >
-                      {/* Selection indicator */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '12px',
-                          right: '12px',
-                          width: '24px',
-                          height: '24px',
-                          borderRadius: '50%',
-                          backgroundColor: isSelected
-                            ? designSystem.colors.primaryGreen
-                            : '#E5E7EB',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        {isSelected && (
-                          <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="#FFFFFF"
-                            strokeWidth="3"
-                          >
-                            <polyline points="20 6 9 17 4 12"></polyline>
-                          </svg>
-                        )}
-                      </div>
-
-                      {/* Student Icon */}
-                      <div
-                        style={{
-                          width: '56px',
-                          height: '56px',
-                          background: isSelected
-                            ? designSystem.gradients.green
-                            : designSystem.gradients.blue,
-                          borderRadius: '50%',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          boxShadow: isSelected
-                            ? designSystem.shadows.green
-                            : designSystem.shadows.blue,
-                        }}
-                      >
+                      {isSelected && (
                         <svg
-                          width="32"
-                          height="32"
+                          width="16"
+                          height="16"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="#FFFFFF"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
+                          strokeWidth="3"
                         >
-                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                          <circle cx="12" cy="7" r="4" />
+                          <polyline points="20 6 9 17 4 12"></polyline>
                         </svg>
-                      </div>
+                      )}
+                    </div>
 
-                      {/* Entity Name */}
-                      <span
-                        style={{
-                          fontSize: '16px',
-                          fontWeight: 700,
-                          lineHeight: '1.2',
-                          textAlign: 'center',
-                          color: '#1F2937',
-                        }}
+                    {/* Student Icon */}
+                    <div
+                      style={{
+                        width: '64px',
+                        height: '64px',
+                        backgroundColor: isSelected ? 'rgba(131,205,45,0.15)' : '#DBEAFE',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: isSelected ? designSystem.colors.primaryGreen : '#2563EB',
+                      }}
+                    >
+                      <svg
+                        width="36"
+                        height="36"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        {entity.type === 'student'
-                          ? `${entity.data.first_name} ${entity.data.last_name}`
-                          : entity.data.display_name}
-                      </span>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                        <circle cx="12" cy="7" r="4" />
+                      </svg>
+                    </div>
 
-                      {/* Role Badge or Class */}
-                      <span
-                        style={{
-                          fontSize: '12px',
-                          padding: '4px 12px',
-                          borderRadius: '12px',
-                          backgroundColor: entity.type === 'teacher' ? '#3B82F6' : '#83cd2d',
-                          color: 'white',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {entity.type === 'teacher'
-                          ? 'Betreuer'
-                          : (entity.data.school_class ?? 'Schüler')}
-                      </span>
-                    </button>
-                  </div>
+                    {/* Entity Name */}
+                    <span
+                      style={{
+                        fontSize: '18px',
+                        fontWeight: 700,
+                        lineHeight: '1.2',
+                        textAlign: 'center',
+                        color: '#111827',
+                      }}
+                    >
+                      {entity.type === 'student'
+                        ? `${entity.data.first_name} ${entity.data.last_name}`
+                        : entity.data.display_name}
+                    </span>
+
+                    {/* Role Badge or Class */}
+                    <span
+                      style={{
+                        fontSize: '12px',
+                        padding: '4px 12px',
+                        borderRadius: '12px',
+                        backgroundColor: entity.type === 'teacher' ? '#3B82F6' : '#83cd2d',
+                        color: 'white',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {entity.type === 'teacher'
+                        ? 'Betreuer'
+                        : (entity.data.school_class ?? 'Schüler')}
+                    </span>
+                  </button>
                 );
               })}
 
@@ -566,10 +653,11 @@ function StudentSelectionPage() {
             {totalPages > 1 && (
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto 1fr',
                   alignItems: 'center',
                   marginTop: '12px',
+                  width: '100%',
                 }}
               >
                 <button
@@ -586,6 +674,7 @@ function StudentSelectionPage() {
                     opacity: currentPage === 0 ? 0.5 : 1,
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
+                    justifySelf: 'start',
                   }}
                 >
                   ← Vorherige
@@ -596,6 +685,7 @@ function StudentSelectionPage() {
                     fontSize: '18px',
                     color: theme.colors.text.secondary,
                     fontWeight: 500,
+                    justifySelf: 'center',
                   }}
                 >
                   Seite {currentPage + 1} von {totalPages}
@@ -615,6 +705,7 @@ function StudentSelectionPage() {
                     opacity: currentPage === totalPages - 1 ? 0.5 : 1,
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
+                    justifySelf: 'end',
                   }}
                 >
                   Nächste →
@@ -627,17 +718,17 @@ function StudentSelectionPage() {
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                marginTop: '24px',
+                marginTop: '12px',
               }}
             >
               <button
                 onClick={handleAssignTag}
                 disabled={!selectedEntityId || isSaving}
                 style={{
-                  height: '56px',
-                  padding: '0 48px',
-                  fontSize: '18px',
-                  fontWeight: 600,
+                  height: '64px',
+                  padding: '0 64px',
+                  fontSize: '24px',
+                  fontWeight: 700,
                   color: '#FFFFFF',
                   background:
                     !selectedEntityId || isSaving
@@ -676,7 +767,7 @@ function StudentSelectionPage() {
           `}
         </style>
       </div>
-    </ContentBox>
+    </BackgroundWrapper>
   );
 }
 

@@ -45,18 +45,6 @@ export const LastSessionToggle: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           gap: '10px',
-          transition: 'all 200ms ease-out',
-        }}
-        onMouseEnter={e => {
-          if (!hasLastSession) return;
-          const el = e.currentTarget;
-          el.style.transform = 'scale(1.02)';
-          el.style.boxShadow = '0 12px 40px rgba(0, 0, 0, 0.15)';
-        }}
-        onMouseLeave={e => {
-          const el = e.currentTarget;
-          el.style.transform = 'scale(1)';
-          el.style.boxShadow = '0 8px 30px rgba(0, 0, 0, 0.12)';
         }}
       >
         <label
