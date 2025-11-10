@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+
 import { designSystem } from '../styles/designSystem';
 
 interface InfoModalProps {
@@ -43,7 +44,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, title, me
         backdropFilter: 'blur(4px)',
         animation: 'fadeIn 200ms ease-out',
       }}
-      onClick={(e) => {
+      onClick={e => {
         if (e.target === e.currentTarget) {
           onClose();
         }
@@ -123,11 +124,11 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, title, me
             outline: 'none',
             boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.4)',
           }}
-          onMouseEnter={(e) => {
+          onMouseEnter={e => {
             e.currentTarget.style.transform = 'translateY(-1px)';
             e.currentTarget.style.boxShadow = '0 6px 20px 0 rgba(59, 130, 246, 0.5)';
           }}
-          onMouseLeave={(e) => {
+          onMouseLeave={e => {
             e.currentTarget.style.transform = 'translateY(0)';
             e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(59, 130, 246, 0.4)';
           }}

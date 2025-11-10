@@ -3,8 +3,8 @@
  * Handles saving and loading of last session configuration
  */
 
-import { safeInvoke } from '../utils/tauriContext';
 import { createLogger } from '../utils/logger';
+import { safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('SessionStorage');
 
@@ -20,7 +20,7 @@ export interface LastSessionConfig {
 }
 
 export interface SessionSettings {
-  use_last_session: boolean;  // Toggle state
+  use_last_session: boolean; // Toggle state
   auto_save_enabled: boolean; // Always true for now
   last_session: LastSessionConfig | null;
 }
@@ -34,9 +34,9 @@ export async function saveSessionSettings(settings: SessionSettings): Promise<vo
       useLastSession: settings.use_last_session,
       hasLastSession: !!settings.last_session,
     });
-    
+
     await safeInvoke('save_session_settings', { settings });
-    
+
     logger.info('Session settings saved successfully');
   } catch (error) {
     logger.error('Failed to save session settings', { error });
@@ -50,9 +50,9 @@ export async function saveSessionSettings(settings: SessionSettings): Promise<vo
 export async function loadSessionSettings(): Promise<SessionSettings | null> {
   try {
     logger.debug('Loading session settings');
-    
+
     const settings = await safeInvoke<SessionSettings | null>('load_session_settings');
-    
+
     if (settings) {
       logger.info('Session settings loaded', {
         useLastSession: settings.use_last_session,
@@ -62,7 +62,7 @@ export async function loadSessionSettings(): Promise<SessionSettings | null> {
     } else {
       logger.debug('No session settings found');
     }
-    
+
     return settings;
   } catch (error) {
     logger.error('Failed to load session settings', { error });
@@ -77,9 +77,9 @@ export async function loadSessionSettings(): Promise<SessionSettings | null> {
 export async function clearLastSession(): Promise<void> {
   try {
     logger.debug('Clearing last session data');
-    
+
     await safeInvoke('clear_last_session');
-    
+
     logger.info('Last session data cleared');
   } catch (error) {
     logger.error('Failed to clear last session', { error });
@@ -95,7 +95,7 @@ export function getRelativeTime(savedAt: string): string {
   const now = new Date();
   const diffMs = now.getTime() - saved.getTime();
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  
+
   if (diffDays === 0) {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     if (diffHours === 0) {
@@ -106,14 +106,14 @@ export function getRelativeTime(savedAt: string): string {
     if (diffHours === 1) return 'vor einer Stunde';
     return `vor ${diffHours} Stunden`;
   }
-  
+
   if (diffDays === 1) return 'gestern';
   if (diffDays < 7) return `vor ${diffDays} Tagen`;
   if (diffDays < 30) {
     const weeks = Math.floor(diffDays / 7);
     return weeks === 1 ? 'vor einer Woche' : `vor ${weeks} Wochen`;
   }
-  
+
   const months = Math.floor(diffDays / 30);
   return months === 1 ? 'vor einem Monat' : `vor ${months} Monaten`;
 }

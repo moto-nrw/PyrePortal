@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox, ErrorModal } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
+import { ErrorModal } from '../components/ui';
 import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
@@ -186,7 +187,7 @@ function PinPage() {
     }
   };
 
-  // Custom numpad button component with modern styling matching other pages
+  // Custom numpad button component - Phoenix Clean Style
   const NumpadButton: React.FC<{
     onClick: () => void;
     isAction?: boolean;
@@ -196,251 +197,193 @@ function PinPage() {
       <button
         onClick={onClick}
         style={{
-          position: 'relative',
-          width: '120px',
-          height: '72px',
+          width: '100%',
+          height: '95px',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: 'transparent',
-          border: 'none',
-          borderRadius: '12px',
-          fontSize: isAction ? '24px' : '28px',
+          backgroundColor: isAction ? '#F9FAFB' : '#FFFFFF',
+          border: isAction ? '3px solid #D1D5DB' : '3px solid #E5E7EB',
+          borderRadius: '24px',
+          fontSize: isAction ? '42px' : '50px',
           fontWeight: 700,
+          color: isAction ? '#6B7280' : '#111827',
           cursor: 'pointer',
-          transition: 'all 200ms',
+          transition: 'all 150ms ease-out',
           outline: 'none',
-          overflow: 'hidden',
           WebkitTapHighlightColor: 'transparent',
+          touchAction: 'manipulation',
+          boxShadow: '0 3px 8px rgba(0, 0, 0, 0.1)',
         }}
         onTouchStart={e => {
           e.currentTarget.style.transform = 'scale(0.95)';
+          e.currentTarget.style.backgroundColor = isAction ? '#F3F4F6' : '#F9FAFB';
+          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
         }}
         onTouchEnd={e => {
           setTimeout(() => {
             if (e.currentTarget) {
               e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
+              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
             }
-          }, 150);
+          }, 100);
         }}
       >
-        {/* Gradient border */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            borderRadius: '12px',
-            background: isAction
-              ? 'linear-gradient(135deg, #6B7280, #4B5563)'
-              : 'linear-gradient(135deg, #5080D8, #3f6bc4)',
-            zIndex: 0,
-          }}
-        />
-
-        {/* Inner content */}
-        <div
-          style={{
-            position: 'absolute',
-            inset: '3px',
-            borderRadius: '9px',
-            background: 'linear-gradient(to bottom, #FFFFFF, #F8FAFC)',
-            zIndex: 1,
-          }}
-        />
-
-        <span
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            color: isAction ? '#6B7280' : '#1F2937',
-          }}
-        >
-          {children}
-        </span>
+        {children}
       </button>
     );
   };
 
   return (
-    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+    <BackgroundWrapper>
+      {/* Back button - positioned at top-left of viewport */}
       <div
         style={{
-          width: '100%',
-          height: '100%',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
+          position: 'fixed',
+          top: '20px',
+          left: '20px',
+          zIndex: 50,
         }}
       >
-        {/* Modern back button - positioned absolutely like other pages */}
-        <div
+        <button
+          type="button"
+          onClick={handleBack}
           style={{
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            zIndex: 10,
+            height: '56px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '10px',
+            padding: '0 28px',
+            backgroundColor: 'rgba(255, 255, 255, 0.9)',
+            border: '1px solid rgba(0, 0, 0, 0.1)',
+            borderRadius: '28px',
+            cursor: 'pointer',
+            transition: 'all 200ms',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            position: 'relative',
+            overflow: 'hidden',
+            backdropFilter: 'blur(8px)',
+          }}
+          onTouchStart={e => {
+            e.currentTarget.style.transform = 'scale(0.95)';
+            e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
+            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
+          }}
+          onTouchEnd={e => {
+            setTimeout(() => {
+              if (e.currentTarget) {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              }
+            }, 150);
           }}
         >
-          <button
-            type="button"
-            onClick={handleBack}
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#374151"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M19 12H5" />
+            <path d="M12 19l-7-7 7-7" />
+          </svg>
+          <span
             style={{
-              height: '56px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              padding: '0 28px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: '28px',
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              position: 'relative',
-              overflow: 'hidden',
-              backdropFilter: 'blur(8px)',
-            }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                }
-              }, 150);
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#374151',
             }}
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#374151"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M19 12H5" />
-              <path d="M12 19l-7-7 7-7" />
-            </svg>
-            <span
-              style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#374151',
-              }}
-            >
-              Zurück
-            </span>
-          </button>
-        </div>
+            Zurück
+          </span>
+        </button>
+      </div>
 
-        {/* Welcome Header with User Info - Extra compact sizing */}
-        <div
-          style={{
-            textAlign: 'center',
-            marginBottom: '0',
-          }}
-        >
+      <div className="flex min-h-screen items-center justify-center">
+        {/* White container - Use grid layout for true full width */}
+        <div className="h-screen w-screen overflow-auto bg-white/90 p-8 backdrop-blur-md">
+          {/* Header - 7-inch optimized */}
           <div
             style={{
-              width: '56px',
-              height: '56px',
-              background: 'linear-gradient(135deg, #5080D8, #3f6bc4)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 10px',
-              boxShadow: '0 4px 12px rgba(80, 128, 216, 0.3)',
+              textAlign: 'center',
+              marginTop: '40px',
+              marginBottom: '20px',
             }}
           >
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#FFFFFF"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            {/* Title */}
+            <h1
+              style={{
+                fontSize: '40px',
+                margin: '0 0 8px 0',
+                lineHeight: 1.2,
+                fontWeight: 700,
+                color: '#111827',
+              }}
             >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
+              PIN-Eingabe
+            </h1>
+
+            {/* Subtitle */}
+            <p
+              style={{
+                fontSize: '18px',
+                margin: 0,
+                color: '#6B7280',
+                fontWeight: 500,
+              }}
+            >
+              Bitte geben Sie Ihren 4-stelligen PIN ein
+            </p>
           </div>
 
-          <h1
-            style={{
-              fontSize: '34px',
-              fontWeight: theme.fonts.weight.bold,
-              margin: 0,
-              color: theme.colors.text.primary,
-              lineHeight: 1.1,
-            }}
-          >
-            PIN-Eingabe
-          </h1>
-        </div>
-
-        {/* Main Content - Centered */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'flex-start',
-            justifyContent: 'center',
-          }}
-        >
-          <div style={{ width: '100%', maxWidth: '400px', marginTop: '12px' }}>
-            {/* PIN display dots with modern styling - compact */}
+          {/* Main Content - Full Width */}
+          <div style={{ width: '100%' }}>
+            {/* PIN display dots - BLACK (no blue!) */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                gap: '10px',
+                gap: '20px',
                 marginBottom: '12px',
-                padding: '12px',
-                backgroundColor: 'rgba(255, 255, 255, 0.6)',
-                borderRadius: '10px',
-                boxShadow: '0 3px 12px rgba(0, 0, 0, 0.08)',
-                backdropFilter: 'blur(8px)',
+                padding: '16px 24px',
+                backgroundColor: '#F9FAFB',
+                borderRadius: '16px',
+                border: '2px solid #E5E7EB',
+                width: 'fit-content',
+                margin: '0 auto 12px auto',
               }}
             >
               {Array.from({ length: maxPinLength }).map((_, i) => (
                 <div
                   key={i}
                   style={{
-                    width: '18px',
-                    height: '18px',
+                    width: '24px',
+                    height: '24px',
                     borderRadius: '50%',
-                    transition: 'all 300ms ease',
-                    background:
-                      i < pin.length ? 'linear-gradient(135deg, #5080D8, #3f6bc4)' : '#E5E7EB',
-                    boxShadow:
-                      i < pin.length
-                        ? '0 2px 6px rgba(80, 128, 216, 0.4)'
-                        : 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
-                    transform: i < pin.length ? 'scale(1.1)' : 'scale(1)',
+                    transition: 'all 200ms ease-out',
+                    backgroundColor: i < pin.length ? '#111827' : '#E5E7EB',
+                    transform: i < pin.length ? 'scale(1.15)' : 'scale(1)',
                   }}
                 />
               ))}
             </div>
 
-            {/* Numpad with modern grid layout - compact */}
+            {/* Numpad Grid - 40% Viewport Width */}
             <div
               style={{
                 display: 'grid',
                 gridTemplateColumns: 'repeat(3, 1fr)',
                 gap: '10px',
-                maxWidth: '400px',
+                width: '40vw',
                 margin: '0 auto',
               }}
             >
@@ -517,7 +460,7 @@ function PinPage() {
         onClose={() => setIsErrorModalOpen(false)}
         message={errorMessage}
       />
-    </ContentBox>
+    </BackgroundWrapper>
   );
 }
 

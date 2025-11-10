@@ -64,12 +64,13 @@ async function ensureInitialized(): Promise<void> {
 }
 
 /**
- * Generic API call function with error handling
+ * Generic API call function with error handling and response timing
  */
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   await ensureInitialized();
 
   const url = `${API_BASE_URL}${endpoint}`;
+  const startTime = Date.now();
 
   // Debug logging for authentication issues
   if (endpoint === '/api/iot/ping') {
@@ -88,6 +89,8 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       ...options.headers,
     },
   });
+
+  const responseTime = Date.now() - startTime;
 
   if (!response.ok) {
     // Try to get error details from response body
@@ -109,7 +112,25 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       errorMessage = `${errorMessage}: ${detailMessage}`;
     }
 
+    // Log failed request with timing
+    logger.warn('API request failed', {
+      endpoint,
+      status: response.status,
+      responseTime,
+      error: errorMessage,
+    });
+
     throw new Error(errorMessage);
+  }
+
+  // Log successful request timing for critical endpoints
+  if (endpoint === '/api/iot/ping' || endpoint === '/api/iot/checkin' || responseTime > 1000) {
+    logger.info('API request completed', {
+      endpoint,
+      status: response.status,
+      responseTime,
+      quality: responseTime < 500 ? 'excellent' : responseTime < 1000 ? 'good' : 'poor',
+    });
   }
 
   return response.json() as Promise<T>;
@@ -410,7 +431,17 @@ export const api = {
   },
 
   /**
-   * Device health ping
+   * Device health check (unauthenticated)
+   * Endpoint: GET /health
+   */
+  async healthCheck(): Promise<void> {
+    await apiCall('/health', {
+      method: 'GET',
+    });
+  },
+
+  /**
+   * Device health ping (authenticated)
    * Endpoint: POST /api/iot/ping
    */
   async pingDevice(pin: string): Promise<void> {
@@ -635,6 +666,59 @@ export const api = {
   },
 
   /**
+   * Assign RFID tag to staff member
+   * Endpoint: POST /api/iot/staff/{staffId}/rfid
+   */
+  async assignStaffTag(pin: string, staffId: number, tagId: string): Promise<TagAssignmentResult> {
+    const response = await apiCall<{
+      status: string;
+      data?: {
+        success: boolean;
+        staff_id: number;
+        staff_name: string;
+        rfid_tag: string;
+        previous_tag?: string;
+        message?: string;
+      };
+      message?: string;
+    }>(`/api/iot/staff/${staffId}/rfid`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
+      },
+      body: JSON.stringify({
+        rfid_tag: tagId,
+      }),
+    });
+
+    return {
+      success: response.data?.success ?? response.status === 'success',
+      message: response.data?.message ?? response.message ?? 'Tag erfolgreich zugewiesen',
+      student_id: response.data?.staff_id,
+      student_name: response.data?.staff_name,
+      rfid_tag: response.data?.rfid_tag,
+      previous_tag: response.data?.previous_tag,
+    };
+  },
+
+  /**
+   * Remove RFID tag from staff member
+   * Endpoint: DELETE /api/iot/staff/{staffId}/rfid
+   */
+  async unassignStaffTag(pin: string, staffId: number): Promise<void> {
+    await apiCall(`/api/iot/staff/${staffId}/rfid`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+        'X-Staff-ID': staffId.toString(),
+      },
+    });
+  },
+
+  /**
    * Process RFID check-in/check-out
    * Endpoint: POST /api/iot/checkin
    */
@@ -787,6 +871,37 @@ export const api = {
       throw error;
     }
   },
+
+  /**
+   * Submit daily feedback when student checks out for the day
+   * Endpoint: POST /api/iot/feedback
+   */
+  async submitDailyFeedback(
+    pin: string,
+    feedback: DailyFeedbackRequest
+  ): Promise<DailyFeedbackResponse> {
+    try {
+      const response = await apiCall<DailyFeedbackResponse>('/api/iot/feedback', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+        },
+        body: JSON.stringify(feedback),
+      });
+
+      return response;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('404')) {
+        throw new Error('Feedback-Service nicht verfügbar');
+      }
+      if (errorMessage.includes('403')) {
+        throw new Error('Keine Berechtigung für Feedback-Übermittlung');
+      }
+      throw error;
+    }
+  },
 };
 
 /**
@@ -832,7 +947,7 @@ export interface TagAssignmentResult {
 export interface RfidScanResult {
   student_id: number;
   student_name: string;
-  action: 'checked_in' | 'checked_out' | 'transferred';
+  action: 'checked_in' | 'checked_out' | 'transferred' | 'supervisor_authenticated';
   greeting?: string;
   visit_id?: number;
   room_name?: string;
@@ -904,6 +1019,35 @@ export interface AttendanceToggleResponse {
     message: string;
   };
   message: string;
+}
+
+/**
+ * Daily feedback rating type - matches backend enum validation
+ */
+export type DailyFeedbackRating = 'positive' | 'neutral' | 'negative';
+
+/**
+ * Feedback submission request for POST /api/iot/feedback
+ */
+export interface DailyFeedbackRequest {
+  student_id: number;
+  value: DailyFeedbackRating;
+}
+
+/**
+ * Feedback submission response from POST /api/iot/feedback
+ */
+export interface DailyFeedbackResponse {
+  status: string;
+  message: string;
+  data?: {
+    id: number;
+    student_id: number;
+    value: string;
+    day: string; // "2025-10-12"
+    time: string; // "15:30:45"
+    created_at: string; // ISO 8601
+  };
 }
 
 /**

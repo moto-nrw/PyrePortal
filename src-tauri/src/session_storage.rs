@@ -53,7 +53,9 @@ pub async fn save_session_settings(
 }
 
 #[tauri::command]
-pub async fn load_session_settings(app_handle: AppHandle) -> Result<Option<SessionSettings>, String> {
+pub async fn load_session_settings(
+    app_handle: AppHandle,
+) -> Result<Option<SessionSettings>, String> {
     let settings_path = get_session_settings_path(&app_handle)?;
 
     // Check if file exists

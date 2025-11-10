@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import {
   api,
   type Teacher,
@@ -7,15 +8,26 @@ import {
   type Room,
   type CurrentSession,
   type RfidScanResult,
+  type DailyFeedbackRating,
 } from '../services/api';
-import { 
-  type SessionSettings, 
-  saveSessionSettings, 
-  loadSessionSettings, 
-  clearLastSession 
+import {
+  type SessionSettings,
+  saveSessionSettings,
+  loadSessionSettings,
+  clearLastSession,
 } from '../services/sessionStorage';
+import {
+  type StudentCacheData,
+  type CachedStudent,
+  loadStudentCache,
+  saveStudentCache,
+  getCachedStudent,
+  setCachedStudent,
+  scanResultToCachedStudent,
+} from '../services/studentCache';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
+import { safeInvoke } from '../utils/tauriContext';
 
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
@@ -104,6 +116,7 @@ interface RecentTagScan {
   timestamp: number;
   studentId?: string;
   result?: RfidScanResult;
+  syncPromise?: Promise<void>; // Background sync promise (for race condition prevention)
 }
 
 // RFID scanning state
@@ -145,10 +158,17 @@ interface UserState {
 
   // RFID scanning state
   rfid: RfidState;
-  
+
   // Session settings state
   sessionSettings: SessionSettings | null;
   isValidatingLastSession: boolean;
+
+  // Network status state
+  networkStatus: NetworkStatusData;
+
+  // Student cache state
+  studentCache: StudentCacheData | null;
+  isCacheLoading: boolean;
 
   // Actions
   setSelectedUser: (userName: string, userId: number | null) => void;
@@ -213,13 +233,34 @@ interface UserState {
   getCachedStudentId: (tagId: string) => string | undefined;
   clearOldTagScans: () => void;
   isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
-  
+
   // Session settings actions
   loadSessionSettings: () => Promise<void>;
   toggleUseLastSession: (enabled: boolean) => Promise<void>;
   saveLastSessionData: () => Promise<void>;
   validateAndRecreateSession: () => Promise<boolean>;
   clearSessionSettings: () => Promise<void>;
+
+  // Network status actions
+  setNetworkStatus: (status: NetworkStatusData) => void;
+  updateNetworkQuality: (quality: NetworkStatusData['quality'], responseTime: number) => void;
+
+  // Student cache actions
+  loadStudentCache: () => Promise<void>;
+  getCachedStudentData: (rfidTag: string) => CachedStudent | null;
+  cacheStudentData: (
+    rfidTag: string,
+    scanResult: RfidScanResult,
+    additionalData?: { room?: string; activity?: string }
+  ) => Promise<void>;
+  updateCachedStudentStatus: (
+    rfidTag: string,
+    status: 'checked_in' | 'checked_out'
+  ) => Promise<void>;
+  clearStudentCache: () => Promise<void>;
+
+  // Daily feedback action
+  submitDailyFeedback: (studentId: number, rating: DailyFeedbackRating) => Promise<boolean>;
 }
 
 // Define the type for the Zustand set function
@@ -282,10 +323,22 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     recentTagScans: new Map<string, RecentTagScan>(),
     tagToStudentMap: new Map<string, string>(),
   },
-  
+
   // Session settings initial state
   sessionSettings: null,
   isValidatingLastSession: false,
+
+  // Network status initial state
+  networkStatus: {
+    isOnline: navigator.onLine,
+    responseTime: 0,
+    lastChecked: Date.now(),
+    quality: 'excellent' as const,
+  },
+
+  // Student cache initial state
+  studentCache: null,
+  isCacheLoading: false,
 
   // Actions
   setSelectedUser: (userName: string, userId: number | null) =>
@@ -1158,13 +1211,170 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
     return true;
   },
-  
+
+  // Network status actions
+  setNetworkStatus: (status: NetworkStatusData) => {
+    set({ networkStatus: status });
+  },
+
+  updateNetworkQuality: (quality: NetworkStatusData['quality'], responseTime: number) => {
+    set(state => ({
+      networkStatus: {
+        ...state.networkStatus,
+        quality,
+        responseTime,
+        lastChecked: Date.now(),
+        isOnline: quality !== 'offline',
+      },
+    }));
+  },
+
+  // Student cache actions
+  loadStudentCache: async () => {
+    const state = get();
+    if (state.isCacheLoading) {
+      storeLogger.debug('Student cache already loading, skipping');
+      return;
+    }
+
+    set({ isCacheLoading: true });
+
+    try {
+      storeLogger.debug('Loading student cache from storage');
+      const cache = await loadStudentCache();
+
+      set({
+        studentCache: cache,
+        isCacheLoading: false,
+      });
+
+      storeLogger.info('Student cache loaded successfully', {
+        hasCache: !!cache,
+        entryCount: cache ? Object.keys(cache.students).length : 0,
+      });
+    } catch (error) {
+      storeLogger.error('Failed to load student cache', { error });
+      set({
+        studentCache: null,
+        isCacheLoading: false,
+      });
+    }
+  },
+
+  getCachedStudentData: (rfidTag: string) => {
+    const { studentCache } = get();
+    if (!studentCache) {
+      return null;
+    }
+
+    const cachedStudent = getCachedStudent(studentCache, rfidTag);
+    if (cachedStudent) {
+      storeLogger.debug('Found cached student data', {
+        rfidTag,
+        studentId: cachedStudent.id,
+        studentName: cachedStudent.name,
+        status: cachedStudent.status,
+      });
+    }
+
+    return cachedStudent;
+  },
+
+  cacheStudentData: async (
+    rfidTag: string,
+    scanResult: RfidScanResult,
+    additionalData?: { room?: string; activity?: string }
+  ) => {
+    const { studentCache } = get();
+
+    try {
+      // Create or use existing cache
+      const cache = studentCache ?? (await loadStudentCache());
+
+      // Convert scan result to cached student format
+      const studentData = scanResultToCachedStudent(scanResult, additionalData);
+
+      // Update cache
+      const updatedCache = setCachedStudent(cache, rfidTag, studentData);
+
+      // Update store state
+      set({ studentCache: updatedCache });
+
+      // Persist to storage
+      await saveStudentCache(updatedCache);
+
+      storeLogger.info('Student data cached successfully', {
+        rfidTag,
+        studentId: studentData.id,
+        studentName: studentData.name,
+        status: studentData.status,
+      });
+    } catch (error) {
+      storeLogger.error('Failed to cache student data', {
+        error,
+        rfidTag,
+        studentId: scanResult.student_id,
+      });
+    }
+  },
+
+  updateCachedStudentStatus: async (rfidTag: string, status: 'checked_in' | 'checked_out') => {
+    const { studentCache } = get();
+    if (!studentCache?.students[rfidTag]) {
+      storeLogger.debug('No cached student to update status for', { rfidTag });
+      return;
+    }
+
+    try {
+      const existingStudent = studentCache.students[rfidTag];
+      const updatedStudent: Omit<CachedStudent, 'cachedAt'> = {
+        ...existingStudent,
+        status,
+        lastSeen: new Date().toISOString(),
+      };
+
+      const updatedCache = setCachedStudent(studentCache, rfidTag, updatedStudent);
+
+      // Update store state
+      set({ studentCache: updatedCache });
+
+      // Persist to storage
+      await saveStudentCache(updatedCache);
+
+      storeLogger.info('Cached student status updated', {
+        rfidTag,
+        studentId: existingStudent.id,
+        newStatus: status,
+      });
+    } catch (error) {
+      storeLogger.error('Failed to update cached student status', {
+        error,
+        rfidTag,
+        status,
+      });
+    }
+  },
+
+  clearStudentCache: async () => {
+    try {
+      // Clear from storage
+      await safeInvoke('clear_student_cache');
+
+      // Clear from store
+      set({ studentCache: null });
+
+      storeLogger.info('Student cache cleared successfully');
+    } catch (error) {
+      storeLogger.error('Failed to clear student cache', { error });
+    }
+  },
+
   // Session settings actions
   loadSessionSettings: async () => {
     try {
       storeLogger.debug('Loading session settings');
       const settings = await loadSessionSettings();
-      
+
       if (settings) {
         set({ sessionSettings: settings });
         storeLogger.info('Session settings loaded', {
@@ -1176,16 +1386,16 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to load session settings', { error });
     }
   },
-  
+
   toggleUseLastSession: async (enabled: boolean) => {
     const { sessionSettings } = get();
-    
+
     const newSettings: SessionSettings = {
       use_last_session: enabled,
       auto_save_enabled: true,
-      last_session: sessionSettings?.last_session || null,
+      last_session: sessionSettings?.last_session ?? null,
     };
-    
+
     try {
       await saveSessionSettings(newSettings);
       set({ sessionSettings: newSettings });
@@ -1194,15 +1404,15 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to save session settings', { error });
     }
   },
-  
+
   saveLastSessionData: async () => {
     const { selectedActivity, selectedRoom, selectedSupervisors, sessionSettings } = get();
-    
+
     if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
       storeLogger.warn('Cannot save session data: missing required fields');
       return;
     }
-    
+
     const lastSessionConfig = {
       activity_id: selectedActivity.id,
       room_id: selectedRoom.id,
@@ -1212,13 +1422,13 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       room_name: selectedRoom.name,
       supervisor_names: selectedSupervisors.map(s => s.name),
     };
-    
+
     const newSettings: SessionSettings = {
       use_last_session: sessionSettings?.use_last_session ?? false,
       auto_save_enabled: true,
       last_session: lastSessionConfig,
     };
-    
+
     try {
       await saveSessionSettings(newSettings);
       set({ sessionSettings: newSettings });
@@ -1231,69 +1441,69 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to save last session data', { error });
     }
   },
-  
+
   validateAndRecreateSession: async () => {
     const { sessionSettings, authenticatedUser } = get();
-    
+
     if (!sessionSettings?.last_session || !authenticatedUser?.pin) {
       storeLogger.warn('Cannot recreate session: no saved session or authentication');
       return false;
     }
-    
+
     set({ isValidatingLastSession: true, error: null });
-    
+
     try {
       // Validate activity exists
       const activities = await api.getActivities(authenticatedUser.pin);
       const activity = activities.find(a => a.id === sessionSettings.last_session!.activity_id);
-      
+
       if (!activity) {
         throw new Error('Gespeicherte Aktivität nicht mehr verfügbar');
       }
-      
+
       // Validate room is available
       const rooms = await api.getRooms(authenticatedUser.pin);
       const room = rooms.find(r => r.id === sessionSettings.last_session!.room_id);
-      
+
       if (!room) {
         throw new Error('Gespeicherter Raum nicht verfügbar');
       }
-      
+
       // Check supervisors - use current if already selected, otherwise validate saved ones
       const { selectedSupervisors, users } = get();
       let supervisors = selectedSupervisors;
-      
+
       if (supervisors.length === 0) {
         // Ensure we have teachers loaded first
         if (users.length === 0) {
           storeLogger.debug('Loading teachers to validate supervisors');
           await get().fetchTeachers();
           const updatedUsers = get().users;
-          
+
           if (updatedUsers.length === 0) {
             throw new Error('Fehler beim Laden der Betreuer');
           }
-          
+
           // Now try to find supervisors with loaded users
-          supervisors = sessionSettings.last_session!.supervisor_ids
+          supervisors = sessionSettings.last_session.supervisor_ids
             .map(id => updatedUsers.find(u => u.id === id))
             .filter((u): u is User => u !== undefined);
         } else {
           // Users already loaded, validate saved supervisors
-          supervisors = sessionSettings.last_session!.supervisor_ids
+          supervisors = sessionSettings.last_session.supervisor_ids
             .map(id => users.find(u => u.id === id))
             .filter((u): u is User => u !== undefined);
         }
-          
+
         if (supervisors.length === 0) {
           storeLogger.warn('No valid supervisors found', {
-            savedIds: sessionSettings.last_session!.supervisor_ids,
+            savedIds: sessionSettings.last_session.supervisor_ids,
             availableUsers: users.length === 0 ? get().users.map(u => u.id) : users.map(u => u.id),
           });
           throw new Error('Keine gültigen Betreuer gefunden');
         }
       }
-      
+
       // Set validated data in store
       set({
         selectedActivity: activity,
@@ -1301,18 +1511,18 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         selectedSupervisors: supervisors,
         isValidatingLastSession: false,
       });
-      
+
       storeLogger.info('Session validation successful', {
         activityId: activity.id,
         roomId: room.id,
         supervisorCount: supervisors.length,
       });
-      
+
       return true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
       storeLogger.error('Session validation failed', { error: errorMessage });
-      
+
       // Clear invalid session data
       await clearLastSession();
       set({
@@ -1320,21 +1530,56 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         isValidatingLastSession: false,
         error: errorMessage,
       });
-      
+
       return false;
     }
   },
-  
+
   clearSessionSettings: async () => {
     try {
       await clearLastSession();
       const { sessionSettings } = get();
       set({
-        sessionSettings: sessionSettings ? { ...sessionSettings, last_session: null, use_last_session: false } : null,
+        sessionSettings: sessionSettings
+          ? { ...sessionSettings, last_session: null, use_last_session: false }
+          : null,
       });
       storeLogger.info('Session settings cleared');
     } catch (error) {
       storeLogger.error('Failed to clear session settings', { error });
+    }
+  },
+
+  // Submit daily feedback
+  submitDailyFeedback: async (studentId: number, rating: DailyFeedbackRating): Promise<boolean> => {
+    const { authenticatedUser } = get();
+
+    if (!authenticatedUser?.pin) {
+      storeLogger.error('Cannot submit feedback: no authenticated user');
+      return false;
+    }
+
+    try {
+      storeLogger.info('Submitting daily feedback', {
+        studentId,
+        rating,
+      });
+
+      await api.submitDailyFeedback(authenticatedUser.pin, {
+        student_id: studentId,
+        value: rating,
+      });
+
+      storeLogger.info('Daily feedback submitted successfully', {
+        studentId,
+        rating,
+      });
+
+      return true;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      storeLogger.error('Failed to submit daily feedback', { error: errorMessage });
+      return false;
     }
   },
 });

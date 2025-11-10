@@ -18,8 +18,8 @@ interface ContentBoxProps {
  */
 const ContentBox: React.FC<ContentBoxProps> = ({
   children,
-  width = '95%',
-  height = '90%',
+  width = '100%',
+  height = '100%',
   padding = theme.spacing.xxxl,
   rounded = 'lg',
   shadow = 'md',

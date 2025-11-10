@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { ContentBox } from '../components/ui';
+import { BackgroundWrapper } from '../components/background-wrapper';
 import { api, type Room, type SessionStartRequest, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -43,32 +43,35 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
       style={{
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        backgroundColor: 'rgba(0, 0, 0, 0.45)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 1000,
-        backdropFilter: 'blur(4px)',
+        backdropFilter: 'blur(6px)',
+        WebkitBackdropFilter: 'blur(6px)',
+        padding: '16px',
       }}
     >
       <div
         style={{
           backgroundColor: '#FFFFFF',
-          borderRadius: '24px',
-          padding: '32px',
-          maxWidth: '480px',
-          width: '90%',
+          borderRadius: designSystem.borderRadius.xl,
+          padding: '28px',
+          maxWidth: '560px',
+          width: '92%',
           textAlign: 'center',
           boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
+          border: '1px solid rgba(229,231,235,0.5)',
           position: 'relative',
-          overflow: 'hidden',
         }}
       >
         {/* Header Icon */}
@@ -102,9 +105,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
         <h2
           style={{
-            fontSize: '28px',
+            fontSize: '32px',
             fontWeight: 700,
-            marginBottom: '16px',
+            marginBottom: '12px',
             color: '#1F2937',
             lineHeight: 1.2,
           }}
@@ -117,9 +120,9 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           style={{
             backgroundColor: '#F8FAFC',
             borderRadius: designSystem.borderRadius.lg,
-            padding: '24px',
-            marginBottom: '32px',
-            border: '1px solid #E2E8F0',
+            padding: '20px',
+            marginBottom: '20px',
+            border: '1px solid #E5E7EB',
           }}
         >
           <div
@@ -127,14 +130,14 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '24px',
-              marginBottom: '12px',
+              gap: '16px',
+              marginBottom: '8px',
             }}
           >
             <div
               style={{
-                fontSize: '20px',
-                fontWeight: 600,
+                fontSize: '18px',
+                fontWeight: 700,
                 color: '#1F2937',
                 display: 'flex',
                 alignItems: 'center',
@@ -159,7 +162,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
             <div
               style={{
-                fontSize: '16px',
+                fontSize: '14px',
                 fontWeight: 600,
                 color: '#9CA3AF',
               }}
@@ -180,7 +183,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 height="20"
                 viewBox="0 0 24 24"
                 fill="none"
-                stroke="#f87C10"
+                stroke="#4f46e5"
                 strokeWidth="2"
               >
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
@@ -195,8 +198,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             <div
               style={{
                 fontSize: '14px',
-                color: '#9CA3AF',
-                marginBottom: '4px',
+                color: '#6B7280',
+                marginBottom: '0px',
               }}
             >
               Typ: {room.room_type}
@@ -207,18 +210,18 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         {/* Supervisors */}
         <div
           style={{
-            backgroundColor: '#F0F9FF',
+            backgroundColor: '#F9FAFB',
             borderRadius: designSystem.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '32px',
-            border: '1px solid #BAE6FD',
+            padding: '16px',
+            marginBottom: '20px',
+            border: '1px solid #E5E7EB',
           }}
         >
           <div
             style={{
               fontSize: '14px',
-              fontWeight: 600,
-              color: '#0369A1',
+              fontWeight: 700,
+              color: '#374151',
               marginBottom: '12px',
               textTransform: 'uppercase',
               letterSpacing: '0.5px',
@@ -238,12 +241,12 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                 key={supervisor.id}
                 style={{
                   backgroundColor: '#FFFFFF',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
+                  padding: '8px 12px',
+                  borderRadius: '16px',
                   fontSize: '14px',
-                  fontWeight: 500,
+                  fontWeight: 600,
                   color: '#1F2937',
-                  border: '1px solid #E0E7FF',
+                  border: '1px solid #E5E7EB',
                   display: 'flex',
                   alignItems: 'center',
                   gap: '6px',
@@ -273,8 +276,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             disabled={isLoading}
             style={{
               flex: 1,
-              height: '52px',
-              fontSize: '16px',
+              height: '64px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#6B7280',
               backgroundColor: 'transparent',
@@ -307,8 +310,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             disabled={isLoading}
             style={{
               flex: 1,
-              height: '52px',
-              fontSize: '16px',
+              height: '64px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#FFFFFF',
               background: isLoading
@@ -623,8 +626,8 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
             disabled={isLoading}
             style={{
               flex: 1,
-              height: '52px',
-              fontSize: '16px',
+              height: '64px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#6B7280',
               backgroundColor: 'transparent',
@@ -657,8 +660,8 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
             disabled={isLoading}
             style={{
               flex: 1,
-              height: '52px',
-              fontSize: '16px',
+              height: '64px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#FFFFFF',
               background: isLoading
@@ -686,7 +689,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
               }
             }}
           >
-            {isLoading ? 'Überschreibe...' : 'Session überschreiben'}
+            {isLoading ? 'Starte...' : 'Trotzdem starten'}
           </button>
         </div>
       </div>
@@ -830,7 +833,7 @@ function RoomSelectionPage() {
 
       // Fetch and update current session to ensure state consistency
       await fetchCurrentSession();
-      
+
       // Auto-save this session for quick recreation
       await saveLastSessionData();
 
@@ -921,7 +924,7 @@ function RoomSelectionPage() {
 
       // Fetch and update current session to ensure state consistency
       await fetchCurrentSession();
-      
+
       // Auto-save this session for quick recreation
       await saveLastSessionData();
 
@@ -1024,11 +1027,11 @@ function RoomSelectionPage() {
   }
 
   return (
-    <ContentBox centered shadow="lg" rounded="lg" padding={theme.spacing.md}>
+    <BackgroundWrapper>
       <div
         style={{
-          width: '100%',
-          height: '100%',
+          width: '100vw',
+          height: '100vh',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
@@ -1100,11 +1103,12 @@ function RoomSelectionPage() {
 
         <h1
           style={{
-            fontSize: '36px',
-            fontWeight: theme.fonts.weight.bold,
-            marginBottom: '48px',
+            fontSize: '56px',
+            fontWeight: 700,
+            marginTop: '40px',
+            marginBottom: '20px',
             textAlign: 'center',
-            color: theme.colors.text.primary,
+            color: '#111827',
           }}
         >
           Raum auswählen
@@ -1201,90 +1205,95 @@ function RoomSelectionPage() {
                   display: 'grid',
                   gridTemplateColumns: 'repeat(5, 1fr)',
                   gap: '14px',
-                  marginBottom: '12px',
-                  flex: 1,
+                  marginTop: '24px',
+                  marginBottom: '0px',
                   alignContent: 'start',
                 }}
               >
                 {paginatedRooms.map(room => {
                   const isOccupied = room.is_occupied;
+                  const isSelected = selectedRoom?.id === room.id;
                   return (
                     <button
                       key={room.id}
                       onClick={() => !isOccupied && handleRoomSelect(room)}
                       disabled={isOccupied}
                       style={{
+                        width: '100%',
                         height: '160px',
-                        padding: '16px',
-                        backgroundColor: 'transparent',
-                        border: 'none',
-                        borderRadius: designSystem.borderRadius.xl,
-                        fontSize: '18px',
-                        fontWeight: 600,
-                        color: isOccupied ? '#9CA3AF' : designSystem.colors.textPrimary,
+                        backgroundColor: '#FFFFFF',
+                        border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
+                        borderRadius: '24px',
                         cursor: isOccupied ? 'not-allowed' : 'pointer',
-                        transition: designSystem.transitions.smooth,
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        textAlign: 'center',
-                        outline: 'none',
+                        gap: '16px',
                         position: 'relative',
-                        overflow: 'hidden',
-                        minWidth: '0',
-                        gap: '12px',
-                        WebkitTapHighlightColor: 'transparent',
+                        transition: 'all 150ms ease-out',
+                        boxShadow: isSelected
+                          ? '0 8px 30px rgba(131, 205, 45, 0.2)'
+                          : '0 4px 12px rgba(0, 0, 0, 0.08)',
                         opacity: isOccupied ? 0.6 : 1,
-                        boxShadow: designSystem.shadows.card,
                       }}
                       onTouchStart={e => {
-                        if (!isOccupied) {
-                          e.currentTarget.style.transform = designSystem.scales.active;
-                          e.currentTarget.style.boxShadow = designSystem.shadows.card;
-                        }
+                        if (!isOccupied) e.currentTarget.style.transform = 'scale(0.98)';
                       }}
                       onTouchEnd={e => {
-                        if (!isOccupied) {
+                        if (!isOccupied)
                           setTimeout(() => {
-                            if (e.currentTarget) {
-                              e.currentTarget.style.transform = 'scale(1)';
-                              e.currentTarget.style.boxShadow = designSystem.shadows.card;
-                            }
-                          }, 150);
-                        }
+                            if (e.currentTarget) e.currentTarget.style.transform = 'scale(1)';
+                          }, 50);
                       }}
                     >
-                      {/* Gradient border wrapper - Orange for available, gray for occupied */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          inset: 0,
-                          borderRadius: designSystem.borderRadius.xl,
-                          background: isOccupied
-                            ? 'linear-gradient(135deg, #9CA3AF, #6B7280)'
-                            : 'linear-gradient(135deg, #f87C10, #e06c0a)',
-                          zIndex: 0,
-                        }}
-                      />
+                      {/* Selection indicator */}
+                      {!isOccupied && (
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '12px',
+                            right: '12px',
+                            width: '24px',
+                            height: '24px',
+                            borderRadius: '50%',
+                            backgroundColor: isSelected
+                              ? designSystem.colors.primaryGreen
+                              : '#E5E7EB',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            transition: 'all 200ms',
+                          }}
+                        >
+                          {isSelected && (
+                            <svg
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="#FFFFFF"
+                              strokeWidth="3"
+                            >
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                      )}
 
-                      {/* Inner content wrapper for border effect */}
+                      {/* Room Icon - circle tint + dark indigo icon */}
                       <div
                         style={{
-                          position: 'absolute',
-                          inset: '2px',
-                          borderRadius: `calc(${designSystem.borderRadius.xl} - 2px)`,
-                          background: designSystem.gradients.light,
-                          backdropFilter: designSystem.glass.blur,
-                          WebkitBackdropFilter: designSystem.glass.blur,
-                          zIndex: 1,
-                        }}
-                      />
-
-                      {/* Room Icon */}
-                      <div
-                        style={{
-                          color: isOccupied ? '#9CA3AF' : '#f87C10',
+                          width: '64px',
+                          height: '64px',
+                          backgroundColor: isOccupied ? '#F3F4F6' : 'rgba(99,102,241,0.15)',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: isOccupied ? '#9CA3AF' : '#4f46e5',
                           position: 'relative',
                           zIndex: 2,
                         }}
@@ -1296,13 +1305,12 @@ function RoomSelectionPage() {
                       <span
                         style={{
                           fontSize: '18px',
-                          fontWeight: 600,
+                          fontWeight: 700,
                           lineHeight: '1.2',
                           maxWidth: '100%',
                           wordBreak: 'break-word',
-                          color: '#1F2937',
-                          position: 'relative',
-                          zIndex: 2,
+                          textAlign: 'center',
+                          color: '#111827',
                         }}
                       >
                         {room.name}
@@ -1310,42 +1318,10 @@ function RoomSelectionPage() {
 
                       {/* Room capacity info */}
                       {room.capacity && (
-                        <div
-                          style={{
-                            fontSize: '12px',
-                            color: '#6B7280',
-                            position: 'relative',
-                            zIndex: 2,
-                          }}
-                        >
+                        <div style={{ fontSize: '12px', color: '#6B7280' }}>
                           {room.capacity} Plätze
                         </div>
                       )}
-
-                      {/* Availability Badge */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '8px',
-                          right: '8px',
-                          backgroundColor: isOccupied ? '#EF4444' : '#10B981',
-                          color: '#FFFFFF',
-                          padding: '4px 8px',
-                          borderRadius: designSystem.borderRadius.md,
-                          fontSize: '10px',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          zIndex: 3,
-                          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
-                        }}
-                      >
-                        <svg width="8" height="8" viewBox="0 0 24 24" fill="currentColor">
-                          <circle cx="12" cy="12" r="10" />
-                        </svg>
-                        {isOccupied ? 'Belegt' : 'Verfügbar'}
-                      </div>
                     </button>
                   );
                 })}
@@ -1409,10 +1385,11 @@ function RoomSelectionPage() {
             {totalPages > 1 && (
               <div
                 style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto 1fr',
                   alignItems: 'center',
-                  marginTop: '12px',
+                  marginTop: '24px',
+                  width: '100%',
                 }}
               >
                 <button
@@ -1434,6 +1411,7 @@ function RoomSelectionPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: 'none',
+                    justifySelf: 'start',
                   }}
                 >
                   ← Vorherige
@@ -1444,6 +1422,7 @@ function RoomSelectionPage() {
                     fontSize: '18px',
                     color: theme.colors.text.secondary,
                     fontWeight: 500,
+                    justifySelf: 'center',
                   }}
                 >
                   Seite {currentPage + 1} von {totalPages}
@@ -1468,6 +1447,7 @@ function RoomSelectionPage() {
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
                     boxShadow: 'none',
+                    justifySelf: 'end',
                   }}
                 >
                   Nächste →
@@ -1512,7 +1492,7 @@ function RoomSelectionPage() {
         onCancel={handleConflictCancel}
         isLoading={isStartingSession}
       />
-    </ContentBox>
+    </BackgroundWrapper>
   );
 }
 
