@@ -142,10 +142,18 @@ const ActivityScanningPage: React.FC = () => {
 
   // Start scanning when component mounts
   useEffect(() => {
-    logger.info('Activity Scanning Page mounted, starting RFID scanning');
+    const mountTimestamp = Date.now();
+    logger.info('[RACE-DEBUG] Activity Scanning Page MOUNTED', {
+      timestamp: mountTimestamp,
+      page: 'ActivityScanningPage',
+    });
 
     // Start scanning and clear initializing state
     const initializeScanning = async () => {
+      logger.info('[RACE-DEBUG] Calling startScanning() from page mount', {
+        timestamp: Date.now(),
+        timeSinceMount: Date.now() - mountTimestamp,
+      });
       await startScanning();
     };
 
@@ -153,7 +161,15 @@ const ActivityScanningPage: React.FC = () => {
 
     // Cleanup: stop scanning when component unmounts
     return () => {
-      logger.info('Activity Scanning Page unmounting, stopping RFID scanning');
+      const unmountTimestamp = Date.now();
+      logger.info('[RACE-DEBUG] Activity Scanning Page UNMOUNTING', {
+        timestamp: unmountTimestamp,
+        page: 'ActivityScanningPage',
+        timeSinceMount: unmountTimestamp - mountTimestamp,
+      });
+      logger.info('[RACE-DEBUG] Calling stopScanning() from page unmount', {
+        timestamp: unmountTimestamp,
+      });
       void stopScanning(); // Handle async function
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

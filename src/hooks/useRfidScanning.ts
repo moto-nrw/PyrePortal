@@ -499,6 +499,13 @@ export const useRfidScanning = () => {
   }, [isTagBlocked, processScan]);
 
   const startScanning = useCallback(async () => {
+    const callTimestamp = Date.now();
+    logger.info('[RACE-DEBUG] startScanning() called', {
+      timestamp: callTimestamp,
+      isServiceStartedRef: isServiceStartedRef.current,
+      rfidEnabled: isRfidEnabled(),
+    });
+
     if (isServiceStartedRef.current) {
       logger.debug('Service already started, ensuring store state is synchronized');
       // Always update store state to reflect actual service state
@@ -556,17 +563,33 @@ export const useRfidScanning = () => {
 
     // Real RFID scanning
     try {
-      logger.info('Starting RFID background service');
+      logger.info('[RACE-DEBUG] Calling start_rfid_service backend command', {
+        timestamp: callTimestamp,
+      });
       await safeInvoke('start_rfid_service');
       isServiceStartedRef.current = true;
       startRfidScanning(); // Update store state
-      logger.info('RFID background service started');
+      logger.info('[RACE-DEBUG] RFID background service started successfully', {
+        timestamp: Date.now(),
+        timeSinceCall: Date.now() - callTimestamp,
+      });
     } catch (error) {
-      logger.error('Failed to start RFID service', { error });
+      logger.error('[RACE-DEBUG] Failed to start RFID service', {
+        error,
+        timestamp: Date.now(),
+        timeSinceCall: Date.now() - callTimestamp,
+      });
     }
   }, [startRfidScanning, isTagBlocked, processScan]);
 
   const stopScanning = useCallback(async () => {
+    const callTimestamp = Date.now();
+    logger.info('[RACE-DEBUG] stopScanning() called', {
+      timestamp: callTimestamp,
+      isServiceStartedRef: isServiceStartedRef.current,
+      rfidEnabled: isRfidEnabled(),
+    });
+
     if (!isServiceStartedRef.current) {
       logger.debug('Service not running, but ensuring store state is synchronized');
       // Even if service is not tracked as running, update store state
@@ -576,7 +599,9 @@ export const useRfidScanning = () => {
 
     try {
       if (isRfidEnabled()) {
-        logger.info('Stopping RFID background service');
+        logger.info('[RACE-DEBUG] Calling stop_rfid_service backend command', {
+          timestamp: callTimestamp,
+        });
         await safeInvoke('stop_rfid_service');
       } else {
         // Stop mock scanning
@@ -588,9 +613,16 @@ export const useRfidScanning = () => {
       }
       isServiceStartedRef.current = false;
       stopRfidScanning(); // Update store state
-      logger.info('RFID service stopped');
+      logger.info('[RACE-DEBUG] RFID service stopped successfully', {
+        timestamp: Date.now(),
+        timeSinceCall: Date.now() - callTimestamp,
+      });
     } catch (error) {
-      logger.error('Failed to stop RFID service', { error });
+      logger.error('[RACE-DEBUG] Failed to stop RFID service', {
+        error,
+        timestamp: Date.now(),
+        timeSinceCall: Date.now() - callTimestamp,
+      });
       // Even on error, update the ref and store state
       isServiceStartedRef.current = false;
       stopRfidScanning();

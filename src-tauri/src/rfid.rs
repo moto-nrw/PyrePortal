@@ -171,6 +171,7 @@ impl RfidBackgroundService {
                         };
 
                         if !should_continue {
+                            println!("Continuous scan loop stopping - scanner will be cleaned up");
                             break;
                         }
 
@@ -355,6 +356,16 @@ mod raspberry_pi {
     // Persistent scanner struct that holds the MFRC522 instance
     pub struct PersistentRfidScanner {
         mfrc522: Mfrc522Scanner,
+    }
+
+    impl Drop for PersistentRfidScanner {
+        fn drop(&mut self) {
+            // Best-effort cleanup: put MFRC522 into halted state
+            // This prevents the chip from being in an inconsistent state
+            // when the next scanner instance tries to initialize
+            let _ = self.mfrc522.hlta();
+            println!("PersistentRfidScanner dropped - MFRC522 halted");
+        }
     }
 
     // Custom error type matching the original implementation
