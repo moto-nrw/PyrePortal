@@ -437,9 +437,7 @@ function TagAssignmentPage() {
                     zIndex: 2,
                   }}
                 >
-                  {scannerStatus?.platform.includes('Development')
-                    ? 'Simuliere Scan-Vorgang...'
-                    : 'Halten Sie das Armband an den Scanner'}
+                  Halten Sie das Armband an den Scanner
                 </p>
 
                 <button
