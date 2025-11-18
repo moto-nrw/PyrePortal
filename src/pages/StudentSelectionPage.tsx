@@ -358,7 +358,7 @@ function StudentSelectionPage() {
             color: '#111827',
           }}
         >
-          Schüler auswählen
+          Person auswählen
         </h1>
 
         {/* Error display */}
@@ -743,7 +743,7 @@ function StudentSelectionPage() {
                   opacity: !selectedEntityId || isSaving ? 0.6 : 1,
                 }}
               >
-                {isSaving ? 'Zuweisen...' : 'Tag zuweisen'}
+                {isSaving ? 'Zuweisen...' : 'Armband zuweisen'}
               </button>
             </div>
           </>
