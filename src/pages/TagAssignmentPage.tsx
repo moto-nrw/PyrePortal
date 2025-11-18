@@ -66,7 +66,7 @@ function TagAssignmentPage() {
     void navigate('/home');
   };
 
-  // Handle success state from student selection page
+  // Handle state from student selection page (success or back navigation)
   useEffect(() => {
     const locationState = location.state as {
       assignmentSuccess?: boolean;
@@ -76,25 +76,30 @@ function TagAssignmentPage() {
       tagAssignment?: TagAssignmentCheck;
     } | null;
 
-    if (locationState?.assignmentSuccess) {
-      const { studentName, previousTag, scannedTag, tagAssignment } = locationState;
+    if (!locationState) return;
 
-      // Restore tag data if coming back from student selection
-      if (scannedTag && tagAssignment) {
-        setScannedTag(scannedTag);
-        setTagAssignment(tagAssignment);
-      }
+    const { scannedTag, tagAssignment } = locationState;
 
-      let successMessage = `Tag erfolgreich zugewiesen an ${studentName ?? 'Schüler'}`;
+    // Restore tag data if coming back from student selection
+    if (scannedTag && tagAssignment) {
+      setScannedTag(scannedTag);
+      setTagAssignment(tagAssignment);
+    }
+
+    // Handle success state
+    if (locationState.assignmentSuccess) {
+      const { studentName, previousTag } = locationState;
+
+      let successMessage = `Armband erfolgreich zugewiesen an ${studentName ?? 'Person'}`;
       if (previousTag) {
-        successMessage += ` (Vorheriger Tag: ${previousTag})`;
+        successMessage += ` (Vorheriges Armband: ${previousTag})`;
       }
 
       setSuccess(successMessage);
-
-      // Clear location state to prevent showing success on page refresh
-      window.history.replaceState({}, document.title);
     }
+
+    // Clear location state to prevent showing on page refresh
+    window.history.replaceState({}, document.title);
   }, [location.state]);
 
   // Check RFID scanner status on component mount

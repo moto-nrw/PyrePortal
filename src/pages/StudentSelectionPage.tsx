@@ -269,7 +269,13 @@ function StudentSelectionPage() {
   const handleBack = () => {
     logger.info('User navigating back to tag assignment');
     logUserAction('student_selection_back');
-    void navigate('/tag-assignment');
+    // Pass back the scan state so TagAssignmentPage shows the scan result
+    void navigate('/tag-assignment', {
+      state: {
+        scannedTag: state.scannedTag,
+        tagAssignment: state.tagAssignment,
+      },
+    });
   };
 
   const handleNextPage = () => {
