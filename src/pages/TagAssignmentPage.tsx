@@ -348,7 +348,7 @@ function TagAssignmentPage() {
               color: '#111827',
             }}
           >
-            Tag zuweisen
+            Armband scannen
           </h1>
 
           {/* Scanner Modal Overlay */}
@@ -503,9 +503,9 @@ function TagAssignmentPage() {
                     lineHeight: '1.4',
                   }}
                 >
-                  Wählen Sie einen Schüler aus,
+                  Drücken Sie den Knopf und halten Sie
                   <br />
-                  um ein Tag zuzuweisen
+                  das Armband an das Lesegerät
                 </p>
 
                 <button
@@ -549,7 +549,7 @@ function TagAssignmentPage() {
                     }
                   }}
                 >
-                  Schüler auswählen
+                  Scan starten
                 </button>
               </div>
             )}
