@@ -38,7 +38,7 @@ function StudentSelectionPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null); // null = all, 'betreuer' = staff only, or class name
 
   const logger = useMemo(() => createLogger('StudentSelectionPage'), []);
 
@@ -119,22 +119,24 @@ function StudentSelectionPage() {
     return Array.from(classSet).sort((a, b) => a.localeCompare(b, 'de'));
   }, [entities]);
 
-  // Apply filter by OGS-Gruppe (class). If a class is selected, hide teachers.
+  // Apply filter by type or class
   const filteredEntities = useMemo(() => {
-    const byClass = entities.filter(e => {
-      if (!selectedClass) return true;
+    const filtered = entities.filter(e => {
+      if (!selectedFilter) return true;
+      if (selectedFilter === 'betreuer') return e.type === 'teacher';
+      // Class filter - only students
       if (e.type !== 'student') return false;
-      return (e.data.school_class ?? '') === selectedClass;
+      return (e.data.school_class ?? '') === selectedFilter;
     });
 
-    return byClass.sort((a, b) => {
+    return filtered.sort((a, b) => {
       const an =
         a.type === 'student' ? `${a.data.last_name} ${a.data.first_name}` : a.data.display_name;
       const bn =
         b.type === 'student' ? `${b.data.last_name} ${b.data.first_name}` : b.data.display_name;
       return an.localeCompare(bn, 'de');
     });
-  }, [entities, selectedClass]);
+  }, [entities, selectedFilter]);
 
   // Calculate pagination on filtered list
   // Fallback to 1 to avoid 0 pages when list is empty
@@ -158,7 +160,7 @@ function StudentSelectionPage() {
   useEffect(() => {
     setCurrentPage(0);
     setSelectedEntityId(null);
-  }, [selectedClass]);
+  }, [selectedFilter]);
 
   const handleEntitySelect = (entity: AssignableEntity) => {
     const entityId =
@@ -383,67 +385,82 @@ function StudentSelectionPage() {
           </div>
         )}
 
-        {/* OGS-Gruppe Filter (chips wrap, no scrolling) */}
-        {availableClasses.length > 0 && (
+        {/* Filter (chips wrap, no scrolling) */}
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '8px',
+            marginTop: '8px',
+          }}
+        >
+          <div style={{ color: '#6B7280', fontSize: '14px', fontWeight: 600 }}>Filter:</div>
           <div
             style={{
               display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
               gap: '8px',
-              marginTop: '8px',
+              maxWidth: '100%',
             }}
           >
-            <div style={{ color: '#6B7280', fontSize: '14px', fontWeight: 600 }}>OGS‑Gruppe:</div>
-            <div
+            <button
+              onClick={() => setSelectedFilter(null)}
               style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                justifyContent: 'center',
-                gap: '8px',
-                maxWidth: '100%',
+                height: '40px',
+                padding: '0 14px',
+                borderRadius: designSystem.borderRadius.full,
+                border: selectedFilter === null ? 'none' : '1px solid #E5E7EB',
+                background: selectedFilter === null ? designSystem.gradients.blueRight : '#FFFFFF',
+                color: selectedFilter === null ? '#FFFFFF' : '#374151',
+                fontSize: '14px',
+                fontWeight: 600,
+                boxShadow: selectedFilter === null ? designSystem.shadows.blue : 'none',
               }}
             >
-              <button
-                onClick={() => setSelectedClass(null)}
-                style={{
-                  height: '40px',
-                  padding: '0 14px',
-                  borderRadius: designSystem.borderRadius.full,
-                  border: selectedClass === null ? 'none' : '1px solid #E5E7EB',
-                  background: selectedClass === null ? designSystem.gradients.blueRight : '#FFFFFF',
-                  color: selectedClass === null ? '#FFFFFF' : '#374151',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  boxShadow: selectedClass === null ? designSystem.shadows.blue : 'none',
-                }}
-              >
-                Alle
-              </button>
-              {availableClasses.map(cls => {
-                const active = selectedClass === cls;
-                return (
-                  <button
-                    key={cls}
-                    onClick={() => setSelectedClass(cls)}
-                    style={{
-                      height: '40px',
-                      padding: '0 14px',
-                      borderRadius: designSystem.borderRadius.full,
-                      border: active ? 'none' : '1px solid #E5E7EB',
-                      background: active ? designSystem.gradients.blueRight : '#FFFFFF',
-                      color: active ? '#FFFFFF' : '#374151',
-                      fontSize: '14px',
-                      fontWeight: 600,
-                    }}
-                  >
-                    {cls}
-                  </button>
-                );
-              })}
-            </div>
+              Alle
+            </button>
+            <button
+              onClick={() => setSelectedFilter('betreuer')}
+              style={{
+                height: '40px',
+                padding: '0 14px',
+                borderRadius: designSystem.borderRadius.full,
+                border: selectedFilter === 'betreuer' ? 'none' : '1px solid #E5E7EB',
+                background:
+                  selectedFilter === 'betreuer' ? designSystem.gradients.blueRight : '#FFFFFF',
+                color: selectedFilter === 'betreuer' ? '#FFFFFF' : '#374151',
+                fontSize: '14px',
+                fontWeight: 600,
+                boxShadow: selectedFilter === 'betreuer' ? designSystem.shadows.blue : 'none',
+              }}
+            >
+              Betreuer
+            </button>
+            {availableClasses.map(cls => {
+              const active = selectedFilter === cls;
+              return (
+                <button
+                  key={cls}
+                  onClick={() => setSelectedFilter(cls)}
+                  style={{
+                    height: '40px',
+                    padding: '0 14px',
+                    borderRadius: designSystem.borderRadius.full,
+                    border: active ? 'none' : '1px solid #E5E7EB',
+                    background: active ? designSystem.gradients.blueRight : '#FFFFFF',
+                    color: active ? '#FFFFFF' : '#374151',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {cls}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
 
         {isLoading ? (
           <div
