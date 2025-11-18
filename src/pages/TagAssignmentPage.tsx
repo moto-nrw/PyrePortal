@@ -644,7 +644,7 @@ function TagAssignmentPage() {
                   </div>
 
                   {/* Current Assignment Status */}
-                  {tagAssignment.assigned && tagAssignment.student ? (
+                  {tagAssignment.assigned && (tagAssignment.person ?? tagAssignment.student) ? (
                     <div>
                       <p
                         style={{
@@ -663,7 +663,7 @@ function TagAssignmentPage() {
                           marginBottom: '4px',
                         }}
                       >
-                        {tagAssignment.student.name}
+                        {(tagAssignment.person ?? tagAssignment.student)?.name}
                       </p>
                       <p
                         style={{
@@ -671,7 +671,9 @@ function TagAssignmentPage() {
                           color: '#6B7280',
                         }}
                       >
-                        {tagAssignment.student.group}
+                        {tagAssignment.person_type === 'staff'
+                          ? 'Betreuer'
+                          : (tagAssignment.person ?? tagAssignment.student)?.group}
                       </p>
                     </div>
                   ) : (

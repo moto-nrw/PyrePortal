@@ -922,6 +922,14 @@ export interface Student {
  */
 export interface TagAssignmentCheck {
   assigned: boolean;
+  person_type?: 'student' | 'staff';
+  person?: {
+    id: number;
+    person_id: number;
+    name: string;
+    group: string;
+  };
+  /** @deprecated Use person instead */
   student?: {
     id: number;
     name: string;
