@@ -619,7 +619,7 @@ function TagAssignmentPage() {
                     >
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
-                    <span>Tag erkannt</span>
+                    <span>Armband erkannt</span>
                   </div>
                   {/* Tag ID label */}
                   <div
@@ -699,7 +699,7 @@ function TagAssignmentPage() {
                         <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
                       <span style={{ fontSize: '16px', color: '#6B7280', fontWeight: 600 }}>
-                        Tag ist nicht zugewiesen
+                        Armband ist nicht zugewiesen
                       </span>
                     </div>
                   )}
@@ -747,7 +747,7 @@ function TagAssignmentPage() {
                       }
                     }}
                   >
-                    {tagAssignment.assigned ? 'Neuen Schüler zuweisen' : 'Schüler auswählen'}
+                    {tagAssignment.assigned ? 'Neue Person zuweisen' : 'Person auswählen'}
                   </button>
                   <button
                     onClick={handleScanAnother}
