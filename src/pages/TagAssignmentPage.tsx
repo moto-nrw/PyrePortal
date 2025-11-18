@@ -426,7 +426,7 @@ function TagAssignmentPage() {
                     zIndex: 2,
                   }}
                 >
-                  RFID Tag scannen...
+                  Armband scannen...
                 </h2>
                 <p
                   style={{
