@@ -44,14 +44,15 @@ jobs:
           components: rustfmt, clippy
 
       - name: Cache Rust dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             src-tauri/target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Install Ubuntu dependencies
         run: |
@@ -86,6 +87,17 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
 
       - name: Install Ubuntu dependencies
         run: |
