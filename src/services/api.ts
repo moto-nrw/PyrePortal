@@ -14,6 +14,46 @@ interface ApiConfig {
   device_api_key: string;
 }
 
+/**
+ * Map server error messages to German user-friendly messages
+ * This enables better debugging by distinguishing different error types
+ */
+function mapServerErrorToGerman(errorMessage: string): string {
+  // API-Key Fehler
+  if (errorMessage.includes('invalid device API key')) {
+    return 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.';
+  }
+  if (errorMessage.includes('device API key is required')) {
+    return 'API-Schlüssel nicht konfiguriert. Bitte .env Datei prüfen.';
+  }
+  if (errorMessage.includes('device is not active')) {
+    return 'Gerät ist deaktiviert. Bitte Administrator kontaktieren.';
+  }
+
+  // PIN Fehler
+  if (errorMessage.includes('invalid staff PIN')) {
+    return 'Ungültiger PIN. Bitte erneut versuchen.';
+  }
+  if (errorMessage.includes('staff PIN is required')) {
+    return 'PIN nicht angegeben.';
+  }
+  if (errorMessage.includes('locked')) {
+    return 'Konto gesperrt. Bitte später erneut versuchen.';
+  }
+
+  // Server-Fehler
+  if (
+    errorMessage.includes('500') ||
+    errorMessage.includes('502') ||
+    errorMessage.includes('503')
+  ) {
+    return 'Server nicht erreichbar. Bitte später versuchen.';
+  }
+
+  // Fallback - return original for unknown errors
+  return errorMessage;
+}
+
 // Environment configuration - will be loaded at runtime
 let API_BASE_URL = '';
 let DEVICE_API_KEY = '';
@@ -82,13 +122,39 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     });
   }
 
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    // Network-level errors (before server response)
+    const errorObj = error instanceof Error ? error : new Error(String(error));
+
+    // Log network error with timing
+    const responseTime = Date.now() - startTime;
+    logger.warn('Network error', {
+      endpoint,
+      responseTime,
+      errorName: errorObj.name,
+      errorMessage: errorObj.message,
+    });
+
+    // Differentiate network error types
+    if (errorObj.name === 'TypeError' && errorObj.message.includes('fetch')) {
+      throw new Error('Keine Netzwerkverbindung. Bitte WLAN prüfen.');
+    } else if (errorObj.name === 'AbortError') {
+      throw new Error('Zeitüberschreitung. Server antwortet nicht.');
+    } else if (errorObj.message.includes('NetworkError') || errorObj.message.includes('network')) {
+      throw new Error('Netzwerkfehler. Bitte Verbindung prüfen.');
+    } else {
+      throw new Error('Verbindungsfehler. Bitte Netzwerkverbindung prüfen.');
+    }
+  }
 
   const responseTime = Date.now() - startTime;
 
@@ -321,23 +387,19 @@ export const api = {
         },
       };
     } catch (error) {
-      logger.error('Global PIN validation failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      if (errorMessage.includes('401')) {
-        return {
-          success: false,
-          error: 'Ungültiger PIN. Bitte versuchen Sie es erneut.',
-        };
-      } else {
-        return {
-          success: false,
-          error: 'Verbindungsfehler. Bitte überprüfen Sie Ihre Netzwerkverbindung.',
-        };
-      }
+      logger.error('Global PIN validation failed', {
+        error: errorMessage,
+      });
+
+      // Use the error mapping function for user-friendly messages
+      const userMessage = mapServerErrorToGerman(errorMessage);
+
+      return {
+        success: false,
+        error: userMessage,
+      };
     }
   },
 
@@ -388,30 +450,23 @@ export const api = {
         },
       };
     } catch (error) {
-      logger.error('PIN validation failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      // Enhanced error handling for security features
       const errorMessage = error instanceof Error ? error.message : String(error);
 
-      if (errorMessage.includes('423')) {
-        return {
-          success: false,
-          error: 'Konto vorübergehend gesperrt. Versuchen Sie es später erneut.',
-          isLocked: true,
-        };
-      } else if (errorMessage.includes('401')) {
-        return {
-          success: false,
-          error: 'Ungültiger PIN. Bitte versuchen Sie es erneut.',
-        };
-      } else {
-        return {
-          success: false,
-          error: 'Verbindungsfehler. Bitte überprüfen Sie Ihre Netzwerkverbindung.',
-        };
-      }
+      logger.error('PIN validation failed', {
+        error: errorMessage,
+      });
+
+      // Use the error mapping function for user-friendly messages
+      const userMessage = mapServerErrorToGerman(errorMessage);
+
+      // Check if account is locked (423 status)
+      const isLocked = errorMessage.includes('423') || errorMessage.includes('locked');
+
+      return {
+        success: false,
+        error: userMessage,
+        isLocked,
+      };
     }
   },
 

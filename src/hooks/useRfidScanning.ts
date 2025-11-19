@@ -408,10 +408,10 @@ export const useRfidScanning = () => {
 
             // Show informative message (not success!)
             const infoResult: ExtendedRfidScanResult = {
-              student_name: 'Already Checked In',
+              student_name: 'Bereits eingecheckt',
               student_id: 0,
               action: 'already_in',
-              message: 'This student is already checked into this room',
+              message: 'Dieser Schüler ist bereits in diesem Raum eingecheckt',
               isInfo: true,
             };
             setScanResult(infoResult as RfidScanResult);
@@ -419,10 +419,10 @@ export const useRfidScanning = () => {
             // Real error
             updateOptimisticScan(scanId, 'failed');
             const errorResult: ExtendedRfidScanResult = {
-              student_name: 'Scan Failed',
+              student_name: 'Scan fehlgeschlagen',
               student_id: 0,
               action: 'error',
-              message: errorMessage || 'Please try again',
+              message: errorMessage || 'Bitte erneut versuchen',
               showAsError: true,
             };
             setScanResult(errorResult as RfidScanResult);
