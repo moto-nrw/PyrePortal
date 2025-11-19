@@ -186,14 +186,14 @@ function TagAssignmentPage() {
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';
         logError(new Error(errorMessage), 'RFID scanning failed');
-        setError(`Scan-Fehler: ${errorMessage}`);
+        setError('Armband konnte nicht gelesen werden. Bitte erneut versuchen.');
         setShowErrorModal(true);
         setShowScanner(false);
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
-      setError(`Scanner-Fehler: ${error.message}`);
+      setError('Verbindung zum Scanner unterbrochen. Bitte App neu starten.');
       setShowErrorModal(true);
       setShowScanner(false);
     } finally {
@@ -215,9 +215,8 @@ function TagAssignmentPage() {
       setTagAssignment(assignment);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      const errorMessage = error.message;
       logError(error, 'Failed to process scanned tag');
-      setError(`Fehler beim Verarbeiten des Tags: ${errorMessage}`);
+      setError('Armband konnte nicht überprüft werden. Bitte Internetverbindung prüfen.');
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);
