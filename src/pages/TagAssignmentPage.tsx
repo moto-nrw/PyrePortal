@@ -66,7 +66,7 @@ function TagAssignmentPage() {
     void navigate('/home');
   };
 
-  // Handle success state from student selection page
+  // Handle state from student selection page (success or back navigation)
   useEffect(() => {
     const locationState = location.state as {
       assignmentSuccess?: boolean;
@@ -76,25 +76,30 @@ function TagAssignmentPage() {
       tagAssignment?: TagAssignmentCheck;
     } | null;
 
-    if (locationState?.assignmentSuccess) {
-      const { studentName, previousTag, scannedTag, tagAssignment } = locationState;
+    if (!locationState) return;
 
-      // Restore tag data if coming back from student selection
-      if (scannedTag && tagAssignment) {
-        setScannedTag(scannedTag);
-        setTagAssignment(tagAssignment);
-      }
+    const { scannedTag, tagAssignment } = locationState;
 
-      let successMessage = `Tag erfolgreich zugewiesen an ${studentName ?? 'Schüler'}`;
+    // Restore tag data if coming back from student selection
+    if (scannedTag && tagAssignment) {
+      setScannedTag(scannedTag);
+      setTagAssignment(tagAssignment);
+    }
+
+    // Handle success state
+    if (locationState.assignmentSuccess) {
+      const { studentName, previousTag } = locationState;
+
+      let successMessage = `Armband erfolgreich zugewiesen an ${studentName ?? 'Person'}`;
       if (previousTag) {
-        successMessage += ` (Vorheriger Tag: ${previousTag})`;
+        successMessage += ` (Vorheriges Armband: ${previousTag})`;
       }
 
       setSuccess(successMessage);
-
-      // Clear location state to prevent showing success on page refresh
-      window.history.replaceState({}, document.title);
     }
+
+    // Clear location state to prevent showing on page refresh
+    window.history.replaceState({}, document.title);
   }, [location.state]);
 
   // Check RFID scanner status on component mount
@@ -181,14 +186,14 @@ function TagAssignmentPage() {
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';
         logError(new Error(errorMessage), 'RFID scanning failed');
-        setError(`Scan-Fehler: ${errorMessage}`);
+        setError('Armband konnte nicht gelesen werden. Bitte erneut versuchen.');
         setShowErrorModal(true);
         setShowScanner(false);
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
-      setError(`Scanner-Fehler: ${error.message}`);
+      setError('Verbindung zum Scanner unterbrochen. Bitte App neu starten.');
       setShowErrorModal(true);
       setShowScanner(false);
     } finally {
@@ -210,9 +215,8 @@ function TagAssignmentPage() {
       setTagAssignment(assignment);
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      const errorMessage = error.message;
       logError(error, 'Failed to process scanned tag');
-      setError(`Fehler beim Verarbeiten des Tags: ${errorMessage}`);
+      setError('Armband konnte nicht überprüft werden. Bitte Internetverbindung prüfen.');
       setShowErrorModal(true);
     } finally {
       setIsLoading(false);
@@ -231,7 +235,7 @@ function TagAssignmentPage() {
   // Navigate to student selection
   const handleNavigateToStudentSelection = () => {
     if (!scannedTag || !tagAssignment) {
-      setError('Ungültige Tag-Daten. Bitte scannen Sie erneut.');
+      setError('Ungültige Daten. Bitte erneut scannen.');
       setShowErrorModal(true);
       return;
     }
@@ -348,7 +352,7 @@ function TagAssignmentPage() {
               color: '#111827',
             }}
           >
-            Tag zuweisen
+            Armband scannen
           </h1>
 
           {/* Scanner Modal Overlay */}
@@ -426,7 +430,7 @@ function TagAssignmentPage() {
                     zIndex: 2,
                   }}
                 >
-                  RFID Tag scannen...
+                  Armband scannen...
                 </h2>
                 <p
                   style={{
@@ -437,9 +441,7 @@ function TagAssignmentPage() {
                     zIndex: 2,
                   }}
                 >
-                  {scannerStatus?.platform.includes('Development')
-                    ? 'Simuliere Scan-Vorgang...'
-                    : 'Halten Sie das Armband an den Scanner'}
+                  Halten Sie das Armband an den Scanner
                 </p>
 
                 <button
@@ -503,9 +505,9 @@ function TagAssignmentPage() {
                     lineHeight: '1.4',
                   }}
                 >
-                  Wählen Sie einen Schüler aus,
+                  Drücken Sie den Knopf und halten Sie
                   <br />
-                  um ein Tag zuzuweisen
+                  das Armband an das Lesegerät
                 </p>
 
                 <button
@@ -549,7 +551,7 @@ function TagAssignmentPage() {
                     }
                   }}
                 >
-                  Schüler auswählen
+                  Scan starten
                 </button>
               </div>
             )}
@@ -619,7 +621,7 @@ function TagAssignmentPage() {
                     >
                       <path d="M20 6L9 17l-5-5" />
                     </svg>
-                    <span>Tag erkannt</span>
+                    <span>Armband erkannt</span>
                   </div>
                   {/* Tag ID label */}
                   <div
@@ -641,7 +643,7 @@ function TagAssignmentPage() {
                   </div>
 
                   {/* Current Assignment Status */}
-                  {tagAssignment.assigned && tagAssignment.student ? (
+                  {tagAssignment.assigned && (tagAssignment.person ?? tagAssignment.student) ? (
                     <div>
                       <p
                         style={{
@@ -660,7 +662,7 @@ function TagAssignmentPage() {
                           marginBottom: '4px',
                         }}
                       >
-                        {tagAssignment.student.name}
+                        {(tagAssignment.person ?? tagAssignment.student)?.name}
                       </p>
                       <p
                         style={{
@@ -668,7 +670,9 @@ function TagAssignmentPage() {
                           color: '#6B7280',
                         }}
                       >
-                        {tagAssignment.student.group}
+                        {tagAssignment.person_type === 'staff'
+                          ? 'Betreuer'
+                          : (tagAssignment.person ?? tagAssignment.student)?.group}
                       </p>
                     </div>
                   ) : (
@@ -699,7 +703,7 @@ function TagAssignmentPage() {
                         <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
                       <span style={{ fontSize: '16px', color: '#6B7280', fontWeight: 600 }}>
-                        Tag ist nicht zugewiesen
+                        Armband ist nicht zugewiesen
                       </span>
                     </div>
                   )}
@@ -747,7 +751,7 @@ function TagAssignmentPage() {
                       }
                     }}
                   >
-                    {tagAssignment.assigned ? 'Neuen Schüler zuweisen' : 'Schüler auswählen'}
+                    {tagAssignment.assigned ? 'Neue Person zuweisen' : 'Person auswählen'}
                   </button>
                   <button
                     onClick={handleScanAnother}
