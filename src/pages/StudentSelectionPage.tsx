@@ -256,12 +256,12 @@ function StudentSelectionPage() {
           },
         });
       } else {
-        throw new Error(result.message ?? 'Tag-Zuweisung fehlgeschlagen');
+        throw new Error(result.message ?? 'Armband-Zuweisung fehlgeschlagen');
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       logger.error('Failed to assign tag', { error });
-      setError(`Fehler bei der Tag-Zuweisung: ${error.message}`);
+      setError('Armband konnte nicht zugewiesen werden. Bitte erneut versuchen.');
       setShowErrorModal(true);
     } finally {
       setIsSaving(false);

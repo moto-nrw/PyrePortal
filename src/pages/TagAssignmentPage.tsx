@@ -235,7 +235,7 @@ function TagAssignmentPage() {
   // Navigate to student selection
   const handleNavigateToStudentSelection = () => {
     if (!scannedTag || !tagAssignment) {
-      setError('Ungültige Tag-Daten. Bitte scannen Sie erneut.');
+      setError('Ungültige Daten. Bitte erneut scannen.');
       setShowErrorModal(true);
       return;
     }
