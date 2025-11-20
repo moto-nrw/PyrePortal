@@ -179,7 +179,7 @@ interface UserState {
     pin: string;
   }) => void;
   setSelectedActivity: (activity: ActivityResponse) => void;
-  fetchTeachers: () => Promise<void>;
+  fetchTeachers: (forceRefresh?: boolean) => Promise<void>;
   fetchRooms: () => Promise<void>;
   selectRoom: (roomId: number) => void;
   fetchCurrentSession: () => Promise<void>;
@@ -363,24 +363,23 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   setSelectedActivity: (activity: ActivityResponse) => set({ selectedActivity: activity }),
 
-  fetchTeachers: async () => {
+  fetchTeachers: async (forceRefresh = false) => {
     const { isLoading, users } = get();
 
-    // Prevent duplicate requests
-    if (isLoading) {
+    // Prevent unnecessary or duplicate requests unless explicitly forced
+    if (isLoading && !forceRefresh) {
       storeLogger.debug('Teachers fetch already in progress, skipping');
       return;
     }
 
-    // Skip if we already have teachers
-    if (users.length > 0) {
+    if (!forceRefresh && users.length > 0) {
       storeLogger.debug('Teachers already loaded, skipping fetch');
       return;
     }
 
     set({ isLoading: true, error: null });
     try {
-      storeLogger.info('Fetching teachers from API');
+      storeLogger.info('Fetching teachers from API', { forceRefresh });
       const teachers = await api.getTeachers();
       const users = teachers.map(teacherToUser);
 

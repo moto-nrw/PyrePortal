@@ -23,8 +23,8 @@ function StaffSelectionPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const navigate = useNavigate();
 
-  // Create logger instance for this component
-  const logger = createLogger('StaffSelectionPage');
+  // Create stable logger instance for this component
+  const logger = useMemo(() => createLogger('StaffSelectionPage'), []);
 
   // Redirect if missing authentication or selected activity
   useEffect(() => {
