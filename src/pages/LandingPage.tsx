@@ -16,26 +16,28 @@ function LandingPage() {
     void navigate('/pin');
   };
 
-  // Handle application quit
-  const handleQuit = () => {
-    logger.info('User requested application quit from landing page');
-    logUserAction('quit_app');
+  // Handle application restart (Balena will restart the container)
+  const handleRestart = () => {
+    logger.info('User requested application restart from landing page');
+    logUserAction('restart_app');
 
-    invoke('quit_app', {})
+    invoke('restart_app', {})
       .then(() => {
-        logger.debug('Application quit command sent successfully');
+        logger.debug('Application restart command sent successfully');
       })
       .catch(error => {
+        // Expected: invoke may fail because the process exits
+        // This is normal behavior when Balena restarts the container
         logError(
           error instanceof Error ? error : new Error(String(error)),
-          'LandingPage.handleQuit'
+          'LandingPage.handleRestart'
         );
       });
   };
 
   return (
     <BackgroundWrapper>
-      {/* Quit button - positioned at top-right of viewport */}
+      {/* Restart button - positioned at top-right of viewport */}
       <div
         style={{
           position: 'fixed',
@@ -46,7 +48,7 @@ function LandingPage() {
       >
         <button
           type="button"
-          onClick={handleQuit}
+          onClick={handleRestart}
           style={{
             height: '56px',
             display: 'flex',
@@ -55,7 +57,7 @@ function LandingPage() {
             gap: '10px',
             padding: '0 28px',
             backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            border: '1px solid rgba(255, 49, 48, 0.2)',
+            border: '1px solid rgba(80, 128, 216, 0.2)',
             borderRadius: '28px',
             cursor: 'pointer',
             transition: 'all 200ms',
@@ -66,7 +68,7 @@ function LandingPage() {
           }}
           onTouchStart={e => {
             e.currentTarget.style.transform = 'scale(0.95)';
-            e.currentTarget.style.backgroundColor = 'rgba(255, 49, 48, 0.1)';
+            e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
             e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
           }}
           onTouchEnd={e => {
@@ -84,22 +86,24 @@ function LandingPage() {
             height="24"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#FF3130"
+            stroke="#5080d8"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M18 6L6 18" />
-            <path d="M6 6l12 12" />
+            <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+            <path d="M3 3v5h5" />
+            <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+            <path d="M16 16h5v5" />
           </svg>
           <span
             style={{
               fontSize: '18px',
               fontWeight: 600,
-              color: '#FF3130',
+              color: '#5080d8',
             }}
           >
-            Beenden
+            Neu starten
           </span>
         </button>
       </div>

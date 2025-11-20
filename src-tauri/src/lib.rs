@@ -37,7 +37,9 @@ fn greet(name: &str) -> String {
 }
 
 #[tauri::command]
-fn quit_app() {
+fn restart_app() {
+    // Exit with code 0 - Balena's restart: always policy will restart the container
+    // On macOS/dev mode, the app simply exits
     std::process::exit(0);
 }
 
@@ -57,7 +59,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             get_api_config,
             greet,
-            quit_app,
+            restart_app,
             logging::write_log,
             logging::get_log_files,
             logging::read_log_file,

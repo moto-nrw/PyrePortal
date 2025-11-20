@@ -43,11 +43,12 @@ runs:
     
     - name: Cache Rust dependencies
       if: inputs.install-deps == 'true'
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           ~/.cargo/registry
           ~/.cargo/git
           src-tauri/target
         key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: ${{ runner.os }}-cargo-
+        restore-keys: |
+          ${{ runner.os }}-cargo-
