@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import {
   api,
+  mapServerErrorToGerman,
   type Teacher,
   type ActivityResponse,
   type Room,
@@ -389,7 +390,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       storeLogger.error('Failed to fetch teachers', { error: errorMessage });
       set({
-        error: 'Fehler beim Laden der Lehrer. Bitte versuchen Sie es erneut.',
+        error: mapServerErrorToGerman(errorMessage),
         isLoading: false,
       });
       throw error;
@@ -400,8 +401,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     const { authenticatedUser } = get();
 
     if (!authenticatedUser?.pin) {
+      const errorMsg = 'Keine Authentifizierung für das Laden von Räumen';
       storeLogger.warn('Cannot fetch rooms: no authenticated user or PIN');
-      set({ error: 'Keine Authentifizierung für das Laden von Räumen', isLoading: false });
+      set({ error: mapServerErrorToGerman(errorMsg), isLoading: false });
       return;
     }
 
@@ -419,7 +421,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Fehler beim Laden der Räume';
       storeLogger.error('Failed to fetch available rooms', { error: errorMessage });
-      set({ error: errorMessage, isLoading: false });
+      set({ error: mapServerErrorToGerman(errorMessage), isLoading: false });
     }
   },
 
@@ -743,16 +745,18 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       set({ isLoading: true, error: null });
 
       if (!authenticatedUser) {
+        const errorMsg = 'Keine Authentifizierung für das Laden von Aktivitäten';
         set({
-          error: 'Keine Authentifizierung für das Laden von Aktivitäten',
+          error: mapServerErrorToGerman(errorMsg),
           isLoading: false,
         });
         return null;
       }
 
       if (!authenticatedUser.pin) {
+        const errorMsg = 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.';
         set({
-          error: 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.',
+          error: mapServerErrorToGerman(errorMsg),
           isLoading: false,
         });
         return null;
@@ -788,7 +792,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           });
 
           set({
-            error: 'Fehler beim Laden der Aktivitäten',
+            error: mapServerErrorToGerman(errorMessage),
             isLoading: false,
           });
 
