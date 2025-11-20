@@ -46,7 +46,8 @@ const NETWORK_ERROR_PATTERNS = [
 
 const isNetworkRelatedError = (error: unknown): boolean => {
   if (!navigator.onLine) return true;
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   return NETWORK_ERROR_PATTERNS.some(pattern => message.includes(pattern));
 };
 

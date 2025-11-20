@@ -17,7 +17,8 @@ import { logNavigation, logUserAction } from '../utils/logger';
  */
 const isNetworkError = (error: unknown): boolean => {
   if (!navigator.onLine) return true;
-  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   return (
     message.includes('network') ||
     message.includes('netzwerk') ||
