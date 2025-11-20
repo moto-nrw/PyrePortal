@@ -18,7 +18,7 @@ interface ApiConfig {
  * Map server error messages to German user-friendly messages
  * This enables better debugging by distinguishing different error types
  */
-function mapServerErrorToGerman(errorMessage: string): string {
+export function mapServerErrorToGerman(errorMessage: string): string {
   // API-Key Fehler
   if (errorMessage.includes('invalid device API key')) {
     return 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.';
