@@ -42,8 +42,8 @@ function TeamManagementPage() {
   const orderCounter = useRef(0);
   const navigate = useNavigate();
 
-  // Create logger instance for this component
-  const logger = createLogger('TeamManagementPage');
+  // Create stable logger instance for this component
+  const logger = useMemo(() => createLogger('TeamManagementPage'), []);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -67,7 +67,8 @@ function TeamManagementPage() {
   useEffect(() => {
     const initializePage = async () => {
       try {
-        await fetchTeachers();
+        // Always refresh to pick up newly added supervisors
+        await fetchTeachers(true);
 
         // If we have an active session and no supervisors selected yet,
         // initialize with current session supervisors
