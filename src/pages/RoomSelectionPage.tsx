@@ -978,9 +978,9 @@ function RoomSelectionPage() {
 
   // Handle back navigation
   const handleGoBack = () => {
-    logger.info('User navigating back to activity selection');
-    logNavigation('RoomSelectionPage', 'ActivitySelectionPage', { reason: 'back_button' });
-    void navigate('/activity-selection');
+    logger.info('User navigating back to staff selection');
+    logNavigation('RoomSelectionPage', 'StaffSelectionPage', { reason: 'back_button' });
+    void navigate('/staff-selection');
   };
 
   const handleNextPage = () => {
