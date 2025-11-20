@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
 import { ErrorModal } from '../components/ui';
-import { api, type SessionStartRequest } from '../services/api';
+import { api, mapServerErrorToGerman, type SessionStartRequest } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { logNavigation, logUserAction } from '../utils/logger';
@@ -15,6 +15,20 @@ import { logNavigation, logUserAction } from '../utils/logger';
  * Home View Page - Modern tablet-optimized dashboard
  * Displays after successful PIN validation
  */
+const isNetworkError = (error: unknown): boolean => {
+  if (!navigator.onLine) return true;
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes('network') ||
+    message.includes('netzwerk') ||
+    message.includes('failed to fetch') ||
+    message.includes('timeout') ||
+    message.includes('connection') ||
+    message.includes('verbindung') ||
+    message.includes('offline')
+  );
+};
+
 function HomeViewPage() {
   const {
     authenticatedUser,
@@ -78,6 +92,13 @@ function HomeViewPage() {
       if (success) {
         // Show confirmation modal with session details
         setShowConfirmModal(true);
+      } else {
+        const latestError =
+          useUserStore.getState().error ??
+          'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.';
+        setErrorMessage(latestError);
+        setShowErrorModal(true);
+        setShowConfirmModal(false);
       }
     } else {
       // Normal flow
@@ -108,7 +129,9 @@ function HomeViewPage() {
       const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
 
       if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
-        setErrorMessage('Fehler bei der Validierung der gespeicherten Sitzung');
+        setErrorMessage(
+          'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.'
+        );
         setShowErrorModal(true);
         setShowConfirmModal(false);
         return;
@@ -143,7 +166,11 @@ function HomeViewPage() {
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
+      const rawMessage =
+        error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
+      const errorMsg = isNetworkError(error)
+        ? 'Netzwerkfehler beim Starten der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
+        : mapServerErrorToGerman(rawMessage);
       setErrorMessage(errorMsg);
       setShowErrorModal(true);
     } finally {

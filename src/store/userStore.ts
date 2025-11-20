@@ -33,6 +33,46 @@ import { safeInvoke } from '../utils/tauriContext';
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
 
+const NETWORK_ERROR_PATTERNS = [
+  'network',
+  'netzwerk',
+  'failed to fetch',
+  'timeout',
+  'timed out',
+  'connection',
+  'verbindung',
+  'offline',
+];
+
+const isNetworkRelatedError = (error: unknown): boolean => {
+  if (!navigator.onLine) return true;
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return NETWORK_ERROR_PATTERNS.some(pattern => message.includes(pattern));
+};
+
+const mapSessionValidationError = (error: unknown): string => {
+  const rawMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
+
+  if (isNetworkRelatedError(error)) {
+    return 'Netzwerkfehler bei der Überprüfung der gespeicherten Sitzung. Bitte Verbindung prüfen und erneut versuchen.';
+  }
+
+  switch (rawMessage) {
+    case 'Gespeicherte Aktivität nicht mehr verfügbar':
+      return 'Die gespeicherte Aktivität wurde gelöscht oder ist nicht mehr verfügbar. Bitte wählen Sie eine neue Aktivität aus.';
+    case 'Gespeicherter Raum nicht verfügbar':
+      return 'Der gespeicherte Raum ist nicht mehr verfügbar. Bitte wählen Sie einen anderen Raum.';
+    case 'Fehler beim Laden der Betreuer':
+      return 'Die Betreuer konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.';
+    case 'Keine gültigen Betreuer gefunden':
+      return 'Die gespeicherten Betreuer sind nicht mehr gültig. Bitte wählen Sie das Team erneut aus.';
+    case 'Validierung fehlgeschlagen':
+      return 'Die gespeicherte Sitzung ist nicht mehr gültig. Bitte erstellen Sie sie erneut.';
+    default:
+      return mapServerErrorToGerman(rawMessage);
+  }
+};
+
 // Define the ActivityCategory enum
 export enum ActivityCategory {
   SPORT = 'Sport',
@@ -1523,15 +1563,20 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
       return true;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
-      storeLogger.error('Session validation failed', { error: errorMessage });
+      const userMessage = mapSessionValidationError(error);
+      storeLogger.error('Session validation failed', {
+        error: userMessage,
+        rawError: error instanceof Error ? error.message : error,
+      });
 
       // Clear invalid session data
       await clearLastSession();
       set({
-        sessionSettings: { ...sessionSettings, last_session: null, use_last_session: false },
+        sessionSettings: sessionSettings
+          ? { ...sessionSettings, last_session: null, use_last_session: false }
+          : null,
         isValidatingLastSession: false,
-        error: errorMessage,
+        error: userMessage,
       });
 
       return false;
