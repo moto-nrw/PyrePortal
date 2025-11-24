@@ -5,11 +5,35 @@ import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { useRfidScanning } from '../hooks/useRfidScanning';
-import { api, type RfidScanResult, type DailyFeedbackRating } from '../services/api';
+import {
+  api,
+  mapServerErrorToGerman,
+  type RfidScanResult,
+  type DailyFeedbackRating,
+} from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
+
+/**
+ * Check if an error is network-related
+ */
+const isNetworkError = (error: unknown): boolean => {
+  if (!navigator.onLine) return true;
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes('network') ||
+    message.includes('netzwerk') ||
+    message.includes('failed to fetch') ||
+    message.includes('timeout') ||
+    message.includes('connection') ||
+    message.includes('verbindung') ||
+    message.includes('offline')
+  );
+};
+
 /**
  * Timeout duration (in milliseconds) for daily checkout/destination modals.
  * 15 seconds gives students enough time to read and choose (vs. shorter
@@ -495,12 +519,19 @@ const ActivityScanningPage: React.FC = () => {
       } catch (error) {
         logger.error('Failed to check into Schulhof', { error });
 
+        // Map error to user-friendly German message with network detection
+        const userFriendlyError = isNetworkError(error)
+          ? 'Netzwerkfehler bei Schulhof-Anmeldung. Bitte Verbindung prüfen und erneut scannen.'
+          : mapServerErrorToGerman(
+              error instanceof Error ? error.message : 'Schulhof Check-in fehlgeschlagen'
+            );
+
         // Show error modal
         const errorResult: Partial<RfidScanResult> & { showAsError: boolean } = {
           student_name: 'Schulhof Check-in fehlgeschlagen',
           student_id: checkoutDestinationState.studentId,
           action: 'checked_out', // Use valid action type
-          message: 'Bitte versuche es erneut oder wende dich an einen Betreuer',
+          message: userFriendlyError,
           showAsError: true,
         };
 

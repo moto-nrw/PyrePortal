@@ -74,6 +74,83 @@ const mapSessionValidationError = (error: unknown): string => {
   }
 };
 
+/**
+ * Error types for activity check-in/check-out operations
+ */
+type ActivityErrorType =
+  | 'activity_not_found'
+  | 'student_already_checked_in'
+  | 'no_students_checked_in'
+  | 'student_not_checked_in'
+  | 'checkin_failed'
+  | 'checkout_failed';
+
+interface ActivityErrorContext {
+  activityName?: string;
+  studentName?: string;
+  activityId?: number;
+  studentId?: number;
+}
+
+/**
+ * Maps activity-related errors to user-friendly German messages with context
+ */
+const mapActivityError = (
+  errorType: ActivityErrorType,
+  context: ActivityErrorContext = {},
+  originalError?: unknown
+): string => {
+  const { activityName, studentName, activityId } = context;
+
+  // For catch block errors, check network first
+  if (errorType === 'checkin_failed' || errorType === 'checkout_failed') {
+    if (isNetworkRelatedError(originalError)) {
+      const action = errorType === 'checkin_failed' ? 'Einchecken' : 'Auschecken';
+      const name = studentName ? ` von ${studentName}` : '';
+      return `Netzwerkfehler beim ${action}${name}. Bitte Verbindung prüfen und erneut scannen.`;
+    }
+    const rawMessage = originalError instanceof Error ? originalError.message : '';
+    if (rawMessage) {
+      return mapServerErrorToGerman(rawMessage);
+    }
+  }
+
+  switch (errorType) {
+    case 'activity_not_found':
+      return activityName
+        ? `Aktivität '${activityName}' nicht gefunden. Bitte Seite neu laden.`
+        : `Aktivität (ID: ${activityId}) nicht gefunden. Bitte Seite neu laden.`;
+
+    case 'student_already_checked_in':
+      if (studentName && activityName) {
+        return `${studentName} ist bereits in '${activityName}' eingecheckt.`;
+      }
+      return 'Schüler/in ist bereits eingecheckt.';
+
+    case 'no_students_checked_in':
+      return activityName
+        ? `In '${activityName}' sind keine Schüler/innen eingecheckt.`
+        : 'Keine Schüler/innen eingecheckt.';
+
+    case 'student_not_checked_in':
+      if (studentName && activityName) {
+        return `${studentName} ist in '${activityName}' nicht eingecheckt.`;
+      }
+      return activityName
+        ? `Schüler/in ist in '${activityName}' nicht eingecheckt.`
+        : 'Schüler/in ist nicht eingecheckt.';
+
+    case 'checkin_failed':
+      return studentName ? `Fehler beim Einchecken von ${studentName}.` : 'Fehler beim Einchecken.';
+
+    case 'checkout_failed':
+      return studentName ? `Fehler beim Auschecken von ${studentName}.` : 'Fehler beim Auschecken.';
+
+    default:
+      return 'Ein unbekannter Fehler ist aufgetreten.';
+  }
+};
+
 // Define the ActivityCategory enum
 export enum ActivityCategory {
   SPORT = 'Sport',
@@ -764,8 +841,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         stack: error.stack,
       });
 
+      const errorMsg = isNetworkRelatedError(err)
+        ? 'Netzwerkfehler beim Erstellen der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
+        : mapServerErrorToGerman(error.message);
       set({
-        error: 'Fehler beim Erstellen der Aktivität',
+        error: errorMsg,
         isLoading: false,
       });
       return false;
@@ -914,7 +994,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const activityIndex = activities.findIndex(a => a.id === activityId);
 
       if (activityIndex === -1) {
-        set({ error: 'Aktivität nicht gefunden', isLoading: false });
+        set({
+          error: mapActivityError('activity_not_found', { activityId }),
+          isLoading: false,
+        });
         return false;
       }
 
@@ -939,7 +1022,13 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           };
         } else {
           // Student is already checked in
-          set({ error: 'Schüler/in ist bereits eingecheckt', isLoading: false });
+          set({
+            error: mapActivityError('student_already_checked_in', {
+              studentName: student.name,
+              activityName: activity.name,
+            }),
+            isLoading: false,
+          });
           return false;
         }
       } else {
@@ -954,8 +1043,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       // Update activities array
       set({ activities: updatedActivities, isLoading: false });
       return true;
-    } catch {
-      set({ error: 'Fehler beim Einchecken des Schülers/der Schülerin', isLoading: false });
+    } catch (error) {
+      set({
+        error: mapActivityError('checkin_failed', { studentName: student.name }, error),
+        isLoading: false,
+      });
       return false;
     }
   },
@@ -970,7 +1062,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const activityIndex = activities.findIndex(a => a.id === activityId);
 
       if (activityIndex === -1) {
-        set({ error: 'Aktivität nicht gefunden', isLoading: false });
+        set({
+          error: mapActivityError('activity_not_found', { activityId }),
+          isLoading: false,
+        });
         return false;
       }
 
@@ -980,7 +1075,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
       // Check if there are any checked in students
       if (!activity.checkedInStudents || activity.checkedInStudents.length === 0) {
-        set({ error: 'Keine Schüler/innen eingecheckt', isLoading: false });
+        set({
+          error: mapActivityError('no_students_checked_in', { activityName: activity.name }),
+          isLoading: false,
+        });
         return false;
       }
 
@@ -990,7 +1088,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       );
 
       if (studentIndex === -1) {
-        set({ error: 'Schüler/in ist nicht eingecheckt', isLoading: false });
+        set({
+          error: mapActivityError('student_not_checked_in', { activityName: activity.name }),
+          isLoading: false,
+        });
         return false;
       }
 
@@ -1004,8 +1105,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       // Update activities array
       set({ activities: updatedActivities, isLoading: false });
       return true;
-    } catch {
-      set({ error: 'Fehler beim Auschecken des Schülers/der Schülerin', isLoading: false });
+    } catch (error) {
+      set({
+        error: mapActivityError('checkout_failed', {}, error),
+        isLoading: false,
+      });
       return false;
     }
   },
