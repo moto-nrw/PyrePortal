@@ -68,25 +68,6 @@ export const useRfidScanning = () => {
   const isServiceStartedRef = useRef<boolean>(false);
   const scannedSupervisorsRef = useRef<Set<number>>(new Set());
 
-  // Helper to show system error modal
-  const showSystemError = useCallback(
-    (title: string, message: string) => {
-      const errorResult: ExtendedRfidScanResult = {
-        student_name: title,
-        student_id: 0,
-        action: 'error',
-        message,
-        showAsError: true,
-      };
-      setScanResult(errorResult as RfidScanResult);
-      showScanModal();
-      setTimeout(() => {
-        hideScanModal();
-      }, rfid.modalDisplayTime);
-    },
-    [setScanResult, showScanModal, hideScanModal, rfid.modalDisplayTime]
-  );
-
   // Initialize RFID service on mount
   const initializeService = useCallback(async () => {
     if (!isRfidEnabled() || isInitializedRef.current) {
@@ -99,22 +80,13 @@ export const useRfidScanning = () => {
       logger.info('RFID service initialized');
     } catch (error) {
       logger.error('Failed to initialize RFID service', { error });
-      showSystemError(
-        'RFID-Initialisierung fehlgeschlagen',
-        'Das RFID-Lesegerät konnte nicht initialisiert werden. Bitte Gerät neu starten.'
-      );
     }
-  }, [showSystemError]);
+  }, []);
 
   const processScan = useCallback(
     async (tagId: string) => {
       if (!authenticatedUser?.pin || !selectedRoom) {
         logger.error('Missing authentication or room selection');
-        showSystemError('Sitzung abgelaufen', 'Bitte melden Sie sich erneut an.');
-        // Navigate to home after showing error
-        setTimeout(() => {
-          void navigate('/home');
-        }, rfid.modalDisplayTime);
         return;
       }
 
@@ -491,7 +463,6 @@ export const useRfidScanning = () => {
       rfid.modalDisplayTime,
       rfid.recentTagScans,
       navigate,
-      showSystemError,
     ]
   );
 
@@ -524,12 +495,8 @@ export const useRfidScanning = () => {
       logger.info('RFID event listener setup complete');
     } catch (error) {
       logger.error('Failed to setup RFID event listener', { error });
-      showSystemError(
-        'RFID-Verbindung fehlgeschlagen',
-        'Das RFID-System konnte nicht verbunden werden. Scannen nicht möglich.'
-      );
     }
-  }, [isTagBlocked, processScan, showSystemError]);
+  }, [isTagBlocked, processScan]);
 
   const startScanning = useCallback(async () => {
     const callTimestamp = Date.now();
@@ -612,12 +579,8 @@ export const useRfidScanning = () => {
         timestamp: Date.now(),
         timeSinceCall: Date.now() - callTimestamp,
       });
-      showSystemError(
-        'RFID-Service Start fehlgeschlagen',
-        'Das RFID-Lesegerät konnte nicht gestartet werden. Bitte Gerät prüfen.'
-      );
     }
-  }, [startRfidScanning, isTagBlocked, processScan, showSystemError]);
+  }, [startRfidScanning, isTagBlocked, processScan]);
 
   const stopScanning = useCallback(async () => {
     const callTimestamp = Date.now();
