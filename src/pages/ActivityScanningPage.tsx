@@ -392,10 +392,31 @@ const ActivityScanningPage: React.FC = () => {
       setShowFeedbackPrompt(true);
     } catch (error) {
       logger.error('Failed to toggle attendance', { error });
-      // On error, just close modal (student stays logged in)
+
+      // Show error modal with network-aware message
+      const userFriendlyError = isNetworkRelatedError(error)
+        ? 'Netzwerkfehler beim Abmelden. Bitte Verbindung prüfen und erneut versuchen.'
+        : mapServerErrorToGerman(
+            error instanceof Error ? error.message : 'Abmeldung fehlgeschlagen'
+          );
+
+      const errorResult: Partial<RfidScanResult> & { showAsError: boolean } = {
+        student_name: 'Abmeldung fehlgeschlagen',
+        student_id: 0,
+        action: 'checked_out',
+        message: `${dailyCheckoutState.studentName}: ${userFriendlyError}`,
+        showAsError: true,
+      };
+
+      setScanResult(errorResult as RfidScanResult);
       setDailyCheckoutState(null);
       setShowFeedbackPrompt(false);
-      hideScanModal();
+      showScanModal();
+
+      // Auto-close after display time
+      setTimeout(() => {
+        hideScanModal();
+      }, rfid.modalDisplayTime);
     }
   };
 
@@ -445,9 +466,23 @@ const ActivityScanningPage: React.FC = () => {
       // Check if Schulhof room ID is available
       if (!schulhofRoomId) {
         logger.error('Cannot check into Schulhof: room ID not available');
-        // Show error or just close modal
+
+        // Show error modal
+        const errorResult: Partial<RfidScanResult> & { showAsError: boolean } = {
+          student_name: 'Schulhof nicht verfügbar',
+          student_id: checkoutDestinationState.studentId,
+          action: 'checked_out',
+          message: `${checkoutDestinationState.studentName}: Schulhof-Raum wurde nicht konfiguriert.`,
+          showAsError: true,
+        };
+
+        setScanResult(errorResult as RfidScanResult);
         setCheckoutDestinationState(null);
-        hideScanModal();
+        showScanModal();
+
+        setTimeout(() => {
+          hideScanModal();
+        }, rfid.modalDisplayTime);
         return;
       }
 
