@@ -1,8 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { api, type Room, type SessionStartRequest, type ActivityResponse } from '../services/api';
+import { ErrorModal } from '../components/ui';
+import {
+  api,
+  mapServerErrorToGerman,
+  isNetworkRelatedError,
+  type Room,
+  type SessionStartRequest,
+  type ActivityResponse,
+} from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
@@ -714,10 +722,22 @@ function RoomSelectionPage() {
   const [isStartingSession, setIsStartingSession] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showConflictModal, setShowConflictModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const [currentPage, setCurrentPage] = useState(0);
   const navigate = useNavigate();
   const fetchedRef = useRef(false);
+
+  // Helper to show error modal with network-aware message
+  const showError = useCallback((error: unknown, fallbackMessage: string) => {
+    const rawMessage = error instanceof Error ? error.message : fallbackMessage;
+    const userMessage = isNetworkRelatedError(error)
+      ? 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.'
+      : mapServerErrorToGerman(rawMessage);
+    setErrorMessage(userMessage);
+    setShowErrorModal(true);
+  }, []);
 
   // Create logger instance for this component
   const logger = createLogger('RoomSelectionPage');
@@ -885,7 +905,7 @@ function RoomSelectionPage() {
         setIsStartingSession(false);
         return; // Don't close the confirm modal yet, show conflict modal instead
       } else {
-        alert(`Fehler beim Starten der Aktivität: ${errorMessage}`);
+        showError(error, 'Fehler beim Starten der Aktivität');
         setIsStartingSession(false);
         setShowConfirmModal(false);
         setSelectedRoom(null);
@@ -958,8 +978,7 @@ function RoomSelectionPage() {
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
       });
-      // Could add another error modal here, but for now use alert for force errors
-      alert(`Fehler beim Überschreiben der Session: ${forceErrorMessage}`);
+      showError(forceError, 'Fehler beim Überschreiben der Session');
       // Clean up modal state only on error
       setIsStartingSession(false);
       setShowConfirmModal(false);
@@ -1491,6 +1510,12 @@ function RoomSelectionPage() {
         onForceStart={handleForceSessionStart}
         onCancel={handleConflictCancel}
         isLoading={isStartingSession}
+      />
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        message={errorMessage}
+        autoCloseDelay={5000}
       />
     </BackgroundWrapper>
   );

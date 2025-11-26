@@ -55,22 +55,31 @@ export function mapServerErrorToGerman(errorMessage: string): string {
 }
 
 /**
- * Check if error message indicates a network-level error
- * Note: For error objects, use isNetworkRelatedError from userStore instead
+ * Patterns that indicate a network-related error
+ * Includes both English (technical) and German (translated) patterns
  */
-function isNetworkErrorMessage(errorMessage: string): boolean {
-  const lowerMessage = errorMessage.toLowerCase();
-  return (
-    lowerMessage.includes('netzwerk') ||
-    lowerMessage.includes('verbindung') ||
-    lowerMessage.includes('fetch') ||
-    lowerMessage.includes('networkerror') ||
-    lowerMessage.includes('network') ||
-    lowerMessage.includes('timeout') ||
-    lowerMessage.includes('timed out') ||
-    lowerMessage.includes('connection') ||
-    lowerMessage.includes('offline')
-  );
+const NETWORK_ERROR_PATTERNS = [
+  'network',
+  'netzwerk',
+  'failed to fetch',
+  'fetch',
+  'networkerror',
+  'timeout',
+  'timed out',
+  'connection',
+  'verbindung',
+  'offline',
+];
+
+/**
+ * Check if an error (object or message) indicates a network-level error
+ * Checks navigator.onLine first, then pattern-matches the error message
+ */
+export function isNetworkRelatedError(error: unknown): boolean {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return NETWORK_ERROR_PATTERNS.some(pattern => message.includes(pattern));
 }
 
 /**
@@ -81,8 +90,8 @@ export function mapAttendanceErrorToGerman(
   errorMessage: string,
   context: 'status' | 'toggle' | 'feedback'
 ): string {
-  // Network errors - use generic handler
-  if (isNetworkErrorMessage(errorMessage)) {
+  // Network errors - use consolidated handler
+  if (isNetworkRelatedError(errorMessage)) {
     return 'Netzwerkfehler. Bitte Verbindung prüfen.';
   }
 
@@ -1060,9 +1069,15 @@ export interface TagAssignmentResult {
  * RFID scan result from POST /api/iot/checkin
  */
 export interface RfidScanResult {
-  student_id: number;
+  student_id: number | null;
   student_name: string;
-  action: 'checked_in' | 'checked_out' | 'transferred' | 'supervisor_authenticated';
+  action:
+    | 'checked_in'
+    | 'checked_out'
+    | 'transferred'
+    | 'supervisor_authenticated'
+    | 'error'
+    | 'already_in';
   greeting?: string;
   visit_id?: number;
   room_name?: string;
@@ -1070,6 +1085,10 @@ export interface RfidScanResult {
   processed_at?: string;
   message?: string;
   status?: string;
+  /** Indicates this result should be displayed as an error state */
+  showAsError?: boolean;
+  /** Indicates this result is informational (not a scan result) */
+  isInfo?: boolean;
 }
 
 /**

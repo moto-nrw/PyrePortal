@@ -8,22 +8,6 @@ import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 
-// Extended type for error and info states
-interface ExtendedRfidScanResult {
-  student_name: string;
-  student_id: number;
-  action: 'checked_in' | 'checked_out' | 'transferred' | 'already_in' | 'error';
-  message?: string;
-  isInfo?: boolean;
-  showAsError?: boolean;
-  greeting?: string;
-  visit_id?: number;
-  room_name?: string;
-  previous_room?: string;
-  processed_at?: string;
-  status?: string;
-}
-
 // Tauri event listening
 let eventListener: (() => void) | null = null;
 
@@ -71,14 +55,14 @@ export const useRfidScanning = () => {
   // Helper to show system error modal
   const showSystemError = useCallback(
     (title: string, message: string) => {
-      const errorResult: ExtendedRfidScanResult = {
+      const errorResult: RfidScanResult = {
         student_name: title,
-        student_id: 0,
+        student_id: null,
         action: 'error',
         message,
         showAsError: true,
       };
-      setScanResult(errorResult as RfidScanResult);
+      setScanResult(errorResult);
       showScanModal();
       setTimeout(() => {
         hideScanModal();
@@ -213,8 +197,8 @@ export const useRfidScanning = () => {
               // Update UI with supervisor result
               setScanResult(syncResult);
 
-              // Check if supervisor has already scanned
-              if (scannedSupervisorsRef.current.has(staffId)) {
+              // Check if supervisor has already scanned (skip if null)
+              if (staffId !== null && scannedSupervisorsRef.current.has(staffId)) {
                 // Second+ scan - navigate to home after brief display
                 logger.info('Supervisor second scan - navigating to home (cache path)', {
                   supervisorName: syncResult.student_name,
@@ -231,7 +215,9 @@ export const useRfidScanning = () => {
               }
 
               // First scan - show modal and track
-              scannedSupervisorsRef.current.add(staffId);
+              if (staffId !== null) {
+                scannedSupervisorsRef.current.add(staffId);
+              }
               logger.info('Supervisor first scan - showing modal (cache path)', {
                 supervisorName: syncResult.student_name,
                 message: syncResult.message,
@@ -264,8 +250,9 @@ export const useRfidScanning = () => {
               logger.warn('Failed to update session activity during sync', { error });
             }
           } catch (syncError) {
+            const errorMessage = syncError instanceof Error ? syncError.message : String(syncError);
             logger.warn('Background sync failed, queuing for retry', {
-              error: syncError instanceof Error ? syncError.message : String(syncError),
+              error: errorMessage,
               syncTime: Date.now() - startTime,
             });
 
@@ -278,6 +265,24 @@ export const useRfidScanning = () => {
             );
 
             logger.info('Scan queued for background sync', { operationId, tagId });
+
+            // Show brief warning notification (non-blocking)
+            // Wait for current modal to close, then show sync warning
+            setTimeout(() => {
+              const syncWarning: RfidScanResult = {
+                student_name: 'Sync ausstehend',
+                student_id: null,
+                action: 'error',
+                message: `${cachedStudent.name}: Wird synchronisiert sobald Verbindung wiederhergestellt.`,
+                showAsError: true,
+                isInfo: true, // Indicates this is informational, not a hard error
+              };
+              setScanResult(syncWarning);
+              showScanModal();
+              setTimeout(() => {
+                hideScanModal();
+              }, 3000); // Shorter display for sync warnings
+            }, rfid.modalDisplayTime + 500);
           }
         })();
 
@@ -349,8 +354,8 @@ export const useRfidScanning = () => {
           if (result.action === 'supervisor_authenticated') {
             const staffId = result.student_id; // Actually staff_id
 
-            // Check if supervisor has already scanned
-            if (scannedSupervisorsRef.current.has(staffId)) {
+            // Check if supervisor has already scanned (skip if null)
+            if (staffId !== null && scannedSupervisorsRef.current.has(staffId)) {
               // Second+ scan - navigate to home
               logger.info('Supervisor second scan - navigating to home', {
                 supervisorName: result.student_name,
@@ -368,7 +373,9 @@ export const useRfidScanning = () => {
             }
 
             // First scan - show modal and track
-            scannedSupervisorsRef.current.add(staffId);
+            if (staffId !== null) {
+              scannedSupervisorsRef.current.add(staffId);
+            }
             logger.info('Supervisor first scan - showing modal', {
               supervisorName: result.student_name,
               message: result.message,
@@ -435,25 +442,25 @@ export const useRfidScanning = () => {
             updateOptimisticScan(scanId, 'failed');
 
             // Show informative message (not success!)
-            const infoResult: ExtendedRfidScanResult = {
+            const infoResult: RfidScanResult = {
               student_name: 'Bereits eingecheckt',
-              student_id: 0,
+              student_id: null,
               action: 'already_in',
               message: 'Dieser Schüler ist bereits in diesem Raum eingecheckt',
               isInfo: true,
             };
-            setScanResult(infoResult as RfidScanResult);
+            setScanResult(infoResult);
           } else {
             // Real error
             updateOptimisticScan(scanId, 'failed');
-            const errorResult: ExtendedRfidScanResult = {
+            const errorResult: RfidScanResult = {
               student_name: 'Scan fehlgeschlagen',
-              student_id: 0,
+              student_id: null,
               action: 'error',
               message: errorMessage || 'Bitte erneut versuchen',
               showAsError: true,
             };
-            setScanResult(errorResult as RfidScanResult);
+            setScanResult(errorResult);
           }
 
           // Show modal with error/info state
