@@ -65,7 +65,11 @@ function isNetworkErrorMessage(errorMessage: string): boolean {
     lowerMessage.includes('verbindung') ||
     lowerMessage.includes('fetch') ||
     lowerMessage.includes('networkerror') ||
-    lowerMessage.includes('network')
+    lowerMessage.includes('network') ||
+    lowerMessage.includes('timeout') ||
+    lowerMessage.includes('timed out') ||
+    lowerMessage.includes('connection') ||
+    lowerMessage.includes('offline')
   );
 }
 
@@ -116,16 +120,7 @@ export function mapAttendanceErrorToGerman(
     return 'Ungültige Anfrage. Bitte Eingaben prüfen.';
   }
 
-  // Server errors
-  if (
-    errorMessage.includes('500') ||
-    errorMessage.includes('502') ||
-    errorMessage.includes('503')
-  ) {
-    return 'Server nicht erreichbar. Bitte später versuchen.';
-  }
-
-  // Fallback - use generic mapper
+  // Fallback - use generic mapper (handles 5xx errors and other cases)
   return mapServerErrorToGerman(errorMessage);
 }
 
