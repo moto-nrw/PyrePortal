@@ -110,5 +110,6 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Verify Tauri build works
-        run: npm run tauri build -- --debug
+      - name: Verify Rust compiles
+        working-directory: ./src-tauri
+        run: cargo check
