@@ -7,28 +7,9 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
 import { ErrorModal } from '../components/ui';
 import { api, mapServerErrorToGerman, type SessionStartRequest } from '../services/api';
-import { useUserStore } from '../store/userStore';
+import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { logNavigation, logUserAction } from '../utils/logger';
-
-/**
- * Home View Page - Modern tablet-optimized dashboard
- * Displays after successful PIN validation
- */
-const isNetworkError = (error: unknown): boolean => {
-  if (!navigator.onLine) return true;
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return (
-    message.includes('network') ||
-    message.includes('netzwerk') ||
-    message.includes('failed to fetch') ||
-    message.includes('timeout') ||
-    message.includes('connection') ||
-    message.includes('verbindung') ||
-    message.includes('offline')
-  );
-};
 
 function HomeViewPage() {
   const {
@@ -169,7 +150,7 @@ function HomeViewPage() {
     } catch (error) {
       const rawMessage =
         error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
-      const errorMsg = isNetworkError(error)
+      const errorMsg = isNetworkRelatedError(error)
         ? 'Netzwerkfehler beim Starten der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
         : mapServerErrorToGerman(rawMessage);
       setErrorMessage(errorMsg);
