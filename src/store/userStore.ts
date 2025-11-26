@@ -44,7 +44,7 @@ const NETWORK_ERROR_PATTERNS = [
   'offline',
 ];
 
-const isNetworkRelatedError = (error: unknown): boolean => {
+export const isNetworkRelatedError = (error: unknown): boolean => {
   if (!navigator.onLine) return true;
   const message =
     error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
@@ -1054,11 +1054,17 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   checkOutStudent: async (activityId: number, studentId: number) => {
     set({ isLoading: true, error: null });
+
+    // Get student name early for error context (before try block)
+    const { activities } = get();
+    const activity = activities.find(a => a.id === activityId);
+    const student = activity?.checkedInStudents?.find(s => s.id === studentId);
+    const studentName = student?.name;
+
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const { activities } = get();
       const activityIndex = activities.findIndex(a => a.id === activityId);
 
       if (activityIndex === -1) {
@@ -1107,7 +1113,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       return true;
     } catch (error) {
       set({
-        error: mapActivityError('checkout_failed', {}, error),
+        error: mapActivityError('checkout_failed', { studentName }, error),
         isLoading: false,
       });
       return false;
