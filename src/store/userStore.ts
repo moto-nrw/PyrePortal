@@ -4,6 +4,7 @@ import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import {
   api,
   mapServerErrorToGerman,
+  isNetworkRelatedError,
   type Teacher,
   type ActivityResponse,
   type Room,
@@ -33,23 +34,8 @@ import { safeInvoke } from '../utils/tauriContext';
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
 
-const NETWORK_ERROR_PATTERNS = [
-  'network',
-  'netzwerk',
-  'failed to fetch',
-  'timeout',
-  'timed out',
-  'connection',
-  'verbindung',
-  'offline',
-];
-
-export const isNetworkRelatedError = (error: unknown): boolean => {
-  if (!navigator.onLine) return true;
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return NETWORK_ERROR_PATTERNS.some(pattern => message.includes(pattern));
-};
+// Re-export isNetworkRelatedError for backward compatibility
+export { isNetworkRelatedError } from '../services/api';
 
 const mapSessionValidationError = (error: unknown): string => {
   const rawMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
@@ -1442,11 +1428,20 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     const { studentCache } = get();
 
     try {
-      // Create or use existing cache
-      const cache = studentCache ?? (await loadStudentCache());
-
       // Convert scan result to cached student format
       const studentData = scanResultToCachedStudent(scanResult, additionalData);
+
+      // Skip caching if student data is null (e.g., error states, supervisor scans)
+      if (studentData === null) {
+        storeLogger.debug('Skipping cache: no valid student ID', {
+          rfidTag,
+          action: scanResult.action,
+        });
+        return;
+      }
+
+      // Create or use existing cache
+      const cache = studentCache ?? (await loadStudentCache());
 
       // Update cache
       const updatedCache = setCachedStudent(cache, rfidTag, studentData);

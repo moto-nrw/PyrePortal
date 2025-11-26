@@ -231,6 +231,7 @@ export function setCachedStudent(
 
 /**
  * Convert API scan result to cached student format
+ * Returns null if student_id is null (e.g., error states, supervisor scans)
  */
 export function scanResultToCachedStudent(
   scanResult: RfidScanResult,
@@ -238,7 +239,12 @@ export function scanResultToCachedStudent(
     room?: string;
     activity?: string;
   }
-): Omit<CachedStudent, 'cachedAt'> {
+): Omit<CachedStudent, 'cachedAt'> | null {
+  // Cannot cache results without a valid student ID
+  if (scanResult.student_id === null) {
+    return null;
+  }
+
   return {
     id: scanResult.student_id,
     name: scanResult.student_name,
