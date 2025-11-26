@@ -54,6 +54,76 @@ export function mapServerErrorToGerman(errorMessage: string): string {
   return errorMessage;
 }
 
+/**
+ * Check if error message indicates a network-level error
+ * Note: For error objects, use isNetworkRelatedError from userStore instead
+ */
+function isNetworkErrorMessage(errorMessage: string): boolean {
+  const lowerMessage = errorMessage.toLowerCase();
+  return (
+    lowerMessage.includes('netzwerk') ||
+    lowerMessage.includes('verbindung') ||
+    lowerMessage.includes('fetch') ||
+    lowerMessage.includes('networkerror') ||
+    lowerMessage.includes('network') ||
+    lowerMessage.includes('timeout') ||
+    lowerMessage.includes('timed out') ||
+    lowerMessage.includes('connection') ||
+    lowerMessage.includes('offline')
+  );
+}
+
+/**
+ * Map attendance-specific errors to German user-friendly messages
+ * Provides context-aware error messages for attendance operations
+ */
+export function mapAttendanceErrorToGerman(
+  errorMessage: string,
+  context: 'status' | 'toggle' | 'feedback'
+): string {
+  // Network errors - use generic handler
+  if (isNetworkErrorMessage(errorMessage)) {
+    return 'Netzwerkfehler. Bitte Verbindung prüfen.';
+  }
+
+  // 404 errors - context-specific messages
+  if (errorMessage.includes('404')) {
+    switch (context) {
+      case 'status':
+        return 'Schüler nicht gefunden oder keine Anwesenheitsdaten für heute verfügbar.';
+      case 'toggle':
+        return 'Schüler nicht gefunden. RFID-Tag möglicherweise nicht zugewiesen.';
+      case 'feedback':
+        return 'Feedback-Service nicht erreichbar. Bitte später versuchen.';
+    }
+  }
+
+  // 403 errors - permission denied
+  if (errorMessage.includes('403')) {
+    switch (context) {
+      case 'status':
+        return 'Keine Berechtigung für Anwesenheitsstatus dieses Schülers.';
+      case 'toggle':
+        return 'Keine Berechtigung für An-/Abmeldung dieses Schülers.';
+      case 'feedback':
+        return 'Keine Berechtigung für Feedback-Übermittlung.';
+    }
+  }
+
+  // 401 errors - authentication issues
+  if (errorMessage.includes('401')) {
+    return 'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.';
+  }
+
+  // 400 errors - bad request
+  if (errorMessage.includes('400')) {
+    return 'Ungültige Anfrage. Bitte Eingaben prüfen.';
+  }
+
+  // Fallback - use generic mapper (handles 5xx errors and other cases)
+  return mapServerErrorToGerman(errorMessage);
+}
+
 // Environment configuration - will be loaded at runtime
 let API_BASE_URL = '';
 let DEVICE_API_KEY = '';
@@ -882,13 +952,7 @@ export const api = {
       return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('404')) {
-        throw new Error('Schüler nicht gefunden oder keine Anwesenheitsdaten verfügbar');
-      }
-      if (errorMessage.includes('403')) {
-        throw new Error('Keine Berechtigung für diesen Schüler');
-      }
-      throw error;
+      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'status'));
     }
   },
 
@@ -917,13 +981,7 @@ export const api = {
       return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('404')) {
-        throw new Error('Schüler nicht gefunden');
-      }
-      if (errorMessage.includes('403')) {
-        throw new Error('Keine Berechtigung für diesen Schüler');
-      }
-      throw error;
+      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'toggle'));
     }
   },
 
@@ -948,13 +1006,7 @@ export const api = {
       return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('404')) {
-        throw new Error('Feedback-Service nicht verfügbar');
-      }
-      if (errorMessage.includes('403')) {
-        throw new Error('Keine Berechtigung für Feedback-Übermittlung');
-      }
-      throw error;
+      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'feedback'));
     }
   },
 };
