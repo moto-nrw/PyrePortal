@@ -1,3 +1,5 @@
+import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
@@ -700,7 +702,8 @@ function StudentSelectionPage() {
                     justifySelf: 'start',
                   }}
                 >
-                  ← Vorherige
+                  <FontAwesomeIcon icon={faChevronLeft} style={{ marginRight: '6px' }} />
+                  Vorherige
                 </button>
 
                 <span
@@ -731,7 +734,8 @@ function StudentSelectionPage() {
                     justifySelf: 'end',
                   }}
                 >
-                  Nächste →
+                  Nächste
+                  <FontAwesomeIcon icon={faChevronRight} style={{ marginLeft: '6px' }} />
                 </button>
               </div>
             )}

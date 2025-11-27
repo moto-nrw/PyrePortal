@@ -1,3 +1,5 @@
+import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -1433,7 +1435,8 @@ function RoomSelectionPage() {
                     justifySelf: 'start',
                   }}
                 >
-                  ← Vorherige
+                  <FontAwesomeIcon icon={faChevronLeft} style={{ marginRight: '6px' }} />
+                  Vorherige
                 </button>
 
                 <span
@@ -1469,7 +1472,8 @@ function RoomSelectionPage() {
                     justifySelf: 'end',
                   }}
                 >
-                  Nächste →
+                  Nächste
+                  <FontAwesomeIcon icon={faChevronRight} style={{ marginLeft: '6px' }} />
                 </button>
               </div>
             )}
