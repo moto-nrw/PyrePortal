@@ -1,3 +1,5 @@
+import { faXmark } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { invoke } from '@tauri-apps/api/core';
 import { useState, useEffect, useCallback } from 'react';
 
@@ -134,8 +136,12 @@ function LogViewer({
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-bold">Log Viewer</h2>
         {onClose && (
-          <button onClick={onClose} className="rounded-full bg-gray-200 p-2 hover:bg-gray-300">
-            ✕
+          <button
+            onClick={onClose}
+            className="rounded-full bg-gray-200 p-2 hover:bg-gray-300"
+            aria-label="Close log viewer"
+          >
+            <FontAwesomeIcon icon={faXmark} />
           </button>
         )}
       </div>

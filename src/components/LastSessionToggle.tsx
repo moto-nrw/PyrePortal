@@ -170,14 +170,14 @@ export const LastSessionToggle: React.FC = () => {
         isOpen={showInfoModal}
         onClose={() => setShowInfoModal(false)}
         title="Letzte Sitzung verwenden"
-        message="Diese Funktion ermöglicht es Ihnen, die zuletzt gestartete Aktivität mit einem Klick zu wiederholen.
+        message={`Diese Funktion ermöglicht es Ihnen, die zuletzt gestartete Aktivität mit einem Klick zu wiederholen.
 
 Die gespeicherten Daten umfassen:
-• Aktivität
-• Raum
-• Betreuer
+- Aktivität
+- Raum
+- Betreuer
 
-Die Daten werden automatisch bei jedem erfolgreichen Start einer neuen Aktivität aktualisiert. Wenn eine der gespeicherten Komponenten nicht mehr verfügbar ist, wird die Speicherung gelöscht und Sie müssen die Aktivität neu erstellen."
+Die Daten werden automatisch bei jedem erfolgreichen Start einer neuen Aktivität aktualisiert. Wenn eine der gespeicherten Komponenten nicht mehr verfügbar ist, wird die Speicherung gelöscht und Sie müssen die Aktivität neu erstellen.`}
       />
     </>
   );
