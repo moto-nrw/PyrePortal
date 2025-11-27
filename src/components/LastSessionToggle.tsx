@@ -1,3 +1,5 @@
+import { faArrowsRotate, faCheck, faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
 
 import { getRelativeTime } from '../services/sessionStorage';
@@ -101,7 +103,7 @@ export const LastSessionToggle: React.FC = () => {
                   color: '#FFFFFF',
                 }}
               >
-                ✓
+                <FontAwesomeIcon icon={faCheck} style={{ fontSize: '12px' }} />
               </div>
             )}
           </div>
@@ -116,7 +118,7 @@ export const LastSessionToggle: React.FC = () => {
               gap: '6px',
             }}
           >
-            <span style={{ fontSize: '20px' }}>↻</span>
+            <FontAwesomeIcon icon={faArrowsRotate} style={{ fontSize: '18px' }} />
             Letzte Sitzung
           </span>
 
@@ -159,7 +161,7 @@ export const LastSessionToggle: React.FC = () => {
             e.currentTarget.style.backgroundColor = '#F3F4F6';
           }}
         >
-          ⓘ
+          <FontAwesomeIcon icon={faCircleInfo} />
         </button>
       </div>
 
