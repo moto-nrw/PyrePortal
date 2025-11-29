@@ -301,6 +301,7 @@ interface UserState {
   setSelectedSupervisors: (supervisors: User[]) => void;
   toggleSupervisor: (user: User) => void;
   clearSelectedSupervisors: () => void;
+  addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
 
   // Check-in/check-out actions
   startNfcScan: () => void;
@@ -334,6 +335,7 @@ interface UserState {
   // Enhanced duplicate prevention actions
   canProcessTag: (tagId: string) => boolean;
   recordTagScan: (tagId: string, scan: RecentTagScan) => void;
+  clearTagScan: (tagId: string) => void;
   mapTagToStudent: (tagId: string, studentId: string) => void;
   getCachedStudentId: (tagId: string) => string | undefined;
   clearOldTagScans: () => void;
@@ -728,6 +730,30 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   clearSelectedSupervisors: () => set({ selectedSupervisors: [] }),
+
+  addSupervisorFromRfid: (staffId: number, staffName: string) => {
+    const { selectedSupervisors } = get();
+    const isAlreadySelected = selectedSupervisors.some(s => s.id === staffId);
+
+    if (isAlreadySelected) {
+      storeLogger.info('Supervisor already in selectedSupervisors via RFID', {
+        staffId,
+        staffName,
+      });
+      return true; // Already present - second scan
+    }
+
+    const newSupervisor: User = { id: staffId, name: staffName };
+    set({ selectedSupervisors: [...selectedSupervisors, newSupervisor] });
+
+    storeLogger.info('Supervisor added to selectedSupervisors via RFID', {
+      staffId,
+      staffName,
+      totalSupervisors: selectedSupervisors.length + 1,
+    });
+
+    return false; // Was not present - first scan
+  },
 
   // Activity-related actions
   initializeActivity: (roomId: number) => {
@@ -1294,6 +1320,16 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     set(state => {
       const newScans = new Map(state.rfid.recentTagScans);
       newScans.set(tagId, scan);
+      return {
+        rfid: { ...state.rfid, recentTagScans: newScans },
+      };
+    });
+  },
+
+  clearTagScan: (tagId: string) => {
+    set(state => {
+      const newScans = new Map(state.rfid.recentTagScans);
+      newScans.delete(tagId);
       return {
         rfid: { ...state.rfid, recentTagScans: newScans },
       };

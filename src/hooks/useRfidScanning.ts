@@ -24,6 +24,7 @@ export const useRfidScanning = () => {
     authenticatedUser,
     selectedRoom,
     selectedActivity,
+    currentSession,
     startRfidScanning,
     stopRfidScanning,
     setScanResult,
@@ -40,17 +41,19 @@ export const useRfidScanning = () => {
     // Enhanced duplicate prevention
     canProcessTag,
     recordTagScan,
+    clearTagScan,
     mapTagToStudent,
     clearOldTagScans,
     // Student cache actions
     getCachedStudentData,
     cacheStudentData,
     loadStudentCache,
+    // Supervisor RFID actions
+    addSupervisorFromRfid,
   } = useUserStore();
 
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
-  const scannedSupervisorsRef = useRef<Set<number>>(new Set());
 
   // Helper to show system error modal
   const showSystemError = useCallback(
@@ -193,36 +196,66 @@ export const useRfidScanning = () => {
             // Check if this is a supervisor scan
             if (syncResult.action === 'supervisor_authenticated') {
               const staffId = syncResult.student_id; // Actually staff_id
+              const staffName = syncResult.student_name;
 
               // Update UI with supervisor result
               setScanResult(syncResult);
 
-              // Check if supervisor has already scanned (skip if null)
-              if (staffId !== null && scannedSupervisorsRef.current.has(staffId)) {
-                // Second+ scan - navigate to home after brief display
-                logger.info('Supervisor second scan - navigating to home (cache path)', {
-                  supervisorName: syncResult.student_name,
+              if (staffId !== null) {
+                // Use store-based check instead of ref
+                const wasAlreadySelected = addSupervisorFromRfid(staffId, staffName);
+
+                if (wasAlreadySelected) {
+                  // Supervisor already in selectedSupervisors - redirect to home
+                  logger.info('Supervisor already selected - navigating to home (cache path)', {
+                    supervisorName: staffName,
+                    staffId,
+                  });
+
+                  setTimeout(() => {
+                    hideScanModal();
+                    void navigate('/home');
+                  }, 1500);
+
+                  return;
+                }
+
+                // First scan - sync with backend (async, non-blocking)
+                if (currentSession && authenticatedUser?.pin) {
+                  void (async () => {
+                    try {
+                      const updatedSupervisorIds = useUserStore
+                        .getState()
+                        .selectedSupervisors.map(s => s.id);
+                      await api.updateSessionSupervisors(
+                        authenticatedUser.pin,
+                        currentSession.active_group_id,
+                        updatedSupervisorIds
+                      );
+                      logger.info('Supervisor synced to backend via RFID (cache path)', {
+                        staffId,
+                        sessionId: currentSession.active_group_id,
+                      });
+                    } catch (error) {
+                      logger.warn('Failed to sync supervisor to backend (cache path)', {
+                        error: error instanceof Error ? error.message : String(error),
+                        staffId,
+                      });
+                      // Local state update is still valid - will sync on next Team-Page save
+                    }
+                  })();
+                }
+
+                logger.info('Supervisor first scan - showing modal (cache path)', {
+                  supervisorName: staffName,
+                  message: syncResult.message,
                   staffId,
                 });
-
-                setTimeout(() => {
-                  hideScanModal();
-                  // Navigate to home - scanning will be stopped by page unmount
-                  void navigate('/home');
-                }, 1500); // Show modal briefly before navigating
-
-                return;
               }
 
-              // First scan - show modal and track
-              if (staffId !== null) {
-                scannedSupervisorsRef.current.add(staffId);
-              }
-              logger.info('Supervisor first scan - showing modal (cache path)', {
-                supervisorName: syncResult.student_name,
-                message: syncResult.message,
-                staffId,
-              });
+              // Clean up processing queue and allow re-scanning for supervisors
+              removeFromProcessingQueue(tagId);
+              clearTagScan(tagId);
 
               // Don't cache supervisor data or update student history
               return;
@@ -353,40 +386,68 @@ export const useRfidScanning = () => {
           // Check if this is a supervisor scan
           if (result.action === 'supervisor_authenticated') {
             const staffId = result.student_id; // Actually staff_id
+            const staffName = result.student_name;
 
-            // Check if supervisor has already scanned (skip if null)
-            if (staffId !== null && scannedSupervisorsRef.current.has(staffId)) {
-              // Second+ scan - navigate to home
-              logger.info('Supervisor second scan - navigating to home', {
-                supervisorName: result.student_name,
+            if (staffId !== null) {
+              // Use store-based check instead of ref
+              const wasAlreadySelected = addSupervisorFromRfid(staffId, staffName);
+
+              if (wasAlreadySelected) {
+                // Supervisor already in selectedSupervisors - redirect to home
+                logger.info('Supervisor already selected - navigating to home', {
+                  supervisorName: staffName,
+                  staffId,
+                });
+
+                // Clean up immediately
+                hideScanModal();
+                removeOptimisticScan(scanId);
+
+                void navigate('/home');
+                return;
+              }
+
+              // First scan - sync with backend (async, non-blocking)
+              if (currentSession && authenticatedUser?.pin) {
+                void (async () => {
+                  try {
+                    const updatedSupervisorIds = useUserStore
+                      .getState()
+                      .selectedSupervisors.map(s => s.id);
+                    await api.updateSessionSupervisors(
+                      authenticatedUser.pin,
+                      currentSession.active_group_id,
+                      updatedSupervisorIds
+                    );
+                    logger.info('Supervisor synced to backend via RFID (network path)', {
+                      staffId,
+                      sessionId: currentSession.active_group_id,
+                    });
+                  } catch (error) {
+                    logger.warn('Failed to sync supervisor to backend (network path)', {
+                      error: error instanceof Error ? error.message : String(error),
+                      staffId,
+                    });
+                  }
+                })();
+              }
+
+              logger.info('Supervisor first scan - showing modal', {
+                supervisorName: staffName,
+                message: result.message,
                 staffId,
               });
-
-              // Clean up immediately
-              hideScanModal();
-              removeOptimisticScan(scanId);
-
-              // Navigate to home - scanning will be stopped by page unmount
-              void navigate('/home');
-
-              return;
             }
-
-            // First scan - show modal and track
-            if (staffId !== null) {
-              scannedSupervisorsRef.current.add(staffId);
-            }
-            logger.info('Supervisor first scan - showing modal', {
-              supervisorName: result.student_name,
-              message: result.message,
-              staffId,
-            });
 
             // Clean up after modal display time
             setTimeout(() => {
               hideScanModal();
               removeOptimisticScan(scanId);
             }, rfid.modalDisplayTime);
+
+            // Clean up processing queue and allow re-scanning for supervisors
+            removeFromProcessingQueue(tagId);
+            clearTagScan(tagId);
 
             // Skip student-specific logic
             return;
@@ -482,6 +543,7 @@ export const useRfidScanning = () => {
       authenticatedUser,
       selectedRoom,
       selectedActivity,
+      currentSession,
       setScanResult,
       showScanModal,
       hideScanModal,
@@ -493,9 +555,11 @@ export const useRfidScanning = () => {
       removeFromProcessingQueue,
       canProcessTag,
       recordTagScan,
+      clearTagScan,
       mapTagToStudent,
       getCachedStudentData,
       cacheStudentData,
+      addSupervisorFromRfid,
       rfid.modalDisplayTime,
       rfid.recentTagScans,
       navigate,
@@ -570,13 +634,13 @@ export const useRfidScanning = () => {
             const mockStudentTags: string[] = envTags
               ? envTags.split(',').map(tag => tag.trim())
               : [
-                // Default realistic hardware format tags
-                '04:D6:94:82:97:6A:80',
-                '04:A7:B3:C2:D1:E0:F5',
-                '04:12:34:56:78:9A:BC',
-                '04:FE:DC:BA:98:76:54',
-                '04:11:22:33:44:55:66',
-              ];
+                  // Default realistic hardware format tags
+                  '04:D6:94:82:97:6A:80',
+                  '04:A7:B3:C2:D1:E0:F5',
+                  '04:12:34:56:78:9A:BC',
+                  '04:FE:DC:BA:98:76:54',
+                  '04:11:22:33:44:55:66',
+                ];
 
             // Pick a random tag from the list
             const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
@@ -734,6 +798,8 @@ export const useRfidScanning = () => {
       if (isServiceStartedRef.current) {
         void stopScanning();
       }
+      // Reset the ref so scanning can restart when returning to the page
+      isServiceStartedRef.current = false;
     };
   }, [stopScanning]);
 
