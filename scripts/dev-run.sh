@@ -28,6 +28,7 @@ NC='\033[0m' # No Color
 RUN_MODE="release"  # release, dev, or build
 FULLSCREEN=""
 LOG_LEVEL="info"
+SKIP_ROTATION=false
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -56,6 +57,10 @@ while [[ $# -gt 0 ]]; do
             LOG_LEVEL="trace"
             shift
             ;;
+        --no-rotate)
+            SKIP_ROTATION=true
+            shift
+            ;;
         --help|-h)
             echo "Usage: $0 [OPTIONS]"
             echo ""
@@ -69,6 +74,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -w, --windowed    Force windowed mode"
             echo "  -d, --debug       Enable debug logging (RUST_LOG=debug)"
             echo "  -t, --trace       Enable trace logging (RUST_LOG=trace)"
+            echo "  --no-rotate       Skip display rotation (for HDMI or pre-rotated displays)"
             echo "  -h, --help        Show this help"
             echo ""
             echo "Examples:"
@@ -131,6 +137,50 @@ else
     DISPLAY_TYPE="X11 (defaulted to :0)"
 fi
 
+# Configure display rotation for DSI touchscreen (Pi with portrait display)
+configure_display_rotation() {
+    if [[ "$SKIP_ROTATION" == "true" ]]; then
+        echo -e "${YELLOW}Skipping display rotation (--no-rotate)${NC}"
+        return
+    fi
+
+    # Only rotate on X11 with DSI display
+    if [[ "$DISPLAY_TYPE" != *"X11"* ]]; then
+        echo -e "${YELLOW}Display rotation only supported on X11${NC}"
+        return
+    fi
+
+    # Check if xrandr is available
+    if ! command -v xrandr &> /dev/null; then
+        echo -e "${YELLOW}xrandr not found, skipping rotation${NC}"
+        return
+    fi
+
+    # Detect DSI display
+    DSI_OUTPUT=$(xrandr 2>/dev/null | grep -E "DSI.*connected" | awk '{print $1}' | head -1)
+
+    if [[ -n "$DSI_OUTPUT" ]]; then
+        echo -e "${BLUE}Detected DSI display: $DSI_OUTPUT${NC}"
+
+        # Check current rotation
+        CURRENT_ROTATION=$(xrandr --verbose 2>/dev/null | grep -A5 "^$DSI_OUTPUT" | grep "Rotation:" | awk '{print $2}')
+
+        if [[ "$CURRENT_ROTATION" == "left" ]]; then
+            echo -e "${GREEN}Display already rotated to landscape${NC}"
+        else
+            echo -e "${BLUE}Rotating display to landscape (left)...${NC}"
+            if xrandr --output "$DSI_OUTPUT" --rotate left 2>/dev/null; then
+                echo -e "${GREEN}Display rotation applied${NC}"
+            else
+                echo -e "${RED}Failed to rotate display${NC}"
+                echo -e "${YELLOW}You may need to run: xrandr --output $DSI_OUTPUT --rotate left${NC}"
+            fi
+        fi
+    else
+        echo -e "${YELLOW}No DSI display detected (HDMI only?)${NC}"
+    fi
+}
+
 # Check GPIO permissions (for RFID/SPI)
 check_hardware_access() {
     echo ""
@@ -168,6 +218,7 @@ case $RUN_MODE in
         echo -e "  RFID:        ${VITE_ENABLE_RFID:-false}"
 
         check_hardware_access
+        configure_display_rotation
 
         echo ""
         echo -e "${GREEN}Starting tauri dev...${NC}"
@@ -223,6 +274,7 @@ case $RUN_MODE in
         echo -e "  RFID:        ${VITE_ENABLE_RFID:-false}"
 
         check_hardware_access
+        configure_display_rotation
 
         echo ""
         echo -e "${GREEN}Starting PyrePortal...${NC}"
