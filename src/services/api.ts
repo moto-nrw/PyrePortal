@@ -41,6 +41,15 @@ export function mapServerErrorToGerman(errorMessage: string): string {
     return 'Konto gesperrt. Bitte später erneut versuchen.';
   }
 
+  // RFID/Student nicht gefunden (404)
+  if (
+    errorMessage.includes('404') ||
+    errorMessage.includes('not found') ||
+    errorMessage.includes('Not Found')
+  ) {
+    return 'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.';
+  }
+
   // Server-Fehler
   if (
     errorMessage.includes('500') ||
@@ -1072,12 +1081,12 @@ export interface RfidScanResult {
   student_id: number | null;
   student_name: string;
   action:
-    | 'checked_in'
-    | 'checked_out'
-    | 'transferred'
-    | 'supervisor_authenticated'
-    | 'error'
-    | 'already_in';
+  | 'checked_in'
+  | 'checked_out'
+  | 'transferred'
+  | 'supervisor_authenticated'
+  | 'error'
+  | 'already_in';
   greeting?: string;
   visit_id?: number;
   room_name?: string;

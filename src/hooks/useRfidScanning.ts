@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { api } from '../services/api';
+import { api, mapServerErrorToGerman } from '../services/api';
 import type { RfidScanResult } from '../services/api';
 import { queueFailedScan } from '../services/syncQueue';
 import { useUserStore } from '../store/userStore';
@@ -451,13 +451,14 @@ export const useRfidScanning = () => {
             };
             setScanResult(infoResult);
           } else {
-            // Real error
+            // Real error - map to German user-friendly message
             updateOptimisticScan(scanId, 'failed');
+            const userFriendlyMessage = mapServerErrorToGerman(errorMessage);
             const errorResult: RfidScanResult = {
               student_name: 'Scan fehlgeschlagen',
               student_id: null,
               action: 'error',
-              message: errorMessage || 'Bitte erneut versuchen',
+              message: userFriendlyMessage || 'Bitte erneut versuchen',
               showAsError: true,
             };
             setScanResult(errorResult);
@@ -569,13 +570,13 @@ export const useRfidScanning = () => {
             const mockStudentTags: string[] = envTags
               ? envTags.split(',').map(tag => tag.trim())
               : [
-                  // Default realistic hardware format tags
-                  '04:D6:94:82:97:6A:80',
-                  '04:A7:B3:C2:D1:E0:F5',
-                  '04:12:34:56:78:9A:BC',
-                  '04:FE:DC:BA:98:76:54',
-                  '04:11:22:33:44:55:66',
-                ];
+                // Default realistic hardware format tags
+                '04:D6:94:82:97:6A:80',
+                '04:A7:B3:C2:D1:E0:F5',
+                '04:12:34:56:78:9A:BC',
+                '04:FE:DC:BA:98:76:54',
+                '04:11:22:33:44:55:66',
+              ];
 
             // Pick a random tag from the list
             const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
