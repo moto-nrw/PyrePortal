@@ -71,13 +71,13 @@ import { api } from '../services/api';
 
 ### Hooks (Performance-Critical)
 
-- `hooks/useRfidScanning.ts` - RFID scanning logic with cache-first pattern
+- `hooks/useRfidScanning.ts` - RFID scanning logic (always server-first, no local cache)
 - `hooks/useNetworkStatus.ts` - Network quality monitoring
 
 ### Services (Business Logic)
 
 - `services/api.ts` - All HTTP API calls to Project Phoenix backend
-- `services/studentCache.ts` - Offline student data caching (Tauri IPC)
+- (removed) früher: `services/studentCache.ts` für Offline-Cache; Live-Scans sind jetzt ausschließlich server-first
 - `services/sessionStorage.ts` - Session persistence (Tauri IPC)
 - `services/syncQueue.ts` - Offline operation retry queue
 

@@ -18,18 +18,8 @@ import {
   loadSessionSettings,
   clearLastSession,
 } from '../services/sessionStorage';
-import {
-  type StudentCacheData,
-  type CachedStudent,
-  loadStudentCache,
-  saveStudentCache,
-  getCachedStudent,
-  setCachedStudent,
-  scanResultToCachedStudent,
-} from '../services/studentCache';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
-import { safeInvoke } from '../utils/tauriContext';
 
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
@@ -272,10 +262,6 @@ interface UserState {
   // Network status state
   networkStatus: NetworkStatusData;
 
-  // Student cache state
-  studentCache: StudentCacheData | null;
-  isCacheLoading: boolean;
-
   // Actions
   setSelectedUser: (userName: string, userId: number | null) => void;
   setAuthenticatedUser: (userData: {
@@ -356,20 +342,6 @@ interface UserState {
   setNetworkStatus: (status: NetworkStatusData) => void;
   updateNetworkQuality: (quality: NetworkStatusData['quality'], responseTime: number) => void;
 
-  // Student cache actions
-  loadStudentCache: () => Promise<void>;
-  getCachedStudentData: (rfidTag: string) => CachedStudent | null;
-  cacheStudentData: (
-    rfidTag: string,
-    scanResult: RfidScanResult,
-    additionalData?: { room?: string; activity?: string }
-  ) => Promise<void>;
-  updateCachedStudentStatus: (
-    rfidTag: string,
-    status: 'checked_in' | 'checked_out'
-  ) => Promise<void>;
-  clearStudentCache: () => Promise<void>;
-
   // Daily feedback action
   submitDailyFeedback: (studentId: number, rating: DailyFeedbackRating) => Promise<boolean>;
 }
@@ -447,10 +419,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     lastChecked: Date.now(),
     quality: 'excellent' as const,
   },
-
-  // Student cache initial state
-  studentCache: null,
-  isCacheLoading: false,
 
   // Actions
   setSelectedUser: (userName: string, userId: number | null) =>
@@ -1434,155 +1402,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         isOnline: quality !== 'offline',
       },
     }));
-  },
-
-  // Student cache actions
-  loadStudentCache: async () => {
-    const state = get();
-    if (state.isCacheLoading) {
-      storeLogger.debug('Student cache already loading, skipping');
-      return;
-    }
-
-    set({ isCacheLoading: true });
-
-    try {
-      storeLogger.debug('Loading student cache from storage');
-      const cache = await loadStudentCache();
-
-      set({
-        studentCache: cache,
-        isCacheLoading: false,
-      });
-
-      storeLogger.info('Student cache loaded successfully', {
-        hasCache: !!cache,
-        entryCount: cache ? Object.keys(cache.students).length : 0,
-      });
-    } catch (error) {
-      storeLogger.error('Failed to load student cache', { error });
-      set({
-        studentCache: null,
-        isCacheLoading: false,
-      });
-    }
-  },
-
-  getCachedStudentData: (rfidTag: string) => {
-    const { studentCache } = get();
-    if (!studentCache) {
-      return null;
-    }
-
-    const cachedStudent = getCachedStudent(studentCache, rfidTag);
-    if (cachedStudent) {
-      storeLogger.debug('Found cached student data', {
-        rfidTag,
-        studentId: cachedStudent.id,
-        studentName: cachedStudent.name,
-        status: cachedStudent.status,
-      });
-    }
-
-    return cachedStudent;
-  },
-
-  cacheStudentData: async (
-    rfidTag: string,
-    scanResult: RfidScanResult,
-    additionalData?: { room?: string; activity?: string }
-  ) => {
-    const { studentCache } = get();
-
-    try {
-      // Convert scan result to cached student format
-      const studentData = scanResultToCachedStudent(scanResult, additionalData);
-
-      // Skip caching if student data is null (e.g., error states, supervisor scans)
-      if (studentData === null) {
-        storeLogger.debug('Skipping cache: no valid student ID', {
-          rfidTag,
-          action: scanResult.action,
-        });
-        return;
-      }
-
-      // Create or use existing cache
-      const cache = studentCache ?? (await loadStudentCache());
-
-      // Update cache
-      const updatedCache = setCachedStudent(cache, rfidTag, studentData);
-
-      // Update store state
-      set({ studentCache: updatedCache });
-
-      // Persist to storage
-      await saveStudentCache(updatedCache);
-
-      storeLogger.info('Student data cached successfully', {
-        rfidTag,
-        studentId: studentData.id,
-        studentName: studentData.name,
-        status: studentData.status,
-      });
-    } catch (error) {
-      storeLogger.error('Failed to cache student data', {
-        error,
-        rfidTag,
-        studentId: scanResult.student_id,
-      });
-    }
-  },
-
-  updateCachedStudentStatus: async (rfidTag: string, status: 'checked_in' | 'checked_out') => {
-    const { studentCache } = get();
-    if (!studentCache?.students[rfidTag]) {
-      storeLogger.debug('No cached student to update status for', { rfidTag });
-      return;
-    }
-
-    try {
-      const existingStudent = studentCache.students[rfidTag];
-      const updatedStudent: Omit<CachedStudent, 'cachedAt'> = {
-        ...existingStudent,
-        status,
-        lastSeen: new Date().toISOString(),
-      };
-
-      const updatedCache = setCachedStudent(studentCache, rfidTag, updatedStudent);
-
-      // Update store state
-      set({ studentCache: updatedCache });
-
-      // Persist to storage
-      await saveStudentCache(updatedCache);
-
-      storeLogger.info('Cached student status updated', {
-        rfidTag,
-        studentId: existingStudent.id,
-        newStatus: status,
-      });
-    } catch (error) {
-      storeLogger.error('Failed to update cached student status', {
-        error,
-        rfidTag,
-        status,
-      });
-    }
-  },
-
-  clearStudentCache: async () => {
-    try {
-      // Clear from storage
-      await safeInvoke('clear_student_cache');
-
-      // Clear from store
-      set({ studentCache: null });
-
-      storeLogger.info('Student cache cleared successfully');
-    } catch (error) {
-      storeLogger.error('Failed to clear student cache', { error });
-    }
   },
 
   // Session settings actions

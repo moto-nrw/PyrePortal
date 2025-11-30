@@ -941,13 +941,15 @@ const ActivityScanningPage: React.FC = () => {
                   }
                 }
 
-                // Supervisor authentication - custom greeting
+                // Supervisor authentication - prefer custom message (e.g., redirect hint)
                 if (currentScan.action === 'supervisor_authenticated') {
+                  if (currentScan.message) return currentScan.message;
+
                   const roomName = selectedRoom?.name ?? 'diesen Raum';
                   return `${currentScan.student_name} betreut jetzt ${roomName}`;
                 }
 
-                // Show custom message if available (but not for supervisors - handled above)
+                // Show custom message if available
                 const msg = currentScan.message;
                 if (msg) return msg;
 

@@ -14,7 +14,8 @@
     "check": "eslint src --ext .ts,.tsx && tsc --noEmit",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
-    "clean:target": "cd src-tauri && cargo clean"
+    "clean:target": "cd src-tauri && cargo clean",
+    "prepare": "husky install"
   },
   "dependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.7.2",
@@ -45,6 +46,8 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-security": "^3.0.1",
     "globals": "^16.1.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.2.10",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
     "prettier-plugin-tailwindcss": "^0.6.11",
@@ -52,5 +55,13 @@
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.32.1",
     "vite": "^6.0.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx,json,css,md}": [
+      "prettier --write"
+    ],
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix"
+    ]
   }
 }
