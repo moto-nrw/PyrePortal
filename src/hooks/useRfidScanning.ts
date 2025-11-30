@@ -112,7 +112,7 @@ export const useRfidScanning = () => {
         const infoResult: RfidScanResult = {
           student_name: 'Betreuer erkannt',
           student_id: null,
-          action: 'info',
+          action: 'supervisor_authenticated',
           message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
           isInfo: true,
         };
@@ -216,9 +216,12 @@ export const useRfidScanning = () => {
 
               // Supervisor-Scans sollten den Cache-Pfad nicht nutzen
               if (syncResult.action === 'supervisor_authenticated') {
-                logger.warn('Supervisor-Scan im Cache-Pfad erkannt – erneutes Scannen erforderlich', {
-                  tagId,
-                });
+                logger.warn(
+                  'Supervisor-Scan im Cache-Pfad erkannt – erneutes Scannen erforderlich',
+                  {
+                    tagId,
+                  }
+                );
                 return;
               }
 
@@ -244,7 +247,8 @@ export const useRfidScanning = () => {
                 logger.warn('Failed to update session activity during sync', { error });
               }
             } catch (syncError) {
-              const errorMessage = syncError instanceof Error ? syncError.message : String(syncError);
+              const errorMessage =
+                syncError instanceof Error ? syncError.message : String(syncError);
               logger.warn('Background sync failed, queuing for retry', {
                 error: errorMessage,
                 syncTime: Date.now() - startTime,
