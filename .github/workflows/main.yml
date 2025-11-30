@@ -1,11 +1,14 @@
 name: PyrePortal CI
 run-name: CI workflow
 
-on: 
+on:
   pull_request:
     branches:
       - main
       - development
+  push:
+    branches:
+      - main
   workflow_dispatch:
 
 defaults:
@@ -15,7 +18,9 @@ defaults:
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
-    
+
+  # Full build only on push to main (not on PRs)
   build:
     needs: [lint]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     uses: ./.github/workflows/build.yml

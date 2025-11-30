@@ -4,27 +4,6 @@ defaults:
     shell: bash
 
 jobs:
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        
-      - name: Setup Tauri environment
-        uses: ./.github/actions/setup-tauri-environment
-        
-      - name: Build frontend
-        run: npm run build
-        
-      - name: Build Tauri app (debug)
-        run: npm run tauri build -- --debug
-        
-      - name: Upload macOS build
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyreportal-macos-${{github.sha}}
-          path: src-tauri/target/debug/bundle/macos
-          
   build-linux-arm64:
     runs-on: ubuntu-24.04-arm
     steps:
