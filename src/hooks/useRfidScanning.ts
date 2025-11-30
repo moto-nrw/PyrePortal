@@ -238,7 +238,7 @@ export const useRfidScanning = () => {
               const redirectResult: RfidScanResult = {
                 ...result,
                 student_name: 'Betreuer erkannt',
-                message: 'Betreuer erkannt – Weiterleitung zum Hauptbildschirm...',
+                message: 'Betreuer wird zum Hauptbildschirm weitergeleitet.',
               };
               setScanResult(redirectResult);
               showScanModal();
