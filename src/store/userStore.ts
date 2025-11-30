@@ -262,7 +262,6 @@ interface UserState {
   // Network status state
   networkStatus: NetworkStatusData;
 
-
   // Actions
   setSelectedUser: (userName: string, userId: number | null) => void;
   setAuthenticatedUser: (userData: {
@@ -342,7 +341,6 @@ interface UserState {
   // Network status actions
   setNetworkStatus: (status: NetworkStatusData) => void;
   updateNetworkQuality: (quality: NetworkStatusData['quality'], responseTime: number) => void;
-
 
   // Daily feedback action
   submitDailyFeedback: (studentId: number, rating: DailyFeedbackRating) => Promise<boolean>;
