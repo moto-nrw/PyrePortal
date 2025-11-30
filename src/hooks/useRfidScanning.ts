@@ -192,14 +192,13 @@ export const useRfidScanning = () => {
         if (result.action === 'supervisor_authenticated') {
           const staffId = result.student_id;
           const staffName = result.student_name;
-          const isRepeatSupervisor = staffId !== null && scannedSupervisorsRef.current.has(staffId);
-
-          if (staffId !== null && !isRepeatSupervisor) {
-            scannedSupervisorsRef.current.add(staffId);
-          }
-
           if (staffId !== null) {
-            addSupervisorFromRfid(staffId, staffName);
+            const alreadySelected = addSupervisorFromRfid(staffId, staffName); // true if existed
+            const isRepeatSupervisor = alreadySelected || scannedSupervisorsRef.current.has(staffId);
+
+            // Track in-memory so subsequent scans are repeat
+            scannedSupervisorsRef.current.add(staffId);
+
             addActiveSupervisorTag(tagId);
 
             if (currentSession && authenticatedUser?.pin) {
@@ -231,24 +230,25 @@ export const useRfidScanning = () => {
               message: result.message,
               staffId,
               isRepeatSupervisor,
+              alreadySelected,
             });
-          }
 
-          // Modal-Texte klar definieren
-          if (staffId !== null && isRepeatSupervisor) {
-            const redirectResult: RfidScanResult = {
-              ...result,
-              student_name: 'Betreuer erkannt',
-              message: 'Betreuer erkannt – Weiterleitung zum Hauptbildschirm...',
-            };
-            setScanResult(redirectResult);
-          } else {
-            const firstScanResult: RfidScanResult = {
-              ...result,
-              student_name: 'Betreuer erkannt',
-              message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
-            };
-            setScanResult(firstScanResult);
+            // Modal-Texte klar definieren
+            if (isRepeatSupervisor) {
+              const redirectResult: RfidScanResult = {
+                ...result,
+                student_name: 'Betreuer erkannt',
+                message: 'Betreuer erkannt – Weiterleitung zum Hauptbildschirm...',
+              };
+              setScanResult(redirectResult);
+            } else {
+              const firstScanResult: RfidScanResult = {
+                ...result,
+                student_name: 'Betreuer erkannt',
+                message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
+              };
+              setScanResult(firstScanResult);
+            }
           }
 
           setTimeout(() => {
