@@ -194,11 +194,11 @@ export const useRfidScanning = () => {
           const staffName = result.student_name;
           if (staffId !== null) {
             const alreadySelected = addSupervisorFromRfid(staffId, staffName); // true if existed
-            const isRepeatSupervisor = alreadySelected || scannedSupervisorsRef.current.has(staffId);
+            const wasSeenThisSession = scannedSupervisorsRef.current.has(staffId);
+            const isRepeatSupervisor = alreadySelected || wasSeenThisSession || isActiveSupervisor(tagId);
 
-            // Track in-memory so subsequent scans are repeat
+            // Track in-memory and mark tag active for fast return
             scannedSupervisorsRef.current.add(staffId);
-
             addActiveSupervisorTag(tagId);
 
             if (currentSession && authenticatedUser?.pin) {
@@ -233,7 +233,7 @@ export const useRfidScanning = () => {
               alreadySelected,
             });
 
-            // Modal-Texte klar definieren
+            // Nur zwei Varianten: Redirect oder Hinzufügen
             if (isRepeatSupervisor) {
               const redirectResult: RfidScanResult = {
                 ...result,
@@ -241,22 +241,28 @@ export const useRfidScanning = () => {
                 message: 'Betreuer erkannt – Weiterleitung zum Hauptbildschirm...',
               };
               setScanResult(redirectResult);
-            } else {
-              const firstScanResult: RfidScanResult = {
-                ...result,
-                student_name: 'Betreuer erkannt',
-                message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
-              };
-              setScanResult(firstScanResult);
+              showScanModal();
+              setTimeout(() => {
+                hideScanModal();
+                removeOptimisticScan(scanId);
+                void navigate('/home');
+              }, rfid.modalDisplayTime);
+              return;
             }
+
+            const firstScanResult: RfidScanResult = {
+              ...result,
+              student_name: 'Betreuer erkannt',
+              message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
+            };
+            setScanResult(firstScanResult);
+            showScanModal();
+            setTimeout(() => {
+              hideScanModal();
+              removeOptimisticScan(scanId);
+            }, rfid.modalDisplayTime);
+            return;
           }
-
-          setTimeout(() => {
-            hideScanModal();
-            removeOptimisticScan(scanId);
-          }, rfid.modalDisplayTime);
-
-          return;
         }
 
         // Student bookkeeping (no caching)
