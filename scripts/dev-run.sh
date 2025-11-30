@@ -126,6 +126,13 @@ fi
 # Set logging level
 export RUST_LOG="$LOG_LEVEL"
 
+# WebKit environment variables to prevent display corruption (horizontal stripes)
+# These are CRITICAL for Tauri/WebKitGTK on Raspberry Pi!
+export WEBKIT_DISABLE_COMPOSITING_MODE=1
+export WEBKIT_DISABLE_DMABUF_RENDERER=1
+export GDK_BACKEND=x11
+export XDG_SESSION_TYPE=x11
+
 # Detect display server
 if [[ -n "$WAYLAND_DISPLAY" ]]; then
     DISPLAY_TYPE="Wayland"
