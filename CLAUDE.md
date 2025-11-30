@@ -138,12 +138,10 @@ API client configured with device-specific credentials
 **Layers** (in order of data flow):
 
 1. **Frontend Logger** (`src/utils/logger.ts`)
-
    - Browser console + in-memory buffer
    - Sends entries to Rust via IPC
 
 2. **Store Logger** (`src/utils/storeMiddleware.ts`)
-
    - Automatic Zustand action tracking
    - Middleware wraps store creation
 

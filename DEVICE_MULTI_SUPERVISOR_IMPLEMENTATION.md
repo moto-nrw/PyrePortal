@@ -734,20 +734,17 @@ X-Staff-PIN: {global_pin}
 1. **Breaking Change**: `supervisor_ids` is now REQUIRED when starting sessions (no backward compatibility)
 
 2. **Supervisor Management**:
-
    - Minimum 1 supervisor required at all times
    - Use PUT endpoint to update entire supervisor list
    - Supervisors are automatically deduplicated
    - One supervisor can manage multiple rooms (Springerkraft)
 
 3. **Session Lifecycle**:
-
    - Sessions only end via explicit API call
    - No automatic termination when supervisors change
    - Device can only have one active session at a time
 
 4. **Error Handling**:
-
    - All errors return JSON with `status: "error"` and `error` message
    - HTTP status codes: 200 (success), 400 (bad request), 401 (auth), 404 (not found)
 
@@ -1028,7 +1025,6 @@ Error Responses (All Endpoints)
 Important Implementation Notes
 
 1. Authentication: All endpoints require both:
-
    - Device API key in Authorization: Bearer header
    - Global OGS PIN in X-Staff-PIN header
 

@@ -226,7 +226,6 @@ console.log(analysis);
 2. **Track action IDs**: Related state changes share the same action ID for easy correlation
 
 3. **Look for timing patterns**: Many state loss issues happen during specific user flows:
-
    - After form submission
    - During navigation
    - When switching between tabs/views
@@ -262,7 +261,6 @@ When debugging the specific activity name persistence issue:
    ```
 
 2. Review the complete lifecycle of an activity:
-
    - Look for the initial name setting (from empty to a value)
    - Track what happens to the name during activity creation
    - Check if the name is correctly passed to the activities array

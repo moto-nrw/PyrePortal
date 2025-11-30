@@ -36,14 +36,12 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
 ### Key Features
 
 1. **Teacher Authentication**
-
    - PIN-based login system
    - Global OGS PIN for quick access
    - Individual teacher PINs with device binding
    - Automatic session timeout prevention
 
 2. **RFID-Based Check-In/Check-Out**
-
    - Hardware RFID reader integration (MFRC522 via SPI on Raspberry Pi)
    - Mock RFID scanning for development
    - Server-first scanning (optimistic UI, keine lokale Cache-Persistenz)
@@ -51,14 +49,12 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
    - Offline operation with sync queue (RFID-Cache entfernt)
 
 3. **Room & Activity Management**
-
    - Room selection with occupancy status
    - Activity creation and selection
    - Multi-supervisor support
    - Session management with timeout prevention
 
 4. **Comprehensive Logging**
-
    - Frontend logging (browser console + in-memory)
    - Zustand store action logging
    - Rust backend file logging with rotation
@@ -578,13 +574,11 @@ src/
 #### Testing Priorities (When Implemented)
 
 1. **Critical Path**:
-
    - RFID scan processing (`useRfidScanning.ts`)
    - API authentication (`api.ts` PIN validation)
    - Store actions (`userStore.ts`)
 
 2. **UI Components**:
-
    - Modal behavior
    - Form validation
    - Error states
@@ -1342,7 +1336,6 @@ try {
 #### Three-Layer Logging System
 
 1. **Frontend Logger** (`src/utils/logger.ts`)
-
    - **Purpose**: Browser-side logging with levels
    - **Output**: Console + in-memory buffer
    - **Persistence**: Sends to Rust backend via IPC
@@ -1372,12 +1365,10 @@ try {
    ```
 
    **Configuration**:
-
    - Development: `DEBUG` level, console output
    - Production: `WARN` level, persistence enabled
 
 2. **Store Logger** (`src/utils/storeLogger.ts` + `storeMiddleware.ts`)
-
    - **Purpose**: Zustand store action tracking
    - **Output**: Console + frontend logger
 
@@ -1397,18 +1388,15 @@ try {
    ```
 
    **Logged Events**:
-
    - Action calls (function name + arguments)
    - State changes (before/after snapshots)
    - Action source (which component triggered)
 
 3. **Rust Backend Logger** (`src-tauri/src/logging.rs`)
-
    - **Purpose**: Persistent file-based logging
    - **Output**: Log files with rotation
 
    **Log Locations**:
-
    - **macOS**: `~/Library/Logs/pyreportal/app_YYYYMMDD_HHMMSS.log`
    - **Linux**: `~/.config/pyreportal/logs/app_YYYYMMDD_HHMMSS.log`
    - **Windows**: `%APPDATA%\pyreportal\logs\app_YYYYMMDD_HHMMSS.log`

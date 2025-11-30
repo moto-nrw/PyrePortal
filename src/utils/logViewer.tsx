@@ -269,7 +269,7 @@ function LogViewer({
                 </span>{' '}
                 <span className="text-gray-800">[{log.source}]</span> <span>{log.message}</span>
                 {log.data && (
-                  <pre className="ml-6 text-xs whitespace-pre-wrap text-gray-600">
+                  <pre className="ml-6 whitespace-pre-wrap text-xs text-gray-600">
                     {JSON.stringify(log.data, null, 2)}
                   </pre>
                 )}
@@ -326,7 +326,7 @@ function LogViewer({
                   <span className="text-gray-800">[{logEntry?.source}]</span>{' '}
                   <span>{logEntry?.message}</span>
                   {logEntry?.data && (
-                    <pre className="ml-6 text-xs whitespace-pre-wrap text-gray-600">
+                    <pre className="ml-6 whitespace-pre-wrap text-xs text-gray-600">
                       {JSON.stringify(logEntry?.data, null, 2)}
                     </pre>
                   )}

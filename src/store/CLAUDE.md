@@ -16,20 +16,17 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts` - 1552 lines) 
 ### State Categories
 
 1. **Authentication State** (lines 82-185)
-
    - `authenticatedUser` - Current logged-in staff member
    - `users` - Available teachers
    - `isLoading` - Loading indicator
    - `error` - Error message
 
 2. **Session State** (lines 186-395)
-
    - `currentSession` - Active session details
    - `activities` - Teacher's activities
    - `rooms` - Available rooms
 
 3. **RFID State** (lines 1117-1201)
-
    - `rfid.processingQueue` - Tags currently being processed
    - `rfid.recentTagScans` - Recent scans (duplicate prevention)
    - `rfid.tagToStudentMap` - Tag → Student mapping
@@ -41,19 +38,16 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts` - 1552 lines) 
 ### Action Categories
 
 1. **Teacher Management** (lines 354-450)
-
    - `fetchTeachers()` - Load teacher list
    - `selectUser(userId)` - Select teacher
    - `setPin(pin)` - Set PIN
 
 2. **Authentication** (lines 489-629)
-
    - `validateGlobalPIN(pin)` - Validate OGS PIN
    - `validateTeacherPIN(pin, staffId)` - Validate teacher PIN
    - `logout()` - Clear auth state
 
 3. **Session Management** (lines 721-1116)
-
    - `fetchActivities()` - Load activities
    - `fetchRooms()` - Load available rooms
    - `startSession(...)` - Start activity session

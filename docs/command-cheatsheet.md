@@ -360,23 +360,19 @@ cargo clippy --fix-safe
 ### Efficient Development Patterns
 
 1. **Hot Module Replacement (HMR)**
-
    - Vite provides HMR out of the box, making React component updates instant.
    - Use the React Fast Refresh feature for maintaining component state.
 
 2. **Parallel Development**
-
    - Run Vite frontend and Tauri backend development servers separately when working primarily on UI.
    - Use `npm run dev` for frontend-only changes to avoid Rust compilation times.
    - Use `npm run tauri dev` when working on full-stack features.
 
 3. **TypeScript Optimization**
-
    - Use the TypeScript Language Server in your IDE for realtime feedback.
    - Run periodic type checks with `npm run typecheck` during development.
 
 4. **Debug Tools**
-
    - Access Tauri logs:
      - Windows: `%APPDATA%\<app-name>\logs`
      - macOS: `~/Library/Logs/<app-name>`
@@ -440,7 +436,6 @@ cargo tauri build --config tauri.conf.prod.json
 ### Common Issues & Solutions
 
 1. **WebView2 Missing on Windows**
-
    - Solution: Add WebView2 installer to your bundle
    - Config in `tauri.conf.json`:
      ```json
@@ -456,7 +451,6 @@ cargo tauri build --config tauri.conf.prod.json
      ```
 
 2. **Large Bundle Size**
-
    - Analyze with `npx vite-bundle-visualizer`
    - Use dynamic imports for code splitting
    - Optimize Tailwind with purge/content settings

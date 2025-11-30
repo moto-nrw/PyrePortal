@@ -55,17 +55,14 @@ For shared UI components:
 ## Performance Considerations
 
 1. **Production Optimizations**:
-
    - Use `import.meta.env.PROD` to adjust log levels in production
    - Set higher thresholds for log persistence in production
 
 2. **Log Size Management**:
-
    - Use the circular buffer strategy (already implemented)
    - Implement log rotation for persistent logs
 
 3. **Asynchronous Logging**:
-
    - Use `async/await` for persistence operations
    - Avoid blocking the main thread with excessive logging
 
@@ -87,12 +84,10 @@ Schedule periodic reviews to:
 ### Log Sprawl Prevention
 
 1. **Centralized Helper Functions**:
-
    - Use the existing helper functions: `logUserAction`, `logNavigation`, `logError`
    - Create additional domain-specific helpers as needed
 
 2. **Remove Temporary Logs**:
-
    - Add `TODO: Remove debug log` comments for temporary debugging logs
    - Review logs during code reviews
 

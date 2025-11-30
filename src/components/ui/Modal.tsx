@@ -31,7 +31,7 @@ export const Modal: React.FC<ModalProps> = ({
   };
 
   return (
-    <div className="bg-opacity-50 fixed inset-0 z-[9999] flex items-center justify-center bg-black">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50">
       <div
         className={`relative mx-4 w-full max-w-2xl transform rounded-lg border-2 p-12 shadow-xl transition-all ${
           typeStyles[type]
