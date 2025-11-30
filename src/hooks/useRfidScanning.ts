@@ -192,6 +192,11 @@ export const useRfidScanning = () => {
         if (result.action === 'supervisor_authenticated') {
           const staffId = result.student_id;
           const staffName = result.student_name;
+          const isRepeatSupervisor = staffId !== null && scannedSupervisorsRef.current.has(staffId);
+
+          if (staffId !== null && !isRepeatSupervisor) {
+            scannedSupervisorsRef.current.add(staffId);
+          }
 
           if (staffId !== null) {
             addSupervisorFromRfid(staffId, staffName);
@@ -225,16 +230,25 @@ export const useRfidScanning = () => {
               supervisorName: staffName,
               message: result.message,
               staffId,
+              isRepeatSupervisor,
             });
           }
 
-          // Zweiter Scan desselben Betreuers: klare Weiterleitungsbotschaft
-          if (staffId !== null && scannedSupervisorsRef.current.has(staffId)) {
+          // Modal-Texte klar definieren
+          if (staffId !== null && isRepeatSupervisor) {
             const redirectResult: RfidScanResult = {
               ...result,
+              student_name: 'Betreuer erkannt',
               message: 'Betreuer erkannt – Weiterleitung zum Hauptbildschirm...',
             };
             setScanResult(redirectResult);
+          } else {
+            const firstScanResult: RfidScanResult = {
+              ...result,
+              student_name: 'Betreuer erkannt',
+              message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
+            };
+            setScanResult(firstScanResult);
           }
 
           setTimeout(() => {
