@@ -6,6 +6,9 @@ on:
     branches:
       - main
       - development
+  push:
+    branches:
+      - development
   workflow_dispatch:
 
 defaults:
