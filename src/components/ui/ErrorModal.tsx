@@ -1,3 +1,5 @@
+import { faCircleXmark } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect } from 'react';
 
 import theme from '../../styles/theme';
@@ -52,7 +54,9 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
         }}
         onClick={e => e.stopPropagation()}
       >
-        <div style={{ fontSize: '3rem', marginBottom: theme.spacing.lg }}>❌</div>
+        <div style={{ marginBottom: theme.spacing.lg, color: '#DC2626' }}>
+          <FontAwesomeIcon icon={faCircleXmark} style={{ fontSize: '3rem' }} />
+        </div>
         <h2
           style={{
             fontSize: theme.fonts.size.xl,

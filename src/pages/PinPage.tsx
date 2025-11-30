@@ -1,3 +1,5 @@
+import { faDeleteLeft } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -401,8 +403,8 @@ function PinPage() {
 
               <NumpadButton onClick={() => handleNumpadClick(0)}>0</NumpadButton>
 
-              <NumpadButton onClick={handleDelete} isAction>
-                ⌫
+              <NumpadButton onClick={handleDelete} isAction aria-label="Delete last digit">
+                <FontAwesomeIcon icon={faDeleteLeft} />
               </NumpadButton>
             </div>
 

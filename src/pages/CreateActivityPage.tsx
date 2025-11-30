@@ -1,3 +1,5 @@
+import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -624,7 +626,8 @@ function CreateActivityPage() {
                     justifySelf: 'start',
                   }}
                 >
-                  ← Vorherige
+                  <FontAwesomeIcon icon={faChevronLeft} style={{ marginRight: '6px' }} />
+                  Vorherige
                 </button>
 
                 <span
@@ -660,7 +663,8 @@ function CreateActivityPage() {
                     justifySelf: 'end',
                   }}
                 >
-                  Nächste →
+                  Nächste
+                  <FontAwesomeIcon icon={faChevronRight} style={{ marginLeft: '6px' }} />
                 </button>
               </div>
             )}

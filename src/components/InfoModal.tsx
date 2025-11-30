@@ -1,3 +1,5 @@
+import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect } from 'react';
 
 import { designSystem } from '../styles/designSystem';
@@ -79,7 +81,7 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, title, me
             boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3)',
           }}
         >
-          <span style={{ color: '#FFFFFF', fontSize: '32px', fontWeight: 700 }}>ⓘ</span>
+          <FontAwesomeIcon icon={faCircleInfo} style={{ color: '#FFFFFF', fontSize: '32px' }} />
         </div>
 
         {/* Title */}

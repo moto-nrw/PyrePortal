@@ -1,3 +1,5 @@
+import { faArrowsRotate, faCheck, faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
 
 import { getRelativeTime } from '../services/sessionStorage';
@@ -101,7 +103,7 @@ export const LastSessionToggle: React.FC = () => {
                   color: '#FFFFFF',
                 }}
               >
-                ✓
+                <FontAwesomeIcon icon={faCheck} style={{ fontSize: '12px' }} />
               </div>
             )}
           </div>
@@ -116,7 +118,7 @@ export const LastSessionToggle: React.FC = () => {
               gap: '6px',
             }}
           >
-            <span style={{ fontSize: '20px' }}>↻</span>
+            <FontAwesomeIcon icon={faArrowsRotate} style={{ fontSize: '18px' }} />
             Letzte Sitzung
           </span>
 
@@ -159,7 +161,7 @@ export const LastSessionToggle: React.FC = () => {
             e.currentTarget.style.backgroundColor = '#F3F4F6';
           }}
         >
-          ⓘ
+          <FontAwesomeIcon icon={faCircleInfo} />
         </button>
       </div>
 
@@ -168,14 +170,14 @@ export const LastSessionToggle: React.FC = () => {
         isOpen={showInfoModal}
         onClose={() => setShowInfoModal(false)}
         title="Letzte Sitzung verwenden"
-        message="Diese Funktion ermöglicht es Ihnen, die zuletzt gestartete Aktivität mit einem Klick zu wiederholen.
+        message={`Diese Funktion ermöglicht es Ihnen, die zuletzt gestartete Aktivität mit einem Klick zu wiederholen.
 
 Die gespeicherten Daten umfassen:
-• Aktivität
-• Raum
-• Betreuer
+- Aktivität
+- Raum
+- Betreuer
 
-Die Daten werden automatisch bei jedem erfolgreichen Start einer neuen Aktivität aktualisiert. Wenn eine der gespeicherten Komponenten nicht mehr verfügbar ist, wird die Speicherung gelöscht und Sie müssen die Aktivität neu erstellen."
+Die Daten werden automatisch bei jedem erfolgreichen Start einer neuen Aktivität aktualisiert. Wenn eine der gespeicherten Komponenten nicht mehr verfügbar ist, wird die Speicherung gelöscht und Sie müssen die Aktivität neu erstellen.`}
       />
     </>
   );
