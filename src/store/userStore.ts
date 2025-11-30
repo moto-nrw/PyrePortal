@@ -260,6 +260,7 @@ interface UserState {
   error: string | null;
   nfcScanActive: boolean;
   selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
+  activeSupervisorTags: Set<string>; // Locally tracked supervisor tagIds for instant re-entry
 
   // RFID scanning state
   rfid: RfidState;
@@ -302,6 +303,9 @@ interface UserState {
   toggleSupervisor: (user: User) => void;
   clearSelectedSupervisors: () => void;
   addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
+  addActiveSupervisorTag: (tagId: string) => void;
+  isActiveSupervisor: (tagId: string) => boolean;
+  clearActiveSupervisorTags: () => void;
 
   // Check-in/check-out actions
   startNfcScan: () => void;
@@ -411,6 +415,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   error: null,
   nfcScanActive: false,
   selectedSupervisors: [] as User[], // New state for multi-supervisor selection
+  activeSupervisorTags: new Set<string>(),
 
   // RFID initial state
   rfid: {
@@ -697,6 +702,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       currentSession: null,
       currentActivity: null,
       selectedSupervisors: [],
+      activeSupervisorTags: new Set<string>(),
     });
   },
 
@@ -753,6 +759,24 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     });
 
     return false; // Was not present - first scan
+  },
+
+  addActiveSupervisorTag: (tagId: string) => {
+    set(state => {
+      const updatedTags = new Set(state.activeSupervisorTags);
+      updatedTags.add(tagId);
+      return { activeSupervisorTags: updatedTags };
+    });
+    storeLogger.debug('RFID-Tag für Betreuer gespeichert', { tagId });
+  },
+
+  isActiveSupervisor: (tagId: string) => {
+    return get().activeSupervisorTags.has(tagId);
+  },
+
+  clearActiveSupervisorTags: () => {
+    set({ activeSupervisorTags: new Set<string>() });
+    storeLogger.debug('Aktive Betreuer-Tags geleert');
   },
 
   // Activity-related actions
@@ -1733,6 +1757,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         sessionSettings: sessionSettings
           ? { ...sessionSettings, last_session: null, use_last_session: false }
           : null,
+        activeSupervisorTags: new Set<string>(),
       });
       storeLogger.info('Session settings cleared');
     } catch (error) {
