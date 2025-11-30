@@ -664,7 +664,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         });
       } else {
         storeLogger.debug('No active session found for device');
-        set({ currentSession: null });
+        set({ currentSession: null, activeSupervisorTags: new Set<string>() });
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -716,7 +716,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   // Supervisor selection actions
-  setSelectedSupervisors: (supervisors: User[]) => set({ selectedSupervisors: supervisors }),
+  setSelectedSupervisors: (supervisors: User[]) =>
+    set({ selectedSupervisors: supervisors, activeSupervisorTags: new Set<string>() }),
 
   toggleSupervisor: (user: User) => {
     const { selectedSupervisors } = get();
@@ -726,16 +727,18 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       // Remove supervisor
       set({
         selectedSupervisors: selectedSupervisors.filter(s => s.id !== user.id),
+        activeSupervisorTags: new Set<string>(),
       });
     } else {
       // Add supervisor
       set({
         selectedSupervisors: [...selectedSupervisors, user],
+        activeSupervisorTags: new Set<string>(),
       });
     }
   },
 
-  clearSelectedSupervisors: () => set({ selectedSupervisors: [] }),
+  clearSelectedSupervisors: () => set({ selectedSupervisors: [], activeSupervisorTags: new Set<string>() }),
 
   addSupervisorFromRfid: (staffId: number, staffName: string) => {
     const { selectedSupervisors } = get();
@@ -750,7 +753,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
 
     const newSupervisor: User = { id: staffId, name: staffName };
-    set({ selectedSupervisors: [...selectedSupervisors, newSupervisor] });
+    set({
+      selectedSupervisors: [...selectedSupervisors, newSupervisor],
+      activeSupervisorTags: new Set<string>(),
+    });
 
     storeLogger.info('Supervisor added to selectedSupervisors via RFID', {
       staffId,
@@ -1718,6 +1724,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         selectedActivity: activity,
         selectedRoom: room,
         selectedSupervisors: supervisors,
+        activeSupervisorTags: new Set<string>(),
         isValidatingLastSession: false,
       });
 
