@@ -227,6 +227,15 @@ export const useRfidScanning = () => {
             });
           }
 
+          // Zweiter Scan desselben Betreuers: klare Weiterleitungsbotschaft
+          if (staffId !== null && scannedSupervisorsRef.current.has(staffId)) {
+            const redirectResult: RfidScanResult = {
+              ...result,
+              message: 'Betreuer erkannt – Weiterleitung zum Hauptbildschirm...',
+            };
+            setScanResult(redirectResult);
+          }
+
           setTimeout(() => {
             hideScanModal();
             removeOptimisticScan(scanId);
