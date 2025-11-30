@@ -1,8 +1,8 @@
 # Dependabot configuration for PyrePortal
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
-# Strategy: Group minor/patch updates together, keep major updates separate
-# This reduces PR noise while maintaining visibility for breaking changes
+# Strategy: Group related dependencies together to reduce PR noise
+# Groups are matched in order - first match wins
 
 version: 2
 updates:
@@ -15,15 +15,41 @@ updates:
       time: "09:00"
       timezone: "Europe/Berlin"
     groups:
+      # React ecosystem (must stay in sync)
       react:
         patterns:
           - "react"
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
+      # Tauri JS bindings
       tauri:
         patterns:
           - "@tauri-apps/*"
+      # FontAwesome icons (all packages must match versions)
+      fontawesome:
+        patterns:
+          - "@fortawesome/*"
+      # Vite build tooling
+      vite:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+      # ESLint and linting tools
+      linting:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "prettier"
+          - "lint-staged"
+          - "husky"
+      # TypeScript tooling
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/*"
+      # All remaining minor/patch updates
       minor-patch:
         patterns:
           - "*"
@@ -43,10 +69,19 @@ updates:
       time: "09:00"
       timezone: "Europe/Berlin"
     groups:
+      # Tauri framework crates
       tauri:
         patterns:
           - "tauri"
           - "tauri-*"
+      # Embedded HAL ecosystem (RFID hardware)
+      embedded-hal:
+        patterns:
+          - "embedded-hal"
+          - "linux-embedded-hal"
+          - "rppal"
+          - "spidev"
+      # All remaining minor/patch updates
       minor-patch:
         patterns:
           - "*"
@@ -57,7 +92,7 @@ updates:
     commit-message:
       prefix: "chore(deps)"
 
-  # GitHub Actions
+  # GitHub Actions (group all together)
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -65,6 +100,11 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Europe/Berlin"
+    groups:
+      # All GitHub Actions in one PR
+      actions:
+        patterns:
+          - "*"
     open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
