@@ -260,6 +260,7 @@ interface UserState {
   error: string | null;
   nfcScanActive: boolean;
   selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
+  activeSupervisorTags: Set<string>; // Locally tracked supervisor tagIds for instant re-entry
 
   // RFID scanning state
   rfid: RfidState;
@@ -301,6 +302,10 @@ interface UserState {
   setSelectedSupervisors: (supervisors: User[]) => void;
   toggleSupervisor: (user: User) => void;
   clearSelectedSupervisors: () => void;
+  addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
+  addActiveSupervisorTag: (tagId: string) => void;
+  isActiveSupervisor: (tagId: string) => boolean;
+  clearActiveSupervisorTags: () => void;
 
   // Check-in/check-out actions
   startNfcScan: () => void;
@@ -334,6 +339,7 @@ interface UserState {
   // Enhanced duplicate prevention actions
   canProcessTag: (tagId: string) => boolean;
   recordTagScan: (tagId: string, scan: RecentTagScan) => void;
+  clearTagScan: (tagId: string) => void;
   mapTagToStudent: (tagId: string, studentId: string) => void;
   getCachedStudentId: (tagId: string) => string | undefined;
   clearOldTagScans: () => void;
@@ -409,6 +415,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   error: null,
   nfcScanActive: false,
   selectedSupervisors: [] as User[], // New state for multi-supervisor selection
+  activeSupervisorTags: new Set<string>(),
 
   // RFID initial state
   rfid: {
@@ -657,7 +664,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         });
       } else {
         storeLogger.debug('No active session found for device');
-        set({ currentSession: null });
+        set({ currentSession: null, activeSupervisorTags: new Set<string>() });
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -695,6 +702,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       currentSession: null,
       currentActivity: null,
       selectedSupervisors: [],
+      activeSupervisorTags: new Set<string>(),
     });
   },
 
@@ -708,7 +716,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   // Supervisor selection actions
-  setSelectedSupervisors: (supervisors: User[]) => set({ selectedSupervisors: supervisors }),
+  setSelectedSupervisors: (supervisors: User[]) =>
+    set({ selectedSupervisors: supervisors, activeSupervisorTags: new Set<string>() }),
 
   toggleSupervisor: (user: User) => {
     const { selectedSupervisors } = get();
@@ -718,16 +727,64 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       // Remove supervisor
       set({
         selectedSupervisors: selectedSupervisors.filter(s => s.id !== user.id),
+        activeSupervisorTags: new Set<string>(),
       });
     } else {
       // Add supervisor
       set({
         selectedSupervisors: [...selectedSupervisors, user],
+        activeSupervisorTags: new Set<string>(),
       });
     }
   },
 
-  clearSelectedSupervisors: () => set({ selectedSupervisors: [] }),
+  clearSelectedSupervisors: () =>
+    set({ selectedSupervisors: [], activeSupervisorTags: new Set<string>() }),
+
+  addSupervisorFromRfid: (staffId: number, staffName: string) => {
+    const { selectedSupervisors } = get();
+    const isAlreadySelected = selectedSupervisors.some(s => s.id === staffId);
+
+    if (isAlreadySelected) {
+      storeLogger.info('Supervisor already in selectedSupervisors via RFID', {
+        staffId,
+        staffName,
+      });
+      return true; // Already present - second scan
+    }
+
+    const newSupervisor: User = { id: staffId, name: staffName };
+    set({
+      selectedSupervisors: [...selectedSupervisors, newSupervisor],
+      activeSupervisorTags: new Set<string>(),
+    });
+
+    storeLogger.info('Supervisor added to selectedSupervisors via RFID', {
+      staffId,
+      staffName,
+      totalSupervisors: selectedSupervisors.length + 1,
+    });
+
+    return false; // Was not present - first scan
+  },
+
+  addActiveSupervisorTag: (tagId: string) => {
+    set(state => {
+      const updatedTags = new Set(state.activeSupervisorTags);
+      updatedTags.add(tagId);
+      return { activeSupervisorTags: updatedTags };
+    });
+    storeLogger.debug('RFID-Tag für Betreuer gespeichert', { tagId });
+  },
+
+  isActiveSupervisor: (tagId: string) => {
+    return get().activeSupervisorTags.has(tagId);
+  },
+
+  clearActiveSupervisorTags: () => {
+    set({ activeSupervisorTags: new Set<string>() });
+    storeLogger.debug('Aktive Betreuer-Tags geleert');
+  },
 
   // Activity-related actions
   initializeActivity: (roomId: number) => {
@@ -1300,6 +1357,16 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     });
   },
 
+  clearTagScan: (tagId: string) => {
+    set(state => {
+      const newScans = new Map(state.rfid.recentTagScans);
+      newScans.delete(tagId);
+      return {
+        rfid: { ...state.rfid, recentTagScans: newScans },
+      };
+    });
+  },
+
   mapTagToStudent: (tagId: string, studentId: string) => {
     set(state => {
       const newMap = new Map(state.rfid.tagToStudentMap);
@@ -1658,6 +1725,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         selectedActivity: activity,
         selectedRoom: room,
         selectedSupervisors: supervisors,
+        activeSupervisorTags: new Set<string>(),
         isValidatingLastSession: false,
       });
 
@@ -1697,6 +1765,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         sessionSettings: sessionSettings
           ? { ...sessionSettings, last_session: null, use_last_session: false }
           : null,
+        activeSupervisorTags: new Set<string>(),
       });
       storeLogger.info('Session settings cleared');
     } catch (error) {

@@ -41,6 +41,15 @@ export function mapServerErrorToGerman(errorMessage: string): string {
     return 'Konto gesperrt. Bitte später erneut versuchen.';
   }
 
+  // RFID/Student nicht gefunden (404)
+  if (
+    errorMessage.includes('404') ||
+    errorMessage.includes('not found') ||
+    errorMessage.includes('Not Found')
+  ) {
+    return 'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.';
+  }
+
   // Server-Fehler
   if (
     errorMessage.includes('500') ||
