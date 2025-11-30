@@ -2882,7 +2882,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "dotenvy",
- "embedded-hal 0.2.7",
+ "embedded-hal 1.0.0",
  "linux-embedded-hal",
  "mfrc522",
  "rand 0.8.5",

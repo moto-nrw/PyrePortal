@@ -32,7 +32,7 @@ dotenvy = "0.15"
 [target.'cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))'.dependencies]
 mfrc522 = { version = "0.8.0", features = ["eh02"], optional = true }
 rppal = { version = "0.22.1", optional = true }
-embedded-hal = { version = "0.2.7", optional = true }
+embedded-hal = { version = "1.0.0", optional = true }
 linux-embedded-hal = { version = "0.3.2", optional = true }
 
 [features]
