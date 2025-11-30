@@ -46,9 +46,9 @@ PyrePortal is a **desktop kiosk application** designed for educational settings 
 
    - Hardware RFID reader integration (MFRC522 via SPI on Raspberry Pi)
    - Mock RFID scanning for development
-   - Cache-first scanning (instant UI feedback, background sync)
+   - Server-first scanning (optimistic UI, keine lokale Cache-Persistenz)
    - Duplicate scan prevention (multi-layer)
-   - Offline operation with sync queue
+   - Offline operation with sync queue (RFID-Cache entfernt)
 
 3. **Room & Activity Management**
 
@@ -179,7 +179,6 @@ PyrePortal/
 │   ├── services/                  # Business logic layer
 │   │   ├── api.ts                # API client (947 lines)
 │   │   ├── sessionStorage.ts     # Session persistence
-│   │   ├── studentCache.ts       # Offline student data cache
 │   │   └── syncQueue.ts          # Offline operation queue
 │   ├── store/                     # Zustand state management
 │   │   └── userStore.ts          # Main application store (1552 lines)
@@ -259,7 +258,7 @@ PyrePortal/
 4. **Services**: Abstraction layer for external dependencies
    - `api.ts`: All HTTP API calls
    - `sessionStorage.ts`: Tauri IPC for session data
-   - `studentCache.ts`: Tauri IPC for student caching
+   - (entfernt) früher: `studentCache.ts` für Offline-Cache
    - `syncQueue.ts`: Offline operation management
 5. **Components**: Atomic design pattern
    - `ui/` = atoms/molecules (reusable)
@@ -280,7 +279,7 @@ PyrePortal/
 Pages
   └─> Hooks (useRfidScanning, useNetworkStatus)
        └─> Store (userStore)
-            ├─> Services (api, sessionStorage, studentCache, syncQueue)
+           ├─> Services (api, sessionStorage, syncQueue)
             │    └─> Tauri IPC (tauriContext)
             │         └─> Rust Backend (lib.rs)
             └─> Utils (logger, storeLogger)

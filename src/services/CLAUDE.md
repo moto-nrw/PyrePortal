@@ -67,35 +67,9 @@ interface SessionSettings {
 }
 ```
 
-### studentCache.ts
+### studentCache.ts (entfernt)
 
-**Purpose**: Cache student data for offline operation and instant RFID responses
-
-**Key Functions**:
-
-- `getCachedStudentData(tagId)` - Get cached student by RFID tag
-- `cacheStudentData(tagId, student)` - Cache student data
-- `clearStudentCache()` - Clear all cached data
-
-**Cache Strategy**:
-
-- Daily cache invalidation (new JSON file per day)
-- Stores: student ID, name, last action, last scan time, tag ID
-- Location: Platform-specific app data directory
-
-**Usage**:
-
-```typescript
-// Check cache first (instant)
-const cached = getCachedStudentData(tagId);
-if (cached) {
-  // Show UI immediately with cached data
-  showResult(cached);
-
-  // Background sync with server
-  void syncWithServer(tagId);
-}
-```
+Die frühere Offline-Studenten-Cache-Implementierung wurde entfernt. Live-RFID-Scans arbeiten ausschließlich server-first; es gibt keinen lokalen Cache oder Persistenzpfad mehr. Sollte künftig wieder ein Offline-Feature benötigt werden, müsste der Cache neu eingeführt oder serverseitig unterstützt werden.
 
 ### syncQueue.ts
 

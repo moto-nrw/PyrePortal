@@ -7,7 +7,7 @@
 - **Key Features & Capabilities**:
   - PIN-authenticated login and staff selection flows (`src/pages/PinPage.tsx:1-214`, `src/store/userStore.ts:82-185`).
   - Activity lifecycle management, room selection, and supervisor assignment (`src/pages/HomeViewPage.tsx:1-214`, `src/store/userStore.ts:186-213`).
-  - RFID scanning with optimistic UI updates, offline queuing, and background synchronization (`src/hooks/useRfidScanning.ts:1-200`, `src/services/syncQueue.ts:1-186`).
+  - RFID scanning mit Optimistic-UI, server-first Verarbeitung und optionalem Offline-Queueing (`src/hooks/useRfidScanning.ts:1-200`, `src/services/syncQueue.ts:1-186`).
   - Comprehensive multi-layer logging (frontend, Zustand store middleware, and Rust backend persistence) (`src/utils/logger.ts:1-200`, `src/utils/storeMiddleware.ts:283-360`, `src-tauri/src/logging.rs:1-120`).
   - Real API integration endpoints for teachers, sessions, and RFID check-ins (`src/services/api.ts:25-720`).
 - **Current Development Stage**: Version 0.1.0 with core teacher integration delivered, ongoing work on PIN validation, room integration, RFID workflows, and offline improvements, and a roadmap for audit logging and advanced recovery (`package.json:2-55`, `README.md:23-48`).
@@ -20,7 +20,7 @@
   - Rust Backend: Tokio 1.45.0, Serde 1.0.219, Chrono 0.4, dotenvy 0.15 (`Cargo.toml:21-36`, `Cargo.lock:3230-3235`, `Cargo.lock:4072-4076`).
   - Raspberry Pi RFID (conditional): mfrc522 0.8.0 (eh02), rppal 0.14.1, embedded-hal 0.2.7, linux-embedded-hal 0.3.2 (`Cargo.toml:31-36`).
   - Tooling: ESLint 9.26.0 w/ Flat config, TypeScript-ESLint 8.32.1, Prettier 3.5.3 + Tailwind plugin, PostCSS 8.5.3 (`package.json:30-55`).
-- **Architecture Pattern**: Single-repo monolith combining a React SPA and a Tauri Rust backend. The frontend renders inside a WebView, communicates with Rust via Tauri invoke, and persists data using Tauri commands for logging, session state, and student cache (`src/App.tsx:31-160`, `src-tauri/src/lib.rs:55-97`).
+- **Architecture Pattern**: Single-repo monolith combining a React SPA and a Tauri Rust backend. The frontend renders inside a WebView, communicates with Rust via Tauri invoke, and persists data using Tauri commands for logging und Session-Storage (kein Student-Cache mehr) (`src/App.tsx:31-160`, `src-tauri/src/lib.rs:55-97`).
 - **Directory Structure & Responsibilities**:
   - Root config (`package.json`, `tsconfig.json`, `vite.config.ts`, `tailwind.config.js`, `eslint.config.js`) orchestrates the web build pipeline.
   - `src/` contains the React application with `components/`, `pages/`, `hooks/`, `services/`, `store/`, `styles/`, `utils/`, and static assets (`ls src`).
@@ -28,7 +28,7 @@
   - `docs/` captures operational guides (logging, performance, kiosk setup), `dist/` holds Vite output, `src-tauri/target/` stores compiled binaries (`docs/performance-testing.md:1-172`, `WORKING_KIOSK_SETUP.md:1-200`).
 - **Package/Module Relationships**:
   - Routed components (`src/App.tsx:31-160`) drive high-level flows, each page orchestrates store actions (Zustand) and services.
-  - `useUserStore` centralizes state, depending on `services/api`, `services/sessionStorage`, `services/studentCache`, and `services/syncQueue` (`src/store/userStore.ts:1-1551`).
+  - `useUserStore` centralizes state, depending on `services/api`, `services/sessionStorage`, und `services/syncQueue` (`src/store/userStore.ts`).
   - Hooks provide cross-cutting concerns: network health (`src/hooks/useNetworkStatus.ts:1-200`), RFID scanning (`src/hooks/useRfidScanning.ts:1-200`).
   - Utilities wrap Tauri context detection, logging, and store middleware to route data to Rust commands (`src/utils/tauriContext.ts:1-80`, `src/utils/logger.ts:1-200`).
 - **Dependency Graph Highlights**:
@@ -106,7 +106,7 @@
   - State-managed staff PIN with stored PIN to reuse across requests (`src/store/userStore.ts:82-185`).
   - No OAuth/third-party login; purely header-based token + PIN.
 - **Data Persistence & Storage**:
-  - Session settings and student caches persisted via Tauri commands writing JSON files into app data directory (`src-tauri/src/session_storage.rs:1-120`, `src-tauri/src/student_cache.rs:1-200`).
+  - Session settings persisted via Tauri commands writing JSON files into app data directory (`src-tauri/src/session_storage.rs:1-120`). Student-Cache wurde entfernt; Live-Scans sind server-first.
   - Logs persisted per day through Tauri logging module (`src-tauri/src/logging.rs:1-120`).
   - No direct database connection; relies on remote API.
 - **Hardware Integrations**:
@@ -155,8 +155,7 @@
 
 - **Architectural Decisions**:
   - **Tauri context detection** prevents invoking native commands when running pure web builds. Missing context surfaces explicit errors guiding developers to start `tauri dev` (`src/utils/tauriContext.ts:41-80`).
-  - **Optimistic RFID UX** uses cache-first responses and background sync to deliver instant feedback, plus duplicate prevention via short-term maps and processing queues (`src/hooks/useRfidScanning.ts:91-198`, `src/store/userStore.ts:120-168`).
-  - **Daily Student Cache** resets per-day JSON files to avoid stale data (`src-tauri/src/student_cache.rs:33-120`, `src/services/studentCache.ts:11-120`).
+- **Optimistic RFID UX** liefert sofortiges Feedback ohne lokalen Cache; Verarbeitung läuft direkt gegen den Server mit kurzlebiger In-Memory-Dedupe (`src/hooks/useRfidScanning.ts:90-210`, `src/store/userStore.ts`).
   - **Automatic Sync Queue** replays failed check-ins with retry/backoff, useful in poor network kiosks (`src/services/syncQueue.ts:42-186`).
 - **Known Issues / Workarounds**:
   - PIN validation and room selection integration still in progress; flows fallback to placeholders (`README.md:34-41`, `src/services/api.ts:213-400`).
@@ -186,7 +185,7 @@
 - **Key Source Directories**:
   - `src/components/ui` – Shared UI widgets (`src/components/ui/NetworkStatus.tsx:1-100`, `src/components/ui/ActionButton.tsx:1-90`).
   - `src/pages` – Route-level screens (e.g., `src/pages/HomeViewPage.tsx:1-214`, `src/pages/PinPage.tsx:1-214`).
-  - `src/services` – API, caching, session storage, sync queue (`src/services/api.ts:1-720`, `src/services/studentCache.ts:1-200`).
+  - `src/services` – API, session storage, sync queue (`src/services/api.ts:1-720`).
   - `src/store` – Zustand store composition and middleware integration (`src/store/userStore.ts:1-1551`).
   - `src/hooks` – Cross-cutting logic for network and RFID (`src/hooks/useNetworkStatus.ts:1-200`, `src/hooks/useRfidScanning.ts:1-200`).
   - `src-tauri/src` – Rust commands for API config, logging, RFID, session persistence (`src-tauri/src/lib.rs:1-97`, `src-tauri/src/rfid.rs:1-200`, `src-tauri/src/session_storage.rs:1-120`).
