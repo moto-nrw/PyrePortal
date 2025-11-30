@@ -832,11 +832,14 @@ const ActivityScanningPage: React.FC = () => {
                       width="80"
                       height="80"
                       viewBox="0 0 24 24"
-                      fill="white"
+                      fill="none"
                       stroke="white"
-                      strokeWidth="2"
+                      strokeWidth="2.5"
                     >
-                      <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-1.41 16L7 13.41 8.41 12l2.17 2.17 5.59-5.59L17.59 10l-7 7z" />
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                   );
                 }
