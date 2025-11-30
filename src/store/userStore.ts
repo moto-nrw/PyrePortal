@@ -738,7 +738,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
   },
 
-  clearSelectedSupervisors: () => set({ selectedSupervisors: [], activeSupervisorTags: new Set<string>() }),
+  clearSelectedSupervisors: () =>
+    set({ selectedSupervisors: [], activeSupervisorTags: new Set<string>() }),
 
   addSupervisorFromRfid: (staffId: number, staffName: string) => {
     const { selectedSupervisors } = get();
