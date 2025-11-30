@@ -74,13 +74,6 @@ updates:
         patterns:
           - "tauri"
           - "tauri-*"
-      # Embedded HAL ecosystem (RFID hardware)
-      embedded-hal:
-        patterns:
-          - "embedded-hal"
-          - "linux-embedded-hal"
-          - "rppal"
-          - "spidev"
       # All remaining minor/patch updates
       minor-patch:
         patterns:
@@ -88,6 +81,14 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    # Ignore embedded-hal ecosystem - major updates break mfrc522 compatibility
+    # mfrc522 0.8 requires embedded-hal 0.2, not 1.0
+    # Revisit when mfrc522 releases embedded-hal 1.0 support
+    ignore:
+      - dependency-name: "embedded-hal"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "linux-embedded-hal"
+        update-types: ["version-update:semver-major"]
     open-pull-requests-limit: 10
     commit-message:
       prefix: "chore(deps)"
