@@ -1114,8 +1114,7 @@ const ActivityScanningPage: React.FC = () => {
 
       {/* Checkout Destination Selection Modal */}
       {showModal &&
-        currentScan &&
-        currentScan.action === 'checked_out' &&
+        currentScan?.action === 'checked_out' &&
         checkoutDestinationState &&
         !dailyCheckoutState && (
           <div

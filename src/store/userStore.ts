@@ -347,10 +347,7 @@ interface UserState {
 }
 
 // Define the type for the Zustand set function
-type SetState<T> = (
-  partial: T | Partial<T> | ((state: T) => T | Partial<T>),
-  replace?: false
-) => void;
+type SetState<T> = (partial: Partial<T> | ((state: T) => Partial<T>), replace?: false) => void;
 
 // Define the type for the Zustand get function
 type GetState<T> = () => T;
