@@ -1,12 +1,11 @@
 # Dependabot configuration for PyrePortal
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
 #
-# Strategy: Group related dependencies together to reduce PR noise
-# Groups are matched in order - first match wins
+# Strategy: Minimize PRs - one per ecosystem (npm, cargo, actions)
 
 version: 2
 updates:
-  # npm packages (Frontend + Tauri JS bindings)
+  # npm packages - ALL in one PR
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -15,52 +14,14 @@ updates:
       time: "09:00"
       timezone: "Europe/Berlin"
     groups:
-      # React ecosystem (must stay in sync)
-      react:
-        patterns:
-          - "react"
-          - "react-dom"
-          - "@types/react"
-          - "@types/react-dom"
-      # Tauri JS bindings
-      tauri:
-        patterns:
-          - "@tauri-apps/*"
-      # FontAwesome icons (all packages must match versions)
-      fontawesome:
-        patterns:
-          - "@fortawesome/*"
-      # Vite build tooling
-      vite:
-        patterns:
-          - "vite"
-          - "@vitejs/*"
-      # ESLint and linting tools
-      linting:
-        patterns:
-          - "eslint"
-          - "eslint-*"
-          - "@eslint/*"
-          - "prettier"
-          - "lint-staged"
-          - "husky"
-      # TypeScript tooling
-      typescript:
-        patterns:
-          - "typescript"
-          - "@types/*"
-      # All remaining minor/patch updates
-      minor-patch:
+      all-npm:
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
 
-  # Cargo/Rust (Tauri backend)
+  # Cargo/Rust - ALL in one PR
   - package-ecosystem: "cargo"
     directory: "/src-tauri"
     schedule:
@@ -69,31 +30,21 @@ updates:
       time: "09:00"
       timezone: "Europe/Berlin"
     groups:
-      # Tauri framework crates
-      tauri:
-        patterns:
-          - "tauri"
-          - "tauri-*"
-      # All remaining minor/patch updates
-      minor-patch:
+      all-cargo:
         patterns:
           - "*"
-        update-types:
-          - "minor"
-          - "patch"
     # Ignore embedded-hal ecosystem - major updates break mfrc522 compatibility
     # mfrc522 0.8 requires embedded-hal 0.2, not 1.0
-    # Revisit when mfrc522 releases embedded-hal 1.0 support
     ignore:
       - dependency-name: "embedded-hal"
         update-types: ["version-update:semver-major"]
       - dependency-name: "linux-embedded-hal"
         update-types: ["version-update:semver-major"]
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 5
     commit-message:
       prefix: "chore(deps)"
 
-  # GitHub Actions (group all together)
+  # GitHub Actions - ALL in one PR
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -102,8 +53,7 @@ updates:
       time: "09:00"
       timezone: "Europe/Berlin"
     groups:
-      # All GitHub Actions in one PR
-      actions:
+      all-actions:
         patterns:
           - "*"
     open-pull-requests-limit: 5
