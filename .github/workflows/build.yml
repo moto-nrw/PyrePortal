@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Tauri environment
         uses: ./.github/actions/setup-tauri-environment
@@ -23,7 +23,7 @@ jobs:
         run: npm run tauri build -- --features rfid --no-bundle
 
       - name: Upload Linux ARM64 build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: pyreportal-linux-arm64-${{github.sha}}
           path: src-tauri/target/release/pyreportal
