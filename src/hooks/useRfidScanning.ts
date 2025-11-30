@@ -354,6 +354,7 @@ export const useRfidScanning = () => {
       rfid.recentTagScans,
       navigate,
       showSystemError,
+      showSupervisorRedirect,
     ]
   );
 
