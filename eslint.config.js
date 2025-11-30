@@ -1,13 +1,13 @@
 import { FlatCompat } from '@eslint/eslintrc';
-import tseslint from 'typescript-eslint';
-import globals from 'globals';
-import reactPlugin from 'eslint-plugin-react';
-import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import eslint from '@eslint/js';
+import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import a11yPlugin from 'eslint-plugin-jsx-a11y';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import securityPlugin from 'eslint-plugin-security';
-import prettierConfig from 'eslint-config-prettier';
-import eslint from '@eslint/js';
+import globals from 'globals';
+import tseslint from 'typescript-eslint';
 
 const compat = new FlatCompat({
   baseDirectory: import.meta.dirname,
@@ -112,7 +112,6 @@ export default tseslint.config(
         ...globals.es2021,
       },
       parserOptions: {
-        project: './tsconfig.json',
         projectService: true,
       },
     },
