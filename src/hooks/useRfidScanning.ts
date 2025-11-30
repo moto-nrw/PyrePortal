@@ -22,7 +22,6 @@ export const useRfidScanning = () => {
     rfid,
     authenticatedUser,
     selectedRoom,
-    selectedActivity,
     currentSession,
     startRfidScanning,
     stopRfidScanning,
@@ -306,7 +305,6 @@ export const useRfidScanning = () => {
     [
       authenticatedUser,
       selectedRoom,
-      selectedActivity,
       currentSession,
       setScanResult,
       showScanModal,

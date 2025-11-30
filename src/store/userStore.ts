@@ -20,7 +20,6 @@ import {
 } from '../services/sessionStorage';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
-import { safeInvoke } from '../utils/tauriContext';
 
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
