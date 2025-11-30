@@ -51,6 +51,28 @@ export const useRfidScanning = () => {
   const isServiceStartedRef = useRef<boolean>(false);
   const scannedSupervisorsRef = useRef<Set<number>>(new Set());
 
+  const showSupervisorRedirect = useCallback(
+    (scanId?: string, durationMs: number = rfid.modalDisplayTime) => {
+      const redirectResult: RfidScanResult = {
+        student_name: 'Betreuer erkannt',
+        student_id: null,
+        action: 'supervisor_authenticated',
+        message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
+        isInfo: true,
+      };
+      setScanResult(redirectResult);
+      showScanModal();
+      setTimeout(() => {
+        hideScanModal();
+        if (scanId) {
+          removeOptimisticScan(scanId);
+        }
+        void navigate('/home');
+      }, durationMs);
+    },
+    [hideScanModal, navigate, removeOptimisticScan, rfid.modalDisplayTime, setScanResult, showScanModal]
+  );
+
   // Helper to show system error modal
   const showSystemError = useCallback(
     (title: string, message: string) => {
@@ -104,19 +126,7 @@ export const useRfidScanning = () => {
       // Sofortiger Rückweg für bereits angemeldete Betreuer
       if (isActiveSupervisor(tagId)) {
         logger.info('Aktiver Betreuer-Tag erkannt, leite sofort um', { tagId });
-        const infoResult: RfidScanResult = {
-          student_name: 'Betreuer erkannt',
-          student_id: null,
-          action: 'supervisor_authenticated',
-          message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
-          isInfo: true,
-        };
-        setScanResult(infoResult);
-        showScanModal();
-        setTimeout(() => {
-          hideScanModal();
-          void navigate('/home');
-        }, 900);
+        showSupervisorRedirect(undefined, 900);
         return;
       }
 
@@ -235,18 +245,7 @@ export const useRfidScanning = () => {
 
             // Nur zwei Varianten: Redirect oder Hinzufügen
             if (isRepeatSupervisor) {
-              const redirectResult: RfidScanResult = {
-                ...result,
-                student_name: 'Betreuer erkannt',
-                message: 'Betreuer wird zum Hauptbildschirm weitergeleitet.',
-              };
-              setScanResult(redirectResult);
-              showScanModal();
-              setTimeout(() => {
-                hideScanModal();
-                removeOptimisticScan(scanId);
-                void navigate('/home');
-              }, rfid.modalDisplayTime);
+              showSupervisorRedirect(scanId);
               return;
             }
 
