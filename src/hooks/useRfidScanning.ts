@@ -70,7 +70,14 @@ export const useRfidScanning = () => {
         void navigate('/home');
       }, durationMs);
     },
-    [hideScanModal, navigate, removeOptimisticScan, rfid.modalDisplayTime, setScanResult, showScanModal]
+    [
+      hideScanModal,
+      navigate,
+      removeOptimisticScan,
+      rfid.modalDisplayTime,
+      setScanResult,
+      showScanModal,
+    ]
   );
 
   // Helper to show system error modal
@@ -205,7 +212,8 @@ export const useRfidScanning = () => {
           if (staffId !== null) {
             const alreadySelected = addSupervisorFromRfid(staffId, staffName); // true if existed
             const wasSeenThisSession = scannedSupervisorsRef.current.has(staffId);
-            const isRepeatSupervisor = alreadySelected || wasSeenThisSession || isActiveSupervisor(tagId);
+            const isRepeatSupervisor =
+              alreadySelected || wasSeenThisSession || isActiveSupervisor(tagId);
 
             // Track in-memory and mark tag active for fast return
             scannedSupervisorsRef.current.add(staffId);
