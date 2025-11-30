@@ -109,8 +109,19 @@ export const useRfidScanning = () => {
       // Sofortiger Rückweg für bereits angemeldete Betreuer
       if (isActiveSupervisor(tagId)) {
         logger.info('Aktiver Betreuer-Tag erkannt, leite sofort um', { tagId });
-        hideScanModal();
-        void navigate('/home');
+        const infoResult: RfidScanResult = {
+          student_name: 'Betreuer erkannt',
+          student_id: null,
+          action: 'info',
+          message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
+          isInfo: true,
+        };
+        setScanResult(infoResult);
+        showScanModal();
+        setTimeout(() => {
+          hideScanModal();
+          void navigate('/home');
+        }, 900);
         return;
       }
 
