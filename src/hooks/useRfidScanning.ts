@@ -49,6 +49,7 @@ export const useRfidScanning = () => {
 
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
+  const scannedSupervisorsRef = useRef<Set<number>>(new Set());
 
   // Helper to show system error modal
   const showSystemError = useCallback(
