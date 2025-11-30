@@ -22,26 +22,27 @@ const logger = createLogger('ActivityScanningPage');
  */
 const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
 
-// Button style constants for consistent styling
+// Button style constants for consistent styling (matching Check In/Check Out modal patterns)
 const FEEDBACK_BUTTON_STYLES = {
   base: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     border: '3px solid rgba(255, 255, 255, 0.5)',
-    borderRadius: '24px',
+    borderRadius: '20px',
     color: '#FFFFFF',
-    fontSize: '80px',
-    padding: '32px 48px',
+    padding: '24px 32px',
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center' as const,
-    gap: '16px',
+    justifyContent: 'center' as const,
+    gap: '12px',
+    minWidth: '140px',
   },
   hover: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
-    transform: 'scale(1.1)',
+    transform: 'scale(1.05)',
   },
   normal: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
@@ -969,29 +970,35 @@ const ActivityScanningPage: React.FC = () => {
 
             {/* Content area for message or button */}
             {showFeedbackPrompt ? (
-              // Feedback prompt UI
+              // Feedback prompt UI - styled to match Check In/Check Out modals
               <div
                 style={{
                   position: 'relative',
                   zIndex: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                 }}
               >
+                {/* Student name subtitle - matching other modal styles */}
                 <div
                   style={{
-                    fontSize: '32px',
+                    fontSize: '28px',
                     color: 'rgba(255, 255, 255, 0.95)',
                     fontWeight: 600,
-                    marginBottom: '32px',
+                    marginBottom: '40px',
                   }}
                 >
                   {dailyCheckoutState?.studentName}
                 </div>
 
+                {/* Feedback buttons container - centered with consistent spacing */}
                 <div
                   style={{
                     display: 'flex',
-                    gap: '32px',
+                    gap: '24px',
                     justifyContent: 'center',
+                    flexWrap: 'wrap',
                   }}
                 >
                   {feedbackButtons.map(({ rating, icon, label }) => (
@@ -1010,8 +1017,16 @@ const ActivityScanningPage: React.FC = () => {
                         e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
                       }}
                     >
-                      <FontAwesomeIcon icon={icon} size="4x" />
-                      <span style={{ fontSize: '24px', fontWeight: 700 }}>{label}</span>
+                      {/* Icon sized appropriately within button */}
+                      <FontAwesomeIcon
+                        icon={icon}
+                        style={{
+                          fontSize: '56px',
+                          width: '64px',
+                          height: '64px',
+                        }}
+                      />
+                      <span style={{ fontSize: '20px', fontWeight: 700 }}>{label}</span>
                     </button>
                   ))}
                 </div>
