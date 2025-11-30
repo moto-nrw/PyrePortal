@@ -54,7 +54,7 @@
     "tailwindcss": "^4.1.6",
     "typescript": "~5.6.2",
     "typescript-eslint": "^8.32.1",
-    "vite": "^6.0.3"
+    "vite": "^7.2.4"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,css,md}": [
