@@ -18,31 +18,31 @@ const logger = createLogger('ActivityScanningPage');
 
 /**
  * Timeout duration (in milliseconds) for daily checkout/destination modals.
- * 15 seconds gives students enough time to read and choose (vs. shorter
- * confirmation/error dialogs) without feeling rushed on a 7" tablet.
+ * 7 seconds provides a quick flow while still giving students time to respond.
  */
-const DAILY_CHECKOUT_TIMEOUT_MS = 15000;
+const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
 
-// Button style constants for consistent styling
+// Button style constants for consistent styling (matching Check In/Check Out modal patterns)
 const FEEDBACK_BUTTON_STYLES = {
   base: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     border: '3px solid rgba(255, 255, 255, 0.5)',
-    borderRadius: '24px',
+    borderRadius: '20px',
     color: '#FFFFFF',
-    fontSize: '80px',
-    padding: '32px 48px',
+    padding: '24px 32px',
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
     display: 'flex',
     flexDirection: 'column' as const,
     alignItems: 'center' as const,
-    gap: '16px',
+    justifyContent: 'center' as const,
+    gap: '12px',
+    minWidth: '140px',
   },
   hover: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
-    transform: 'scale(1.1)',
+    transform: 'scale(1.05)',
   },
   normal: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
@@ -225,8 +225,8 @@ const ActivityScanningPage: React.FC = () => {
         logger.debug('Fetching rooms to find Schulhof');
         const rooms = await api.getRooms(authenticatedUser.pin);
 
-        // Find Schulhof room by category
-        const schulhofRoom = rooms.find(r => r.category === 'Schulhof');
+        // Find Schulhof room by name (consistent with backend name-based detection)
+        const schulhofRoom = rooms.find(r => r.name === 'Schulhof');
 
         if (schulhofRoom) {
           setSchulhofRoomId(schulhofRoom.id);
@@ -263,7 +263,10 @@ const ActivityScanningPage: React.FC = () => {
 
       if (!isError && !isInfo) {
         if (currentScan.action === 'checked_in') {
-          setStudentCount(prev => prev + 1);
+          // Don't increment for Schulhof check-in (student is leaving this room, not entering)
+          if (!(currentScan as { isSchulhof?: boolean }).isSchulhof) {
+            setStudentCount(prev => prev + 1);
+          }
         } else if (currentScan.action === 'checked_out') {
           // Find the RFID tag from recent scans
           let rfidTag = '';
@@ -970,29 +973,35 @@ const ActivityScanningPage: React.FC = () => {
 
             {/* Content area for message or button */}
             {showFeedbackPrompt ? (
-              // Feedback prompt UI
+              // Feedback prompt UI - styled to match Check In/Check Out modals
               <div
                 style={{
                   position: 'relative',
                   zIndex: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                 }}
               >
+                {/* Student name subtitle - matching other modal styles */}
                 <div
                   style={{
-                    fontSize: '32px',
+                    fontSize: '28px',
                     color: 'rgba(255, 255, 255, 0.95)',
                     fontWeight: 600,
-                    marginBottom: '32px',
+                    marginBottom: '40px',
                   }}
                 >
                   {dailyCheckoutState?.studentName}
                 </div>
 
+                {/* Feedback buttons container - centered with consistent spacing */}
                 <div
                   style={{
                     display: 'flex',
-                    gap: '32px',
+                    gap: '24px',
                     justifyContent: 'center',
+                    flexWrap: 'wrap',
                   }}
                 >
                   {feedbackButtons.map(({ rating, icon, label }) => (
@@ -1011,74 +1020,113 @@ const ActivityScanningPage: React.FC = () => {
                         e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
                       }}
                     >
-                      <FontAwesomeIcon icon={icon} size="4x" />
-                      <span style={{ fontSize: '24px', fontWeight: 700 }}>{label}</span>
+                      {/* Icon sized appropriately within button */}
+                      <FontAwesomeIcon
+                        icon={icon}
+                        style={{
+                          fontSize: '56px',
+                          width: '64px',
+                          height: '64px',
+                        }}
+                      />
+                      <span style={{ fontSize: '20px', fontWeight: 700 }}>{label}</span>
                     </button>
                   ))}
                 </div>
               </div>
             ) : dailyCheckoutState ? (
-              <>
+              <div
+                style={{
+                  position: 'relative',
+                  zIndex: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
                 {!dailyCheckoutState.showingFarewell && (
                   <>
+                    {/* Student name subtitle */}
                     <div
                       style={{
-                        fontSize: '32px',
+                        fontSize: '28px',
                         color: 'rgba(255, 255, 255, 0.95)',
                         fontWeight: 600,
-                        marginBottom: '32px',
-                        position: 'relative',
-                        zIndex: 2,
+                        marginBottom: '40px',
                       }}
                     >
                       {dailyCheckoutState.studentName}
                     </div>
 
-                    <button
-                      onClick={handleDailyCheckoutConfirm}
+                    {/* Button container for Yes/No options */}
+                    <div
                       style={{
-                        backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                        border: '2px solid rgba(255, 255, 255, 0.5)',
-                        borderRadius: '16px',
-                        color: '#FFFFFF',
-                        fontSize: '24px',
-                        fontWeight: 700,
-                        padding: '16px 48px',
-                        cursor: 'pointer',
-                        transition: 'all 200ms',
-                        position: 'relative',
-                        zIndex: 2,
-                        outline: 'none',
                         display: 'flex',
+                        flexDirection: 'column',
+                        gap: '16px',
                         alignItems: 'center',
-                        gap: '12px',
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                        e.currentTarget.style.transform = 'scale(1.05)';
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                        e.currentTarget.style.transform = 'scale(1)';
                       }}
                     >
-                      <svg
-                        width="28"
-                        height="28"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="white"
-                        strokeWidth="2.2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                      {/* Confirm button */}
+                      <button
+                        onClick={handleDailyCheckoutConfirm}
+                        style={{
+                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                          border: '3px solid rgba(255, 255, 255, 0.5)',
+                          borderRadius: '20px',
+                          color: '#FFFFFF',
+                          fontSize: '32px',
+                          fontWeight: 700,
+                          padding: '20px 64px',
+                          cursor: 'pointer',
+                          transition: 'all 200ms',
+                          outline: 'none',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                          e.currentTarget.style.transform = 'scale(1.05)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                          e.currentTarget.style.transform = 'scale(1)';
+                        }}
                       >
-                        <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                      </svg>
-                      Ja
-                    </button>
+                        Ja, nach Hause
+                      </button>
+
+                      {/* Decline button */}
+                      <button
+                        onClick={() => {
+                          setDailyCheckoutState(null);
+                          hideScanModal();
+                        }}
+                        style={{
+                          backgroundColor: 'transparent',
+                          border: '2px solid rgba(255, 255, 255, 0.4)',
+                          borderRadius: '16px',
+                          color: 'rgba(255, 255, 255, 0.9)',
+                          fontSize: '24px',
+                          fontWeight: 600,
+                          padding: '12px 48px',
+                          cursor: 'pointer',
+                          transition: 'all 200ms',
+                          outline: 'none',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                        }}
+                      >
+                        Nein
+                      </button>
+                    </div>
                   </>
                 )}
-              </>
+              </div>
             ) : (
               <div
                 style={{
