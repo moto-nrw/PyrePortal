@@ -33,6 +33,9 @@ jobs:
         run: npm run typecheck
         continue-on-error: true
 
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
         env:
