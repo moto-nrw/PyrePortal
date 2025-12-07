@@ -216,13 +216,9 @@ export function startAutoSync(intervalMs = 30000): () => void {
   });
 
   const interval = setInterval(() => {
-    void (async () => {
-      try {
-        await processSyncQueue();
-      } catch (error) {
-        logger.error('Auto sync queue processing failed', { error });
-      }
-    })();
+    processSyncQueue().catch((error: unknown) => {
+      logger.error('Auto sync queue processing failed', { error });
+    });
   }, intervalMs);
 
   // Return cleanup function
