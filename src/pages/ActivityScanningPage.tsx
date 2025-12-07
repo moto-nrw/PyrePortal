@@ -225,8 +225,8 @@ const ActivityScanningPage: React.FC = () => {
         logger.debug('Fetching rooms to find Schulhof');
         const rooms = await api.getRooms(authenticatedUser.pin);
 
-        // Find Schulhof room by category
-        const schulhofRoom = rooms.find(r => r.category === 'Schulhof');
+        // Find Schulhof room by name (consistent with backend name-based detection)
+        const schulhofRoom = rooms.find(r => r.name === 'Schulhof');
 
         if (schulhofRoom) {
           setSchulhofRoomId(schulhofRoom.id);
@@ -263,7 +263,10 @@ const ActivityScanningPage: React.FC = () => {
 
       if (!isError && !isInfo) {
         if (currentScan.action === 'checked_in') {
-          setStudentCount(prev => prev + 1);
+          // Don't increment for Schulhof check-in (student is leaving this room, not entering)
+          if (!(currentScan as { isSchulhof?: boolean }).isSchulhof) {
+            setStudentCount(prev => prev + 1);
+          }
         } else if (currentScan.action === 'checked_out') {
           // Find the RFID tag from recent scans
           let rfidTag = '';
