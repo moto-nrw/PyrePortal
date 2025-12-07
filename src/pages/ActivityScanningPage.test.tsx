@@ -407,6 +407,120 @@ describe('ActivityScanningPage', () => {
     });
   });
 
+  describe('Student Count Updates on Scan', () => {
+    it('renders check-in modal for regular check-in action', async () => {
+      mockApi.getCurrentSessionInfo.mockResolvedValue({ active_students: 5 });
+
+      const checkinScan: RfidScanResult = {
+        student_name: 'Max Mustermann',
+        student_id: 123,
+        action: 'checked_in',
+        message: undefined,
+        room_name: 'Test Room',
+        previous_room: undefined,
+      };
+
+      mockUseRfidScanning.mockReturnValue(
+        createMockRfidHookState({
+          showModal: true,
+          currentScan: checkinScan,
+        })
+      );
+
+      renderActivityScanningPage();
+
+      // Verify the check-in modal renders with greeting
+      await waitFor(() => {
+        expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
+      });
+    });
+
+    it('renders check-in modal for Schulhof check-in with isSchulhof flag', async () => {
+      mockApi.getCurrentSessionInfo.mockResolvedValue({ active_students: 5 });
+
+      // Schulhof check-in has isSchulhof: true - student is LEAVING this room
+      const schulhofCheckinScan = {
+        student_name: 'Max Mustermann',
+        student_id: 123,
+        action: 'checked_in' as const,
+        message: undefined,
+        room_name: 'Schulhof',
+        previous_room: 'Test Room',
+        isSchulhof: true, // This flag prevents count increment
+      };
+
+      mockUseRfidScanning.mockReturnValue(
+        createMockRfidHookState({
+          showModal: true,
+          currentScan: schulhofCheckinScan,
+        })
+      );
+
+      renderActivityScanningPage();
+
+      // Verify greeting shows for Schulhof check-in
+      await waitFor(() => {
+        expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
+      });
+
+      // Initial count should be displayed (from session info)
+      expect(screen.getByText('5')).toBeInTheDocument();
+    });
+
+    it('does not render greeting for error scans', async () => {
+      mockApi.getCurrentSessionInfo.mockResolvedValue({ active_students: 5 });
+
+      const errorScan = {
+        student_name: 'Fehler',
+        student_id: null,
+        action: 'error' as const,
+        message: 'RFID nicht erkannt',
+        showAsError: true,
+      };
+
+      mockUseRfidScanning.mockReturnValue(
+        createMockRfidHookState({
+          showModal: true,
+          currentScan: errorScan,
+        })
+      );
+
+      renderActivityScanningPage();
+
+      // Error modal shows error message, not greeting
+      await waitFor(() => {
+        expect(screen.getByText('RFID nicht erkannt')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/Hallo/)).not.toBeInTheDocument();
+    });
+
+    it('renders info scan with message instead of greeting', async () => {
+      mockApi.getCurrentSessionInfo.mockResolvedValue({ active_students: 5 });
+
+      const infoScan = {
+        student_name: 'Info Student',
+        student_id: 123,
+        action: 'checked_in' as const,
+        message: 'Bereits eingecheckt',
+        isInfo: true,
+      };
+
+      mockUseRfidScanning.mockReturnValue(
+        createMockRfidHookState({
+          showModal: true,
+          currentScan: infoScan,
+        })
+      );
+
+      renderActivityScanningPage();
+
+      // Info scan shows the message as title
+      await waitFor(() => {
+        expect(screen.getByText('Bereits eingecheckt')).toBeInTheDocument();
+      });
+    });
+  });
+
   describe('Schulhof Check-in Flow', () => {
     it('shows Schulhof option in destination modal when Schulhof room exists', async () => {
       const roomsWithSchulhof: Room[] = [
@@ -505,6 +619,42 @@ describe('ActivityScanningPage', () => {
       expect(screen.getByText('Max Mustermann')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Ja, nach Hause/i })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Nein/i })).toBeInTheDocument();
+    });
+
+    it('Nein button is accessible and styled correctly in daily checkout modal', async () => {
+      const dailyCheckoutScan = {
+        student_name: 'Max Mustermann',
+        student_id: 123,
+        action: 'checked_out_daily' as const,
+        message: undefined,
+        room_name: 'Test Room',
+        previous_room: undefined,
+      };
+
+      const storeState = createMockStoreState();
+      storeState.rfid.recentTagScans = new Map([['ABC123', { result: { student_id: 123 } }]]);
+
+      mockUseUserStore.mockImplementation((selector?: (state: unknown) => unknown) => {
+        return selector ? selector(storeState) : storeState;
+      });
+
+      mockUseRfidScanning.mockReturnValue(
+        createMockRfidHookState({
+          showModal: true,
+          currentScan: dailyCheckoutScan,
+        })
+      );
+
+      renderActivityScanningPage();
+
+      await waitFor(() => {
+        expect(screen.getByText('Gehst du nach Hause?')).toBeInTheDocument();
+      });
+
+      // Verify Nein button exists and has correct text
+      const neinButton = screen.getByRole('button', { name: /Nein/i });
+      expect(neinButton).toBeInTheDocument();
+      expect(neinButton).toHaveStyle({ cursor: 'pointer' });
     });
   });
 
