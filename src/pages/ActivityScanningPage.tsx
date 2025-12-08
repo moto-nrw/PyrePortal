@@ -1,4 +1,4 @@
-import { faFaceSmile, faFaceMeh, faFaceFrown } from '@fortawesome/free-solid-svg-icons';
+import { faFaceSmile, faFaceMeh, faFaceFrown, faTree } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -53,15 +53,16 @@ const FEEDBACK_BUTTON_STYLES = {
 const DESTINATION_BUTTON_STYLES = {
   base: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    border: '2px solid rgba(255, 255, 255, 0.5)',
-    borderRadius: '16px',
+    border: '3px solid rgba(255, 255, 255, 0.5)',
+    borderRadius: '20px',
     color: '#FFFFFF',
-    fontSize: '28px',
+    fontSize: '32px',
     fontWeight: 700,
-    padding: '20px 48px',
+    padding: '32px 48px',
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
+    minWidth: '260px',
   },
   hover: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
@@ -1296,24 +1297,13 @@ const ActivityScanningPage: React.FC = () => {
                           <line x1="21" y1="12" x2="9" y2="12" />
                         </svg>
                       ) : (
-                        <svg
-                          width="48"
-                          height="48"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="white"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          <path d="M12 12a8 8 0 008 4" />
-                          <path d="M7.5 13.5a12 12 0 008.5 6.5" />
-                          <path d="M12 12a8 8 0 00-7.464 4.928" />
-                          <path d="M12.951 7.353a12 12 0 00-9.88 4.111" />
-                          <path d="M12 12a8 8 0 00-.536-8.928" />
-                          <path d="M15.549 15.147a12 12 0 001.38-10.611" />
-                        </svg>
+                        <FontAwesomeIcon
+                          icon={faTree}
+                          style={{
+                            fontSize: '48px',
+                            color: '#FFFFFF',
+                          }}
+                        />
                       )}
                       <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
                         {label}
