@@ -341,17 +341,17 @@ const ActivityScanningPage: React.FC = () => {
     }
   }, [showModal, currentScan, rfid.modalDisplayTime, dailyCheckoutState]);
 
-  // Auto-close destination modal after configured duration
+  // Auto-close checkout destination modal after configured duration
   useEffect(() => {
-    if (checkoutDestinationState) {
+    if (checkoutDestinationState && currentScan?.action === 'checked_out') {
       const timer = setTimeout(() => {
-        logger.info('Destination modal auto-dismissed after timeout');
+        logger.info('Checkout destination modal auto-dismissed after timeout');
         setCheckoutDestinationState(null);
         hideScanModal();
       }, DAILY_CHECKOUT_TIMEOUT_MS);
       return () => clearTimeout(timer);
     }
-  }, [checkoutDestinationState, hideScanModal]);
+  }, [checkoutDestinationState, currentScan?.action, hideScanModal]);
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -584,10 +584,7 @@ const ActivityScanningPage: React.FC = () => {
     setCheckoutDestinationState(null);
   };
 
-  const shouldShowCheckModal =
-    showModal &&
-    !!currentScan &&
-    !(currentScan.action === 'checked_out' && checkoutDestinationState && !dailyCheckoutState);
+  const shouldShowCheckModal = showModal && !!currentScan;
 
   return (
     <>
@@ -1128,6 +1125,105 @@ const ActivityScanningPage: React.FC = () => {
                   </>
                 )}
               </div>
+            ) : currentScan.action === 'checked_out' && checkoutDestinationState ? (
+              // Combined checkout + destination selection
+              <div
+                style={{
+                  position: 'relative',
+                  zIndex: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '24px',
+                    justifyContent: 'center',
+                    position: 'relative',
+                    zIndex: 2,
+                  }}
+                >
+                  {[
+                    { destination: 'raumwechsel' as const, label: 'Raumwechsel', condition: true },
+                    {
+                      destination: 'schulhof' as const,
+                      label: 'Schulhof',
+                      condition: Boolean(schulhofRoomId),
+                    },
+                  ]
+                    .filter(btn => btn.condition)
+                    .map(({ destination, label }) => (
+                      <button
+                        key={destination}
+                        onClick={() => handleDestinationSelect(destination)}
+                        style={{
+                          ...DESTINATION_BUTTON_STYLES.base,
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: '12px',
+                          minWidth: '220px',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.backgroundColor =
+                            DESTINATION_BUTTON_STYLES.hover.backgroundColor;
+                          e.currentTarget.style.transform =
+                            DESTINATION_BUTTON_STYLES.hover.transform;
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.backgroundColor =
+                            DESTINATION_BUTTON_STYLES.normal.backgroundColor;
+                          e.currentTarget.style.transform =
+                            DESTINATION_BUTTON_STYLES.normal.transform;
+                        }}
+                      >
+                        {destination === 'raumwechsel' ? (
+                          <svg
+                            width="48"
+                            height="48"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="2.5"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                            <polyline points="16 17 21 12 16 7" />
+                            <line x1="21" y1="12" x2="9" y2="12" />
+                          </svg>
+                        ) : (
+                          <FontAwesomeIcon
+                            icon={faChildren}
+                            style={{
+                              fontSize: '48px',
+                              color: '#FFFFFF',
+                            }}
+                          />
+                        )}
+                        <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
+                          {label}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+
+                {!schulhofRoomId && (
+                  <p
+                    style={{
+                      marginTop: '16px',
+                      fontSize: '18px',
+                      color: 'rgba(255, 255, 255, 0.7)',
+                      position: 'relative',
+                      zIndex: 2,
+                    }}
+                  >
+                    (Schulhof derzeit nicht verfügbar)
+                  </p>
+                )}
+              </div>
             ) : (
               <div
                 style={{
@@ -1160,174 +1256,6 @@ const ActivityScanningPage: React.FC = () => {
           </div>
         </div>
       )}
-
-      {/* Checkout Destination Selection Modal */}
-      {showModal &&
-        currentScan?.action === 'checked_out' &&
-        checkoutDestinationState &&
-        !dailyCheckoutState && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-            }}
-            onClick={() => {
-              // Allow clicking backdrop to dismiss (same as timeout)
-              setCheckoutDestinationState(null);
-              hideScanModal();
-            }}
-          >
-            <div
-              style={{
-                backgroundColor: '#f87C10', // Orange like checkout
-                borderRadius: '32px',
-                padding: '64px',
-                maxWidth: '800px',
-                width: '90%',
-                textAlign: 'center',
-                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-                position: 'relative',
-              }}
-              onClick={e => e.stopPropagation()} // Prevent closing when clicking inside
-            >
-              {/* Background gradient */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background:
-                    'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                  pointerEvents: 'none',
-                  borderRadius: '32px',
-                }}
-              />
-
-              <h2
-                style={{
-                  fontSize: '48px',
-                  fontWeight: 800,
-                  marginBottom: '24px',
-                  color: '#FFFFFF',
-                  lineHeight: 1.2,
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                Wohin gehst du?
-              </h2>
-
-              <p
-                style={{
-                  fontSize: '32px',
-                  color: 'rgba(255, 255, 255, 0.95)',
-                  marginBottom: '48px',
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                {checkoutDestinationState.studentName}
-              </p>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '24px',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                {[
-                  { destination: 'raumwechsel' as const, label: 'Raumwechsel', condition: true },
-                  {
-                    destination: 'schulhof' as const,
-                    label: 'Schulhof',
-                    condition: Boolean(schulhofRoomId),
-                  },
-                ]
-                  .filter(btn => btn.condition)
-                  .map(({ destination, label }) => (
-                    <button
-                      key={destination}
-                      onClick={() => handleDestinationSelect(destination)}
-                      style={{
-                        ...DESTINATION_BUTTON_STYLES.base,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '12px',
-                        minWidth: '220px',
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor =
-                          DESTINATION_BUTTON_STYLES.hover.backgroundColor;
-                        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor =
-                          DESTINATION_BUTTON_STYLES.normal.backgroundColor;
-                        e.currentTarget.style.transform =
-                          DESTINATION_BUTTON_STYLES.normal.transform;
-                      }}
-                    >
-                      {destination === 'raumwechsel' ? (
-                        <svg
-                          width="48"
-                          height="48"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="white"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                          <polyline points="16 17 21 12 16 7" />
-                          <line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                      ) : (
-                        <FontAwesomeIcon
-                          icon={faChildren}
-                          style={{
-                            fontSize: '48px',
-                            color: '#FFFFFF',
-                          }}
-                        />
-                      )}
-                      <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
-                        {label}
-                      </span>
-                    </button>
-                  ))}
-              </div>
-
-              {!schulhofRoomId && (
-                <p
-                  style={{
-                    marginTop: '16px',
-                    fontSize: '18px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  (Schulhof derzeit nicht verfügbar)
-                </p>
-              )}
-            </div>
-          </div>
-        )}
     </>
   );
 };
