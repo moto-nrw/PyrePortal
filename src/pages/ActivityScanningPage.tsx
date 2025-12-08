@@ -24,6 +24,12 @@ const logger = createLogger('ActivityScanningPage');
  */
 const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
 
+/**
+ * Timeout duration (in milliseconds) for farewell messages after actions.
+ * 2 seconds is enough to read a short goodbye message.
+ */
+const FAREWELL_TIMEOUT_MS = 2000;
+
 // Button style constants for consistent styling (matching Check In/Check Out modal patterns)
 const FEEDBACK_BUTTON_STYLES = {
   base: {
@@ -328,6 +334,10 @@ const ActivityScanningPage: React.FC = () => {
 
   // Determine modal timeout duration based on current state
   const modalTimeoutDuration = useMemo(() => {
+    // Farewell messages use shorter timeout (just showing goodbye)
+    if (dailyCheckoutState?.showingFarewell) {
+      return FAREWELL_TIMEOUT_MS;
+    }
     // Daily checkout states (confirmation, destination, feedback) use longer timeout
     if (dailyCheckoutState || checkoutDestinationState) {
       return DAILY_CHECKOUT_TIMEOUT_MS;
@@ -362,9 +372,11 @@ const ActivityScanningPage: React.FC = () => {
     duration: modalTimeoutDuration,
     isActive: showModal && !!currentScan,
     onTimeout: handleModalTimeout,
-    // Reset timer when scan changes (parallel scanning support)
-    // Use combination of student_id and action as unique key for each scan result
-    resetKey: currentScan ? `${currentScan.student_id}-${currentScan.action}` : null,
+    // Reset timer when scan changes OR modal state changes (e.g., farewell starts)
+    // This ensures the progress bar restarts when transitioning between modal states
+    resetKey: currentScan
+      ? `${currentScan.student_id}-${currentScan.action}-${dailyCheckoutState?.showingFarewell ?? false}`
+      : null,
   });
 
   // Guard clause - if data is missing, show loading or error state
@@ -430,11 +442,7 @@ const ActivityScanningPage: React.FC = () => {
       setDailyCheckoutState(null);
       setShowFeedbackPrompt(false);
       showScanModal();
-
-      // Auto-close after display time
-      setTimeout(() => {
-        hideScanModal();
-      }, rfid.modalDisplayTime);
+      // Modal will auto-close via useModalTimeout hook
     }
   };
 
@@ -453,11 +461,8 @@ const ActivityScanningPage: React.FC = () => {
     if (currentScan.student_id === null) {
       logger.warn('Cannot submit feedback: student_id is null');
       setShowFeedbackPrompt(false);
+      // Show farewell - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
       setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-      setTimeout(() => {
-        setDailyCheckoutState(null);
-        hideScanModal();
-      }, 2000);
       return;
     }
 
@@ -465,27 +470,14 @@ const ActivityScanningPage: React.FC = () => {
 
     if (success) {
       logger.info('Feedback submitted successfully', { rating });
-      setShowFeedbackPrompt(false);
-
-      // Show farewell message
-      setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-
-      // Close modal after 2 seconds
-      setTimeout(() => {
-        setDailyCheckoutState(null);
-        hideScanModal();
-      }, 2000);
     } else {
       // On error, still show farewell (don't block user from leaving)
       logger.warn('Feedback submission failed but continuing with checkout');
-      setShowFeedbackPrompt(false);
-      setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-
-      setTimeout(() => {
-        setDailyCheckoutState(null);
-        hideScanModal();
-      }, 2000);
     }
+
+    // Show farewell message - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
+    setShowFeedbackPrompt(false);
+    setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
   };
 
   // Handle checkout destination selection (Schulhof or Raumwechsel)
@@ -509,10 +501,7 @@ const ActivityScanningPage: React.FC = () => {
         setScanResult(errorResult);
         setCheckoutDestinationState(null);
         showScanModal();
-
-        setTimeout(() => {
-          hideScanModal();
-        }, rfid.modalDisplayTime);
+        // Modal will auto-close via useModalTimeout hook
         return;
       }
 
@@ -556,13 +545,9 @@ const ActivityScanningPage: React.FC = () => {
         } as RfidScanResult & { isSchulhof: boolean };
 
         setScanResult(schulhofResult);
-
+        setCheckoutDestinationState(null);
         showScanModal();
-
-        // Auto-close after display time
-        setTimeout(() => {
-          hideScanModal();
-        }, rfid.modalDisplayTime);
+        // Modal will auto-close via useModalTimeout hook
       } catch (error) {
         logger.error('Failed to check into Schulhof', { error });
 
@@ -583,18 +568,13 @@ const ActivityScanningPage: React.FC = () => {
         };
 
         setScanResult(errorResult);
-
+        setCheckoutDestinationState(null);
         showScanModal();
-
-        setTimeout(() => {
-          hideScanModal();
-        }, rfid.modalDisplayTime);
+        // Modal will auto-close via useModalTimeout hook
       }
     }
     // else: destination === 'raumwechsel'
-    // Do nothing - student will scan at destination room
-
-    // Clear destination state
+    // Clear destination state - student will scan at destination room
     setCheckoutDestinationState(null);
   };
 
