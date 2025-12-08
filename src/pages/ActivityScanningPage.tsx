@@ -352,7 +352,11 @@ const ActivityScanningPage: React.FC = () => {
       hasDailyCheckout: !!dailyCheckoutState,
       hasDestinationState: !!checkoutDestinationState,
       showingFarewell: dailyCheckoutState?.showingFarewell,
+      navigateOnClose: (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose,
     });
+
+    // Check if navigation is required after modal close
+    const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
 
     // Clean up daily checkout state if no action taken (not during farewell)
     if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
@@ -365,7 +369,13 @@ const ActivityScanningPage: React.FC = () => {
     }
 
     hideScanModal();
-  }, [dailyCheckoutState, checkoutDestinationState, hideScanModal]);
+
+    // Navigate after modal is closed if required
+    if (navigateTo) {
+      logger.info('Navigating after modal timeout', { navigateTo });
+      void navigate(navigateTo);
+    }
+  }, [dailyCheckoutState, checkoutDestinationState, hideScanModal, currentScan, navigate]);
 
   // Modal timeout hook - handles timer logic and provides animation key for progress bar
   const { animationKey: modalAnimationKey, isRunning: isModalTimerRunning } = useModalTimeout({
