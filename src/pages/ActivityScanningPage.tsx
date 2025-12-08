@@ -216,10 +216,10 @@ const ActivityScanningPage: React.FC = () => {
     // Initial fetch
     void fetchSessionInfo();
 
-    // Set up periodic updates every 30 seconds (just for sync)
+    // Set up periodic updates every 10 seconds (for multi-kiosk sync)
     const interval = setInterval(() => {
       void fetchSessionInfo();
-    }, 30000);
+    }, 10000);
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
