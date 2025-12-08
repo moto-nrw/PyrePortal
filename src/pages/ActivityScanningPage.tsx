@@ -585,9 +585,7 @@ const ActivityScanningPage: React.FC = () => {
   };
 
   const shouldShowCheckModal =
-    showModal &&
-    !!currentScan &&
-    !(currentScan.action === 'checked_out' && checkoutDestinationState && !dailyCheckoutState);
+    showModal && !!currentScan && !(currentScan.action === 'checked_out' && !dailyCheckoutState);
 
   return (
     <>
