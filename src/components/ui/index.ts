@@ -7,3 +7,4 @@ export { Modal } from './Modal';
 export { ErrorModal } from './ErrorModal';
 export { SuccessModal } from './SuccessModal';
 export { default as BackButton } from './BackButton';
+export { ModalTimeoutIndicator } from './ModalTimeoutIndicator';

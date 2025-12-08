@@ -1,5 +1,4 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 
 import { api, mapServerErrorToGerman } from '../services/api';
 import type { RfidScanResult } from '../services/api';
@@ -16,7 +15,7 @@ let mockScanInterval: ReturnType<typeof setInterval> | null = null;
 const logger = createLogger('useRfidScanning');
 
 export const useRfidScanning = () => {
-  const navigate = useNavigate();
+  // Note: Navigation is now handled by page components via navigateOnClose flag in scan result
 
   const {
     rfid,
@@ -28,7 +27,7 @@ export const useRfidScanning = () => {
     setScanResult,
     isTagBlocked,
     showScanModal,
-    hideScanModal,
+    // Note: hideScanModal removed - modal timeout now handled exclusively by page components
     // New optimistic actions
     addOptimisticScan,
     updateOptimisticScan,
@@ -52,35 +51,28 @@ export const useRfidScanning = () => {
   const scannedSupervisorsRef = useRef<Set<number>>(new Set());
 
   const showSupervisorRedirect = useCallback(
-    (scanId?: string, durationMs: number = rfid.modalDisplayTime) => {
+    (scanId?: string) => {
       const redirectResult: RfidScanResult = {
         student_name: 'Betreuer erkannt',
         student_id: null,
         action: 'supervisor_authenticated',
         message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
         isInfo: true,
-      };
+        // Flag to indicate navigation should happen on modal close
+        navigateOnClose: '/home',
+      } as RfidScanResult & { navigateOnClose: string };
       setScanResult(redirectResult);
+      if (scanId) {
+        removeOptimisticScan(scanId);
+      }
       showScanModal();
-      setTimeout(() => {
-        hideScanModal();
-        if (scanId) {
-          removeOptimisticScan(scanId);
-        }
-        void navigate('/home');
-      }, durationMs);
+      // Modal timeout and navigation handled by ActivityScanningPage via useModalTimeout
     },
-    [
-      hideScanModal,
-      navigate,
-      removeOptimisticScan,
-      rfid.modalDisplayTime,
-      setScanResult,
-      showScanModal,
-    ]
+    [removeOptimisticScan, setScanResult, showScanModal]
   );
 
   // Helper to show system error modal
+  // Note: Modal timeout handled by page component via useModalTimeout hook
   const showSystemError = useCallback(
     (title: string, message: string) => {
       const errorResult: RfidScanResult = {
@@ -92,11 +84,9 @@ export const useRfidScanning = () => {
       };
       setScanResult(errorResult);
       showScanModal();
-      setTimeout(() => {
-        hideScanModal();
-      }, rfid.modalDisplayTime);
+      // Modal timeout handled by ActivityScanningPage via useModalTimeout
     },
-    [setScanResult, showScanModal, hideScanModal, rfid.modalDisplayTime]
+    [setScanResult, showScanModal]
   );
 
   // Initialize RFID service on mount
@@ -122,18 +112,25 @@ export const useRfidScanning = () => {
     async (tagId: string) => {
       if (!authenticatedUser?.pin || !selectedRoom) {
         logger.error('Missing authentication or room selection');
-        showSystemError('Sitzung abgelaufen', 'Bitte melden Sie sich erneut an.');
-        // Navigate to home after showing error
-        setTimeout(() => {
-          void navigate('/home');
-        }, rfid.modalDisplayTime);
+        // Show error with navigation flag - page will handle timeout and navigation
+        const sessionExpiredResult: RfidScanResult = {
+          student_name: 'Sitzung abgelaufen',
+          student_id: null,
+          action: 'error',
+          message: 'Bitte melden Sie sich erneut an.',
+          showAsError: true,
+          navigateOnClose: '/home',
+        } as RfidScanResult & { navigateOnClose: string };
+        setScanResult(sessionExpiredResult);
+        showScanModal();
+        // Modal timeout and navigation handled by ActivityScanningPage via useModalTimeout
         return;
       }
 
       // Sofortiger Rückweg für bereits angemeldete Betreuer
       if (isActiveSupervisor(tagId)) {
         logger.info('Aktiver Betreuer-Tag erkannt, leite sofort um', { tagId });
-        showSupervisorRedirect(undefined, 900);
+        showSupervisorRedirect();
         return;
       }
 
@@ -149,9 +146,7 @@ export const useRfidScanning = () => {
           // Show the cached result instead of making a new API call
           setScanResult(recentScan.result);
           showScanModal();
-          setTimeout(() => {
-            hideScanModal();
-          }, rfid.modalDisplayTime);
+          // Modal timeout handled by ActivityScanningPage via useModalTimeout
         } else {
           // Just show a quick message that scan is processing
           logger.debug('Scan already in progress, please wait');
@@ -263,11 +258,9 @@ export const useRfidScanning = () => {
               message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
             };
             setScanResult(firstScanResult);
+            removeOptimisticScan(scanId);
             showScanModal();
-            setTimeout(() => {
-              hideScanModal();
-              removeOptimisticScan(scanId);
-            }, rfid.modalDisplayTime);
+            // Modal timeout handled by ActivityScanningPage via useModalTimeout
             return;
           }
         }
@@ -295,10 +288,9 @@ export const useRfidScanning = () => {
           logger.warn('Failed to update session activity', { error });
         }
 
-        setTimeout(() => {
-          hideScanModal();
-          removeOptimisticScan(scanId);
-        }, rfid.modalDisplayTime);
+        // Clean up optimistic scan immediately; modal timeout handled by ActivityScanningPage
+        removeOptimisticScan(scanId);
+        // Modal timeout handled by ActivityScanningPage via useModalTimeout
       } catch (error) {
         logger.error('Failed to process RFID scan', { error });
 
@@ -329,12 +321,10 @@ export const useRfidScanning = () => {
           setScanResult(errorResult);
         }
 
+        // Clean up optimistic scan immediately
+        removeOptimisticScan(scanId);
         showScanModal();
-
-        setTimeout(() => {
-          hideScanModal();
-          removeOptimisticScan(scanId);
-        }, rfid.modalDisplayTime);
+        // Modal timeout handled by ActivityScanningPage via useModalTimeout
       } finally {
         removeFromProcessingQueue(tagId);
       }
@@ -345,7 +335,6 @@ export const useRfidScanning = () => {
       currentSession,
       setScanResult,
       showScanModal,
-      hideScanModal,
       addOptimisticScan,
       updateOptimisticScan,
       removeOptimisticScan,
@@ -358,10 +347,7 @@ export const useRfidScanning = () => {
       addSupervisorFromRfid,
       addActiveSupervisorTag,
       isActiveSupervisor,
-      rfid.modalDisplayTime,
       rfid.recentTagScans,
-      navigate,
-      showSystemError,
       showSupervisorRedirect,
     ]
   );

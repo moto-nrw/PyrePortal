@@ -1,9 +1,11 @@
-import { faFaceSmile, faFaceMeh, faFaceFrown } from '@fortawesome/free-solid-svg-icons';
+import { faFaceSmile, faFaceMeh, faFaceFrown, faChildren } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
+import { ModalTimeoutIndicator } from '../components/ui';
+import { useModalTimeout } from '../hooks/useModalTimeout';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
@@ -21,6 +23,12 @@ const logger = createLogger('ActivityScanningPage');
  * 7 seconds provides a quick flow while still giving students time to respond.
  */
 const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
+
+/**
+ * Timeout duration (in milliseconds) for farewell messages after actions.
+ * 2 seconds is enough to read a short goodbye message.
+ */
+const FAREWELL_TIMEOUT_MS = 2000;
 
 // Button style constants for consistent styling (matching Check In/Check Out modal patterns)
 const FEEDBACK_BUTTON_STYLES = {
@@ -53,15 +61,16 @@ const FEEDBACK_BUTTON_STYLES = {
 const DESTINATION_BUTTON_STYLES = {
   base: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    border: '2px solid rgba(255, 255, 255, 0.5)',
-    borderRadius: '16px',
+    border: '3px solid rgba(255, 255, 255, 0.5)',
+    borderRadius: '20px',
     color: '#FFFFFF',
-    fontSize: '28px',
+    fontSize: '32px',
     fontWeight: 700,
-    padding: '20px 48px',
+    padding: '32px 48px',
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
+    width: '280px',
   },
   hover: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
@@ -323,34 +332,68 @@ const ActivityScanningPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
 
-  // Auto-close modal after delay
-  useEffect(() => {
-    if (showModal && currentScan) {
-      // Use 10 seconds for daily checkout, otherwise use default modal display time
-      const timeout = dailyCheckoutState ? DAILY_CHECKOUT_TIMEOUT_MS : rfid.modalDisplayTime;
-
-      const timer = setTimeout(() => {
-        // For daily checkout, clean up state if no action taken
-        if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
-          setDailyCheckoutState(null);
-        }
-        // Modal will auto-close through the hook
-      }, timeout);
-      return () => clearTimeout(timer);
+  // Determine modal timeout duration based on current state
+  const modalTimeoutDuration = useMemo(() => {
+    // Farewell messages use shorter timeout (just showing goodbye)
+    if (dailyCheckoutState?.showingFarewell) {
+      return FAREWELL_TIMEOUT_MS;
     }
-  }, [showModal, currentScan, rfid.modalDisplayTime, dailyCheckoutState]);
+    // Daily checkout states (confirmation, destination, feedback) use longer timeout
+    if (dailyCheckoutState || checkoutDestinationState) {
+      return DAILY_CHECKOUT_TIMEOUT_MS;
+    }
+    // Normal scans use configured display time
+    return rfid.modalDisplayTime;
+  }, [dailyCheckoutState, checkoutDestinationState, rfid.modalDisplayTime]);
 
-  // Auto-close destination modal after configured duration
-  useEffect(() => {
+  // Handle modal timeout - cleanup state and dismiss modal
+  const handleModalTimeout = useCallback(() => {
+    logger.debug('Modal timeout triggered', {
+      hasDailyCheckout: !!dailyCheckoutState,
+      hasDestinationState: !!checkoutDestinationState,
+      showingFarewell: dailyCheckoutState?.showingFarewell,
+      navigateOnClose: (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose,
+    });
+
+    // Check if navigation is required after modal close
+    const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
+
+    // Clean up daily checkout state if no action taken (not during farewell)
+    if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
+      setDailyCheckoutState(null);
+    }
+
+    // Clean up checkout destination state
     if (checkoutDestinationState) {
-      const timer = setTimeout(() => {
-        logger.info('Destination modal auto-dismissed after timeout');
-        setCheckoutDestinationState(null);
-        hideScanModal();
-      }, DAILY_CHECKOUT_TIMEOUT_MS);
-      return () => clearTimeout(timer);
+      setCheckoutDestinationState(null);
     }
-  }, [checkoutDestinationState, hideScanModal]);
+
+    hideScanModal();
+
+    // Navigate after modal is closed if required
+    if (navigateTo) {
+      logger.info('Navigating after modal timeout', { navigateTo });
+      // Navigation is fire-and-forget - errors are logged but don't affect modal flow
+      const result = navigate(navigateTo);
+      if (result instanceof Promise) {
+        result.catch((err: unknown) => {
+          logger.error('Navigation failed after modal timeout', { navigateTo, error: err });
+        });
+      }
+    }
+  }, [dailyCheckoutState, checkoutDestinationState, hideScanModal, currentScan, navigate]);
+
+  // Modal timeout hook - handles timer logic and provides animation key for progress bar
+  const { animationKey: modalAnimationKey, isRunning: isModalTimerRunning } = useModalTimeout({
+    duration: modalTimeoutDuration,
+    isActive: showModal && !!currentScan,
+    onTimeout: handleModalTimeout,
+    // Reset timer when scan changes OR modal state changes (e.g., farewell starts)
+    // This ensures the progress bar restarts when transitioning between modal states
+    resetKey: currentScan
+      ? `${currentScan.student_id}-${currentScan.action}-${dailyCheckoutState?.showingFarewell ?? false}`
+      : null,
+  });
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -415,11 +458,7 @@ const ActivityScanningPage: React.FC = () => {
       setDailyCheckoutState(null);
       setShowFeedbackPrompt(false);
       showScanModal();
-
-      // Auto-close after display time
-      setTimeout(() => {
-        hideScanModal();
-      }, rfid.modalDisplayTime);
+      // Modal will auto-close via useModalTimeout hook
     }
   };
 
@@ -438,11 +477,8 @@ const ActivityScanningPage: React.FC = () => {
     if (currentScan.student_id === null) {
       logger.warn('Cannot submit feedback: student_id is null');
       setShowFeedbackPrompt(false);
+      // Show farewell - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
       setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-      setTimeout(() => {
-        setDailyCheckoutState(null);
-        hideScanModal();
-      }, 2000);
       return;
     }
 
@@ -450,27 +486,14 @@ const ActivityScanningPage: React.FC = () => {
 
     if (success) {
       logger.info('Feedback submitted successfully', { rating });
-      setShowFeedbackPrompt(false);
-
-      // Show farewell message
-      setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-
-      // Close modal after 2 seconds
-      setTimeout(() => {
-        setDailyCheckoutState(null);
-        hideScanModal();
-      }, 2000);
     } else {
       // On error, still show farewell (don't block user from leaving)
       logger.warn('Feedback submission failed but continuing with checkout');
-      setShowFeedbackPrompt(false);
-      setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-
-      setTimeout(() => {
-        setDailyCheckoutState(null);
-        hideScanModal();
-      }, 2000);
     }
+
+    // Show farewell message - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
+    setShowFeedbackPrompt(false);
+    setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
   };
 
   // Handle checkout destination selection (Schulhof or Raumwechsel)
@@ -494,10 +517,7 @@ const ActivityScanningPage: React.FC = () => {
         setScanResult(errorResult);
         setCheckoutDestinationState(null);
         showScanModal();
-
-        setTimeout(() => {
-          hideScanModal();
-        }, rfid.modalDisplayTime);
+        // Modal will auto-close via useModalTimeout hook
         return;
       }
 
@@ -541,13 +561,9 @@ const ActivityScanningPage: React.FC = () => {
         } as RfidScanResult & { isSchulhof: boolean };
 
         setScanResult(schulhofResult);
-
+        setCheckoutDestinationState(null);
         showScanModal();
-
-        // Auto-close after display time
-        setTimeout(() => {
-          hideScanModal();
-        }, rfid.modalDisplayTime);
+        // Modal will auto-close via useModalTimeout hook
       } catch (error) {
         logger.error('Failed to check into Schulhof', { error });
 
@@ -568,25 +584,318 @@ const ActivityScanningPage: React.FC = () => {
         };
 
         setScanResult(errorResult);
-
+        setCheckoutDestinationState(null);
         showScanModal();
-
-        setTimeout(() => {
-          hideScanModal();
-        }, rfid.modalDisplayTime);
+        // Modal will auto-close via useModalTimeout hook
       }
     }
     // else: destination === 'raumwechsel'
-    // Do nothing - student will scan at destination room
-
-    // Clear destination state
+    // Clear destination state - student will scan at destination room
     setCheckoutDestinationState(null);
   };
 
-  const shouldShowCheckModal =
-    showModal &&
-    !!currentScan &&
-    !(currentScan.action === 'checked_out' && checkoutDestinationState && !dailyCheckoutState);
+  // Helper function to render modal content area - extracted to avoid nested ternaries
+  const renderModalContent = () => {
+    if (!currentScan) return null;
+
+    // Feedback prompt UI - styled to match Check In/Check Out modals
+    if (showFeedbackPrompt) {
+      return (
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          {/* Student name subtitle - matching other modal styles */}
+          <div
+            style={{
+              fontSize: '28px',
+              color: 'rgba(255, 255, 255, 0.95)',
+              fontWeight: 600,
+              marginBottom: '40px',
+            }}
+          >
+            {dailyCheckoutState?.studentName}
+          </div>
+
+          {/* Feedback buttons container - centered with consistent spacing */}
+          <div
+            style={{
+              display: 'flex',
+              gap: '24px',
+              justifyContent: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            {feedbackButtons.map(({ rating, icon, label }) => (
+              <button
+                key={rating}
+                onClick={() => handleFeedbackSubmit(rating)}
+                style={FEEDBACK_BUTTON_STYLES.base}
+                onMouseEnter={e => {
+                  e.currentTarget.style.backgroundColor =
+                    FEEDBACK_BUTTON_STYLES.hover.backgroundColor;
+                  e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.backgroundColor =
+                    FEEDBACK_BUTTON_STYLES.normal.backgroundColor;
+                  e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
+                }}
+              >
+                {/* Icon sized appropriately within button */}
+                <FontAwesomeIcon
+                  icon={icon}
+                  style={{
+                    fontSize: '56px',
+                    width: '64px',
+                    height: '64px',
+                  }}
+                />
+                <span style={{ fontSize: '20px', fontWeight: 700 }}>{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // Daily checkout confirmation UI
+    if (dailyCheckoutState) {
+      return (
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          {!dailyCheckoutState.showingFarewell && (
+            <>
+              {/* Student name subtitle */}
+              <div
+                style={{
+                  fontSize: '28px',
+                  color: 'rgba(255, 255, 255, 0.95)',
+                  fontWeight: 600,
+                  marginBottom: '40px',
+                }}
+              >
+                {dailyCheckoutState.studentName}
+              </div>
+
+              {/* Button container for Yes/No options */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                  alignItems: 'center',
+                }}
+              >
+                {/* Confirm button */}
+                <button
+                  onClick={handleDailyCheckoutConfirm}
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+                    border: '3px solid rgba(255, 255, 255, 0.5)',
+                    borderRadius: '20px',
+                    color: '#FFFFFF',
+                    fontSize: '32px',
+                    fontWeight: 700,
+                    padding: '20px 64px',
+                    cursor: 'pointer',
+                    transition: 'all 200ms',
+                    outline: 'none',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
+                    e.currentTarget.style.transform = 'scale(1.05)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
+                    e.currentTarget.style.transform = 'scale(1)';
+                  }}
+                >
+                  Ja, nach Hause
+                </button>
+
+                {/* Decline button */}
+                <button
+                  onClick={() => {
+                    setDailyCheckoutState(null);
+                    hideScanModal();
+                  }}
+                  style={{
+                    backgroundColor: 'transparent',
+                    border: '2px solid rgba(255, 255, 255, 0.4)',
+                    borderRadius: '16px',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    fontSize: '24px',
+                    fontWeight: 600,
+                    padding: '12px 48px',
+                    cursor: 'pointer',
+                    transition: 'all 200ms',
+                    outline: 'none',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
+                  }}
+                >
+                  Nein
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      );
+    }
+
+    // Combined checkout + destination selection
+    if (currentScan.action === 'checked_out' && checkoutDestinationState) {
+      return (
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+          }}
+        >
+          <div
+            style={{
+              display: 'flex',
+              gap: '24px',
+              justifyContent: 'center',
+              position: 'relative',
+              zIndex: 2,
+            }}
+          >
+            {[
+              { destination: 'raumwechsel' as const, label: 'Raumwechsel', condition: true },
+              {
+                destination: 'schulhof' as const,
+                label: 'Schulhof',
+                condition: Boolean(schulhofRoomId),
+              },
+            ]
+              .filter(btn => btn.condition)
+              .map(({ destination, label }) => (
+                <button
+                  key={destination}
+                  onClick={() => handleDestinationSelect(destination)}
+                  style={{
+                    ...DESTINATION_BUTTON_STYLES.base,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '12px',
+                    minWidth: '220px',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor =
+                      DESTINATION_BUTTON_STYLES.hover.backgroundColor;
+                    e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor =
+                      DESTINATION_BUTTON_STYLES.normal.backgroundColor;
+                    e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
+                  }}
+                >
+                  {destination === 'raumwechsel' ? (
+                    <svg
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                  ) : (
+                    <FontAwesomeIcon
+                      icon={faChildren}
+                      style={{
+                        fontSize: '48px',
+                        color: '#FFFFFF',
+                      }}
+                    />
+                  )}
+                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
+                    {label}
+                  </span>
+                </button>
+              ))}
+          </div>
+
+          {!schulhofRoomId && (
+            <p
+              style={{
+                marginTop: '16px',
+                fontSize: '18px',
+                color: 'rgba(255, 255, 255, 0.7)',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              (Schulhof derzeit nicht verfügbar)
+            </p>
+          )}
+        </div>
+      );
+    }
+
+    // Default message content
+    return (
+      <div
+        style={{
+          fontSize: '28px',
+          color: 'rgba(255, 255, 255, 0.95)',
+          fontWeight: 600,
+          position: 'relative',
+          zIndex: 2,
+        }}
+      >
+        {(() => {
+          // Special handling for Schulhof - no additional content needed
+          if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
+            return ''; // Empty content - title message is enough
+          }
+
+          switch (currentScan.action) {
+            case 'checked_in':
+              return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
+            case 'checked_out':
+              return 'Du bist jetzt ausgecheckt';
+            case 'transferred':
+              return 'Raumwechsel erfolgreich';
+            default:
+              return '';
+          }
+        })()}
+      </div>
+    );
+  };
+
+  const shouldShowCheckModal = showModal && !!currentScan;
 
   return (
     <>
@@ -972,372 +1281,19 @@ const ActivityScanningPage: React.FC = () => {
             </h2>
 
             {/* Content area for message or button */}
-            {showFeedbackPrompt ? (
-              // Feedback prompt UI - styled to match Check In/Check Out modals
-              <div
-                style={{
-                  position: 'relative',
-                  zIndex: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                }}
-              >
-                {/* Student name subtitle - matching other modal styles */}
-                <div
-                  style={{
-                    fontSize: '28px',
-                    color: 'rgba(255, 255, 255, 0.95)',
-                    fontWeight: 600,
-                    marginBottom: '40px',
-                  }}
-                >
-                  {dailyCheckoutState?.studentName}
-                </div>
+            {renderModalContent()}
 
-                {/* Feedback buttons container - centered with consistent spacing */}
-                <div
-                  style={{
-                    display: 'flex',
-                    gap: '24px',
-                    justifyContent: 'center',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  {feedbackButtons.map(({ rating, icon, label }) => (
-                    <button
-                      key={rating}
-                      onClick={() => handleFeedbackSubmit(rating)}
-                      style={FEEDBACK_BUTTON_STYLES.base}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor =
-                          FEEDBACK_BUTTON_STYLES.hover.backgroundColor;
-                        e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor =
-                          FEEDBACK_BUTTON_STYLES.normal.backgroundColor;
-                        e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
-                      }}
-                    >
-                      {/* Icon sized appropriately within button */}
-                      <FontAwesomeIcon
-                        icon={icon}
-                        style={{
-                          fontSize: '56px',
-                          width: '64px',
-                          height: '64px',
-                        }}
-                      />
-                      <span style={{ fontSize: '20px', fontWeight: 700 }}>{label}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : dailyCheckoutState ? (
-              <div
-                style={{
-                  position: 'relative',
-                  zIndex: 2,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                }}
-              >
-                {!dailyCheckoutState.showingFarewell && (
-                  <>
-                    {/* Student name subtitle */}
-                    <div
-                      style={{
-                        fontSize: '28px',
-                        color: 'rgba(255, 255, 255, 0.95)',
-                        fontWeight: 600,
-                        marginBottom: '40px',
-                      }}
-                    >
-                      {dailyCheckoutState.studentName}
-                    </div>
-
-                    {/* Button container for Yes/No options */}
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '16px',
-                        alignItems: 'center',
-                      }}
-                    >
-                      {/* Confirm button */}
-                      <button
-                        onClick={handleDailyCheckoutConfirm}
-                        style={{
-                          backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                          border: '3px solid rgba(255, 255, 255, 0.5)',
-                          borderRadius: '20px',
-                          color: '#FFFFFF',
-                          fontSize: '32px',
-                          fontWeight: 700,
-                          padding: '20px 64px',
-                          cursor: 'pointer',
-                          transition: 'all 200ms',
-                          outline: 'none',
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                          e.currentTarget.style.transform = 'scale(1.05)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                          e.currentTarget.style.transform = 'scale(1)';
-                        }}
-                      >
-                        Ja, nach Hause
-                      </button>
-
-                      {/* Decline button */}
-                      <button
-                        onClick={() => {
-                          setDailyCheckoutState(null);
-                          hideScanModal();
-                        }}
-                        style={{
-                          backgroundColor: 'transparent',
-                          border: '2px solid rgba(255, 255, 255, 0.4)',
-                          borderRadius: '16px',
-                          color: 'rgba(255, 255, 255, 0.9)',
-                          fontSize: '24px',
-                          fontWeight: 600,
-                          padding: '12px 48px',
-                          cursor: 'pointer',
-                          transition: 'all 200ms',
-                          outline: 'none',
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.backgroundColor = 'transparent';
-                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-                        }}
-                      >
-                        Nein
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            ) : (
-              <div
-                style={{
-                  fontSize: '28px',
-                  color: 'rgba(255, 255, 255, 0.95)',
-                  fontWeight: 600,
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                {(() => {
-                  // Special handling for Schulhof - no additional content needed
-                  if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
-                    return ''; // Empty content - title message is enough
-                  }
-
-                  switch (currentScan.action) {
-                    case 'checked_in':
-                      return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
-                    case 'checked_out':
-                      return 'Du bist jetzt ausgecheckt';
-                    case 'transferred':
-                      return 'Raumwechsel erfolgreich';
-                    default:
-                      return '';
-                  }
-                })()}
-              </div>
-            )}
+            {/* Timeout progress indicator - shows remaining time before modal auto-dismisses */}
+            <ModalTimeoutIndicator
+              key={modalAnimationKey}
+              duration={modalTimeoutDuration}
+              isActive={isModalTimerRunning}
+              position="bottom"
+              height={8}
+            />
           </div>
         </div>
       )}
-
-      {/* Checkout Destination Selection Modal */}
-      {showModal &&
-        currentScan?.action === 'checked_out' &&
-        checkoutDestinationState &&
-        !dailyCheckoutState && (
-          <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: 'rgba(0, 0, 0, 0.7)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              zIndex: 1000,
-            }}
-            onClick={() => {
-              // Allow clicking backdrop to dismiss (same as timeout)
-              setCheckoutDestinationState(null);
-              hideScanModal();
-            }}
-          >
-            <div
-              style={{
-                backgroundColor: '#f87C10', // Orange like checkout
-                borderRadius: '32px',
-                padding: '64px',
-                maxWidth: '800px',
-                width: '90%',
-                textAlign: 'center',
-                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-                position: 'relative',
-              }}
-              onClick={e => e.stopPropagation()} // Prevent closing when clicking inside
-            >
-              {/* Background gradient */}
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  background:
-                    'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                  pointerEvents: 'none',
-                  borderRadius: '32px',
-                }}
-              />
-
-              <h2
-                style={{
-                  fontSize: '48px',
-                  fontWeight: 800,
-                  marginBottom: '24px',
-                  color: '#FFFFFF',
-                  lineHeight: 1.2,
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                Wohin gehst du?
-              </h2>
-
-              <p
-                style={{
-                  fontSize: '32px',
-                  color: 'rgba(255, 255, 255, 0.95)',
-                  marginBottom: '48px',
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                {checkoutDestinationState.studentName}
-              </p>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: '24px',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  zIndex: 2,
-                }}
-              >
-                {[
-                  { destination: 'raumwechsel' as const, label: 'Raumwechsel', condition: true },
-                  {
-                    destination: 'schulhof' as const,
-                    label: 'Schulhof',
-                    condition: Boolean(schulhofRoomId),
-                  },
-                ]
-                  .filter(btn => btn.condition)
-                  .map(({ destination, label }) => (
-                    <button
-                      key={destination}
-                      onClick={() => handleDestinationSelect(destination)}
-                      style={{
-                        ...DESTINATION_BUTTON_STYLES.base,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '12px',
-                        minWidth: '220px',
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.backgroundColor =
-                          DESTINATION_BUTTON_STYLES.hover.backgroundColor;
-                        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.backgroundColor =
-                          DESTINATION_BUTTON_STYLES.normal.backgroundColor;
-                        e.currentTarget.style.transform =
-                          DESTINATION_BUTTON_STYLES.normal.transform;
-                      }}
-                    >
-                      {destination === 'raumwechsel' ? (
-                        <svg
-                          width="48"
-                          height="48"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="white"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                          <polyline points="16 17 21 12 16 7" />
-                          <line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                      ) : (
-                        <svg
-                          width="48"
-                          height="48"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="white"
-                          strokeWidth="2.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          <path d="M12 12a8 8 0 008 4" />
-                          <path d="M7.5 13.5a12 12 0 008.5 6.5" />
-                          <path d="M12 12a8 8 0 00-7.464 4.928" />
-                          <path d="M12.951 7.353a12 12 0 00-9.88 4.111" />
-                          <path d="M12 12a8 8 0 00-.536-8.928" />
-                          <path d="M15.549 15.147a12 12 0 001.38-10.611" />
-                        </svg>
-                      )}
-                      <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
-                        {label}
-                      </span>
-                    </button>
-                  ))}
-              </div>
-
-              {!schulhofRoomId && (
-                <p
-                  style={{
-                    marginTop: '16px',
-                    fontSize: '18px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  (Schulhof derzeit nicht verfügbar)
-                </p>
-              )}
-            </div>
-          </div>
-        )}
     </>
   );
 };
