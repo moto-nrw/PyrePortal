@@ -15,10 +15,56 @@ interface ApiConfig {
 }
 
 /**
+ * Structured API error response with optional details
+ * Used for rich error responses like capacity exceeded
+ */
+export interface ApiErrorResponse {
+  status: string;
+  message: string;
+  code?: string;
+  details?: {
+    room_id?: number;
+    room_name?: string;
+    current_occupancy?: number;
+    max_capacity?: number;
+  };
+}
+
+/**
+ * Custom error class that preserves structured API error data
+ */
+export class ApiError extends Error {
+  public readonly code?: string;
+  public readonly details?: ApiErrorResponse['details'];
+  public readonly statusCode: number;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    code?: string,
+    details?: ApiErrorResponse['details']
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+/**
  * Map server error messages to German user-friendly messages
  * This enables better debugging by distinguishing different error types
  */
 export function mapServerErrorToGerman(errorMessage: string): string {
+  // Room capacity exceeded (409)
+  if (
+    errorMessage.includes('capacity exceeded') ||
+    errorMessage.includes('ROOM_CAPACITY_EXCEEDED')
+  ) {
+    return 'Raum ist voll. Kein Platz mehr verfügbar.';
+  }
+
   // API-Key Fehler
   if (errorMessage.includes('invalid device API key')) {
     return 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.';
@@ -61,6 +107,31 @@ export function mapServerErrorToGerman(errorMessage: string): string {
 
   // Fallback - return original for unknown errors
   return errorMessage;
+}
+
+/**
+ * Map API errors to German user-friendly messages with rich details support
+ * Handles structured error responses (e.g., capacity errors with room details)
+ */
+export function mapApiErrorToGerman(error: unknown): string {
+  // Handle structured ApiError with details
+  if (error instanceof ApiError) {
+    // Room capacity exceeded - use details for rich message
+    if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
+      const { room_name, current_occupancy, max_capacity } = error.details;
+      if (room_name && max_capacity !== undefined) {
+        return `${room_name} ist voll (${current_occupancy ?? max_capacity}/${max_capacity} Plätze belegt).`;
+      }
+      return 'Raum ist voll. Kein Platz mehr verfügbar.';
+    }
+
+    // Fall back to message-based mapping
+    return mapServerErrorToGerman(error.message);
+  }
+
+  // Handle standard Error or string
+  const message = error instanceof Error ? error.message : String(error);
+  return mapServerErrorToGerman(message);
 }
 
 /**
@@ -249,21 +320,21 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!response.ok) {
     // Try to get error details from response body
     let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
-    let detailMessage = '';
+    let errorCode: string | undefined;
+    let errorDetails: ApiErrorResponse['details'];
+
     try {
-      const errorData = (await response.json()) as { message?: string; error?: string };
+      const errorData = (await response.json()) as ApiErrorResponse;
       if (errorData.message) {
-        detailMessage = errorData.message;
-      } else if (errorData.error) {
-        detailMessage = errorData.error;
+        errorMessage = `${errorMessage}: ${errorData.message}`;
+      } else if ((errorData as { error?: string }).error) {
+        errorMessage = `${errorMessage}: ${(errorData as { error?: string }).error}`;
       }
+      // Capture structured error data
+      errorCode = errorData.code;
+      errorDetails = errorData.details;
     } catch {
       // If JSON parsing fails, use the default error message
-    }
-
-    // Include both status code and detail message for better error handling
-    if (detailMessage) {
-      errorMessage = `${errorMessage}: ${detailMessage}`;
     }
 
     // Log failed request with timing
@@ -272,9 +343,12 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       status: response.status,
       responseTime,
       error: errorMessage,
+      errorCode,
+      errorDetails,
     });
 
-    throw new Error(errorMessage);
+    // Throw structured ApiError for rich error handling
+    throw new ApiError(errorMessage, response.status, errorCode, errorDetails);
   }
 
   // Log successful request timing for critical endpoints
