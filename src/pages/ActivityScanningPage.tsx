@@ -1,9 +1,11 @@
 import { faFaceSmile, faFaceMeh, faFaceFrown, faChildren } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
+import { ModalTimeoutIndicator } from '../components/ui';
+import { useModalTimeout } from '../hooks/useModalTimeout';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
@@ -324,34 +326,46 @@ const ActivityScanningPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
 
-  // Auto-close modal after delay
-  useEffect(() => {
-    if (showModal && currentScan) {
-      // Use 10 seconds for daily checkout, otherwise use default modal display time
-      const timeout = dailyCheckoutState ? DAILY_CHECKOUT_TIMEOUT_MS : rfid.modalDisplayTime;
-
-      const timer = setTimeout(() => {
-        // For daily checkout, clean up state if no action taken
-        if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
-          setDailyCheckoutState(null);
-        }
-        // Modal will auto-close through the hook
-      }, timeout);
-      return () => clearTimeout(timer);
+  // Determine modal timeout duration based on current state
+  const modalTimeoutDuration = useMemo(() => {
+    // Daily checkout states (confirmation, destination, feedback) use longer timeout
+    if (dailyCheckoutState || checkoutDestinationState) {
+      return DAILY_CHECKOUT_TIMEOUT_MS;
     }
-  }, [showModal, currentScan, rfid.modalDisplayTime, dailyCheckoutState]);
+    // Normal scans use configured display time
+    return rfid.modalDisplayTime;
+  }, [dailyCheckoutState, checkoutDestinationState, rfid.modalDisplayTime]);
 
-  // Auto-close checkout destination modal after configured duration
-  useEffect(() => {
-    if (checkoutDestinationState && currentScan?.action === 'checked_out') {
-      const timer = setTimeout(() => {
-        logger.info('Checkout destination modal auto-dismissed after timeout');
-        setCheckoutDestinationState(null);
-        hideScanModal();
-      }, DAILY_CHECKOUT_TIMEOUT_MS);
-      return () => clearTimeout(timer);
+  // Handle modal timeout - cleanup state and dismiss modal
+  const handleModalTimeout = useCallback(() => {
+    logger.debug('Modal timeout triggered', {
+      hasDailyCheckout: !!dailyCheckoutState,
+      hasDestinationState: !!checkoutDestinationState,
+      showingFarewell: dailyCheckoutState?.showingFarewell,
+    });
+
+    // Clean up daily checkout state if no action taken (not during farewell)
+    if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
+      setDailyCheckoutState(null);
     }
-  }, [checkoutDestinationState, currentScan?.action, hideScanModal]);
+
+    // Clean up checkout destination state
+    if (checkoutDestinationState) {
+      setCheckoutDestinationState(null);
+    }
+
+    hideScanModal();
+  }, [dailyCheckoutState, checkoutDestinationState, hideScanModal]);
+
+  // Modal timeout hook - handles timer logic and provides animation key for progress bar
+  const { animationKey: modalAnimationKey, isRunning: isModalTimerRunning } = useModalTimeout({
+    duration: modalTimeoutDuration,
+    isActive: showModal && !!currentScan,
+    onTimeout: handleModalTimeout,
+    // Reset timer when scan changes (parallel scanning support)
+    // Use combination of student_id and action as unique key for each scan result
+    resetKey: currentScan ? `${currentScan.student_id}-${currentScan.action}` : null,
+  });
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -1253,6 +1267,15 @@ const ActivityScanningPage: React.FC = () => {
                 })()}
               </div>
             )}
+
+            {/* Timeout progress indicator - shows remaining time before modal auto-dismisses */}
+            <ModalTimeoutIndicator
+              key={modalAnimationKey}
+              duration={modalTimeoutDuration}
+              isActive={isModalTimerRunning}
+              position="bottom"
+              height={8}
+            />
           </div>
         </div>
       )}
