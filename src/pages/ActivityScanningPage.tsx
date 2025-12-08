@@ -1,4 +1,4 @@
-import { faFaceSmile, faFaceMeh, faFaceFrown, faTree } from '@fortawesome/free-solid-svg-icons';
+import { faFaceSmile, faFaceMeh, faFaceFrown, faChildren } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -62,7 +62,7 @@ const DESTINATION_BUTTON_STYLES = {
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
-    minWidth: '260px',
+    width: '280px',
   },
   hover: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
@@ -1298,7 +1298,7 @@ const ActivityScanningPage: React.FC = () => {
                         </svg>
                       ) : (
                         <FontAwesomeIcon
-                          icon={faTree}
+                          icon={faChildren}
                           style={{
                             fontSize: '48px',
                             color: '#FFFFFF',
