@@ -1,6 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 
-import { api, mapServerErrorToGerman } from '../services/api';
+import { api, mapApiErrorToGerman, ApiError } from '../services/api';
 import type { RfidScanResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
@@ -310,9 +310,21 @@ export const useRfidScanning = () => {
           setScanResult(infoResult);
         } else {
           updateOptimisticScan(scanId, 'failed');
-          const userFriendlyMessage = mapServerErrorToGerman(errorMessage);
+          // Use mapApiErrorToGerman for rich error messages (e.g., capacity errors with details)
+          const userFriendlyMessage = mapApiErrorToGerman(error);
+
+          // Customize title for capacity errors
+          let errorTitle = 'Scan fehlgeschlagen';
+          if (error instanceof ApiError) {
+            if (error.code === 'ROOM_CAPACITY_EXCEEDED') {
+              errorTitle = 'Raum voll';
+            } else if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED') {
+              errorTitle = 'Aktivität voll';
+            }
+          }
+
           const errorResult: RfidScanResult = {
-            student_name: 'Scan fehlgeschlagen',
+            student_name: errorTitle,
             student_id: null,
             action: 'error',
             message: userFriendlyMessage || 'Bitte erneut versuchen',

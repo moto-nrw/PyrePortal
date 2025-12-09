@@ -15,10 +15,67 @@ interface ApiConfig {
 }
 
 /**
+ * Structured API error response with optional details
+ * Used for rich error responses like capacity exceeded
+ */
+export interface ApiErrorResponse {
+  status: string;
+  message: string;
+  code?: string;
+  details?: {
+    // Room capacity fields
+    room_id?: number;
+    room_name?: string;
+    current_occupancy?: number;
+    max_capacity?: number;
+    // Activity capacity fields
+    activity_id?: number;
+    activity_name?: string;
+    current_participants?: number;
+    max_participants?: number;
+  };
+}
+
+/**
+ * Custom error class that preserves structured API error data
+ */
+export class ApiError extends Error {
+  public readonly code?: string;
+  public readonly details?: ApiErrorResponse['details'];
+  public readonly statusCode: number;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    code?: string,
+    details?: ApiErrorResponse['details']
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+/**
  * Map server error messages to German user-friendly messages
  * This enables better debugging by distinguishing different error types
  */
 export function mapServerErrorToGerman(errorMessage: string): string {
+  // Activity capacity exceeded (409)
+  if (errorMessage.includes('ACTIVITY_CAPACITY_EXCEEDED')) {
+    return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
+  }
+
+  // Room capacity exceeded (409)
+  if (
+    errorMessage.includes('capacity exceeded') ||
+    errorMessage.includes('ROOM_CAPACITY_EXCEEDED')
+  ) {
+    return 'Raum ist voll. Kein Platz mehr verfügbar.';
+  }
+
   // API-Key Fehler
   if (errorMessage.includes('invalid device API key')) {
     return 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.';
@@ -61,6 +118,66 @@ export function mapServerErrorToGerman(errorMessage: string): string {
 
   // Fallback - return original for unknown errors
   return errorMessage;
+}
+
+/** Type guard to check if value is a string or number */
+function isStringOrNumber(value: unknown): value is string | number {
+  return typeof value === 'string' || typeof value === 'number';
+}
+
+/**
+ * Format activity capacity error message from details
+ */
+function formatActivityCapacityError(details: Record<string, unknown>): string {
+  const activityName = details.activity_name;
+  const currentParticipants = details.current_participants;
+  const maxParticipants = details.max_participants;
+
+  if (isStringOrNumber(activityName) && isStringOrNumber(maxParticipants)) {
+    const current = isStringOrNumber(currentParticipants) ? currentParticipants : maxParticipants;
+    return `${activityName} ist voll (${current}/${maxParticipants} Teilnehmer).`;
+  }
+  return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
+}
+
+/**
+ * Format room capacity error message from details
+ */
+function formatRoomCapacityError(details: Record<string, unknown>): string {
+  const roomName = details.room_name;
+  const currentOccupancy = details.current_occupancy;
+  const maxCapacity = details.max_capacity;
+
+  if (isStringOrNumber(roomName) && isStringOrNumber(maxCapacity)) {
+    const current = isStringOrNumber(currentOccupancy) ? currentOccupancy : maxCapacity;
+    return `${roomName} ist voll (${current}/${maxCapacity} Plätze belegt).`;
+  }
+  return 'Raum ist voll. Kein Platz mehr verfügbar.';
+}
+
+/**
+ * Map API errors to German user-friendly messages with rich details support
+ * Handles structured error responses (e.g., capacity errors with room/activity details)
+ */
+export function mapApiErrorToGerman(error: unknown): string {
+  // Handle non-ApiError cases first
+  if (!(error instanceof ApiError)) {
+    const message = error instanceof Error ? error.message : String(error);
+    return mapServerErrorToGerman(message);
+  }
+
+  // Activity capacity exceeded
+  if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED' && error.details) {
+    return formatActivityCapacityError(error.details);
+  }
+
+  // Room capacity exceeded
+  if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
+    return formatRoomCapacityError(error.details);
+  }
+
+  // Fall back to message-based mapping
+  return mapServerErrorToGerman(error.message);
 }
 
 /**
@@ -249,21 +366,21 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   if (!response.ok) {
     // Try to get error details from response body
     let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
-    let detailMessage = '';
+    let errorCode: string | undefined;
+    let errorDetails: ApiErrorResponse['details'];
+
     try {
-      const errorData = (await response.json()) as { message?: string; error?: string };
+      const errorData = (await response.json()) as ApiErrorResponse;
       if (errorData.message) {
-        detailMessage = errorData.message;
-      } else if (errorData.error) {
-        detailMessage = errorData.error;
+        errorMessage = `${errorMessage}: ${errorData.message}`;
+      } else if ((errorData as { error?: string }).error) {
+        errorMessage = `${errorMessage}: ${(errorData as { error?: string }).error}`;
       }
+      // Capture structured error data
+      errorCode = errorData.code;
+      errorDetails = errorData.details;
     } catch {
       // If JSON parsing fails, use the default error message
-    }
-
-    // Include both status code and detail message for better error handling
-    if (detailMessage) {
-      errorMessage = `${errorMessage}: ${detailMessage}`;
     }
 
     // Log failed request with timing
@@ -272,9 +389,12 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       status: response.status,
       responseTime,
       error: errorMessage,
+      errorCode,
+      errorDetails,
     });
 
-    throw new Error(errorMessage);
+    // Throw structured ApiError for rich error handling
+    throw new ApiError(errorMessage, response.status, errorCode, errorDetails);
   }
 
   // Log successful request timing for critical endpoints
