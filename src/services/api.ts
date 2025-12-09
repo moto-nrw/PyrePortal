@@ -120,38 +120,64 @@ export function mapServerErrorToGerman(errorMessage: string): string {
   return errorMessage;
 }
 
+/** Type guard to check if value is a string or number */
+function isStringOrNumber(value: unknown): value is string | number {
+  return typeof value === 'string' || typeof value === 'number';
+}
+
+/**
+ * Format activity capacity error message from details
+ */
+function formatActivityCapacityError(details: Record<string, unknown>): string {
+  const activityName = details.activity_name;
+  const currentParticipants = details.current_participants;
+  const maxParticipants = details.max_participants;
+
+  if (isStringOrNumber(activityName) && isStringOrNumber(maxParticipants)) {
+    const current = isStringOrNumber(currentParticipants) ? currentParticipants : maxParticipants;
+    return `${activityName} ist voll (${current}/${maxParticipants} Teilnehmer).`;
+  }
+  return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
+}
+
+/**
+ * Format room capacity error message from details
+ */
+function formatRoomCapacityError(details: Record<string, unknown>): string {
+  const roomName = details.room_name;
+  const currentOccupancy = details.current_occupancy;
+  const maxCapacity = details.max_capacity;
+
+  if (isStringOrNumber(roomName) && isStringOrNumber(maxCapacity)) {
+    const current = isStringOrNumber(currentOccupancy) ? currentOccupancy : maxCapacity;
+    return `${roomName} ist voll (${current}/${maxCapacity} Plätze belegt).`;
+  }
+  return 'Raum ist voll. Kein Platz mehr verfügbar.';
+}
+
 /**
  * Map API errors to German user-friendly messages with rich details support
  * Handles structured error responses (e.g., capacity errors with room/activity details)
  */
 export function mapApiErrorToGerman(error: unknown): string {
-  // Handle structured ApiError with details
-  if (error instanceof ApiError) {
-    // Activity capacity exceeded - use details for rich message
-    if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED' && error.details) {
-      const { activity_name, current_participants, max_participants } = error.details;
-      if (activity_name && max_participants !== undefined) {
-        return `${activity_name} ist voll (${current_participants ?? max_participants}/${max_participants} Teilnehmer).`;
-      }
-      return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
-    }
-
-    // Room capacity exceeded - use details for rich message
-    if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
-      const { room_name, current_occupancy, max_capacity } = error.details;
-      if (room_name && max_capacity !== undefined) {
-        return `${room_name} ist voll (${current_occupancy ?? max_capacity}/${max_capacity} Plätze belegt).`;
-      }
-      return 'Raum ist voll. Kein Platz mehr verfügbar.';
-    }
-
-    // Fall back to message-based mapping
-    return mapServerErrorToGerman(error.message);
+  // Handle non-ApiError cases first
+  if (!(error instanceof ApiError)) {
+    const message = error instanceof Error ? error.message : String(error);
+    return mapServerErrorToGerman(message);
   }
 
-  // Handle standard Error or string
-  const message = error instanceof Error ? error.message : String(error);
-  return mapServerErrorToGerman(message);
+  // Activity capacity exceeded
+  if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED' && error.details) {
+    return formatActivityCapacityError(error.details);
+  }
+
+  // Room capacity exceeded
+  if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
+    return formatRoomCapacityError(error.details);
+  }
+
+  // Fall back to message-based mapping
+  return mapServerErrorToGerman(error.message);
 }
 
 /**
