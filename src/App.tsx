@@ -79,21 +79,20 @@ function App() {
   return (
     <ErrorBoundary>
       <RfidServiceInitializer />
-      {/* Network Status Indicator - only shown when poor/offline */}
-      {isFullyAuthenticated &&
-        (networkStatus.quality === 'poor' || networkStatus.quality === 'offline') && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '8px',
-              right: '8px',
-              zIndex: 1000,
-              pointerEvents: 'none', // Doesn't interfere with interactions
-            }}
-          >
-            <NetworkStatus status={networkStatus} size="sm" />
-          </div>
-        )}
+      {/* Network Status Indicator - shown on all pages when poor/offline */}
+      {(networkStatus.quality === 'poor' || networkStatus.quality === 'offline') && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '8px',
+            right: '8px',
+            zIndex: 1000,
+            pointerEvents: 'none', // Doesn't interfere with interactions
+          }}
+        >
+          <NetworkStatus status={networkStatus} />
+        </div>
+      )}
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">
         <BrowserRouter>
           <Routes>
