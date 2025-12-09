@@ -23,10 +23,16 @@ export interface ApiErrorResponse {
   message: string;
   code?: string;
   details?: {
+    // Room capacity fields
     room_id?: number;
     room_name?: string;
     current_occupancy?: number;
     max_capacity?: number;
+    // Activity capacity fields
+    activity_id?: number;
+    activity_name?: string;
+    current_participants?: number;
+    max_participants?: number;
   };
 }
 
@@ -57,6 +63,11 @@ export class ApiError extends Error {
  * This enables better debugging by distinguishing different error types
  */
 export function mapServerErrorToGerman(errorMessage: string): string {
+  // Activity capacity exceeded (409)
+  if (errorMessage.includes('ACTIVITY_CAPACITY_EXCEEDED')) {
+    return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
+  }
+
   // Room capacity exceeded (409)
   if (
     errorMessage.includes('capacity exceeded') ||
@@ -111,11 +122,20 @@ export function mapServerErrorToGerman(errorMessage: string): string {
 
 /**
  * Map API errors to German user-friendly messages with rich details support
- * Handles structured error responses (e.g., capacity errors with room details)
+ * Handles structured error responses (e.g., capacity errors with room/activity details)
  */
 export function mapApiErrorToGerman(error: unknown): string {
   // Handle structured ApiError with details
   if (error instanceof ApiError) {
+    // Activity capacity exceeded - use details for rich message
+    if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED' && error.details) {
+      const { activity_name, current_participants, max_participants } = error.details;
+      if (activity_name && max_participants !== undefined) {
+        return `${activity_name} ist voll (${current_participants ?? max_participants}/${max_participants} Teilnehmer).`;
+      }
+      return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
+    }
+
     // Room capacity exceeded - use details for rich message
     if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
       const { room_name, current_occupancy, max_capacity } = error.details;

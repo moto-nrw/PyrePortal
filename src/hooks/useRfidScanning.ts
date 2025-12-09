@@ -310,13 +310,18 @@ export const useRfidScanning = () => {
           setScanResult(infoResult);
         } else {
           updateOptimisticScan(scanId, 'failed');
-          // Use mapApiErrorToGerman for rich error messages (e.g., room capacity with details)
+          // Use mapApiErrorToGerman for rich error messages (e.g., capacity errors with details)
           const userFriendlyMessage = mapApiErrorToGerman(error);
 
           // Customize title for capacity errors
-          const isCapacityError =
-            error instanceof ApiError && error.code === 'ROOM_CAPACITY_EXCEEDED';
-          const errorTitle = isCapacityError ? 'Raum voll' : 'Scan fehlgeschlagen';
+          let errorTitle = 'Scan fehlgeschlagen';
+          if (error instanceof ApiError) {
+            if (error.code === 'ROOM_CAPACITY_EXCEEDED') {
+              errorTitle = 'Raum voll';
+            } else if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED') {
+              errorTitle = 'Aktivität voll';
+            }
+          }
 
           const errorResult: RfidScanResult = {
             student_name: errorTitle,
