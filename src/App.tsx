@@ -28,8 +28,9 @@ function App() {
     selectedActivity,
     setNetworkStatus,
     updateNetworkQuality,
+    networkStatus: storeNetworkStatus,
   } = useUserStore();
-  const { networkStatus } = useNetworkStatus();
+  const { networkStatus: hookNetworkStatus } = useNetworkStatus();
   const appLogger = createLogger('App');
 
   // Initialize logger with runtime config and API
@@ -56,10 +57,10 @@ function App() {
     void initApp();
   }, [appLogger]); // Include appLogger in dependency array
 
-  // Sync network status from hook to store
+  // Sync network status from hook to store (for periodic health checks)
   useEffect(() => {
-    setNetworkStatus(networkStatus);
-  }, [networkStatus, setNetworkStatus]);
+    setNetworkStatus(hookNetworkStatus);
+  }, [hookNetworkStatus, setNetworkStatus]);
 
   // Register API callback to update network status on every API call
   useEffect(() => {
@@ -92,7 +93,7 @@ function App() {
     <ErrorBoundary>
       <RfidServiceInitializer />
       {/* Network Status Indicator - shown on all pages when poor/offline */}
-      {(networkStatus.quality === 'poor' || networkStatus.quality === 'offline') && (
+      {(storeNetworkStatus.quality === 'poor' || storeNetworkStatus.quality === 'offline') && (
         <div
           style={{
             position: 'fixed',
@@ -102,7 +103,7 @@ function App() {
             pointerEvents: 'none', // Doesn't interfere with interactions
           }}
         >
-          <NetworkStatus status={networkStatus} />
+          <NetworkStatus status={storeNetworkStatus} />
         </div>
       )}
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">

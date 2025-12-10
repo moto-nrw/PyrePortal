@@ -281,15 +281,15 @@ export function setNetworkStatusCallback(callback: NetworkStatusCallback | null)
  * Report network status based on API call result
  */
 function reportNetworkStatus(responseTime: number, success: boolean): void {
-  if (!networkStatusCallback) return;
-
-  if (!success) {
-    networkStatusCallback('offline', responseTime);
-  } else if (responseTime > POOR_THRESHOLD_MS) {
-    networkStatusCallback('poor', responseTime);
-  } else {
-    networkStatusCallback('online', responseTime);
+  if (!networkStatusCallback) {
+    logger.debug('Network status callback not registered, skipping update');
+    return;
   }
+
+  const quality = !success ? 'offline' : responseTime > POOR_THRESHOLD_MS ? 'poor' : 'online';
+  logger.debug('Reporting network status', { quality, responseTime, success });
+
+  networkStatusCallback(quality, responseTime);
 }
 
 /**
