@@ -54,6 +54,7 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     color: '#EF4444',
+    animation: 'pulse-scale 2s ease-in-out infinite',
   };
 
   return (
