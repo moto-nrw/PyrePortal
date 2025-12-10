@@ -54,12 +54,12 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     color: '#EF4444',
-    animation: 'pulse-scale 2s ease-in-out infinite',
+    animation: 'pulse-scale-centered 2s ease-in-out infinite',
   };
 
   return (
     <>
-      {/* Add keyframe animation for pulsing scale */}
+      {/* Add keyframe animations for pulsing scale */}
       <style>{`
         @keyframes pulse-scale {
           0%, 100% {
@@ -67,6 +67,14 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
           }
           50% {
             transform: scale(1.15);
+          }
+        }
+        @keyframes pulse-scale-centered {
+          0%, 100% {
+            transform: translate(-50%, -50%) scale(1);
+          }
+          50% {
+            transform: translate(-50%, -50%) scale(1.15);
           }
         }
       `}</style>
