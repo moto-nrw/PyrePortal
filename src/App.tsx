@@ -14,7 +14,7 @@ import StaffSelectionPage from './pages/StaffSelectionPage';
 import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
-import { initializeApi } from './services/api';
+import { initializeApi, setNetworkStatusCallback } from './services/api';
 import { startAutoSync } from './services/syncQueue';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
@@ -22,7 +22,13 @@ import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { authenticatedUser, selectedRoom, selectedActivity, setNetworkStatus } = useUserStore();
+  const {
+    authenticatedUser,
+    selectedRoom,
+    selectedActivity,
+    setNetworkStatus,
+    updateNetworkQuality,
+  } = useUserStore();
   const { networkStatus } = useNetworkStatus();
   const appLogger = createLogger('App');
 
@@ -54,6 +60,12 @@ function App() {
   useEffect(() => {
     setNetworkStatus(networkStatus);
   }, [networkStatus, setNetworkStatus]);
+
+  // Register API callback to update network status on every API call
+  useEffect(() => {
+    setNetworkStatusCallback(updateNetworkQuality);
+    return () => setNetworkStatusCallback(null);
+  }, [updateNetworkQuality]);
 
   // Start automatic sync queue processing for offline operations
   useEffect(() => {

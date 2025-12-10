@@ -264,6 +264,34 @@ let API_BASE_URL = '';
 let DEVICE_API_KEY = '';
 let isInitialized = false;
 
+// Network status callback - set by the app to receive status updates from API calls
+type NetworkStatusCallback = (quality: 'online' | 'poor' | 'offline', responseTime: number) => void;
+let networkStatusCallback: NetworkStatusCallback | null = null;
+
+const POOR_THRESHOLD_MS = 1000;
+
+/**
+ * Register a callback to receive network status updates from API calls
+ */
+export function setNetworkStatusCallback(callback: NetworkStatusCallback | null): void {
+  networkStatusCallback = callback;
+}
+
+/**
+ * Report network status based on API call result
+ */
+function reportNetworkStatus(responseTime: number, success: boolean): void {
+  if (!networkStatusCallback) return;
+
+  if (!success) {
+    networkStatusCallback('offline', responseTime);
+  } else if (responseTime > POOR_THRESHOLD_MS) {
+    networkStatusCallback('poor', responseTime);
+  } else {
+    networkStatusCallback('online', responseTime);
+  }
+}
+
 /**
  * Initialize API configuration from Tauri backend
  */
@@ -349,6 +377,9 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       errorMessage: errorObj.message,
     });
 
+    // Report network offline
+    reportNetworkStatus(responseTime, false);
+
     // Differentiate network error types
     if (errorObj.name === 'TypeError' && errorObj.message.includes('fetch')) {
       throw new Error('Keine Netzwerkverbindung. Bitte WLAN prüfen.');
@@ -403,9 +434,12 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       endpoint,
       status: response.status,
       responseTime,
-      quality: responseTime < 1000 ? 'online' : 'poor',
+      quality: responseTime < POOR_THRESHOLD_MS ? 'online' : 'poor',
     });
   }
+
+  // Report network status on successful API call
+  reportNetworkStatus(responseTime, true);
 
   return response.json() as Promise<T>;
 }
