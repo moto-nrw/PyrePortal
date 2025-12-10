@@ -6,7 +6,7 @@ export interface NetworkStatusData {
   isOnline: boolean;
   responseTime: number;
   lastChecked: number;
-  quality: 'excellent' | 'good' | 'poor' | 'offline';
+  quality: 'online' | 'poor' | 'offline';
 }
 
 interface NetworkStatusProps {
@@ -18,8 +18,8 @@ interface NetworkStatusProps {
  * Displays in bottom-right corner with prominent red warning icon
  */
 const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
-  // Only render for poor or offline states
-  if (status.quality !== 'poor' && status.quality !== 'offline') {
+  // Only render for poor or offline states (not when online)
+  if (status.quality === 'online') {
     return null;
   }
 

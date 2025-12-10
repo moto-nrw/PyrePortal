@@ -403,7 +403,7 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       endpoint,
       status: response.status,
       responseTime,
-      quality: responseTime < 500 ? 'excellent' : responseTime < 1000 ? 'good' : 'poor',
+      quality: responseTime < 1000 ? 'online' : 'poor',
     });
   }
 
