@@ -14,7 +14,7 @@ import StaffSelectionPage from './pages/StaffSelectionPage';
 import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
-import { initializeApi, setNetworkStatusCallback } from './services/api';
+import { setNetworkStatusCallback } from './services/api';
 import { startAutoSync } from './services/syncQueue';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
@@ -33,29 +33,16 @@ function App() {
   const { networkStatus: hookNetworkStatus } = useNetworkStatus();
   const appLogger = createLogger('App');
 
-  // Initialize logger with runtime config and API
+  // Initialize logger with runtime config
   useEffect(() => {
-    const initApp = async () => {
-      // Initialize logger
-      const config = getRuntimeConfig();
-      logger.updateConfig(config);
+    const config = getRuntimeConfig();
+    logger.updateConfig(config);
 
-      // Initialize API configuration
-      try {
-        await initializeApi();
-        appLogger.info('API configuration loaded successfully');
-      } catch (error) {
-        appLogger.error('Failed to initialize API configuration', { error });
-      }
-
-      appLogger.info('Application initialized', {
-        version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
-        environment: import.meta.env.MODE,
-      });
-    };
-
-    void initApp();
-  }, [appLogger]); // Include appLogger in dependency array
+    appLogger.info('Application initialized', {
+      version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
+      environment: import.meta.env.MODE,
+    });
+  }, [appLogger]);
 
   // Sync network status from hook to store (for periodic health checks)
   useEffect(() => {
