@@ -696,11 +696,17 @@ export const api = {
   /**
    * Device health check (unauthenticated)
    * Endpoint: GET /health
+   * Note: Returns plain text "OK", not JSON, so we don't use apiCall
    */
   async healthCheck(): Promise<void> {
-    await apiCall('/health', {
+    const response = await fetch(`${API_BASE_URL}/health`, {
       method: 'GET',
     });
+
+    if (!response.ok) {
+      throw new Error(`Health check failed: ${response.status}`);
+    }
+    // Response is plain text "OK", not JSON - no parsing needed
   },
 
   /**
