@@ -25,17 +25,13 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
 
   const isOffline = status.quality === 'offline';
 
-  // Container styles with backdrop for visibility on all backgrounds
+  // Container styles - transparent, just positions the icon
   const containerStyle: React.CSSProperties = {
     position: 'relative',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     padding: '12px',
-    borderRadius: '8px',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    backdropFilter: 'blur(8px)',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.3)',
   };
 
   // Icon wrapper for stacking (offline only)
