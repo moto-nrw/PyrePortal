@@ -40,11 +40,10 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
     display: 'inline-block',
   };
 
-  // Red color with glow for both states
+  // Red color with pulse animation for both states
   const wifiIconStyle = {
     color: '#EF4444',
-    filter: 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.5))',
-    animation: 'pulse-glow 2s ease-in-out infinite',
+    animation: 'pulse-scale 2s ease-in-out infinite',
     opacity: isOffline ? 0.4 : 1, // Dimmed for offline to show it's not working
   } as const;
 
@@ -55,20 +54,18 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     color: '#EF4444',
-    filter: 'drop-shadow(0 0 8px rgba(239, 68, 68, 0.5))',
-    animation: 'pulse-glow 2s ease-in-out infinite',
   };
 
   return (
     <>
-      {/* Add keyframe animation for pulsing glow */}
+      {/* Add keyframe animation for pulsing scale */}
       <style>{`
-        @keyframes pulse-glow {
+        @keyframes pulse-scale {
           0%, 100% {
-            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.5));
+            transform: scale(1);
           }
           50% {
-            filter: drop-shadow(0 0 16px rgba(239, 68, 68, 0.8));
+            transform: scale(1.15);
           }
         }
       `}</style>
