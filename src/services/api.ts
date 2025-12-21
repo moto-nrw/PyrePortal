@@ -286,7 +286,12 @@ function reportNetworkStatus(responseTime: number, success: boolean): void {
     return;
   }
 
-  const quality = !success ? 'offline' : responseTime > POOR_THRESHOLD_MS ? 'poor' : 'online';
+  let quality: 'online' | 'poor' | 'offline';
+  if (success) {
+    quality = responseTime > POOR_THRESHOLD_MS ? 'poor' : 'online';
+  } else {
+    quality = 'offline';
+  }
   logger.debug('Reporting network status', { quality, responseTime, success });
 
   networkStatusCallback(quality, responseTime);
