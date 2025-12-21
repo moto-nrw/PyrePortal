@@ -411,10 +411,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   // Network status initial state
   networkStatus: {
-    isOnline: navigator.onLine,
+    isOnline: true,
     responseTime: 0,
     lastChecked: Date.now(),
-    quality: 'excellent' as const,
+    quality: 'online' as const,
   },
 
   // Actions

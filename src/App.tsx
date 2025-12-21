@@ -14,7 +14,7 @@ import StaffSelectionPage from './pages/StaffSelectionPage';
 import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
-import { initializeApi } from './services/api';
+import { setNetworkStatusCallback } from './services/api';
 import { startAutoSync } from './services/syncQueue';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
@@ -22,38 +22,38 @@ import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { authenticatedUser, selectedRoom, selectedActivity, setNetworkStatus } = useUserStore();
-  const { networkStatus } = useNetworkStatus();
+  const {
+    authenticatedUser,
+    selectedRoom,
+    selectedActivity,
+    setNetworkStatus,
+    updateNetworkQuality,
+    networkStatus: storeNetworkStatus,
+  } = useUserStore();
+  const { networkStatus: hookNetworkStatus } = useNetworkStatus();
   const appLogger = createLogger('App');
 
-  // Initialize logger with runtime config and API
+  // Initialize logger with runtime config
   useEffect(() => {
-    const initApp = async () => {
-      // Initialize logger
-      const config = getRuntimeConfig();
-      logger.updateConfig(config);
+    const config = getRuntimeConfig();
+    logger.updateConfig(config);
 
-      // Initialize API configuration
-      try {
-        await initializeApi();
-        appLogger.info('API configuration loaded successfully');
-      } catch (error) {
-        appLogger.error('Failed to initialize API configuration', { error });
-      }
+    appLogger.info('Application initialized', {
+      version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
+      environment: import.meta.env.MODE,
+    });
+  }, [appLogger]);
 
-      appLogger.info('Application initialized', {
-        version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
-        environment: import.meta.env.MODE,
-      });
-    };
-
-    void initApp();
-  }, [appLogger]); // Include appLogger in dependency array
-
-  // Sync network status from hook to store
+  // Sync network status from hook to store (for periodic health checks)
   useEffect(() => {
-    setNetworkStatus(networkStatus);
-  }, [networkStatus, setNetworkStatus]);
+    setNetworkStatus(hookNetworkStatus);
+  }, [hookNetworkStatus, setNetworkStatus]);
+
+  // Register API callback to update network status on every API call
+  useEffect(() => {
+    setNetworkStatusCallback(updateNetworkQuality);
+    return () => setNetworkStatusCallback(null);
+  }, [updateNetworkQuality]);
 
   // Start automatic sync queue processing for offline operations
   useEffect(() => {
@@ -79,21 +79,20 @@ function App() {
   return (
     <ErrorBoundary>
       <RfidServiceInitializer />
-      {/* Network Status Indicator - only shown when poor/offline */}
-      {isFullyAuthenticated &&
-        (networkStatus.quality === 'poor' || networkStatus.quality === 'offline') && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '8px',
-              right: '8px',
-              zIndex: 1000,
-              pointerEvents: 'none', // Doesn't interfere with interactions
-            }}
-          >
-            <NetworkStatus status={networkStatus} size="sm" />
-          </div>
-        )}
+      {/* Network Status Indicator - shown on all pages when poor/offline */}
+      {(storeNetworkStatus.quality === 'poor' || storeNetworkStatus.quality === 'offline') && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '8px',
+            right: '8px',
+            zIndex: 1000,
+            pointerEvents: 'none', // Doesn't interfere with interactions
+          }}
+        >
+          <NetworkStatus status={storeNetworkStatus} />
+        </div>
+      )}
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">
         <BrowserRouter>
           <Routes>
