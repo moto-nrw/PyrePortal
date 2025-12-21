@@ -454,8 +454,8 @@ export const useRfidScanning = () => {
               logger.debug(`Mock tag ${mockTagId} is blocked, skipping`);
             }
           },
-          3000 + Math.random() * 2000
-        ); // Random interval between 3-5 seconds
+          5000 + Math.random() * 5000
+        ); // Random interval between 5-10 seconds
 
         isServiceStartedRef.current = true;
         logger.info('Mock RFID scanning started');
