@@ -23,7 +23,7 @@ jobs:
         run: npm run tauri build -- --features rfid --no-bundle
 
       - name: Upload Linux ARM64 build
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: pyreportal-linux-arm64-${{github.sha}}
           path: src-tauri/target/release/pyreportal
