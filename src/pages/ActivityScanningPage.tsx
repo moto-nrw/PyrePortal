@@ -176,6 +176,33 @@ const ActivityScanningPage: React.FC = () => {
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
 
+  // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
+  // This prevents previous student's state from affecting the next scan's modal
+  useEffect(() => {
+    if (currentScan && dailyCheckoutState) {
+      // Find the current scan's RFID from recent scans
+      let currentRfid = '';
+      for (const [tag, scan] of recentTagScans.entries()) {
+        if (scan.result?.student_id === currentScan.student_id) {
+          currentRfid = tag;
+          break;
+        }
+      }
+
+      // If dailyCheckoutState exists for a DIFFERENT scan, clear it
+      if (currentRfid && dailyCheckoutState.rfid !== currentRfid) {
+        logger.debug('Clearing stale dailyCheckoutState for new scan', {
+          oldRfid: dailyCheckoutState.rfid,
+          newRfid: currentRfid,
+          oldStudentName: dailyCheckoutState.studentName,
+          newStudentName: currentScan.student_name,
+        });
+        setDailyCheckoutState(null);
+        setShowFeedbackPrompt(false);
+      }
+    }
+  }, [currentScan, dailyCheckoutState, recentTagScans]);
+
   // Start scanning when component mounts
   useEffect(() => {
     const mountTimestamp = Date.now();
@@ -373,20 +400,27 @@ const ActivityScanningPage: React.FC = () => {
       hasDailyCheckout: !!dailyCheckoutState,
       hasDestinationState: !!checkoutDestinationState,
       showingFarewell: dailyCheckoutState?.showingFarewell,
+      showFeedbackPrompt,
       navigateOnClose: (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose,
     });
 
     // Check if navigation is required after modal close
     const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
 
-    // Clean up daily checkout state if no action taken (not during farewell)
-    if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
+    // Always clear daily checkout state on timeout (Issue #129 Bug 2 fix)
+    // The timer resets when showingFarewell changes, so timeout here means display is complete
+    if (dailyCheckoutState) {
       setDailyCheckoutState(null);
     }
 
     // Clean up checkout destination state
     if (checkoutDestinationState) {
       setCheckoutDestinationState(null);
+    }
+
+    // Clear feedback prompt state to prevent orphaned state (Issue #129 Bug 2 fix)
+    if (showFeedbackPrompt) {
+      setShowFeedbackPrompt(false);
     }
 
     hideScanModal();
@@ -402,7 +436,14 @@ const ActivityScanningPage: React.FC = () => {
         });
       }
     }
-  }, [dailyCheckoutState, checkoutDestinationState, hideScanModal, currentScan, navigate]);
+  }, [
+    dailyCheckoutState,
+    checkoutDestinationState,
+    showFeedbackPrompt,
+    hideScanModal,
+    currentScan,
+    navigate,
+  ]);
 
   // Modal timeout hook - handles timer logic and provides animation key for progress bar
   const { animationKey: modalAnimationKey, isRunning: isModalTimerRunning } = useModalTimeout({
