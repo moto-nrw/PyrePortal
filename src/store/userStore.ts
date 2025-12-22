@@ -344,6 +344,9 @@ interface UserState {
 
   // Daily feedback action
   submitDailyFeedback: (studentId: number, rating: DailyFeedbackRating) => Promise<boolean>;
+
+  // Session state cleanup action
+  clearSessionState: () => void;
 }
 
 // Define the type for the Zustand set function
@@ -351,6 +354,26 @@ type SetState<T> = (partial: Partial<T> | ((state: T) => Partial<T>), replace?: 
 
 // Define the type for the Zustand get function
 type GetState<T> = () => T;
+
+// Session-scoped state that should be cleared when session ends
+// This prevents stale room/activity data from being used after session change
+const SESSION_INITIAL_STATE = {
+  selectedRoom: null as Room | null,
+  selectedActivity: null as ActivityResponse | null,
+  currentSession: null as CurrentSession | null,
+  selectedSupervisors: [] as User[],
+  activeSupervisorTags: new Set<string>(),
+};
+
+// RFID state that should be cleared on session change
+// Note: tagToStudentMap is intentionally NOT cleared - it maps RFID tags to student IDs
+// which remains useful across sessions
+const RFID_SESSION_INITIAL_STATE = {
+  recentTagScans: new Map<string, RecentTagScan>(),
+  studentHistory: new Map<string, StudentActionHistory>(),
+  processingQueue: new Set<string>(),
+  optimisticScans: [] as OptimisticScanState[],
+};
 
 // Generate a unique id for new activities
 const generateId = (): number => {
@@ -628,8 +651,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           selectedRoom: sessionRoom,
         });
       } else {
-        storeLogger.debug('No active session found for device');
-        set({ currentSession: null, activeSupervisorTags: new Set<string>() });
+        storeLogger.debug('No active session found for device, clearing session state');
+        get().clearSessionState();
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1620,6 +1643,20 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to submit daily feedback', { error: errorMessage });
       return false;
     }
+  },
+
+  // Clear all session-scoped state when session ends
+  // This prevents stale room/activity data from causing issues (Issue #129 Bug 1)
+  clearSessionState: () => {
+    storeLogger.info('Clearing session-scoped state');
+    set(state => ({
+      ...SESSION_INITIAL_STATE,
+      rfid: {
+        ...state.rfid,
+        ...RFID_SESSION_INITIAL_STATE,
+        // Preserve tagToStudentMap - useful across sessions for tag-to-student lookups
+      },
+    }));
   },
 });
 

@@ -91,7 +91,14 @@ const feedbackButtons = [
 
 const ActivityScanningPage: React.FC = () => {
   const navigate = useNavigate();
-  const { selectedActivity, selectedRoom, authenticatedUser, rfid } = useUserStore();
+  const {
+    selectedActivity,
+    selectedRoom,
+    authenticatedUser,
+    rfid,
+    currentSession,
+    fetchCurrentSession,
+  } = useUserStore();
 
   const { currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
 
@@ -130,6 +137,20 @@ const ActivityScanningPage: React.FC = () => {
       });
     }
   }, [showModal, currentScan]);
+
+  // State consistency guard - detect and fix stale room state (Issue #129 Bug 1)
+  useEffect(() => {
+    if (currentSession?.room_id && selectedRoom && selectedRoom.id !== currentSession.room_id) {
+      logger.warn('State inconsistency detected: selectedRoom does not match session', {
+        selectedRoomId: selectedRoom.id,
+        selectedRoomName: selectedRoom.name,
+        sessionRoomId: currentSession.room_id,
+        sessionRoomName: currentSession.room_name,
+      });
+      // Re-sync state from server to fix inconsistency
+      void fetchCurrentSession();
+    }
+  }, [currentSession, selectedRoom, fetchCurrentSession]);
 
   // Track student count based on check-ins
   const [studentCount, setStudentCount] = useState(0);
