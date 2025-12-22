@@ -91,7 +91,14 @@ const feedbackButtons = [
 
 const ActivityScanningPage: React.FC = () => {
   const navigate = useNavigate();
-  const { selectedActivity, selectedRoom, authenticatedUser, rfid } = useUserStore();
+  const {
+    selectedActivity,
+    selectedRoom,
+    authenticatedUser,
+    rfid,
+    currentSession,
+    fetchCurrentSession,
+  } = useUserStore();
 
   const { currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
 
@@ -131,6 +138,20 @@ const ActivityScanningPage: React.FC = () => {
     }
   }, [showModal, currentScan]);
 
+  // State consistency guard - detect and fix stale room state (Issue #129 Bug 1)
+  useEffect(() => {
+    if (currentSession?.room_id && selectedRoom && selectedRoom.id !== currentSession.room_id) {
+      logger.warn('State inconsistency detected: selectedRoom does not match session', {
+        selectedRoomId: selectedRoom.id,
+        selectedRoomName: selectedRoom.name,
+        sessionRoomId: currentSession.room_id,
+        sessionRoomName: currentSession.room_name,
+      });
+      // Re-sync state from server to fix inconsistency
+      void fetchCurrentSession();
+    }
+  }, [currentSession, selectedRoom, fetchCurrentSession]);
+
   // Track student count based on check-ins
   const [studentCount, setStudentCount] = useState(0);
   // Removed initial loading indicator (arrow removed)
@@ -154,6 +175,33 @@ const ActivityScanningPage: React.FC = () => {
 
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
+
+  // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
+  // This prevents previous student's state from affecting the next scan's modal
+  useEffect(() => {
+    if (currentScan && dailyCheckoutState) {
+      // Find the current scan's RFID from recent scans
+      let currentRfid = '';
+      for (const [tag, scan] of recentTagScans.entries()) {
+        if (scan.result?.student_id === currentScan.student_id) {
+          currentRfid = tag;
+          break;
+        }
+      }
+
+      // If dailyCheckoutState exists for a DIFFERENT scan, clear it
+      if (currentRfid && dailyCheckoutState.rfid !== currentRfid) {
+        logger.debug('Clearing stale dailyCheckoutState for new scan', {
+          oldRfid: dailyCheckoutState.rfid,
+          newRfid: currentRfid,
+          oldStudentName: dailyCheckoutState.studentName,
+          newStudentName: currentScan.student_name,
+        });
+        setDailyCheckoutState(null);
+        setShowFeedbackPrompt(false);
+      }
+    }
+  }, [currentScan, dailyCheckoutState, recentTagScans]);
 
   // Start scanning when component mounts
   useEffect(() => {
@@ -352,20 +400,27 @@ const ActivityScanningPage: React.FC = () => {
       hasDailyCheckout: !!dailyCheckoutState,
       hasDestinationState: !!checkoutDestinationState,
       showingFarewell: dailyCheckoutState?.showingFarewell,
+      showFeedbackPrompt,
       navigateOnClose: (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose,
     });
 
     // Check if navigation is required after modal close
     const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
 
-    // Clean up daily checkout state if no action taken (not during farewell)
-    if (dailyCheckoutState && !dailyCheckoutState.showingFarewell) {
+    // Always clear daily checkout state on timeout (Issue #129 Bug 2 fix)
+    // The timer resets when showingFarewell changes, so timeout here means display is complete
+    if (dailyCheckoutState) {
       setDailyCheckoutState(null);
     }
 
     // Clean up checkout destination state
     if (checkoutDestinationState) {
       setCheckoutDestinationState(null);
+    }
+
+    // Clear feedback prompt state to prevent orphaned state (Issue #129 Bug 2 fix)
+    if (showFeedbackPrompt) {
+      setShowFeedbackPrompt(false);
     }
 
     hideScanModal();
@@ -381,7 +436,14 @@ const ActivityScanningPage: React.FC = () => {
         });
       }
     }
-  }, [dailyCheckoutState, checkoutDestinationState, hideScanModal, currentScan, navigate]);
+  }, [
+    dailyCheckoutState,
+    checkoutDestinationState,
+    showFeedbackPrompt,
+    hideScanModal,
+    currentScan,
+    navigate,
+  ]);
 
   // Modal timeout hook - handles timer logic and provides animation key for progress bar
   const { animationKey: modalAnimationKey, isRunning: isModalTimerRunning } = useModalTimeout({
