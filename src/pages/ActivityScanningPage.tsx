@@ -30,11 +30,28 @@ const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
  */
 const FAREWELL_TIMEOUT_MS = 2000;
 
+// Feedback button color schemes: green (positive), yellow (neutral), red (negative)
+const FEEDBACK_BUTTON_COLORS = {
+  positive: {
+    background: 'rgba(16, 185, 129, 0.3)', // Green with transparency
+    border: 'rgba(16, 185, 129, 0.7)',
+    hoverBackground: 'rgba(16, 185, 129, 0.5)',
+  },
+  neutral: {
+    background: 'rgba(245, 158, 11, 0.3)', // Yellow/amber with transparency
+    border: 'rgba(245, 158, 11, 0.7)',
+    hoverBackground: 'rgba(245, 158, 11, 0.5)',
+  },
+  negative: {
+    background: 'rgba(239, 68, 68, 0.3)', // Red with transparency
+    border: 'rgba(239, 68, 68, 0.7)',
+    hoverBackground: 'rgba(239, 68, 68, 0.5)',
+  },
+} as const;
+
 // Button style constants for consistent styling (matching Check In/Check Out modal patterns)
 const FEEDBACK_BUTTON_STYLES = {
   base: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    border: '3px solid rgba(255, 255, 255, 0.5)',
     borderRadius: '20px',
     color: '#FFFFFF',
     padding: '24px 32px',
@@ -47,13 +64,13 @@ const FEEDBACK_BUTTON_STYLES = {
     justifyContent: 'center' as const,
     gap: '12px',
     minWidth: '140px',
+    borderWidth: '3px',
+    borderStyle: 'solid' as const,
   },
   hover: {
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
     transform: 'scale(1.05)',
   },
   normal: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     transform: 'scale(1)',
   },
 };
@@ -693,34 +710,39 @@ const ActivityScanningPage: React.FC = () => {
               flexWrap: 'wrap',
             }}
           >
-            {feedbackButtons.map(({ rating, icon, label }) => (
-              <button
-                key={rating}
-                onClick={() => handleFeedbackSubmit(rating)}
-                style={FEEDBACK_BUTTON_STYLES.base}
-                onMouseEnter={e => {
-                  e.currentTarget.style.backgroundColor =
-                    FEEDBACK_BUTTON_STYLES.hover.backgroundColor;
-                  e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.backgroundColor =
-                    FEEDBACK_BUTTON_STYLES.normal.backgroundColor;
-                  e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
-                }}
-              >
-                {/* Icon sized appropriately within button */}
-                <FontAwesomeIcon
-                  icon={icon}
+            {feedbackButtons.map(({ rating, icon, label }) => {
+              const colorScheme = FEEDBACK_BUTTON_COLORS[rating];
+              return (
+                <button
+                  key={rating}
+                  onClick={() => handleFeedbackSubmit(rating)}
                   style={{
-                    fontSize: '56px',
-                    width: '64px',
-                    height: '64px',
+                    ...FEEDBACK_BUTTON_STYLES.base,
+                    backgroundColor: colorScheme.background,
+                    borderColor: colorScheme.border,
                   }}
-                />
-                <span style={{ fontSize: '20px', fontWeight: 700 }}>{label}</span>
-              </button>
-            ))}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.backgroundColor = colorScheme.hoverBackground;
+                    e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.backgroundColor = colorScheme.background;
+                    e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
+                  }}
+                >
+                  {/* Icon sized appropriately within button */}
+                  <FontAwesomeIcon
+                    icon={icon}
+                    style={{
+                      fontSize: '56px',
+                      width: '64px',
+                      height: '64px',
+                    }}
+                  />
+                  <span style={{ fontSize: '20px', fontWeight: 700 }}>{label}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       );

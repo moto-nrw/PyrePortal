@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
+import { ContinueButton } from '../components/ui';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -674,46 +675,10 @@ function CreateActivityPage() {
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                // Match Team page spacing
                 marginTop: '24px',
               }}
             >
-              <button
-                onClick={handleContinue}
-                disabled={!selectedActivity}
-                style={{
-                  height: '56px',
-                  padding: '0 48px',
-                  fontSize: '24px',
-                  fontWeight: 600,
-                  color: '#FFFFFF',
-                  background: !selectedActivity
-                    ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                    : designSystem.gradients.greenRight,
-                  border: 'none',
-                  borderRadius: designSystem.borderRadius.full,
-                  cursor: !selectedActivity ? 'not-allowed' : 'pointer',
-                  transition: designSystem.transitions.base,
-                  outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                  boxShadow: !selectedActivity ? 'none' : designSystem.shadows.green,
-                  opacity: !selectedActivity ? 0.6 : 1,
-                }}
-                onTouchStart={e => {
-                  if (selectedActivity) {
-                    e.currentTarget.style.transform = designSystem.scales.active;
-                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                  }
-                }}
-                onTouchEnd={e => {
-                  if (selectedActivity) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = designSystem.shadows.green;
-                  }
-                }}
-              >
-                Weiter
-              </button>
+              <ContinueButton onClick={handleContinue} disabled={!selectedActivity} />
             </div>
           </>
         )}
