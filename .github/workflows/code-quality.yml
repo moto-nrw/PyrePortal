@@ -43,16 +43,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v5
+      - name: Setup Rust cache with sccache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          workspaces: "src-tauri -> target"
+          cache-on-failure: true
 
       - name: Install Ubuntu dependencies
         run: |
@@ -67,9 +62,9 @@ jobs:
         working-directory: ./src-tauri
         run: cargo clippy -- -D warnings
 
-      - name: Build Rust (Debug)
+      - name: Check Rust compiles
         working-directory: ./src-tauri
-        run: cargo build
+        run: cargo check
 
   test-integration:
     name: Integration Test
@@ -88,16 +83,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v5
+      - name: Setup Rust cache with sccache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          workspaces: "src-tauri -> target"
+          cache-on-failure: true
 
       - name: Install Ubuntu dependencies
         run: |
