@@ -53,7 +53,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <div
-      role="presentation"
+      aria-hidden="true"
       style={{
         position: 'fixed',
         top: 0,
@@ -78,6 +78,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       <div
         role="dialog"
         aria-modal="true"
+        aria-hidden="false"
         style={{
           backgroundColor: '#FFFFFF',
           borderRadius: designSystem.borderRadius.xl,
@@ -376,7 +377,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
 
   return (
     <div
-      role="presentation"
+      aria-hidden="true"
       style={{
         position: 'fixed',
         top: 0,
