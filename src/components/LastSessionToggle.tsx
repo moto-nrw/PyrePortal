@@ -37,23 +37,23 @@ export const LastSessionToggle: React.FC = () => {
           bottom: '20px',
           left: '20px',
           zIndex: 30,
-          height: '56px',
+          height: '68px',
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(12px)',
-          borderRadius: '28px',
+          borderRadius: '34px',
           boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
           border: '1px solid rgba(229, 231, 235, 0.5)',
-          padding: '0 28px',
+          padding: '0 32px',
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
+          gap: '12px',
         }}
       >
         <label
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '12px',
             cursor: hasLastSession ? 'pointer' : 'not-allowed',
             opacity: hasLastSession ? 1 : 0.5,
           }}
@@ -110,15 +110,15 @@ export const LastSessionToggle: React.FC = () => {
 
           <span
             style={{
-              fontSize: '18px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#374151',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
             }}
           >
-            <FontAwesomeIcon icon={faArrowsRotate} style={{ fontSize: '18px' }} />
+            <FontAwesomeIcon icon={faArrowsRotate} style={{ fontSize: '20px' }} />
             Letzte Sitzung
           </span>
 
