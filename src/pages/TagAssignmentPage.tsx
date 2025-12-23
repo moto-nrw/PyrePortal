@@ -358,6 +358,7 @@ function TagAssignmentPage() {
           {/* Scanner Modal Overlay */}
           {showScanner && (
             <div
+              aria-hidden="true"
               style={{
                 position: 'fixed',
                 top: 0,
@@ -369,6 +370,11 @@ function TagAssignmentPage() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 zIndex: 1000,
+              }}
+              onClick={e => {
+                if (e.target === e.currentTarget) {
+                  setShowScanner(false);
+                }
               }}
             >
               <div

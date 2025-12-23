@@ -53,8 +53,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
+      aria-hidden="true"
       style={{
         position: 'fixed',
         top: 0,
@@ -70,8 +69,16 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         WebkitBackdropFilter: 'blur(6px)',
         padding: '16px',
       }}
+      onClick={e => {
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
+      }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="false"
         style={{
           backgroundColor: '#FFFFFF',
           borderRadius: designSystem.borderRadius.xl,
@@ -370,6 +377,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
 
   return (
     <div
+      aria-hidden="true"
       style={{
         position: 'fixed',
         top: 0,
@@ -382,6 +390,11 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         justifyContent: 'center',
         zIndex: 1000,
         backdropFilter: 'blur(4px)',
+      }}
+      onClick={e => {
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
       }}
     >
       <div
