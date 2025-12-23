@@ -359,8 +359,9 @@ const ActivityScanningPage: React.FC = () => {
           });
 
           setStudentCount(prev => Math.max(0, prev - 1));
-        } else if ((currentScan.action as string) === 'checked_out_daily') {
-          // Handle daily checkout - find the RFID tag from recent scans
+        } else if (currentScan.action === 'pending_daily_checkout') {
+          // Handle pending daily checkout - find the RFID tag from recent scans
+          // NOTE: No checkout has happened yet! Server is waiting for user confirmation.
           let rfidTag = '';
 
           // Look through recent tag scans to find the one for this student
@@ -371,15 +372,15 @@ const ActivityScanningPage: React.FC = () => {
             }
           }
 
-          // Set up daily checkout state
+          // Set up daily checkout state to show confirmation modal
           setDailyCheckoutState({
             rfid: rfidTag,
             studentName: currentScan.student_name,
             showingFarewell: false,
           });
 
-          // Update student count - they're checking out of the room
-          setStudentCount(prev => Math.max(0, prev - 1));
+          // DO NOT decrement student count here - checkout hasn't happened yet!
+          // Count will be decremented after user confirms (Ja/Nein/timeout)
         } else if (currentScan.action === 'transferred') {
           // For transfers, check if student is coming to or leaving our room
           const currentRoomName = selectedRoom?.name;
@@ -412,6 +413,7 @@ const ActivityScanningPage: React.FC = () => {
   }, [dailyCheckoutState, checkoutDestinationState, rfid.modalDisplayTime]);
 
   // Handle modal timeout - cleanup state and dismiss modal
+  // For pending_daily_checkout, timeout = implicit "Nein" (room change)
   const handleModalTimeout = useCallback(() => {
     logger.debug('Modal timeout triggered', {
       hasDailyCheckout: !!dailyCheckoutState,
@@ -424,8 +426,39 @@ const ActivityScanningPage: React.FC = () => {
     // Check if navigation is required after modal close
     const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
 
-    // Always clear daily checkout state on timeout (Issue #129 Bug 2 fix)
-    // The timer resets when showingFarewell changes, so timeout here means display is complete
+    // If pending daily checkout and not showing farewell/feedback, treat timeout as "Nein" (room change)
+    // This sends the API call with destination='unterwegs'
+    if (
+      dailyCheckoutState &&
+      !dailyCheckoutState.showingFarewell &&
+      !showFeedbackPrompt &&
+      authenticatedUser?.pin
+    ) {
+      logger.info('Timeout on pending daily checkout - processing as room change', {
+        rfid: dailyCheckoutState.rfid,
+        studentName: dailyCheckoutState.studentName,
+      });
+
+      // Fire-and-forget API call for room change (destination=unterwegs)
+      void (async () => {
+        try {
+          await api.toggleAttendance(
+            authenticatedUser.pin,
+            dailyCheckoutState.rfid,
+            'confirm_daily_checkout',
+            'unterwegs'
+          );
+          logger.info('Timeout room change successful');
+          // Decrement count after successful API call
+          setStudentCount(prev => Math.max(0, prev - 1));
+        } catch (error) {
+          logger.error('Failed to process timeout room change', { error });
+          // Silently fail - modal is already closing
+        }
+      })();
+    }
+
+    // Always clear daily checkout state on timeout
     if (dailyCheckoutState) {
       setDailyCheckoutState(null);
     }
@@ -460,6 +493,7 @@ const ActivityScanningPage: React.FC = () => {
     hideScanModal,
     currentScan,
     navigate,
+    authenticatedUser?.pin,
   ]);
 
   // Modal timeout hook - handles timer logic and provides animation key for progress bar
@@ -498,25 +532,33 @@ const ActivityScanningPage: React.FC = () => {
     void navigate('/pin');
   };
 
-  // Handle daily checkout confirmation
+  // Handle daily checkout confirmation - user clicked "Ja, nach Hause"
   const handleDailyCheckoutConfirm = async () => {
     if (!dailyCheckoutState || !authenticatedUser?.pin) return;
 
     try {
-      logger.info('Processing daily checkout attendance toggle', {
+      logger.info('Processing daily checkout with destination=zuhause', {
         rfid: dailyCheckoutState.rfid,
         studentName: dailyCheckoutState.studentName,
       });
 
-      // Call attendance toggle API - use 'cancel' to log out for the day
-      await api.toggleAttendance(authenticatedUser.pin, dailyCheckoutState.rfid, 'cancel');
+      // Call attendance toggle API with confirm_daily_checkout and destination=zuhause
+      await api.toggleAttendance(
+        authenticatedUser.pin,
+        dailyCheckoutState.rfid,
+        'confirm_daily_checkout',
+        'zuhause'
+      );
 
-      logger.info('Daily checkout attendance toggle successful');
+      logger.info('Daily checkout successful - student going home');
+
+      // NOW decrement the student count (checkout just happened)
+      setStudentCount(prev => Math.max(0, prev - 1));
 
       // Show feedback prompt instead of farewell
       setShowFeedbackPrompt(true);
     } catch (error) {
-      logger.error('Failed to toggle attendance', { error });
+      logger.error('Failed to process daily checkout', { error });
 
       // Show error modal with network-aware message
       const userFriendlyError = isNetworkRelatedError(error)
@@ -536,6 +578,56 @@ const ActivityScanningPage: React.FC = () => {
       setScanResult(errorResult);
       setDailyCheckoutState(null);
       setShowFeedbackPrompt(false);
+      showScanModal();
+      // Modal will auto-close via useModalTimeout hook
+    }
+  };
+
+  // Handle daily checkout decline - user clicked "Nein" (wants room change)
+  const handleDailyCheckoutDecline = async () => {
+    if (!dailyCheckoutState || !authenticatedUser?.pin) return;
+
+    try {
+      logger.info('Processing daily checkout decline with destination=unterwegs', {
+        rfid: dailyCheckoutState.rfid,
+        studentName: dailyCheckoutState.studentName,
+      });
+
+      // Call attendance toggle API with confirm_daily_checkout and destination=unterwegs
+      await api.toggleAttendance(
+        authenticatedUser.pin,
+        dailyCheckoutState.rfid,
+        'confirm_daily_checkout',
+        'unterwegs'
+      );
+
+      logger.info('Room change checkout successful - student changing rooms');
+
+      // NOW decrement the student count (checkout just happened)
+      setStudentCount(prev => Math.max(0, prev - 1));
+
+      // Clear state and hide modal - no feedback for room changes
+      setDailyCheckoutState(null);
+      hideScanModal();
+    } catch (error) {
+      logger.error('Failed to process room change checkout', { error });
+
+      // Show error modal with network-aware message
+      const errorMessage = error instanceof Error ? error.message : 'Raumwechsel fehlgeschlagen';
+      const userFriendlyError = isNetworkRelatedError(error)
+        ? 'Netzwerkfehler beim Raumwechsel. Bitte Verbindung prüfen und erneut versuchen.'
+        : mapServerErrorToGerman(errorMessage);
+
+      const errorResult: RfidScanResult = {
+        student_name: 'Raumwechsel fehlgeschlagen',
+        student_id: null,
+        action: 'error',
+        message: `${dailyCheckoutState.studentName}: ${userFriendlyError}`,
+        showAsError: true,
+      };
+
+      setScanResult(errorResult);
+      setDailyCheckoutState(null);
       showScanModal();
       // Modal will auto-close via useModalTimeout hook
     }
@@ -810,12 +902,9 @@ const ActivityScanningPage: React.FC = () => {
                   Ja, nach Hause
                 </button>
 
-                {/* Decline button */}
+                {/* Decline button - triggers room change (destination=unterwegs) */}
                 <button
-                  onClick={() => {
-                    setDailyCheckoutState(null);
-                    hideScanModal();
-                  }}
+                  onClick={handleDailyCheckoutDecline}
                   style={{
                     backgroundColor: 'transparent',
                     border: '2px solid rgba(255, 255, 255, 0.4)',
