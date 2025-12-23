@@ -1226,11 +1226,9 @@ const ActivityScanningPage: React.FC = () => {
             zIndex: 1000,
           }}
           onClick={() => {
-            // Allow clicking backdrop to dismiss daily checkout modal (but NOT during feedback)
-            if (dailyCheckoutState && !showFeedbackPrompt) {
-              setDailyCheckoutState(null);
-              hideScanModal();
-            }
+            // Allow clicking backdrop to dismiss any scan modal
+            // Use the same logic as handleModalTimeout to ensure consistent behavior
+            handleModalTimeout();
           }}
         >
           <div

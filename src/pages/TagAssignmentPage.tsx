@@ -370,6 +370,11 @@ function TagAssignmentPage() {
                 justifyContent: 'center',
                 zIndex: 1000,
               }}
+              onClick={e => {
+                if (e.target === e.currentTarget) {
+                  setShowScanner(false);
+                }
+              }}
             >
               <div
                 style={{

@@ -70,6 +70,11 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         WebkitBackdropFilter: 'blur(6px)',
         padding: '16px',
       }}
+      onClick={e => {
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
+      }}
     >
       <div
         style={{
@@ -382,6 +387,11 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         justifyContent: 'center',
         zIndex: 1000,
         backdropFilter: 'blur(4px)',
+      }}
+      onClick={e => {
+        if (e.target === e.currentTarget) {
+          onCancel();
+        }
       }}
     >
       <div
