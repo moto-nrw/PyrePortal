@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal } from '../components/ui';
+import BackButton from '../components/ui/BackButton';
 import { api, type Student, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -319,43 +320,7 @@ function StudentSelectionPage() {
             zIndex: 10,
           }}
         >
-          <button
-            type="button"
-            onClick={handleBack}
-            style={{
-              ...designSystem.components.backButton,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              cursor: 'pointer',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-          >
-            <svg
-              width="28"
-              height="28"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#374151"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M19 12H5" />
-              <path d="M12 19l-7-7 7-7" />
-            </svg>
-            <span
-              style={{
-                fontSize: '20px',
-                fontWeight: 600,
-                color: '#374151',
-              }}
-            >
-              Zurück
-            </span>
-          </button>
+          <BackButton onClick={handleBack} />
         </div>
 
         <h1
