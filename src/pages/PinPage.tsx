@@ -252,15 +252,15 @@ function PinPage() {
           type="button"
           onClick={handleBack}
           style={{
-            height: '56px',
+            height: '68px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '10px',
-            padding: '0 28px',
+            gap: '12px',
+            padding: '0 32px',
             backgroundColor: 'rgba(255, 255, 255, 0.9)',
             border: '1px solid rgba(0, 0, 0, 0.1)',
-            borderRadius: '28px',
+            borderRadius: '34px',
             cursor: 'pointer',
             transition: 'all 200ms',
             outline: 'none',
@@ -286,8 +286,8 @@ function PinPage() {
           }}
         >
           <svg
-            width="24"
-            height="24"
+            width="28"
+            height="28"
             viewBox="0 0 24 24"
             fill="none"
             stroke="#374151"
@@ -300,7 +300,7 @@ function PinPage() {
           </svg>
           <span
             style={{
-              fontSize: '18px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#374151',
             }}
