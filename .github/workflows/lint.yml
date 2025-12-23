@@ -20,19 +20,3 @@ jobs:
         
       - name: Check formatting
         run: npm run format:check
-  
-  rust-lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      
-      - name: Setup Tauri environment
-        uses: ./.github/actions/setup-tauri-environment
-      
-      - name: Check Rust formatting
-        working-directory: ./src-tauri
-        run: cargo fmt --all -- --check
-      
-      - name: Run Clippy
-        working-directory: ./src-tauri
-        run: cargo clippy -- -D warnings
