@@ -198,19 +198,19 @@ function HomeViewPage() {
             type="button"
             onClick={handleTagAssignment}
             style={{
-              height: '56px',
+              height: '68px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
-              padding: '0 28px',
+              gap: '12px',
+              padding: '0 32px',
               backgroundColor: hasSupervisors
                 ? designSystem.glass.background
                 : 'rgba(255, 255, 255, 0.6)',
               border: hasSupervisors
                 ? '1px solid rgba(80, 128, 216, 0.2)'
                 : '1px solid rgba(156, 163, 175, 0.2)',
-              borderRadius: '28px',
+              borderRadius: '34px',
               cursor: hasSupervisors ? 'pointer' : 'not-allowed',
               transition: designSystem.transitions.base,
               outline: 'none',
@@ -243,12 +243,12 @@ function HomeViewPage() {
           >
             <FontAwesomeIcon
               icon={faWifi}
-              size="lg"
+              size="xl"
               style={{ color: hasSupervisors ? '#5080D8' : '#9CA3AF', transform: 'rotate(90deg)' }}
             />
             <span
               style={{
-                fontSize: '18px',
+                fontSize: '20px',
                 fontWeight: 600,
                 color: hasSupervisors ? '#5080D8' : '#9CA3AF',
               }}
@@ -271,15 +271,15 @@ function HomeViewPage() {
             type="button"
             onClick={handleLogout}
             style={{
-              height: '56px',
+              height: '68px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
-              padding: '0 28px',
+              gap: '12px',
+              padding: '0 32px',
               backgroundColor: designSystem.glass.background,
               border: '1px solid rgba(255, 49, 48, 0.2)',
-              borderRadius: '28px',
+              borderRadius: '34px',
               cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
@@ -304,8 +304,8 @@ function HomeViewPage() {
             }}
           >
             <svg
-              width="24"
-              height="24"
+              width="28"
+              height="28"
               viewBox="0 0 24 24"
               fill="none"
               stroke="#FF3130"
@@ -319,7 +319,7 @@ function HomeViewPage() {
             </svg>
             <span
               style={{
-                fontSize: '18px',
+                fontSize: '20px',
                 fontWeight: 600,
                 color: '#FF3130',
               }}
@@ -378,12 +378,12 @@ function HomeViewPage() {
                 style={{
                   backgroundColor: '#FFFFFF',
                   border: '2px solid #E5E7EB',
-                  borderRadius: '24px',
-                  padding: '32px',
+                  borderRadius: '28px',
+                  padding: '36px',
                   transition: 'all 300ms ease-out',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '280px',
+                  minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -402,8 +402,8 @@ function HomeViewPage() {
                 <div>
                   <div
                     style={{
-                      width: '80px',
-                      height: '80px',
+                      width: '88px',
+                      height: '88px',
                       backgroundColor: '#EFF9E5',
                       borderRadius: '50%',
                       display: 'flex',
@@ -414,14 +414,14 @@ function HomeViewPage() {
                   >
                     {currentSession ? (
                       // Play/Continue Icon
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="#83cd2d" stroke="none">
+                      <svg width="52" height="52" viewBox="0 0 24 24" fill="#83cd2d" stroke="none">
                         <path d="M8 5v14l11-7z" />
                       </svg>
                     ) : sessionSettings?.use_last_session && sessionSettings.last_session ? (
                       // Repeat/Replay Icon
                       <svg
-                        width="48"
-                        height="48"
+                        width="52"
+                        height="52"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="#83cd2d"
@@ -437,8 +437,8 @@ function HomeViewPage() {
                     ) : (
                       // Plus Icon
                       <svg
-                        width="48"
-                        height="48"
+                        width="52"
+                        height="52"
                         viewBox="0 0 24 24"
                         fill="none"
                         stroke="#83cd2d"
@@ -453,7 +453,7 @@ function HomeViewPage() {
 
                   <h3
                     style={{
-                      fontSize: '24px',
+                      fontSize: '28px',
                       fontWeight: 700,
                       color: '#1F2937',
                       margin: '0 0 8px 0',
@@ -468,7 +468,7 @@ function HomeViewPage() {
                   </h3>
                   <p
                     style={{
-                      fontSize: '16px',
+                      fontSize: '18px',
                       color: '#6B7280',
                       margin: 0,
                       textAlign: 'center',
@@ -573,13 +573,13 @@ function HomeViewPage() {
                 style={{
                   backgroundColor: '#FFFFFF',
                   border: '2px solid #E5E7EB',
-                  borderRadius: '24px',
-                  padding: '32px',
+                  borderRadius: '28px',
+                  padding: '36px',
                   cursor: 'pointer',
                   transition: 'all 300ms ease-out',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '280px',
+                  minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -596,8 +596,8 @@ function HomeViewPage() {
                 <div>
                   <div
                     style={{
-                      width: '80px',
-                      height: '80px',
+                      width: '88px',
+                      height: '88px',
                       backgroundColor: '#EDE9FE',
                       borderRadius: '50%',
                       display: 'flex',
@@ -607,8 +607,8 @@ function HomeViewPage() {
                     }}
                   >
                     <svg
-                      width="48"
-                      height="48"
+                      width="52"
+                      height="52"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="#9333EA"
@@ -623,7 +623,7 @@ function HomeViewPage() {
 
                   <h3
                     style={{
-                      fontSize: '24px',
+                      fontSize: '28px',
                       fontWeight: 700,
                       color: '#1F2937',
                       margin: '0 0 8px 0',
@@ -634,7 +634,7 @@ function HomeViewPage() {
                   </h3>
                   <p
                     style={{
-                      fontSize: '16px',
+                      fontSize: '18px',
                       color: '#6B7280',
                       margin: 0,
                       textAlign: 'center',
@@ -812,8 +812,8 @@ function HomeViewPage() {
                 onClick={() => setShowConfirmModal(false)}
                 style={{
                   flex: 1,
-                  height: '48px',
-                  fontSize: '16px',
+                  height: '56px',
+                  fontSize: '18px',
                   fontWeight: 600,
                   color: '#6B7280',
                   backgroundColor: 'transparent',
@@ -832,8 +832,8 @@ function HomeViewPage() {
                 disabled={isValidatingLastSession}
                 style={{
                   flex: 1,
-                  height: '48px',
-                  fontSize: '16px',
+                  height: '56px',
+                  fontSize: '18px',
                   fontWeight: 600,
                   color: '#FFFFFF',
                   background: isValidatingLastSession
