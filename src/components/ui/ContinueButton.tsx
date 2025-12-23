@@ -48,11 +48,11 @@ export function ContinueButton({
     alignItems: 'center',
 
     // Dimensions
-    height: '56px',
-    padding: '0 48px',
+    height: '68px',
+    padding: '0 52px',
 
     // Typography
-    fontSize: '24px',
+    fontSize: '26px',
     fontWeight: 600,
     color: '#FFFFFF',
 

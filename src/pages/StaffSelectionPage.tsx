@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ContinueButton } from '../components/ui';
+import BackButton from '../components/ui/BackButton';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
@@ -164,59 +165,7 @@ function StaffSelectionPage() {
             zIndex: 10,
           }}
         >
-          <button
-            type="button"
-            onClick={handleBack}
-            style={{
-              ...designSystem.components.backButton,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              cursor: 'pointer',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = designSystem.scales.activeSmall;
-              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-              e.currentTarget.style.boxShadow = designSystem.shadows.button;
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                }
-              }, 150);
-            }}
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#374151"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M19 12H5" />
-              <path d="M12 19l-7-7 7-7" />
-            </svg>
-            <span
-              style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: '#374151',
-              }}
-            >
-              Zurück
-            </span>
-          </button>
+          <BackButton onClick={handleBack} />
         </div>
 
         <h1

@@ -149,11 +149,11 @@ export const designSystem = {
 
     // Back button style
     backButton: {
-      height: '56px',
-      padding: '0 28px',
+      height: '68px',
+      padding: '0 32px',
       backgroundColor: 'rgba(255, 255, 255, 0.9)',
       border: '1px solid rgba(0, 0, 0, 0.1)',
-      borderRadius: '28px',
+      borderRadius: '34px',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
       boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
