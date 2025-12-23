@@ -1,3 +1,7 @@
+// FontAwesome CSS - MUST be imported explicitly for production builds
+// Without this, icons display as rectangles/empty boxes
+import '@fortawesome/fontawesome-svg-core/styles.css';
+import { config } from '@fortawesome/fontawesome-svg-core';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -5,6 +9,9 @@ import './index.css';
 import App from './App';
 import { initializeApi } from './services/api';
 import { createLogger } from './utils/logger';
+
+// Prevent FontAwesome from auto-injecting CSS (we import it manually above)
+config.autoAddCss = false;
 
 const logger = createLogger('main');
 
