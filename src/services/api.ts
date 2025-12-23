@@ -1146,19 +1146,27 @@ export const api = {
   async toggleAttendance(
     pin: string,
     rfid: string,
-    action: 'confirm' | 'cancel'
+    action: 'confirm' | 'cancel' | 'confirm_daily_checkout',
+    destination?: 'zuhause' | 'unterwegs'
   ): Promise<AttendanceToggleResponse> {
     try {
+      const body: { rfid: string; action: string; destination?: string } = {
+        rfid,
+        action,
+      };
+
+      // Add destination for confirm_daily_checkout action
+      if (action === 'confirm_daily_checkout' && destination) {
+        body.destination = destination;
+      }
+
       const response = await apiCall<AttendanceToggleResponse>('/api/iot/attendance/toggle', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
         },
-        body: JSON.stringify({
-          rfid,
-          action,
-        }),
+        body: JSON.stringify(body),
       });
 
       return response;
@@ -1248,6 +1256,7 @@ export interface RfidScanResult {
   action:
     | 'checked_in'
     | 'checked_out'
+    | 'pending_daily_checkout'
     | 'transferred'
     | 'supervisor_authenticated'
     | 'error'
@@ -1297,7 +1306,8 @@ export interface AttendanceStatusResponse {
  */
 export interface AttendanceToggleRequest {
   rfid: string;
-  action: 'confirm' | 'cancel';
+  action: 'confirm' | 'cancel' | 'confirm_daily_checkout';
+  destination?: 'zuhause' | 'unterwegs';
 }
 
 /**
