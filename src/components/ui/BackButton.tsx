@@ -48,6 +48,8 @@ interface BackButtonProps {
   icon?: 'back' | 'restart';
   /** Custom icon element - overrides the icon prop if provided */
   customIcon?: ReactNode;
+  /** Accessible label for screen readers - defaults to text prop value */
+  ariaLabel?: string;
 }
 
 /**
@@ -61,6 +63,7 @@ const BackButton: React.FC<BackButtonProps> = ({
   color = 'gray',
   icon = 'back',
   customIcon,
+  ariaLabel,
 }) => {
   const strokeColor = color === 'blue' ? '#5080d8' : '#374151';
   const textColor = color === 'blue' ? '#5080d8' : '#374151';
@@ -72,10 +75,22 @@ const BackButton: React.FC<BackButtonProps> = ({
     return <BackArrowIcon stroke={strokeColor} />;
   };
 
+  /** Reset button to default visual state after touch interaction */
+  const resetTouchStyles = (target: HTMLButtonElement) => {
+    setTimeout(() => {
+      if (target) {
+        target.style.transform = 'scale(1)';
+        target.style.backgroundColor = designSystem.glass.background;
+        target.style.boxShadow = designSystem.shadows.button;
+      }
+    }, 150);
+  };
+
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-label={ariaLabel ?? text}
       style={{
         ...designSystem.components.backButton,
         border: `1px solid ${borderColor}`,
@@ -96,13 +111,14 @@ const BackButton: React.FC<BackButtonProps> = ({
         e.currentTarget.style.boxShadow = designSystem.shadows.button;
       }}
       onTouchEnd={e => {
-        setTimeout(() => {
-          if (e.currentTarget) {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.backgroundColor = designSystem.glass.background;
-            e.currentTarget.style.boxShadow = designSystem.shadows.button;
-          }
-        }, 150);
+        // Capture target synchronously - currentTarget becomes null after handler returns
+        const target = e.currentTarget;
+        resetTouchStyles(target);
+      }}
+      onTouchCancel={e => {
+        // Handle system interruptions (e.g., app switch, screen rotation, palm rejection)
+        const target = e.currentTarget;
+        resetTouchStyles(target);
       }}
     >
       {renderIcon()}
