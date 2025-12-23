@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
+import { ContinueButton } from '../components/ui';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
@@ -532,43 +533,10 @@ function StaffSelectionPage() {
                 marginTop: '24px',
               }}
             >
-              <button
+              <ContinueButton
                 onClick={handleContinue}
                 disabled={selectedSupervisors.length === 0}
-                style={{
-                  height: '56px',
-                  padding: '0 48px',
-                  fontSize: '24px',
-                  fontWeight: 600,
-                  color: '#FFFFFF',
-                  background:
-                    selectedSupervisors.length === 0
-                      ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                      : designSystem.gradients.greenRight,
-                  border: 'none',
-                  borderRadius: designSystem.borderRadius.full,
-                  cursor: selectedSupervisors.length === 0 ? 'not-allowed' : 'pointer',
-                  transition: designSystem.transitions.base,
-                  outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                  boxShadow: selectedSupervisors.length === 0 ? 'none' : designSystem.shadows.green,
-                  opacity: selectedSupervisors.length === 0 ? 0.6 : 1,
-                }}
-                onTouchStart={e => {
-                  if (selectedSupervisors.length > 0) {
-                    e.currentTarget.style.transform = designSystem.scales.active;
-                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                  }
-                }}
-                onTouchEnd={e => {
-                  if (selectedSupervisors.length > 0) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = designSystem.shadows.green;
-                  }
-                }}
-              >
-                Weiter
-              </button>
+              />
             </div>
           </>
         )}

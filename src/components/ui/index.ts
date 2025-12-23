@@ -8,3 +8,4 @@ export { ErrorModal } from './ErrorModal';
 export { SuccessModal } from './SuccessModal';
 export { default as BackButton } from './BackButton';
 export { ModalTimeoutIndicator } from './ModalTimeoutIndicator';
+export { ContinueButton } from './ContinueButton';
