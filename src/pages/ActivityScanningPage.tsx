@@ -613,11 +613,10 @@ const ActivityScanningPage: React.FC = () => {
       logger.error('Failed to process room change checkout', { error });
 
       // Show error modal with network-aware message
+      const errorMessage = error instanceof Error ? error.message : 'Raumwechsel fehlgeschlagen';
       const userFriendlyError = isNetworkRelatedError(error)
         ? 'Netzwerkfehler beim Raumwechsel. Bitte Verbindung prüfen und erneut versuchen.'
-        : mapServerErrorToGerman(
-            error instanceof Error ? error.message : 'Raumwechsel fehlgeschlagen'
-          );
+        : mapServerErrorToGerman(errorMessage);
 
       const errorResult: RfidScanResult = {
         student_name: 'Raumwechsel fehlgeschlagen',
