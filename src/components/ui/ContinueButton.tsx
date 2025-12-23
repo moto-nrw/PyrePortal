@@ -26,7 +26,7 @@ export function ContinueButton({
   disabled = false,
   children = 'Weiter',
   style,
-}: ContinueButtonProps) {
+}: Readonly<ContinueButtonProps>) {
   const handleTouchStart = (e: TouchEvent<HTMLButtonElement>) => {
     if (!disabled) {
       e.currentTarget.style.transform = designSystem.scales.active;
