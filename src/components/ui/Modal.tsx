@@ -32,6 +32,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   return (
     <div
+      role="presentation"
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50"
       onClick={e => {
         if (e.target === e.currentTarget) {

@@ -358,6 +358,7 @@ function TagAssignmentPage() {
           {/* Scanner Modal Overlay */}
           {showScanner && (
             <div
+              role="presentation"
               style={{
                 position: 'fixed',
                 top: 0,
