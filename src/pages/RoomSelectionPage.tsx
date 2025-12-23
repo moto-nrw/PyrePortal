@@ -1088,7 +1088,7 @@ function RoomSelectionPage() {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
+              gap: '12px',
               cursor: 'pointer',
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
@@ -1111,8 +1111,8 @@ function RoomSelectionPage() {
             }}
           >
             <svg
-              width="24"
-              height="24"
+              width="28"
+              height="28"
               viewBox="0 0 24 24"
               fill="none"
               stroke="#374151"
@@ -1125,7 +1125,7 @@ function RoomSelectionPage() {
             </svg>
             <span
               style={{
-                fontSize: '18px',
+                fontSize: '20px',
                 fontWeight: 600,
                 color: '#374151',
               }}
