@@ -65,35 +65,25 @@ cd src-tauri && ./test_rfid.sh  # Test RFID hardware (compiles and runs test bin
 
 ## Critical Architecture Patterns
 
-### 1. Cache-First RFID Scanning (Performance-Critical)
+### 1. Server-First RFID Scanning (Correctness-Critical)
 
 **Location**: `src/hooks/useRfidScanning.ts:118-215`
 
-**Why**: Network latency on Pi (200-500ms) vs cache (<10ms). Instant UI feedback is critical for UX.
+**Why**: RFID actions must be authoritative; backend is the source of truth (no local student cache).
 
 **Flow**:
 
 ```typescript
-// 1. Check cache FIRST (instant)
-const cachedStudent = getCachedStudentData(tagId);
-if (cachedStudent) {
-  // Show instant UI with predicted action
-  setScanResult(predictedResult);
-  showScanModal();
-
-  // Background sync with server (async, non-blocking)
-  void (async () => {
-    const serverResult = await api.processRfidScan(...);
-    // Silently update cache
-  })();
-}
+// 1. Call server FIRST (authoritative)
+const serverResult = await api.processRfidScan(...);
+setScanResult(serverResult);
+showScanModal();
 ```
 
 **When modifying**:
 
 - Test rapid scans (<1s apart)
 - Verify offline → online transition
-- Check cache invalidation timing
 
 ### 2. Multi-Layer Duplicate Prevention
 
@@ -117,23 +107,7 @@ mapTagToStudent(tagId, studentId) → enables layer 3
 
 **Location**: `src/store/userStore.ts:1540-1551`
 
-**Pattern**: Single store (not Redux) with custom middleware for complete action/state visibility.
-
-```typescript
-export const useUserStore = create<UserState>(
-  loggerMiddleware(createUserStore, {
-    name: 'UserStore',
-    logLevel: LogLevel.DEBUG,
-    excludedActions: ['functionalUpdate'], // Avoid noise
-  })
-);
-```
-
-**Logs automatically capture**:
-
-- Action calls (with args)
-- State changes (before/after)
-- Component triggering the action
+**Pattern**: Single store (not Redux) with custom middleware for complete action/state visibility. See `src/store/CLAUDE.md` for middleware configuration and logging details.
 
 ### 4. Runtime Configuration via Tauri
 
@@ -275,30 +249,7 @@ headers: {
 
 ### Adding Tauri Command
 
-1. **Define command** in `src-tauri/src/`:
-
-   ```rust
-   #[tauri::command]
-   fn do_something(param: String) -> Result<ReturnType, String> {
-       do_work(param)
-           .map_err(|e| format!("Failed: {}", e))
-   }
-   ```
-
-2. **Register** in `src-tauri/src/lib.rs`:
-
-   ```rust
-   .invoke_handler(tauri::generate_handler![
-       // ... existing
-       do_something
-   ])
-   ```
-
-3. **Use in frontend**:
-   ```typescript
-   import { safeInvoke } from '../utils/tauriContext';
-   const result = await safeInvoke<ReturnType>('do_something', { param: value });
-   ```
+See `src-tauri/CLAUDE.md` for Rust command patterns and `src/services/CLAUDE.md` for frontend `safeInvoke` usage.
 
 ## Working with RFID
 
@@ -349,18 +300,7 @@ const { isScanning, startScanning, stopScanning, currentScan, showModal } = useR
 **Critical patterns**:
 
 - Use `React.memo` for expensive components
-- Batch Zustand `set()` calls (avoid cascading renders):
-
-  ```typescript
-  // ✅ GOOD
-  set({ isLoading: true, error: null, data: result });
-
-  // ❌ BAD
-  set({ isLoading: true });
-  set({ error: null });
-  set({ data: result });
-  ```
-
+- Batch Zustand `set()` calls (see `src/store/CLAUDE.md` for examples)
 - Minimize Tauri IPC calls (batch when possible)
 - Use CSS transforms for animations (GPU-accelerated)
 
@@ -398,9 +338,8 @@ npm run tauri build
 ### ✅ Completed
 
 - Teacher authentication (PIN validation)
-- RFID scanning (cache-first, multi-layer duplicate prevention)
+- RFID scanning (server-first, multi-layer duplicate prevention)
 - Session management (start/end with timeout prevention)
-- Student cache (offline operation)
 - Offline sync queue
 - Three-layer logging system
 
@@ -416,7 +355,7 @@ npm run tauri build
 
 ## Platform-Specific: Raspberry Pi 5
 
-**Recommended**: Native 64-bit build (see `docs/pi5-native-build.md`)
+**Recommended**: Native 64-bit build
 
 **Performance gain**: 50-80% vs cross-compiled 32-bit
 
