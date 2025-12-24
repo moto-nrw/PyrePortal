@@ -128,15 +128,7 @@ try {
 
 ### Logging
 
-All services use logger:
-
-```typescript
-import { createLogger } from '../utils/logger';
-const logger = createLogger('ServiceName');
-
-logger.info('Operation started', { context });
-logger.error('Operation failed', { error });
-```
+All services use `createLogger()` - see root `CLAUDE.md` → "Three-Layer Logging System" for details.
 
 ### Tauri IPC Wrapper
 
@@ -172,11 +164,12 @@ interface NewDataResponse {
 export const api = {
   // ... existing methods
 
-  async getNewData(pin: string): Promise<NewDataType[]> {
+  async getNewData(pin: string, staffId?: number): Promise<NewDataType[]> {
     const response = await apiCall<NewDataResponse>('/api/new-endpoint', {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        ...(staffId != null && { 'X-Staff-ID': staffId.toString() }),
       },
     });
     return response.data;
@@ -186,18 +179,7 @@ export const api = {
 
 ### Tauri IPC Service Template
 
-```typescript
-// 1. Define Rust command in src-tauri/src/lib.rs
-#[tauri::command]
-fn do_something(param: String) -> Result<ReturnType, String> {
-  // Implementation
-}
-
-// 2. Add to frontend service
-export async function doSomething(param: string): Promise<ReturnType> {
-  return await safeInvoke<ReturnType>('do_something', { param });
-}
-```
+For Rust command definitions, see `src-tauri/CLAUDE.md`. Frontend services call Rust via `safeInvoke` (see pattern above).
 
 ## Network Quality Tracking
 
@@ -221,11 +203,10 @@ Used by `useNetworkStatus` hook for UI indicator.
 
 ## Performance Considerations
 
-### Caching
+### Server-First
 
-- Always check cache before API call (instant UI)
-- Background sync to keep cache fresh
-- Daily cache invalidation (prevent stale data)
+- No local student cache for RFID scans; API is the source of truth
+- Use the sync queue to retry failed operations when the network recovers
 
 ### Deduplication
 
