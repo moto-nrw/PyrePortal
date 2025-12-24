@@ -36,6 +36,5 @@ dist-ssr
 # SonarQube
 .scannerwork/
 
-# OpenSpec - ignore working proposals and archives (drafts/WIP)
-# Keep openspec/AGENTS.md, openspec/project.md, and openspec/specs/ tracked
-openspec/changes/
+# OpenSpec - local workflow, not tracked
+openspec/
