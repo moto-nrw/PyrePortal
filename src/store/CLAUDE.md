@@ -314,27 +314,9 @@ if (get().user.name !== newName) {
 }
 ```
 
-### ❌ Not Handling Errors
-
-```typescript
-// BAD: Error crashes component
-actionName: async () => {
-  const result = await api.doSomething();
-  set({ result });
-};
-
-// GOOD: Error handled gracefully
-actionName: async () => {
-  try {
-    const result = await api.doSomething();
-    set({ result });
-  } catch (error) {
-    set({ error: 'Fehler' });
-  }
-};
-```
-
 ### ❌ Forgetting to Clear Loading State
+
+Always clear `isLoading` in both success AND error paths (see Error Handling Pattern above):
 
 ```typescript
 // BAD: Loading state stuck on error
@@ -346,7 +328,7 @@ try {
   // isLoading still true!
 }
 
-// GOOD: Always clear loading
+// GOOD: Always clear loading in catch block too
 try {
   const result = await api.doSomething();
   set({ result, isLoading: false });

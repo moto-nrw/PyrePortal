@@ -7,7 +7,7 @@ This directory contains the React/TypeScript frontend for PyrePortal.
 - **components/** - React components (UI primitives + feature-specific)
 - **hooks/** - Custom React hooks (RFID scanning, network status)
 - **pages/** - Route-level components (full screen views)
-- **services/** - Business logic layer (API, cache, storage)
+- **services/** - Business logic layer (API, storage, sync queue)
 - **store/** - Zustand state management (single store pattern)
 - **styles/** - Design system and theme configuration
 - **utils/** - Pure utility functions (logger, error boundary)
@@ -18,17 +18,7 @@ This directory contains the React/TypeScript frontend for PyrePortal.
 
 - **Single store**: All app state in `store/userStore.ts`
 - **Logging middleware**: Automatic action tracking via `utils/storeMiddleware.ts`
-- **Batch updates**: Always batch multiple `set()` calls to avoid cascading renders
-
-```typescript
-// ✅ GOOD: Single render
-set({ isLoading: true, error: null, data: result });
-
-// ❌ BAD: Multiple renders
-set({ isLoading: true });
-set({ error: null });
-set({ data: result });
-```
+- **Batch updates**: Always batch multiple `set()` calls (see `store/CLAUDE.md` for examples)
 
 ### Component Patterns
 
@@ -115,10 +105,7 @@ import { api } from '../services/api';
 
 ### Adding API Endpoint
 
-1. Add types to `services/api.ts`
-2. Add API method to `services/api.ts`
-3. Add store action to `store/userStore.ts`
-4. Use in component via `useUserStore()`
+See root `CLAUDE.md` → "Adding New Features" for complete workflow.
 
 ### Adding New Page
 
