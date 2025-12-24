@@ -1,8 +1,10 @@
 import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 
 import { designSystem } from '../styles/designSystem';
+
+import { ModalShell } from './ui/modal/index';
 
 interface InfoModalProps {
   isOpen: boolean;
@@ -11,48 +13,38 @@ interface InfoModalProps {
   message: string;
 }
 
+/**
+ * InfoModal - Displays informational messages with a "Verstanden" button.
+ *
+ * Refactored to use ModalShell for consistent backdrop behavior.
+ * Uses centralized Tailwind animations for fade and slide effects.
+ * Preserves Escape key close behavior and message whitespace formatting.
+ *
+ * @example
+ * <InfoModal
+ *   isOpen={showInfo}
+ *   onClose={() => setShowInfo(false)}
+ *   title="Information"
+ *   message="This is an important message"
+ * />
+ */
 export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, title, message }) => {
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
+  const [isButtonHovered, setIsButtonHovered] = useState(false);
 
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
+  // Wrap onClose to ignore the reason parameter (preserve original API)
+  const handleClose = useCallback(() => onClose(), [onClose]);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(4px)',
-        animation: 'fadeIn 200ms ease-out',
-      }}
-      onClick={e => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+    <ModalShell
+      isOpen={isOpen}
+      onClose={handleClose}
+      backdropOpacity={0.6}
+      backdropBlur="4px"
+      closeOnBackdropClick={true}
+      closeOnEscape={true}
     >
       <div
+        className="animate-modal-slide-in"
         style={{
           backgroundColor: '#FFFFFF',
           borderRadius: designSystem.borderRadius.xl,
@@ -64,8 +56,8 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, title, me
           border: '1px solid rgba(255, 255, 255, 0.2)',
           position: 'relative',
           overflow: 'hidden',
-          animation: 'modalSlideIn 300ms ease-out',
         }}
+        onClick={e => e.stopPropagation()}
       >
         {/* Info Icon */}
         <div
@@ -124,45 +116,17 @@ export const InfoModal: React.FC<InfoModalProps> = ({ isOpen, onClose, title, me
             cursor: 'pointer',
             transition: 'all 200ms',
             outline: 'none',
-            boxShadow: '0 4px 14px 0 rgba(59, 130, 246, 0.4)',
+            boxShadow: isButtonHovered
+              ? '0 6px 20px 0 rgba(59, 130, 246, 0.5)'
+              : '0 4px 14px 0 rgba(59, 130, 246, 0.4)',
+            transform: isButtonHovered ? 'translateY(-1px)' : 'translateY(0)',
           }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-1px)';
-            e.currentTarget.style.boxShadow = '0 6px 20px 0 rgba(59, 130, 246, 0.5)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(59, 130, 246, 0.4)';
-          }}
+          onMouseEnter={() => setIsButtonHovered(true)}
+          onMouseLeave={() => setIsButtonHovered(false)}
         >
           Verstanden
         </button>
       </div>
-
-      {/* Animation Styles */}
-      <style>
-        {`
-          @keyframes fadeIn {
-            from {
-              opacity: 0;
-            }
-            to {
-              opacity: 1;
-            }
-          }
-
-          @keyframes modalSlideIn {
-            from {
-              opacity: 0;
-              transform: scale(0.95) translateY(10px);
-            }
-            to {
-              opacity: 1;
-              transform: scale(1) translateY(0);
-            }
-          }
-        `}
-      </style>
-    </div>
+    </ModalShell>
   );
 };

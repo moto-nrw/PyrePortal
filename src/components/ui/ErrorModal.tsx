@@ -1,8 +1,10 @@
 import { faCircleXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 
 import theme from '../../styles/theme';
+
+import { ModalShell } from './modal/index';
 
 interface ErrorModalProps {
   isOpen: boolean;
@@ -11,36 +13,37 @@ interface ErrorModalProps {
   autoCloseDelay?: number;
 }
 
+/**
+ * ErrorModal - Displays error messages with auto-close.
+ *
+ * Refactored to use ModalShell for consistent backdrop behavior.
+ * Preserves original API and styling.
+ *
+ * @example
+ * <ErrorModal
+ *   isOpen={showError}
+ *   onClose={() => setShowError(false)}
+ *   message="Something went wrong"
+ *   autoCloseDelay={5000}
+ * />
+ */
 export const ErrorModal: React.FC<ErrorModalProps> = ({
   isOpen,
   onClose,
   message,
   autoCloseDelay = 3000, // Default 3 seconds
 }) => {
-  useEffect(() => {
-    if (isOpen && autoCloseDelay) {
-      const timer = setTimeout(onClose, autoCloseDelay);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, autoCloseDelay, onClose]);
-
-  if (!isOpen) return null;
+  // Wrap onClose to ignore the reason parameter (preserve original API)
+  const handleClose = useCallback(() => onClose(), [onClose]);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={onClose}
+    <ModalShell
+      isOpen={isOpen}
+      onClose={handleClose}
+      autoCloseMs={autoCloseDelay}
+      backdropOpacity={0.5}
+      closeOnBackdropClick={true}
+      closeOnEscape={false}
     >
       <div
         style={{
@@ -77,6 +80,6 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
           {message}
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 };

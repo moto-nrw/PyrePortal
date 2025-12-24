@@ -1,6 +1,8 @@
-import React, { useEffect } from 'react';
+import React, { useCallback } from 'react';
 
 import theme from '../../styles/theme';
+
+import { ModalShell } from './modal/index';
 
 interface SuccessModalProps {
   isOpen: boolean;
@@ -9,38 +11,41 @@ interface SuccessModalProps {
   autoCloseDelay?: number;
 }
 
+/**
+ * SuccessModal - Displays success messages with auto-close and pop animation.
+ *
+ * Refactored to use ModalShell for consistent backdrop behavior.
+ * Uses centralized Tailwind animation for pop effect.
+ * Preserves original API and styling.
+ *
+ * @example
+ * <SuccessModal
+ *   isOpen={showSuccess}
+ *   onClose={() => setShowSuccess(false)}
+ *   message="Operation completed successfully"
+ *   autoCloseDelay={1500}
+ * />
+ */
 export const SuccessModal: React.FC<SuccessModalProps> = ({
   isOpen,
   onClose,
   message,
   autoCloseDelay = 3000, // Default 3 seconds
 }) => {
-  useEffect(() => {
-    if (isOpen && autoCloseDelay) {
-      const timer = setTimeout(onClose, autoCloseDelay);
-      return () => clearTimeout(timer);
-    }
-  }, [isOpen, autoCloseDelay, onClose]);
-
-  if (!isOpen) return null;
+  // Wrap onClose to ignore the reason parameter (preserve original API)
+  const handleClose = useCallback(() => onClose(), [onClose]);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
-      }}
-      onClick={onClose}
+    <ModalShell
+      isOpen={isOpen}
+      onClose={handleClose}
+      autoCloseMs={autoCloseDelay}
+      backdropOpacity={0.5}
+      closeOnBackdropClick={true}
+      closeOnEscape={false}
     >
       <div
+        className="animate-modal-pop"
         style={{
           backgroundColor: theme.colors.background.light,
           borderRadius: theme.borders.radius.lg,
@@ -49,7 +54,6 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
           width: '90%',
           textAlign: 'center',
           boxShadow: theme.shadows.lg,
-          animation: 'modalPop 0.3s ease-out',
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -100,25 +104,6 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
           {message}
         </div>
       </div>
-
-      {/* Add animation keyframes */}
-      <style>
-        {`
-          @keyframes modalPop {
-            0% {
-              transform: scale(0.8);
-              opacity: 0;
-            }
-            50% {
-              transform: scale(1.05);
-            }
-            100% {
-              transform: scale(1);
-              opacity: 1;
-            }
-          }
-        `}
-      </style>
-    </div>
+    </ModalShell>
   );
 };
