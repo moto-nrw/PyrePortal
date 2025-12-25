@@ -293,17 +293,11 @@ impl RfidBackgroundService {
         }
     }
 
+    // Only compiled for non-ARM platforms (mock scanning)
+    // ARM Linux uses persistent scanner directly in continuous_scan_loop
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     async fn perform_platform_scan() -> Result<String, String> {
-        #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-        {
-            // Use longer timeout for continuous scanning - we'll return quickly when card is found
-            raspberry_pi::scan_rfid_hardware_continuous().await
-        }
-
-        #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
-        {
-            mock_platform::scan_rfid_hardware().await
-        }
+        mock_platform::scan_rfid_hardware().await
     }
 
     fn get_platform_name() -> String {
@@ -348,7 +342,7 @@ mod raspberry_pi {
         Mfrc522, RxGain,
     };
     use rppal::gpio::Gpio;
-    use std::{error::Error, fmt, thread};
+    use std::thread;
 
     // Type alias for the complete MFRC522 type with SpiInterface
     type Mfrc522Scanner = Mfrc522<SpiInterface<Spidev, DummyNSS, DummyDelay>, mfrc522::Initialized>;
@@ -365,42 +359,6 @@ mod raspberry_pi {
             // when the next scanner instance tries to initialize
             let _ = self.mfrc522.hlta();
             println!("PersistentRfidScanner dropped - MFRC522 halted");
-        }
-    }
-
-    // Custom error type matching the original implementation
-    #[derive(Debug)]
-    enum RfidError {
-        DeviceError(String),
-        IoError(std::io::Error),
-    }
-
-    impl fmt::Display for RfidError {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            match self {
-                RfidError::DeviceError(s) => write!(f, "Device error: {}", s),
-                RfidError::IoError(e) => write!(f, "IO error: {}", e),
-            }
-        }
-    }
-
-    impl Error for RfidError {}
-
-    impl From<std::io::Error> for RfidError {
-        fn from(error: std::io::Error) -> Self {
-            RfidError::IoError(error)
-        }
-    }
-
-    impl From<String> for RfidError {
-        fn from(error: String) -> Self {
-            RfidError::DeviceError(error)
-        }
-    }
-
-    impl From<&str> for RfidError {
-        fn from(error: &str) -> Self {
-            RfidError::DeviceError(error.to_string())
         }
     }
 
@@ -569,12 +527,6 @@ mod raspberry_pi {
 
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
         scan_rfid_hardware_with_timeout(Duration::from_secs(5)).await
-    }
-
-    // Optimized for continuous background scanning
-    pub async fn scan_rfid_hardware_continuous() -> Result<String, String> {
-        // Use a longer timeout but with adaptive polling for efficiency
-        scan_rfid_hardware_with_timeout(Duration::from_secs(30)).await
     }
 
     async fn scan_rfid_hardware_with_timeout(timeout: Duration) -> Result<String, String> {
