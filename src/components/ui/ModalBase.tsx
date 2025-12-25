@@ -4,6 +4,41 @@ import { useModalTimeout } from '../../hooks/useModalTimeout';
 
 import { ModalTimeoutIndicator } from './ModalTimeoutIndicator';
 
+/** Modal size preset */
+export type ModalSize = 'sm' | 'md' | 'lg';
+
+/** Size preset configurations matching existing modal dimensions */
+const SIZE_PRESETS = {
+  sm: { maxWidth: '500px', padding: '48px', borderRadius: '20px' }, // ErrorModal, SuccessModal, InfoModal
+  md: { maxWidth: '600px', padding: '56px', borderRadius: '24px' }, // Future use
+  lg: { maxWidth: '700px', padding: '64px', borderRadius: '32px' }, // ActivityScanningPage (current default)
+} as const;
+
+/**
+ * Determines if a background color is light (needs dark indicator).
+ * Uses simple heuristic for white/near-white colors.
+ */
+const isLightBackground = (bg: string): boolean => {
+  const normalized = bg.toLowerCase().trim();
+  return (
+    normalized === '#ffffff' ||
+    normalized === '#fff' ||
+    normalized === 'white' ||
+    normalized.startsWith('rgba(255, 255, 255') ||
+    normalized.startsWith('rgba(255,255,255')
+  );
+};
+
+/**
+ * Returns appropriate timeout indicator colors based on background.
+ * Light backgrounds get dark indicators; dark backgrounds get light indicators.
+ */
+const getContrastColors = (bg: string): { color: string; trackColor: string } => {
+  return isLightBackground(bg)
+    ? { color: 'rgba(0, 0, 0, 0.3)', trackColor: 'rgba(0, 0, 0, 0.1)' }
+    : { color: 'rgba(255, 255, 255, 0.9)', trackColor: 'rgba(255, 255, 255, 0.2)' };
+};
+
 interface ModalBaseProps {
   /** Controls modal visibility */
   isOpen: boolean;
@@ -16,8 +51,14 @@ interface ModalBaseProps {
 
   // --- Visual Customization ---
 
+  /** Modal size preset. Default: 'lg' (backwards compatible) */
+  size?: ModalSize;
+
   /** Background color of the modal container. Default: white */
   backgroundColor?: string;
+
+  /** Backdrop blur amount. Default: '4px' */
+  backdropBlur?: string;
 
   // --- Timeout ---
 
@@ -33,6 +74,12 @@ interface ModalBaseProps {
   /** Called when timeout expires (before onClose) */
   onTimeout?: () => void;
 
+  /** Timeout indicator bar color. Default: determined by background contrast */
+  timeoutColor?: string;
+
+  /** Timeout indicator track color. Default: determined by background contrast */
+  timeoutTrackColor?: string;
+
   // --- Behavior ---
 
   /** Allow closing by clicking backdrop. Default: true */
@@ -40,22 +87,23 @@ interface ModalBaseProps {
 }
 
 /**
- * Unified base modal component extracted from ActivityScanningPage.
+ * Unified base modal component for consistent modal UX.
  *
  * Features:
  * - Uses native <dialog> element for proper accessibility
- * - Dark backdrop overlay (no blur)
- * - Consistent container styling (32px radius, 64px padding, 700px max-width)
+ * - Size presets: sm (500px), md (600px), lg (700px - default)
+ * - Default backdrop blur (4px) with optional customization
  * - Integrated timeout system with visual indicator
+ * - Auto-contrast timeout indicator (dark on light backgrounds)
  * - Configurable backdrop click dismissal
  *
  * @example
  * <ModalBase
  *   isOpen={showModal}
  *   onClose={() => setShowModal(false)}
- *   backgroundColor="#83cd2d"
- *   timeout={7000}
- *   timeoutResetKey={scanId}
+ *   size="sm"
+ *   backgroundColor="#FFFFFF"
+ *   timeout={3000}
  * >
  *   <h2>Modal Content</h2>
  * </ModalBase>
@@ -64,13 +112,24 @@ export function ModalBase({
   isOpen,
   onClose,
   children,
+  size = 'lg',
   backgroundColor = '#FFFFFF',
+  backdropBlur,
   timeout,
   showTimeoutIndicator = true,
   timeoutResetKey,
   onTimeout,
+  timeoutColor,
+  timeoutTrackColor,
   closeOnBackdropClick = true,
 }: Readonly<ModalBaseProps>) {
+  // Get size preset values
+  const sizePreset = SIZE_PRESETS[size];
+
+  // Compute indicator colors based on background contrast
+  const contrastColors = getContrastColors(backgroundColor);
+  const indicatorColor = timeoutColor ?? contrastColors.color;
+  const indicatorTrackColor = timeoutTrackColor ?? contrastColors.trackColor;
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   // Handle timeout expiration
@@ -133,25 +192,36 @@ export function ModalBase({
 
   const shouldShowIndicator = showTimeoutIndicator && timeout !== undefined;
 
+  // Build dialog style with optional backdrop blur override
+  const dialogStyle: React.CSSProperties & { '--modal-backdrop-blur'?: string } = {
+    backgroundColor: 'transparent',
+    border: 'none',
+    padding: 0,
+    maxWidth: 'none',
+    maxHeight: 'none',
+    overflow: 'visible',
+    // Centering: native dialog needs explicit positioning when max-width/height are overridden
+    position: 'fixed',
+    inset: 0,
+    margin: 'auto',
+    // Remove default focus outline (dialog receives focus on showModal())
+    outline: 'none',
+  };
+
+  // Only set custom property when backdropBlur is explicitly provided
+  if (backdropBlur !== undefined) {
+    dialogStyle['--modal-backdrop-blur'] = `blur(${backdropBlur})`;
+  }
+
   return (
-    <dialog
-      ref={dialogRef}
-      style={{
-        backgroundColor: 'transparent',
-        border: 'none',
-        padding: 0,
-        maxWidth: 'none',
-        maxHeight: 'none',
-        overflow: 'visible',
-      }}
-    >
+    <dialog ref={dialogRef} style={dialogStyle}>
       {/* Container */}
       <div
         style={{
           backgroundColor,
-          borderRadius: '32px',
-          padding: '64px',
-          maxWidth: '700px',
+          borderRadius: sizePreset.borderRadius,
+          padding: sizePreset.padding,
+          maxWidth: sizePreset.maxWidth,
           width: '90vw',
           textAlign: 'center',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
@@ -169,6 +239,9 @@ export function ModalBase({
             isActive={isRunning}
             position="bottom"
             height={8}
+            color={indicatorColor}
+            trackColor={indicatorTrackColor}
+            borderRadius={sizePreset.borderRadius}
           />
         )}
       </div>

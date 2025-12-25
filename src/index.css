@@ -53,9 +53,11 @@
   }
 }
 
-/* Native dialog backdrop */
+/* Native dialog backdrop with blur effect */
 dialog::backdrop {
-  background-color: rgba(0, 0, 0, 0.7);
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: var(--modal-backdrop-blur, blur(4px));
+  -webkit-backdrop-filter: var(--modal-backdrop-blur, blur(4px));
 }
 
 /* Dark mode styles */
