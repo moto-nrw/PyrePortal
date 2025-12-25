@@ -1,4 +1,4 @@
-import type React from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 import { useModalTimeout } from '../../hooks/useModalTimeout';
 
@@ -12,7 +12,7 @@ interface ModalBaseProps {
   onClose: () => void;
 
   /** Modal content */
-  children: React.ReactNode;
+  children: ReactNode;
 
   // --- Visual Customization ---
 
@@ -43,6 +43,7 @@ interface ModalBaseProps {
  * Unified base modal component extracted from ActivityScanningPage.
  *
  * Features:
+ * - Uses native <dialog> element for proper accessibility
  * - Dark backdrop overlay (no blur)
  * - Consistent container styling (32px radius, 64px padding, 700px max-width)
  * - Integrated timeout system with visual indicator
@@ -59,7 +60,7 @@ interface ModalBaseProps {
  *   <h2>Modal Content</h2>
  * </ModalBase>
  */
-export const ModalBase: React.FC<ModalBaseProps> = ({
+export function ModalBase({
   isOpen,
   onClose,
   children,
@@ -69,7 +70,9 @@ export const ModalBase: React.FC<ModalBaseProps> = ({
   timeoutResetKey,
   onTimeout,
   closeOnBackdropClick = true,
-}) => {
+}: ModalBaseProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
   // Handle timeout expiration
   const handleTimeoutExpired = () => {
     onTimeout?.();
@@ -84,54 +87,77 @@ export const ModalBase: React.FC<ModalBaseProps> = ({
     resetKey: timeoutResetKey,
   });
 
-  // Handle backdrop click
-  const handleBackdropClick = () => {
-    if (closeOnBackdropClick) {
-      onClose();
-    }
-  };
+  // Sync dialog open state with isOpen prop
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
 
-  // Don't render when closed
-  if (!isOpen) {
-    return null;
-  }
+    if (isOpen && !dialog.open) {
+      dialog.showModal();
+    } else if (!isOpen && dialog.open) {
+      dialog.close();
+    }
+  }, [isOpen]);
+
+  // Handle native dialog close event (e.g., Escape key)
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const handleClose = () => {
+      // Only call onClose if dialog was open (prevents double-call)
+      if (isOpen) {
+        onClose();
+      }
+    };
+
+    dialog.addEventListener('close', handleClose);
+    return () => dialog.removeEventListener('close', handleClose);
+  }, [isOpen, onClose]);
+
+  // Handle backdrop click via native dialog click event
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || !closeOnBackdropClick) return;
+
+    const handleClick = (e: MouseEvent) => {
+      // Check if click was on the backdrop (dialog element itself, not its children)
+      if (e.target === dialog) {
+        dialog.close();
+      }
+    };
+
+    dialog.addEventListener('click', handleClick);
+    return () => dialog.removeEventListener('click', handleClick);
+  }, [closeOnBackdropClick]);
 
   const shouldShowIndicator = showTimeoutIndicator && timeout !== undefined;
 
   return (
-    // Backdrop
-    <div
-      aria-hidden="true"
+    <dialog
+      ref={dialogRef}
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 1000,
+        backgroundColor: 'transparent',
+        border: 'none',
+        padding: 0,
+        maxWidth: 'none',
+        maxHeight: 'none',
+        overflow: 'visible',
       }}
-      onClick={handleBackdropClick}
     >
       {/* Container */}
       <div
-        role="dialog"
-        aria-modal="true"
         style={{
           backgroundColor,
           borderRadius: '32px',
           padding: '64px',
           maxWidth: '700px',
-          width: '90%',
+          width: '90vw',
           textAlign: 'center',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
           position: 'relative',
           overflow: 'hidden',
         }}
-        onClick={e => e.stopPropagation()}
       >
         {children}
 
@@ -146,6 +172,6 @@ export const ModalBase: React.FC<ModalBaseProps> = ({
           />
         )}
       </div>
-    </div>
+    </dialog>
   );
-};
+}

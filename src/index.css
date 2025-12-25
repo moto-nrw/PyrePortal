@@ -53,6 +53,11 @@
   }
 }
 
+/* Native dialog backdrop */
+dialog::backdrop {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
 /* Dark mode styles */
 @media (prefers-color-scheme: dark) {
   :root {
