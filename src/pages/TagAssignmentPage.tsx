@@ -355,12 +355,14 @@ function TagAssignmentPage() {
             Armband scannen
           </h1>
 
-          {/* Scanner Modal Overlay */}
+          {/* Scanner Modal Overlay
+              IMPORTANT: timeout must match Rust scan_rfid_hardware_single() timeout in src-tauri/src/rfid.rs (currently 10s) */}
           <ModalBase
             isOpen={showScanner}
             onClose={() => setShowScanner(false)}
             size="md"
             backgroundColor="#5080D8"
+            timeout={10000}
           >
             {/* Background pattern */}
             <div

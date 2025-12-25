@@ -567,8 +567,10 @@ mod raspberry_pi {
         scan_rfid_hardware_with_timeout(Duration::from_millis(500)).await
     }
 
+    /// Single RFID scan with timeout for tag assignment flow.
+    /// IMPORTANT: Keep in sync with TagAssignmentPage.tsx scanner modal timeout (currently 10s).
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
-        scan_rfid_hardware_with_timeout(Duration::from_secs(5)).await
+        scan_rfid_hardware_with_timeout(Duration::from_secs(10)).await
     }
 
     // Optimized for continuous background scanning
