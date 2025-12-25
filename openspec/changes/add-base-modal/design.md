@@ -7,7 +7,7 @@ interface ModalBaseProps {
   /** Controls modal visibility */
   isOpen: boolean;
 
-  /** Called when modal should close (backdrop click, escape, timeout) */
+  /** Called when modal should close (backdrop click or timeout) */
   onClose: () => void;
 
   /** Modal content */
