@@ -4,7 +4,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal } from '../components/ui';
+import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import {
   api,
@@ -49,321 +49,285 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   onConfirm,
   onCancel,
   isLoading,
-}) => {
-  if (!isOpen) return null;
-
-  return (
+}) => (
+  <ModalBase
+    isOpen={isOpen}
+    onClose={onCancel}
+    size="md"
+    backgroundColor="#FFFFFF"
+    backdropBlur="6px"
+    closeOnBackdropClick={!isLoading}
+  >
+    {/* Header Icon */}
     <div
-      aria-hidden="true"
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.45)',
+        width: '64px',
+        height: '64px',
+        background: 'linear-gradient(to right, #83cd2d, #6ba529)',
+        borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(6px)',
-        WebkitBackdropFilter: 'blur(6px)',
-        padding: '16px',
+        margin: '0 auto 24px auto',
+        boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
       }}
-      onClick={e => {
-        if (e.target === e.currentTarget) {
-          onCancel();
-        }
+    >
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <path d="M9 12l2 2 4-4" />
+      </svg>
+    </div>
+
+    <h2
+      style={{
+        fontSize: '32px',
+        fontWeight: 700,
+        marginBottom: '12px',
+        color: '#1F2937',
+        lineHeight: 1.2,
+      }}
+    >
+      Aktivität starten?
+    </h2>
+
+    {/* Activity Details Card */}
+    <div
+      style={{
+        backgroundColor: '#F8FAFC',
+        borderRadius: designSystem.borderRadius.lg,
+        padding: '20px',
+        marginBottom: '20px',
+        border: '1px solid #E5E7EB',
       }}
     >
       <div
-        role="dialog"
-        aria-modal="true"
-        aria-hidden="false"
         style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: designSystem.borderRadius.xl,
-          padding: '28px',
-          maxWidth: '560px',
-          width: '92%',
-          textAlign: 'center',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          border: '1px solid rgba(229,231,235,0.5)',
-          position: 'relative',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '16px',
+          marginBottom: '8px',
         }}
       >
-        {/* Header Icon */}
         <div
           style={{
-            width: '64px',
-            height: '64px',
-            background: 'linear-gradient(to right, #83cd2d, #6ba529)',
-            borderRadius: '50%',
+            fontSize: '18px',
+            fontWeight: 700,
+            color: '#1F2937',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px auto',
-            boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
+            gap: '8px',
           }}
         >
           <svg
-            width="32"
-            height="32"
+            width="20"
+            height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#FFFFFF"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            stroke="#14B8A6"
+            strokeWidth="2"
           >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M9 12l2 2 4-4" />
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
+          {activity?.name}
         </div>
 
-        <h2
+        <div
           style={{
-            fontSize: '32px',
-            fontWeight: 700,
-            marginBottom: '12px',
+            fontSize: '14px',
+            fontWeight: 600,
+            color: '#9CA3AF',
+          }}
+        ></div>
+
+        <div
+          style={{
+            fontSize: '20px',
+            fontWeight: 600,
             color: '#1F2937',
-            lineHeight: 1.2,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
-          Aktivität starten?
-        </h2>
-
-        {/* Activity Details Card */}
-        <div
-          style={{
-            backgroundColor: '#F8FAFC',
-            borderRadius: designSystem.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '20px',
-            border: '1px solid #E5E7EB',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '16px',
-              marginBottom: '8px',
-            }}
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#4f46e5"
+            strokeWidth="2"
           >
-            <div
-              style={{
-                fontSize: '18px',
-                fontWeight: 700,
-                color: '#1F2937',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#14B8A6"
-                strokeWidth="2"
-              >
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              {activity?.name}
-            </div>
-
-            <div
-              style={{
-                fontSize: '14px',
-                fontWeight: 600,
-                color: '#9CA3AF',
-              }}
-            ></div>
-
-            <div
-              style={{
-                fontSize: '20px',
-                fontWeight: 600,
-                color: '#1F2937',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#4f46e5"
-                strokeWidth="2"
-              >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-                <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
-                <circle cx="11" cy="12" r="1" />
-              </svg>
-              {room.name}
-            </div>
-          </div>
-
-          {room.room_type && (
-            <div
-              style={{
-                fontSize: '14px',
-                color: '#6B7280',
-                marginBottom: '0px',
-              }}
-            >
-              Typ: {room.room_type}
-            </div>
-          )}
-        </div>
-
-        {/* Supervisors */}
-        <div
-          style={{
-            backgroundColor: '#F9FAFB',
-            borderRadius: designSystem.borderRadius.lg,
-            padding: '16px',
-            marginBottom: '20px',
-            border: '1px solid #E5E7EB',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '14px',
-              fontWeight: 700,
-              color: '#374151',
-              marginBottom: '12px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}
-          >
-            Betreuer ({supervisors.length})
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px',
-            }}
-          >
-            {supervisors.map(supervisor => (
-              <div
-                key={supervisor.id}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  padding: '8px 12px',
-                  borderRadius: '16px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  color: '#1F2937',
-                  border: '1px solid #E5E7EB',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#14B8A6"
-                  strokeWidth="2"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                {supervisor.name}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={onCancel}
-            disabled={isLoading}
-            style={{
-              flex: 1,
-              height: '64px',
-              fontSize: '20px',
-              fontWeight: 600,
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: '2px solid #E5E7EB',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              opacity: isLoading ? 0.6 : 1,
-            }}
-            onTouchStart={e => {
-              if (!isLoading) {
-                e.currentTarget.style.backgroundColor = '#F9FAFB';
-                e.currentTarget.style.borderColor = '#D1D5DB';
-              }
-            }}
-            onTouchEnd={e => {
-              if (!isLoading) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.borderColor = '#E5E7EB';
-              }
-            }}
-          >
-            Abbrechen
-          </button>
-
-          <button
-            onClick={onConfirm}
-            disabled={isLoading}
-            style={{
-              flex: 1,
-              height: '64px',
-              fontSize: '20px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              background: isLoading
-                ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                : 'linear-gradient(to right, #83cd2d, #6ba529)',
-              border: 'none',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
-              opacity: isLoading ? 0.6 : 1,
-            }}
-            onTouchStart={e => {
-              if (!isLoading) {
-                e.currentTarget.style.transform = 'scale(0.98)';
-                e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(131, 205, 45, 0.5)';
-              }
-            }}
-            onTouchEnd={e => {
-              if (!isLoading) {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(131, 205, 45, 0.4)';
-              }
-            }}
-          >
-            {isLoading ? 'Starte...' : 'Aktivität starten'}
-          </button>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+            <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+            <circle cx="11" cy="12" r="1" />
+          </svg>
+          {room.name}
         </div>
       </div>
+
+      {room.room_type && (
+        <div
+          style={{
+            fontSize: '14px',
+            color: '#6B7280',
+            marginBottom: '0px',
+          }}
+        >
+          Typ: {room.room_type}
+        </div>
+      )}
     </div>
-  );
-};
+
+    {/* Supervisors */}
+    <div
+      style={{
+        backgroundColor: '#F9FAFB',
+        borderRadius: designSystem.borderRadius.lg,
+        padding: '16px',
+        marginBottom: '20px',
+        border: '1px solid #E5E7EB',
+      }}
+    >
+      <div
+        style={{
+          fontSize: '14px',
+          fontWeight: 700,
+          color: '#374151',
+          marginBottom: '12px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+        }}
+      >
+        Betreuer ({supervisors.length})
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+        }}
+      >
+        {supervisors.map(supervisor => (
+          <div
+            key={supervisor.id}
+            style={{
+              backgroundColor: '#FFFFFF',
+              padding: '8px 12px',
+              borderRadius: '16px',
+              fontSize: '14px',
+              fontWeight: 600,
+              color: '#1F2937',
+              border: '1px solid #E5E7EB',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#14B8A6"
+              strokeWidth="2"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            {supervisor.name}
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Action Buttons */}
+    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+      <button
+        onClick={onCancel}
+        disabled={isLoading}
+        style={{
+          flex: 1,
+          height: '64px',
+          fontSize: '20px',
+          fontWeight: 600,
+          color: '#6B7280',
+          backgroundColor: 'transparent',
+          border: '2px solid #E5E7EB',
+          borderRadius: designSystem.borderRadius.lg,
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          transition: 'all 200ms',
+          outline: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          opacity: isLoading ? 0.6 : 1,
+        }}
+        onTouchStart={e => {
+          if (!isLoading) {
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
+            e.currentTarget.style.borderColor = '#D1D5DB';
+          }
+        }}
+        onTouchEnd={e => {
+          if (!isLoading) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.borderColor = '#E5E7EB';
+          }
+        }}
+      >
+        Abbrechen
+      </button>
+
+      <button
+        onClick={onConfirm}
+        disabled={isLoading}
+        style={{
+          flex: 1,
+          height: '64px',
+          fontSize: '20px',
+          fontWeight: 600,
+          color: '#FFFFFF',
+          background: isLoading
+            ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+            : 'linear-gradient(to right, #83cd2d, #6ba529)',
+          border: 'none',
+          borderRadius: designSystem.borderRadius.lg,
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          transition: 'all 200ms',
+          outline: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
+          opacity: isLoading ? 0.6 : 1,
+        }}
+        onTouchStart={e => {
+          if (!isLoading) {
+            e.currentTarget.style.transform = 'scale(0.98)';
+            e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(131, 205, 45, 0.5)';
+          }
+        }}
+        onTouchEnd={e => {
+          if (!isLoading) {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(131, 205, 45, 0.4)';
+          }
+        }}
+      >
+        {isLoading ? 'Starte...' : 'Aktivität starten'}
+      </button>
+    </div>
+  </ModalBase>
+);
 
 const ConflictModal: React.FC<ConflictModalProps> = ({
   isOpen,
@@ -373,353 +337,320 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
   onForceStart,
   onCancel,
   isLoading,
-}) => {
-  if (!isOpen) return null;
-
-  return (
+}) => (
+  <ModalBase
+    isOpen={isOpen}
+    onClose={onCancel}
+    size="sm"
+    backgroundColor="#FFFFFF"
+    closeOnBackdropClick={!isLoading}
+  >
+    {/* Warning Icon */}
     <div
-      aria-hidden="true"
       style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: 'rgba(0, 0, 0, 0.6)',
+        width: '64px',
+        height: '64px',
+        background: 'linear-gradient(to right, #F59E0B, #EAB308)',
+        borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        zIndex: 1000,
-        backdropFilter: 'blur(4px)',
+        margin: '0 auto 24px auto',
+        boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
       }}
-      onClick={e => {
-        if (e.target === e.currentTarget) {
-          onCancel();
-        }
+    >
+      <svg
+        width="32"
+        height="32"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+        <line x1="12" y1="9" x2="12" y2="13" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
+      </svg>
+    </div>
+
+    <h2
+      style={{
+        fontSize: '28px',
+        fontWeight: 700,
+        marginBottom: '16px',
+        color: '#1F2937',
+        lineHeight: 1.2,
+      }}
+    >
+      Session Konflikt
+    </h2>
+
+    <p
+      style={{
+        fontSize: '16px',
+        color: '#6B7280',
+        marginBottom: '32px',
+        lineHeight: 1.5,
+      }}
+    >
+      Es läuft bereits eine Session für diese Aktivität oder diesen Raum. Möchten Sie die bestehende
+      Session beenden und eine neue starten?
+    </p>
+
+    {/* Activity Details Card */}
+    <div
+      style={{
+        backgroundColor: '#FEF3C7',
+        borderRadius: designSystem.borderRadius.lg,
+        padding: '24px',
+        marginBottom: '32px',
+        border: '1px solid #FCD34D',
       }}
     >
       <div
         style={{
-          backgroundColor: '#FFFFFF',
-          borderRadius: '24px',
-          padding: '32px',
-          maxWidth: '480px',
-          width: '90%',
-          textAlign: 'center',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          border: '1px solid rgba(255, 255, 255, 0.2)',
-          position: 'relative',
-          overflow: 'hidden',
+          fontSize: '14px',
+          color: '#92400E',
+          marginBottom: '8px',
+          fontWeight: 600,
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
         }}
       >
-        {/* Warning Icon */}
+        Neue Session
+      </div>
+
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '24px',
+          marginBottom: '12px',
+        }}
+      >
         <div
           style={{
-            width: '64px',
-            height: '64px',
-            background: 'linear-gradient(to right, #F59E0B, #EAB308)',
-            borderRadius: '50%',
+            fontSize: '20px',
+            fontWeight: 600,
+            color: '#1F2937',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px auto',
-            boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
+            gap: '8px',
           }}
         >
           <svg
-            width="32"
-            height="32"
+            width="20"
+            height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#FFFFFF"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+            stroke="#14B8A6"
+            strokeWidth="2"
           >
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+            <line x1="16" y1="2" x2="16" y2="6" />
+            <line x1="8" y1="2" x2="8" y2="6" />
+            <line x1="3" y1="10" x2="21" y2="10" />
           </svg>
+          {activity?.name}
         </div>
 
-        <h2
-          style={{
-            fontSize: '28px',
-            fontWeight: 700,
-            marginBottom: '16px',
-            color: '#1F2937',
-            lineHeight: 1.2,
-          }}
-        >
-          Session Konflikt
-        </h2>
-
-        <p
+        <div
           style={{
             fontSize: '16px',
-            color: '#6B7280',
-            marginBottom: '32px',
-            lineHeight: 1.5,
+            fontWeight: 600,
+            color: '#9CA3AF',
           }}
-        >
-          Es läuft bereits eine Session für diese Aktivität oder diesen Raum. Möchten Sie die
-          bestehende Session beenden und eine neue starten?
-        </p>
+        ></div>
 
-        {/* Activity Details Card */}
         <div
           style={{
-            backgroundColor: '#FEF3C7',
-            borderRadius: designSystem.borderRadius.lg,
-            padding: '24px',
-            marginBottom: '32px',
-            border: '1px solid #FCD34D',
+            fontSize: '20px',
+            fontWeight: 600,
+            color: '#1F2937',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}
         >
-          <div
-            style={{
-              fontSize: '14px',
-              color: '#92400E',
-              marginBottom: '8px',
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#f87C10"
+            strokeWidth="2"
           >
-            Neue Session
-          </div>
-
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '24px',
-              marginBottom: '12px',
-            }}
-          >
-            <div
-              style={{
-                fontSize: '20px',
-                fontWeight: 600,
-                color: '#1F2937',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#14B8A6"
-                strokeWidth="2"
-              >
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                <line x1="16" y1="2" x2="16" y2="6" />
-                <line x1="8" y1="2" x2="8" y2="6" />
-                <line x1="3" y1="10" x2="21" y2="10" />
-              </svg>
-              {activity?.name}
-            </div>
-
-            <div
-              style={{
-                fontSize: '16px',
-                fontWeight: 600,
-                color: '#9CA3AF',
-              }}
-            ></div>
-
-            <div
-              style={{
-                fontSize: '20px',
-                fontWeight: 600,
-                color: '#1F2937',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#f87C10"
-                strokeWidth="2"
-              >
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-                <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
-                <circle cx="11" cy="12" r="1" />
-              </svg>
-              {room.name}
-            </div>
-          </div>
-        </div>
-
-        {/* Supervisors */}
-        <div
-          style={{
-            backgroundColor: '#F0F9FF',
-            borderRadius: designSystem.borderRadius.lg,
-            padding: '20px',
-            marginBottom: '32px',
-            border: '1px solid #BAE6FD',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '14px',
-              fontWeight: 600,
-              color: '#0369A1',
-              marginBottom: '12px',
-              textTransform: 'uppercase',
-              letterSpacing: '0.5px',
-            }}
-          >
-            Betreuer ({supervisors.length})
-          </div>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              gap: '8px',
-            }}
-          >
-            {supervisors.map(supervisor => (
-              <div
-                key={supervisor.id}
-                style={{
-                  backgroundColor: '#FFFFFF',
-                  padding: '8px 16px',
-                  borderRadius: '20px',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: '#1F2937',
-                  border: '1px solid #E0E7FF',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                }}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#14B8A6"
-                  strokeWidth="2"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-                {supervisor.name}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Warning Message */}
-        <div
-          style={{
-            backgroundColor: '#FEF2F2',
-            border: '1px solid #FECACA',
-            borderRadius: designSystem.borderRadius.md,
-            padding: '16px',
-            marginBottom: '32px',
-          }}
-        >
-          <div
-            style={{
-              fontSize: '14px',
-              color: '#DC2626',
-              fontWeight: 600,
-              textAlign: 'center',
-            }}
-          >
-            Diese Aktion beendet die aktuelle Session
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={onCancel}
-            disabled={isLoading}
-            style={{
-              flex: 1,
-              height: '64px',
-              fontSize: '20px',
-              fontWeight: 600,
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: '2px solid #E5E7EB',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              opacity: isLoading ? 0.6 : 1,
-            }}
-            onTouchStart={e => {
-              if (!isLoading) {
-                e.currentTarget.style.backgroundColor = '#F9FAFB';
-                e.currentTarget.style.borderColor = '#D1D5DB';
-              }
-            }}
-            onTouchEnd={e => {
-              if (!isLoading) {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.borderColor = '#E5E7EB';
-              }
-            }}
-          >
-            Abbrechen
-          </button>
-
-          <button
-            onClick={onForceStart}
-            disabled={isLoading}
-            style={{
-              flex: 1,
-              height: '64px',
-              fontSize: '20px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              background: isLoading
-                ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                : 'linear-gradient(to right, #DC2626, #B91C1C)',
-              border: 'none',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: isLoading ? 'not-allowed' : 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
-              opacity: isLoading ? 0.6 : 1,
-            }}
-            onTouchStart={e => {
-              if (!isLoading) {
-                e.currentTarget.style.transform = 'scale(0.98)';
-                e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(220, 38, 38, 0.5)';
-              }
-            }}
-            onTouchEnd={e => {
-              if (!isLoading) {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(220, 38, 38, 0.4)';
-              }
-            }}
-          >
-            {isLoading ? 'Starte...' : 'Trotzdem starten'}
-          </button>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+            <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+            <circle cx="11" cy="12" r="1" />
+          </svg>
+          {room.name}
         </div>
       </div>
     </div>
-  );
-};
+
+    {/* Supervisors */}
+    <div
+      style={{
+        backgroundColor: '#F0F9FF',
+        borderRadius: designSystem.borderRadius.lg,
+        padding: '20px',
+        marginBottom: '32px',
+        border: '1px solid #BAE6FD',
+      }}
+    >
+      <div
+        style={{
+          fontSize: '14px',
+          fontWeight: 600,
+          color: '#0369A1',
+          marginBottom: '12px',
+          textTransform: 'uppercase',
+          letterSpacing: '0.5px',
+        }}
+      >
+        Betreuer ({supervisors.length})
+      </div>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '8px',
+        }}
+      >
+        {supervisors.map(supervisor => (
+          <div
+            key={supervisor.id}
+            style={{
+              backgroundColor: '#FFFFFF',
+              padding: '8px 16px',
+              borderRadius: '20px',
+              fontSize: '14px',
+              fontWeight: 500,
+              color: '#1F2937',
+              border: '1px solid #E0E7FF',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#14B8A6"
+              strokeWidth="2"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+            {supervisor.name}
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Warning Message */}
+    <div
+      style={{
+        backgroundColor: '#FEF2F2',
+        border: '1px solid #FECACA',
+        borderRadius: designSystem.borderRadius.md,
+        padding: '16px',
+        marginBottom: '32px',
+      }}
+    >
+      <div
+        style={{
+          fontSize: '14px',
+          color: '#DC2626',
+          fontWeight: 600,
+          textAlign: 'center',
+        }}
+      >
+        Diese Aktion beendet die aktuelle Session
+      </div>
+    </div>
+
+    {/* Action Buttons */}
+    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+      <button
+        onClick={onCancel}
+        disabled={isLoading}
+        style={{
+          flex: 1,
+          height: '64px',
+          fontSize: '20px',
+          fontWeight: 600,
+          color: '#6B7280',
+          backgroundColor: 'transparent',
+          border: '2px solid #E5E7EB',
+          borderRadius: designSystem.borderRadius.lg,
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          transition: 'all 200ms',
+          outline: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          opacity: isLoading ? 0.6 : 1,
+        }}
+        onTouchStart={e => {
+          if (!isLoading) {
+            e.currentTarget.style.backgroundColor = '#F9FAFB';
+            e.currentTarget.style.borderColor = '#D1D5DB';
+          }
+        }}
+        onTouchEnd={e => {
+          if (!isLoading) {
+            e.currentTarget.style.backgroundColor = 'transparent';
+            e.currentTarget.style.borderColor = '#E5E7EB';
+          }
+        }}
+      >
+        Abbrechen
+      </button>
+
+      <button
+        onClick={onForceStart}
+        disabled={isLoading}
+        style={{
+          flex: 1,
+          height: '64px',
+          fontSize: '20px',
+          fontWeight: 600,
+          color: '#FFFFFF',
+          background: isLoading
+            ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+            : 'linear-gradient(to right, #DC2626, #B91C1C)',
+          border: 'none',
+          borderRadius: designSystem.borderRadius.lg,
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          transition: 'all 200ms',
+          outline: 'none',
+          WebkitTapHighlightColor: 'transparent',
+          boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
+          opacity: isLoading ? 0.6 : 1,
+        }}
+        onTouchStart={e => {
+          if (!isLoading) {
+            e.currentTarget.style.transform = 'scale(0.98)';
+            e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(220, 38, 38, 0.5)';
+          }
+        }}
+        onTouchEnd={e => {
+          if (!isLoading) {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(220, 38, 38, 0.4)';
+          }
+        }}
+      >
+        {isLoading ? 'Starte...' : 'Trotzdem starten'}
+      </button>
+    </div>
+  </ModalBase>
+);
 
 function RoomSelectionPage() {
   const {

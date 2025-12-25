@@ -13,6 +13,8 @@ interface ModalTimeoutIndicatorProps {
   color?: string;
   /** Background track color */
   trackColor?: string;
+  /** Border radius of the modal container (for matching corners) */
+  borderRadius?: string;
 }
 
 /**
@@ -38,6 +40,7 @@ export const ModalTimeoutIndicator: React.FC<ModalTimeoutIndicatorProps> = ({
   height = 6,
   color = 'rgba(255, 255, 255, 0.9)',
   trackColor = 'rgba(255, 255, 255, 0.2)',
+  borderRadius = '32px',
 }) => {
   // State to trigger animation after mount (avoids flash)
   const [shouldAnimate, setShouldAnimate] = useState(false);
@@ -65,7 +68,10 @@ export const ModalTimeoutIndicator: React.FC<ModalTimeoutIndicatorProps> = ({
     backgroundColor: trackColor,
     overflow: 'hidden',
     // Match modal border radius
-    borderRadius: position === 'top' ? '32px 32px 0 0' : '0 0 32px 32px',
+    borderRadius:
+      position === 'top'
+        ? `${borderRadius} ${borderRadius} 0 0`
+        : `0 0 ${borderRadius} ${borderRadius}`,
   };
 
   const barStyle: React.CSSProperties = {

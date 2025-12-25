@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
-import { ErrorModal } from '../components/ui';
+import { ErrorModal, ModalBase } from '../components/ui';
 import { api, mapServerErrorToGerman, type SessionStartRequest } from '../services/api';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -678,184 +678,151 @@ function HomeViewPage() {
       />
 
       {/* Confirmation Modal for Recreation */}
-      {showConfirmModal && sessionSettings?.last_session && (
+      <ModalBase
+        isOpen={showConfirmModal && !!sessionSettings?.last_session}
+        onClose={() => setShowConfirmModal(false)}
+        size="sm"
+        backgroundColor="#FFFFFF"
+        closeOnBackdropClick={!isValidatingLastSession}
+      >
+        {/* Success Icon */}
         <div
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            width: '64px',
+            height: '64px',
+            background: 'linear-gradient(to right, #83CD2D, #70B525)',
+            borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={e => {
-            if (e.target === e.currentTarget) {
-              setShowConfirmModal(false);
-            }
+            margin: '0 auto 24px auto',
+            boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
           }}
         >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: designSystem.borderRadius.xl,
-              padding: '32px',
-              maxWidth: '480px',
-              width: '90%',
-              textAlign: 'center',
-              boxShadow:
-                '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Success Icon */}
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 12l5 5L20 7"
+              stroke="white"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+
+        {/* Title */}
+        <h2
+          style={{
+            fontSize: '24px',
+            fontWeight: 700,
+            color: '#1F2937',
+            marginBottom: '12px',
+          }}
+        >
+          Aktivität wiederholen?
+        </h2>
+
+        {/* Activity Details */}
+        {useUserStore.getState().selectedActivity && useUserStore.getState().selectedRoom && (
+          <div style={{ marginBottom: '24px' }}>
             <div
               style={{
-                width: '64px',
-                height: '64px',
-                background: 'linear-gradient(to right, #83CD2D, #70B525)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 24px auto',
-                boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: '16px',
               }}
             >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M5 12l5 5L20 7"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {useUserStore.getState().selectedActivity?.name}
             </div>
 
-            {/* Title */}
-            <h2
+            <div
               style={{
-                fontSize: '24px',
-                fontWeight: 700,
-                color: '#1F2937',
-                marginBottom: '12px',
+                backgroundColor: '#F3F4F6',
+                borderRadius: designSystem.borderRadius.lg,
+                padding: '16px',
+                textAlign: 'left',
               }}
             >
-              Aktivität wiederholen?
-            </h2>
-
-            {/* Activity Details */}
-            {useUserStore.getState().selectedActivity && useUserStore.getState().selectedRoom && (
-              <div style={{ marginBottom: '24px' }}>
-                <div
+              <div style={{ marginBottom: '8px' }}>
+                <span style={{ color: '#6B7280', fontSize: '14px' }}>Raum:</span>
+                <span
                   style={{
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '16px',
+                    color: '#1F2937',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    marginLeft: '8px',
                   }}
                 >
-                  {useUserStore.getState().selectedActivity?.name}
-                </div>
-
-                <div
-                  style={{
-                    backgroundColor: '#F3F4F6',
-                    borderRadius: designSystem.borderRadius.lg,
-                    padding: '16px',
-                    textAlign: 'left',
-                  }}
-                >
-                  <div style={{ marginBottom: '8px' }}>
-                    <span style={{ color: '#6B7280', fontSize: '14px' }}>Raum:</span>
-                    <span
-                      style={{
-                        color: '#1F2937',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        marginLeft: '8px',
-                      }}
-                    >
-                      {useUserStore.getState().selectedRoom?.name}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#6B7280', fontSize: '14px' }}>Betreuer:</span>
-                    <span
-                      style={{
-                        color: '#1F2937',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        marginLeft: '8px',
-                      }}
-                    >
-                      {useUserStore
-                        .getState()
-                        .selectedSupervisors.map(s => s.name)
-                        .join(', ')}
-                    </span>
-                  </div>
-                </div>
+                  {useUserStore.getState().selectedRoom?.name}
+                </span>
               </div>
-            )}
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                onClick={() => setShowConfirmModal(false)}
-                style={{
-                  flex: 1,
-                  height: '56px',
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  color: '#6B7280',
-                  backgroundColor: 'transparent',
-                  border: '2px solid #E5E7EB',
-                  borderRadius: designSystem.borderRadius.lg,
-                  cursor: 'pointer',
-                  transition: 'all 200ms',
-                  outline: 'none',
-                }}
-              >
-                Abbrechen
-              </button>
-
-              <button
-                onClick={handleConfirmRecreation}
-                disabled={isValidatingLastSession}
-                style={{
-                  flex: 1,
-                  height: '56px',
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  color: '#FFFFFF',
-                  background: isValidatingLastSession
-                    ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                    : 'linear-gradient(to right, #83CD2D, #70B525)',
-                  border: 'none',
-                  borderRadius: designSystem.borderRadius.lg,
-                  cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
-                  transition: 'all 200ms',
-                  outline: 'none',
-                  boxShadow: isValidatingLastSession
-                    ? 'none'
-                    : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
-                  opacity: isValidatingLastSession ? 0.6 : 1,
-                }}
-              >
-                {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
-              </button>
+              <div>
+                <span style={{ color: '#6B7280', fontSize: '14px' }}>Betreuer:</span>
+                <span
+                  style={{
+                    color: '#1F2937',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    marginLeft: '8px',
+                  }}
+                >
+                  {useUserStore
+                    .getState()
+                    .selectedSupervisors.map(s => s.name)
+                    .join(', ')}
+                </span>
+              </div>
             </div>
           </div>
+        )}
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={() => setShowConfirmModal(false)}
+            style={{
+              flex: 1,
+              height: '56px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#6B7280',
+              backgroundColor: 'transparent',
+              border: '2px solid #E5E7EB',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+            }}
+          >
+            Abbrechen
+          </button>
+
+          <button
+            onClick={handleConfirmRecreation}
+            disabled={isValidatingLastSession}
+            style={{
+              flex: 1,
+              height: '56px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#FFFFFF',
+              background: isValidatingLastSession
+                ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                : 'linear-gradient(to right, #83CD2D, #70B525)',
+              border: 'none',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              boxShadow: isValidatingLastSession ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
+              opacity: isValidatingLastSession ? 0.6 : 1,
+            }}
+          >
+            {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
+          </button>
         </div>
-      )}
+      </ModalBase>
     </BackgroundWrapper>
   );
 }

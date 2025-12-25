@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal } from '../components/ui';
+import { ErrorModal, ModalBase } from '../components/ui';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -356,121 +356,91 @@ function TagAssignmentPage() {
           </h1>
 
           {/* Scanner Modal Overlay */}
-          {showScanner && (
+          <ModalBase
+            isOpen={showScanner}
+            onClose={() => setShowScanner(false)}
+            size="md"
+            backgroundColor="#5080D8"
+          >
+            {/* Background pattern */}
             <div
-              aria-hidden="true"
               style={{
-                position: 'fixed',
+                position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
                 bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                background:
+                  'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* Icon container */}
+            <div
+              style={{
+                width: '120px',
+                height: '120px',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 1000,
-              }}
-              onClick={e => {
-                if (e.target === e.currentTarget) {
-                  setShowScanner(false);
-                }
+                margin: '0 auto 32px',
+                position: 'relative',
+                zIndex: 2,
               }}
             >
-              <div
-                style={{
-                  backgroundColor: '#5080D8',
-                  borderRadius: '32px',
-                  padding: '64px',
-                  maxWidth: '600px',
-                  width: '90%',
-                  textAlign: 'center',
-                  boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Background pattern */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background:
-                      'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                    pointerEvents: 'none',
-                  }}
-                />
-
-                {/* Icon container */}
-                <div
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 32px',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  <FontAwesomeIcon
-                    icon={faWifi}
-                    size="4x"
-                    style={{ color: 'white', transform: 'rotate(90deg)' }}
-                  />
-                </div>
-
-                <h2
-                  style={{
-                    fontSize: '36px',
-                    fontWeight: 700,
-                    marginBottom: '16px',
-                    color: '#FFFFFF',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  Armband scannen...
-                </h2>
-                <p
-                  style={{
-                    fontSize: '20px',
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    marginBottom: '32px',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  Halten Sie das Armband an den Scanner
-                </p>
-
-                <button
-                  onClick={() => setShowScanner(false)}
-                  style={{
-                    padding: '12px 32px',
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '24px',
-                    cursor: 'pointer',
-                    outline: 'none',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  Abbrechen
-                </button>
-              </div>
+              <FontAwesomeIcon
+                icon={faWifi}
+                size="4x"
+                style={{ color: 'white', transform: 'rotate(90deg)' }}
+              />
             </div>
-          )}
+
+            <h2
+              style={{
+                fontSize: '36px',
+                fontWeight: 700,
+                marginBottom: '16px',
+                color: '#FFFFFF',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              Armband scannen...
+            </h2>
+            <p
+              style={{
+                fontSize: '20px',
+                color: 'rgba(255, 255, 255, 0.9)',
+                marginBottom: '32px',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              Halten Sie das Armband an den Scanner
+            </p>
+
+            <button
+              onClick={() => setShowScanner(false)}
+              style={{
+                padding: '12px 32px',
+                fontSize: '18px',
+                fontWeight: 600,
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '24px',
+                cursor: 'pointer',
+                outline: 'none',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              Abbrechen
+            </button>
+          </ModalBase>
 
           {/* Main Content - Centered */}
           <div

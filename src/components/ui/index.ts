@@ -3,9 +3,9 @@ export { default as Button } from './Button';
 export { default as Select } from './Select';
 export { default as ContentBox } from './ContentBox';
 export { default as ActionButton } from './ActionButton';
-export { ModalBase } from './ModalBase';
+export { ModalBase, type ModalSize } from './ModalBase';
 export { ErrorModal } from './ErrorModal';
 export { SuccessModal } from './SuccessModal';
 export { default as BackButton } from './BackButton';
-export { ModalTimeoutIndicator } from './ModalTimeoutIndicator';
+// Note: ModalTimeoutIndicator is internal to ModalBase and not exported
 export { ContinueButton } from './ContinueButton';

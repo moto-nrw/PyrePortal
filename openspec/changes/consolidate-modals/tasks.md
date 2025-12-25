@@ -2,7 +2,7 @@
 
 ## Phase 0: ModalBase Enhancement
 
-- [ ] **0.1** Add size presets to ModalBase
+- [x] **0.1** Add size presets to ModalBase
   - Add `ModalSize = 'sm' | 'md' | 'lg'` type
   - Add `SIZE_PRESETS` constant with dimensions:
     - `sm`: { maxWidth: '500px', padding: '48px', borderRadius: '20px' } (ErrorModal, SuccessModal, InfoModal)
@@ -11,7 +11,7 @@
   - Add `size?: ModalSize` prop, default to 'lg' for backwards compatibility
   - Apply preset values to container div styles
 
-- [ ] **0.2** Add timeout indicator color props to ModalBase
+- [x] **0.2** Add timeout indicator color props to ModalBase
   - Add `timeoutColor?: string` prop
   - Add `timeoutTrackColor?: string` prop
   - Implement `getContrastColors(backgroundColor)` helper:
@@ -19,7 +19,7 @@
     - Dark/colored backgrounds → white indicator colors (current default)
   - Pass resolved colors to ModalTimeoutIndicator
 
-- [ ] **0.3** Add default backdrop blur to ModalBase
+- [x] **0.3** Add default backdrop blur to ModalBase
   - Update `src/index.css` dialog::backdrop with default `backdrop-filter: blur(4px)`
   - Add `backdropBlur?: string` prop for customization
   - Set CSS custom property `--modal-backdrop-blur` only when prop is provided
@@ -27,14 +27,14 @@
 
 ## Phase 1: Shared Component Refactoring
 
-- [ ] **1.1** Refactor ErrorModal to use ModalBase
+- [x] **1.1** Refactor ErrorModal to use ModalBase
   - Replace div-based modal shell with ModalBase wrapper
   - Use `size="sm"` to match original dimensions
   - Keep icon, title, message content
   - Map `autoCloseDelay` to ModalBase `timeout` prop
   - Verify timeout indicator is visible (dark on white)
 
-- [ ] **1.2** Refactor SuccessModal to use ModalBase
+- [x] **1.2** Refactor SuccessModal to use ModalBase
   - Replace div-based modal shell with ModalBase wrapper
   - Use `size="sm"` to match original dimensions
   - Keep icon, title, message content
@@ -42,7 +42,7 @@
   - Map `autoCloseDelay` to ModalBase `timeout` prop
   - Verify timeout indicator is visible (dark on white)
 
-- [ ] **1.3** Refactor InfoModal to use ModalBase
+- [x] **1.3** Refactor InfoModal to use ModalBase
   - Replace div-based modal shell with ModalBase wrapper
   - Use `size="sm"` (standardized to match ErrorModal/SuccessModal)
   - Backdrop blur comes from ModalBase default (4px)
@@ -50,50 +50,50 @@
   - Remove inline `<style>` tag
   - Remove manual Escape key handler (ModalBase handles this)
 
-- [ ] **1.4** Remove ModalTimeoutIndicator from public exports
+- [x] **1.4** Remove ModalTimeoutIndicator from public exports
   - Update `src/components/ui/index.ts` to remove export
   - File stays (used internally by ModalBase)
   - Verify no external imports of ModalTimeoutIndicator
 
 ## Phase 2: Page Modal Migrations
 
-- [ ] **2.1** Migrate RoomSelectionPage ConfirmationModal
+- [x] **2.1** Migrate RoomSelectionPage ConfirmationModal
   - Replace div-based shell with ModalBase
   - Keep activity details, supervisor list, buttons inline
   - Remove backdrop/positioning code
 
-- [ ] **2.2** Migrate RoomSelectionPage ConflictModal
+- [x] **2.2** Migrate RoomSelectionPage ConflictModal
   - Replace div-based shell with ModalBase
   - Keep conflict message, action buttons inline
   - Remove backdrop/positioning code
 
-- [ ] **2.3** Migrate HomeViewPage confirmation modal
+- [x] **2.3** Migrate HomeViewPage confirmation modal
   - Replace inline modal implementation with ModalBase
   - Keep last session details content
 
-- [ ] **2.4** Migrate TagAssignmentPage scanner overlay
+- [x] **2.4** Migrate TagAssignmentPage scanner overlay
   - Replace div-based overlay with ModalBase
   - Keep scanning icon and message content
   - Consider if this is semantically a modal or loading state
 
 ## Phase 3: Cleanup
 
-- [ ] **3.1** Remove dead code from StaffSelectionPage
+- [x] **3.1** Remove dead code from StaffSelectionPage
   - Delete unused `@keyframes modalPop` CSS
 
-- [ ] **3.2** Run validation
+- [x] **3.2** Run validation
   - `npm run check` passes (lint + types)
   - `npm run format` applied
   - Manual visual test of each modal
 
 ## Verification
 
-- [ ] All modals open/close correctly
-- [ ] Modal sizes match original dimensions (no visual size regression)
-- [ ] Timeout indicator visible on light backgrounds (ErrorModal, SuccessModal, InfoModal)
-- [ ] Timeout indicator visible on colored backgrounds (ActivityScanningPage scan modal)
-- [ ] Backdrop click dismisses modals (where applicable)
-- [ ] Auto-close timers work on ErrorModal, SuccessModal
-- [ ] Escape key closes modals
-- [ ] No console errors or warnings
-- [ ] SonarCloud quality gate passes
+- [x] All modals open/close correctly
+- [x] Modal sizes match original dimensions (no visual size regression)
+- [x] Timeout indicator visible on light backgrounds (ErrorModal, SuccessModal, InfoModal)
+- [x] Timeout indicator visible on colored backgrounds (ActivityScanningPage scan modal)
+- [x] Backdrop click dismisses modals (where applicable)
+- [x] Auto-close timers work on ErrorModal, SuccessModal
+- [x] Escape key closes modals
+- [x] No console errors or warnings
+- [ ] SonarCloud quality gate passes (requires CI run)

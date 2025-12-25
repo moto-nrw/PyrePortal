@@ -497,21 +497,6 @@ function StaffSelectionPage() {
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
           }
-
-
-          @keyframes modalPop {
-            0% {
-              transform: scale(0.8);
-              opacity: 0;
-            }
-            50% {
-              transform: scale(1.05);
-            }
-            100% {
-              transform: scale(1);
-              opacity: 1;
-            }
-          }
         `}
         </style>
       </div>
