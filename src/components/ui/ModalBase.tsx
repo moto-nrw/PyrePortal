@@ -70,7 +70,7 @@ export function ModalBase({
   timeoutResetKey,
   onTimeout,
   closeOnBackdropClick = true,
-}: ModalBaseProps) {
+}: Readonly<ModalBaseProps>) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
   // Handle timeout expiration
