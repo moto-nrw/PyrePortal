@@ -34,11 +34,11 @@ Create `ModalBase` - a component that extracts the ActivityScanningPage modal pa
 
 - Create `ModalBase.tsx` component matching ActivityScanningPage modal styling
 - Integrate with existing `ModalTimeoutIndicator` and `useModalTimeout`
+- Migrate ActivityScanningPage to use `ModalBase` (proves the base works)
 - Delete unused `Modal.tsx`
 
 **Out of scope (future changes):**
 
-- Migrating ActivityScanningPage to use `ModalBase` (separate proposal after this works)
 - Migrating other modals (ErrorModal, SuccessModal, InfoModal, RoomSelectionPage modals)
 - Adding blur or other visual changes (will be decided when migrating other modals)
 
@@ -46,6 +46,6 @@ Create `ModalBase` - a component that extracts the ActivityScanningPage modal pa
 
 - **Files added:** `src/components/ui/ModalBase.tsx`
 - **Files removed:** `src/components/ui/Modal.tsx` (dead code)
-- **Files modified:** `src/components/ui/index.ts` (update exports)
-
-No breaking changes - ActivityScanningPage keeps its inline modal until we verify ModalBase works correctly.
+- **Files modified:**
+  - `src/components/ui/index.ts` (update exports)
+  - `src/pages/ActivityScanningPage.tsx` (use ModalBase instead of inline modal)

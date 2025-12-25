@@ -10,36 +10,41 @@
 1. [ ] **Create ModalBase component**
    - File: `src/components/ui/ModalBase.tsx`
    - Implement props interface as specified in design.md
-   - Implement backdrop with blur and configurable opacity
+   - Implement backdrop with dark overlay (no blur)
    - Implement container with consistent styling
    - Integrate `useModalTimeout` hook for timeout management
    - Integrate `ModalTimeoutIndicator` for visual timeout display
-   - Add keyboard (Escape) handling
-   - Add body scroll prevention
 
 2. [ ] **Export from barrel file**
    - File: `src/components/ui/index.ts`
    - Add `export { ModalBase } from './ModalBase'`
 
-3. [ ] **Delete dead code**
+3. [ ] **Migrate ActivityScanningPage to use ModalBase**
+   - File: `src/pages/ActivityScanningPage.tsx`
+   - Replace ~250 lines of inline modal JSX with ModalBase
+   - Keep all existing functionality (icons, content, buttons)
+   - Ensure visual appearance is identical
+
+4. [ ] **Delete dead code**
    - Delete: `src/components/ui/Modal.tsx`
    - Update: `src/components/ui/index.ts` (remove Modal export)
 
 ## Validation
 
-4. [ ] **Manual testing**
-   - Create a test usage in a dev page or storybook
-   - Verify backdrop blur works
+5. [ ] **Manual testing in ActivityScanningPage**
+   - Verify check-in modal displays correctly
+   - Verify check-out modal displays correctly
+   - Verify daily checkout flow works
+   - Verify feedback prompt works
    - Verify click-to-dismiss works
-   - Verify Escape key works
    - Verify timeout and indicator work
-   - Verify timeout reset (via resetKey) works
+   - Verify timeout reset on new scan works
 
-5. [ ] **Type checking**
+6. [ ] **Type checking**
    - Run `npm run check` - must pass with no errors
 
 ## Notes
 
-- Tasks 1-3 can be done in sequence
-- Task 4 is manual verification before commit
-- Task 5 is final validation gate
+- Tasks 1-4 are sequential (each depends on previous)
+- Task 5 is manual verification before commit
+- Task 6 is final validation gate

@@ -111,13 +111,16 @@ overflow: hidden;
 
 - `Modal.tsx` - dead code, will be deleted
 
+### Migrates
+
+- ActivityScanningPage inline modal - replaced with ModalBase in this change
+
 ### Does Not Replace (yet)
 
 - `SuccessModal.tsx` - future proposal
 - `ErrorModal.tsx` - future proposal
 - `InfoModal.tsx` - future proposal
 - `RoomSelectionPage` modals - future proposal
-- ActivityScanningPage inline modal - next proposal after this works
 
 ## File Location
 
