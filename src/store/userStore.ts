@@ -357,11 +357,13 @@ type GetState<T> = () => T;
 
 // Session-scoped state that should be cleared when session ends
 // This prevents stale room/activity data from being used after session change
+// NOTE: selectedSupervisors is NOT included here - supervisors persist independently
+// for Tag Assignment feature (team selection without active session). Supervisors are
+// cleared explicitly in logout() and when a session ends via endSession().
 const SESSION_INITIAL_STATE = {
   selectedRoom: null as Room | null,
   selectedActivity: null as ActivityResponse | null,
   currentSession: null as CurrentSession | null,
-  selectedSupervisors: [] as User[],
   activeSupervisorTags: new Set<string>(),
 };
 
