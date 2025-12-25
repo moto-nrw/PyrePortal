@@ -96,4 +96,4 @@
 - [x] Auto-close timers work on ErrorModal, SuccessModal
 - [x] Escape key closes modals
 - [x] No console errors or warnings
-- [ ] SonarCloud quality gate passes (requires CI run)
+- [x] SonarCloud quality gate passes (requires CI run)
