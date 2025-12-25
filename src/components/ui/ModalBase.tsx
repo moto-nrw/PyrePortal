@@ -143,6 +143,12 @@ export function ModalBase({
         maxWidth: 'none',
         maxHeight: 'none',
         overflow: 'visible',
+        // Centering: native dialog needs explicit positioning when max-width/height are overridden
+        position: 'fixed',
+        inset: 0,
+        margin: 'auto',
+        // Remove default focus outline (dialog receives focus on showModal())
+        outline: 'none',
       }}
     >
       {/* Container */}
