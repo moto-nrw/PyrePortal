@@ -4,8 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ModalTimeoutIndicator } from '../components/ui';
-import { useModalTimeout } from '../hooks/useModalTimeout';
+import { ModalBase } from '../components/ui';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
@@ -495,18 +494,6 @@ const ActivityScanningPage: React.FC = () => {
     navigate,
     authenticatedUser?.pin,
   ]);
-
-  // Modal timeout hook - handles timer logic and provides animation key for progress bar
-  const { animationKey: modalAnimationKey, isRunning: isModalTimerRunning } = useModalTimeout({
-    duration: modalTimeoutDuration,
-    isActive: showModal && !!currentScan,
-    onTimeout: handleModalTimeout,
-    // Reset timer when scan changes OR modal state changes (e.g., farewell starts)
-    // This ensures the progress bar restarts when transitioning between modal states
-    resetKey: currentScan
-      ? `${currentScan.student_id}-${currentScan.action}-${dailyCheckoutState?.showingFarewell ?? false}`
-      : null,
-  });
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -1209,261 +1196,222 @@ const ActivityScanningPage: React.FC = () => {
         </div>
       </BackgroundWrapper>
 
-      {/**/}
       {/* Check-in/Check-out Modal */}
-      {shouldShowCheckModal && currentScan && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.7)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 1000,
-          }}
-          onClick={() => {
-            // Allow clicking backdrop to dismiss any scan modal
-            // Use the same logic as handleModalTimeout to ensure consistent behavior
-            handleModalTimeout();
-          }}
+      {currentScan && (
+        <ModalBase
+          isOpen={shouldShowCheckModal}
+          onClose={handleModalTimeout}
+          backgroundColor={(() => {
+            // Check for daily checkout state
+            if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
+            // Check for Schulhof check-in (special yellow)
+            if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
+            // Check for supervisor authentication
+            if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
+            // Check for error or info states
+            if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
+            if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
+            // Original logic for success states
+            return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
+              ? '#83cd2d'
+              : '#f87C10';
+          })()}
+          timeout={modalTimeoutDuration}
+          timeoutResetKey={`${currentScan.student_id}-${currentScan.action}-${dailyCheckoutState?.showingFarewell ?? false}`}
         >
+          {/* Background pattern for visual interest */}
           <div
             style={{
-              backgroundColor: (() => {
-                // Check for daily checkout state
-                if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
-                // Check for Schulhof check-in (special yellow)
-                if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
-                // Check for supervisor authentication
-                if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
-                // Check for error or info states
-                if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
-                if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
-                // Original logic for success states
-                return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
-                  ? '#83cd2d'
-                  : '#f87C10';
-              })(),
-              borderRadius: '32px',
-              padding: '64px',
-              maxWidth: '700px',
-              width: '90%',
-              textAlign: 'center',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-              position: 'relative',
-              overflow: 'hidden',
-              transform: 'scale(1)',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background:
+                'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+              pointerEvents: 'none',
             }}
-            onClick={e => e.stopPropagation()} // Prevent closing when clicking inside modal
-          >
-            {/* Background pattern for visual interest */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background:
-                  'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                pointerEvents: 'none',
-              }}
-            />
+          />
 
-            {/* Icon container with background circle */}
-            <div
-              style={{
-                width: '120px',
-                height: '120px',
-                backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 32px',
-                position: 'relative',
-                zIndex: 2,
-              }}
-            >
-              {(() => {
-                // Daily checkout state - Question or Farewell icon
-                if (dailyCheckoutState) {
-                  // Home icon (outline) for daily checkout states
-                  return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
-                  );
-                }
-                // Supervisor authentication icon
-                if (currentScan.action === 'supervisor_authenticated') {
-                  return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="2.5"
-                    >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                  );
-                }
-                // Error state - X icon
-                if ((currentScan as { showAsError?: boolean }).showAsError) {
-                  return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18"></line>
-                      <line x1="6" y1="6" x2="18" y2="18"></line>
-                    </svg>
-                  );
-                }
-                // Info state - Info icon
-                if ((currentScan as { isInfo?: boolean }).isInfo) {
-                  return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="2.5"
-                    >
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                      <circle cx="9" cy="7" r="4" />
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                    </svg>
-                  );
-                }
-                // Success states
-                return currentScan.action === 'checked_in' ||
-                  currentScan.action === 'transferred' ? (
+          {/* Icon container with background circle */}
+          <div
+            style={{
+              width: '120px',
+              height: '120px',
+              backgroundColor: 'rgba(255, 255, 255, 0.3)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 32px',
+              position: 'relative',
+              zIndex: 2,
+            }}
+          >
+            {(() => {
+              // Daily checkout state - Question or Farewell icon
+              if (dailyCheckoutState) {
+                // Home icon (outline) for daily checkout states
+                return (
                   <svg
                     width="80"
                     height="80"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="white"
-                    strokeWidth="3"
+                    strokeWidth="2.2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                ) : (
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                   </svg>
                 );
-              })()}
-            </div>
-
-            <h2
-              style={{
-                fontSize: '48px',
-                fontWeight: 800,
-                marginBottom: '24px',
-                color: '#FFFFFF',
-                lineHeight: 1.2,
-                position: 'relative',
-                zIndex: 2,
-              }}
-            >
-              {(() => {
-                // Feedback prompt
-                if (showFeedbackPrompt) {
-                  return 'Wie war dein Tag?';
-                }
-
-                // Daily checkout state
-                if (dailyCheckoutState) {
-                  if (dailyCheckoutState.showingFarewell) {
-                    // Extract first name from full name
-                    const firstName = dailyCheckoutState.studentName.split(' ')[0];
-                    return `Auf Wiedersehen, ${firstName}!`;
-                  } else {
-                    return 'Gehst du nach Hause?';
-                  }
-                }
-
-                // Supervisor authentication - prefer custom message (e.g., redirect hint)
-                if (currentScan.action === 'supervisor_authenticated') {
-                  if (currentScan.message) return currentScan.message;
-
-                  const roomName = selectedRoom?.name ?? 'diesen Raum';
-                  return `${currentScan.student_name} betreut jetzt ${roomName}`;
-                }
-
-                // Show custom message if available
-                const msg = currentScan.message;
-                if (msg) return msg;
-
-                // Error/Info states use student_name as the title
-                if (
-                  (currentScan as { showAsError?: boolean }).showAsError ||
-                  (currentScan as { isInfo?: boolean }).isInfo
-                ) {
-                  return currentScan.student_name;
-                }
-
-                // Normal greeting
-                return currentScan.action === 'checked_in'
-                  ? `Hallo, ${currentScan.student_name}!`
-                  : `Tschüss, ${currentScan.student_name}!`;
-              })()}
-            </h2>
-
-            {/* Content area for message or button */}
-            {renderModalContent()}
-
-            {/* Timeout progress indicator - shows remaining time before modal auto-dismisses */}
-            <ModalTimeoutIndicator
-              key={modalAnimationKey}
-              duration={modalTimeoutDuration}
-              isActive={isModalTimerRunning}
-              position="bottom"
-              height={8}
-            />
+              }
+              // Supervisor authentication icon
+              if (currentScan.action === 'supervisor_authenticated') {
+                return (
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                  >
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                );
+              }
+              // Error state - X icon
+              if ((currentScan as { showAsError?: boolean }).showAsError) {
+                return (
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
+                );
+              }
+              // Info state - Info icon
+              if ((currentScan as { isInfo?: boolean }).isInfo) {
+                return (
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                  >
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                );
+              }
+              // Success states
+              return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
+                <svg
+                  width="80"
+                  height="80"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              ) : (
+                <svg
+                  width="80"
+                  height="80"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="white"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+              );
+            })()}
           </div>
-        </div>
+
+          <h2
+            style={{
+              fontSize: '48px',
+              fontWeight: 800,
+              marginBottom: '24px',
+              color: '#FFFFFF',
+              lineHeight: 1.2,
+              position: 'relative',
+              zIndex: 2,
+            }}
+          >
+            {(() => {
+              // Feedback prompt
+              if (showFeedbackPrompt) {
+                return 'Wie war dein Tag?';
+              }
+
+              // Daily checkout state
+              if (dailyCheckoutState) {
+                if (dailyCheckoutState.showingFarewell) {
+                  // Extract first name from full name
+                  const firstName = dailyCheckoutState.studentName.split(' ')[0];
+                  return `Auf Wiedersehen, ${firstName}!`;
+                } else {
+                  return 'Gehst du nach Hause?';
+                }
+              }
+
+              // Supervisor authentication - prefer custom message (e.g., redirect hint)
+              if (currentScan.action === 'supervisor_authenticated') {
+                if (currentScan.message) return currentScan.message;
+
+                const roomName = selectedRoom?.name ?? 'diesen Raum';
+                return `${currentScan.student_name} betreut jetzt ${roomName}`;
+              }
+
+              // Show custom message if available
+              const msg = currentScan.message;
+              if (msg) return msg;
+
+              // Error/Info states use student_name as the title
+              if (
+                (currentScan as { showAsError?: boolean }).showAsError ||
+                (currentScan as { isInfo?: boolean }).isInfo
+              ) {
+                return currentScan.student_name;
+              }
+
+              // Normal greeting
+              return currentScan.action === 'checked_in'
+                ? `Hallo, ${currentScan.student_name}!`
+                : `Tschüss, ${currentScan.student_name}!`;
+            })()}
+          </h2>
+
+          {/* Content area for message or button */}
+          {renderModalContent()}
+        </ModalBase>
       )}
     </>
   );
