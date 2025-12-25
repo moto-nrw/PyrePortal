@@ -39,3 +39,6 @@ dist-ssr
 # OpenSpec (local-only)
 openspec/changes/archive/
 openspec/specs/
+
+# Git worktrees
+.worktrees/
