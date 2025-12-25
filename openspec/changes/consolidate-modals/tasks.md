@@ -2,28 +2,50 @@
 
 ## Phase 0: ModalBase Enhancement
 
-- [ ] **0.1** Add backdropBlur prop to ModalBase
-  - Add `backdropBlur?: string` to ModalBaseProps interface
-  - Set CSS custom property `--modal-backdrop-blur` on dialog element
-  - Update `src/index.css` dialog::backdrop to use `backdrop-filter: var(--modal-backdrop-blur, none)`
+- [ ] **0.1** Add size presets to ModalBase
+  - Add `ModalSize = 'sm' | 'md' | 'lg'` type
+  - Add `SIZE_PRESETS` constant with dimensions:
+    - `sm`: { maxWidth: '500px', padding: '48px', borderRadius: '20px' } (ErrorModal, SuccessModal, InfoModal)
+    - `md`: { maxWidth: '600px', padding: '56px', borderRadius: '24px' } (future use)
+    - `lg`: { maxWidth: '700px', padding: '64px', borderRadius: '32px' } (ActivityScanningPage)
+  - Add `size?: ModalSize` prop, default to 'lg' for backwards compatibility
+  - Apply preset values to container div styles
+
+- [ ] **0.2** Add timeout indicator color props to ModalBase
+  - Add `timeoutColor?: string` prop
+  - Add `timeoutTrackColor?: string` prop
+  - Implement `getContrastColors(backgroundColor)` helper:
+    - Light backgrounds → dark indicator colors
+    - Dark/colored backgrounds → white indicator colors (current default)
+  - Pass resolved colors to ModalTimeoutIndicator
+
+- [ ] **0.3** Add default backdrop blur to ModalBase
+  - Update `src/index.css` dialog::backdrop with default `backdrop-filter: blur(4px)`
+  - Add `backdropBlur?: string` prop for customization
+  - Set CSS custom property `--modal-backdrop-blur` only when prop is provided
   - Include `-webkit-backdrop-filter` for Safari support
 
 ## Phase 1: Shared Component Refactoring
 
 - [ ] **1.1** Refactor ErrorModal to use ModalBase
   - Replace div-based modal shell with ModalBase wrapper
+  - Use `size="sm"` to match original dimensions
   - Keep icon, title, message content
   - Map `autoCloseDelay` to ModalBase `timeout` prop
-  - Verify auto-close behavior works
+  - Verify timeout indicator is visible (dark on white)
 
 - [ ] **1.2** Refactor SuccessModal to use ModalBase
   - Replace div-based modal shell with ModalBase wrapper
+  - Use `size="sm"` to match original dimensions
   - Keep icon, title, message content
   - Remove inline `<style>` tag (animation handled by ModalBase)
   - Map `autoCloseDelay` to ModalBase `timeout` prop
+  - Verify timeout indicator is visible (dark on white)
 
 - [ ] **1.3** Refactor InfoModal to use ModalBase
   - Replace div-based modal shell with ModalBase wrapper
+  - Use `size="sm"` (standardized to match ErrorModal/SuccessModal)
+  - Backdrop blur comes from ModalBase default (4px)
   - Keep icon, title, message, button content
   - Remove inline `<style>` tag
   - Remove manual Escape key handler (ModalBase handles this)
@@ -67,6 +89,9 @@
 ## Verification
 
 - [ ] All modals open/close correctly
+- [ ] Modal sizes match original dimensions (no visual size regression)
+- [ ] Timeout indicator visible on light backgrounds (ErrorModal, SuccessModal, InfoModal)
+- [ ] Timeout indicator visible on colored backgrounds (ActivityScanningPage scan modal)
 - [ ] Backdrop click dismisses modals (where applicable)
 - [ ] Auto-close timers work on ErrorModal, SuccessModal
 - [ ] Escape key closes modals
