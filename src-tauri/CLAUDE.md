@@ -14,7 +14,6 @@ This directory contains the Rust backend for PyrePortal, providing system access
 - `logging.rs` (~200 lines) - File-based logging with rotation
 - `rfid.rs` (~400 lines) - RFID hardware abstraction + mock implementation
 - `session_storage.rs` (~150 lines) - Session settings persistence
-- `student_cache.rs` (~200 lines) - Legacy student cache (currently unused; server-first scans)
 
 ### Test Examples (Not Bundled)
 
@@ -131,27 +130,6 @@ fn load_session_settings() -> Result<Option<SessionSettings>, String>
 #[tauri::command]
 fn clear_session() -> Result<(), String>
 ```
-
-### Legacy Student Cache (student_cache.rs)
-
-Currently unused: the frontend is server-first with no local student cache. Keep only if we reintroduce offline caching later.
-
-```rust
-#[tauri::command]
-fn cache_student(tag_id: String, student_data: StudentData) -> Result<(), String>
-
-#[tauri::command]
-fn get_cached_student(tag_id: String) -> Result<Option<StudentData>, String>
-
-#[tauri::command]
-fn clear_student_cache() -> Result<(), String>
-```
-
-**Legacy Cache Strategy:**
-
-- Daily JSON files: `student_cache_YYYYMMDD.json`
-- Automatic invalidation on date change
-- Platform-specific app data directory
 
 ## Error Handling
 
