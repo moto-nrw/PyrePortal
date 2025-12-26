@@ -31,11 +31,6 @@ fn get_api_config() -> Result<ApiConfig, String> {
 }
 
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {name}! You've been greeted from Rust!")
-}
-
-#[tauri::command]
 fn restart_app() {
     // Exit with code 0 - Balena's restart: always policy will restart the container
     // On macOS/dev mode, the app simply exits
@@ -62,7 +57,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_api_config,
-            greet,
             restart_app,
             logging::write_log,
             logging::get_log_files,
