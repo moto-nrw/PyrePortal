@@ -5,6 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
+import BackButton from '../components/ui/BackButton';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -285,7 +286,7 @@ function TagAssignmentPage() {
             position: 'relative',
           }}
         >
-          {/* Modern back button */}
+          {/* Back button */}
           <div
             style={{
               position: 'absolute',
@@ -294,51 +295,7 @@ function TagAssignmentPage() {
               zIndex: 10,
             }}
           >
-            <button
-              type="button"
-              onClick={handleBack}
-              style={{
-                height: '56px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                padding: '0 28px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-                borderRadius: '28px',
-                cursor: 'pointer',
-                outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                position: 'relative',
-                overflow: 'hidden',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#374151"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M19 12H5" />
-                <path d="M12 19l-7-7 7-7" />
-              </svg>
-              <span
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  color: '#374151',
-                }}
-              >
-                Zurück
-              </span>
-            </button>
+            <BackButton onClick={handleBack} />
           </div>
 
           {/* Title */}
@@ -819,14 +776,14 @@ function TagAssignmentPage() {
                   <button
                     onClick={handleScanAnother}
                     style={{
-                      height: '56px',
-                      padding: '0 32px',
-                      fontSize: '18px',
+                      height: '68px',
+                      padding: '0 40px',
+                      fontSize: '20px',
                       fontWeight: 600,
                       backgroundColor: '#5080D8',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '28px',
+                      borderRadius: '34px',
                       cursor: 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
@@ -838,14 +795,14 @@ function TagAssignmentPage() {
                   <button
                     onClick={handleBack}
                     style={{
-                      height: '56px',
-                      padding: '0 32px',
-                      fontSize: '18px',
+                      height: '68px',
+                      padding: '0 40px',
+                      fontSize: '20px',
                       fontWeight: 600,
                       backgroundColor: 'white',
                       color: '#374151',
                       border: '2px solid #E5E7EB',
-                      borderRadius: '28px',
+                      borderRadius: '34px',
                       cursor: 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
