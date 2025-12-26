@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ModalBase } from '../components/ui';
+import BackButton from '../components/ui/BackButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
@@ -1071,60 +1072,33 @@ const ActivityScanningPage: React.FC = () => {
           }}
         >
           {/* Anmelden Button - Top Right of ContentBox */}
-          <button
-            onClick={handleAnmelden}
+          <div
             style={{
               position: 'absolute',
               top: '20px',
               right: '20px',
-              height: '56px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px',
-              padding: '0 28px',
-              backgroundColor: 'rgba(255, 255, 255, 0.9)',
-              border: '1px solid rgba(0, 0, 0, 0.1)',
-              borderRadius: '28px',
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
-              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-              backdropFilter: 'blur(8px)',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#374151',
               zIndex: 10,
             }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-              e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-              e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                }
-              }, 150);
-            }}
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            Anmelden
-          </button>
+            <BackButton
+              onClick={handleAnmelden}
+              text="Anmelden"
+              customIcon={
+                <svg
+                  width="28"
+                  height="28"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#374151"
+                  strokeWidth="2.5"
+                >
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+              }
+              ariaLabel="Anmelden - zur PIN-Eingabe"
+            />
+          </div>
 
           <div
             style={{
