@@ -32,8 +32,7 @@ pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(
 
     // Create log directory if it doesn't exist
     if !log_dir.exists() {
-        fs::create_dir_all(&log_dir)
-            .map_err(|e| format!("Failed to create log directory: {e}"))?;
+        fs::create_dir_all(&log_dir).map_err(|e| format!("Failed to create log directory: {e}"))?;
     }
 
     // Open log file for appending, create if it doesn't exist
