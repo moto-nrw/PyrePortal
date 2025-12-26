@@ -1,5 +1,4 @@
 // Export all UI components for easier imports
-export { default as Button } from './Button';
 export { default as Select } from './Select';
 export { default as ContentBox } from './ContentBox';
 export { default as ActionButton } from './ActionButton';
@@ -9,3 +8,4 @@ export { SuccessModal } from './SuccessModal';
 export { default as BackButton } from './BackButton';
 // Note: ModalTimeoutIndicator is internal to ModalBase and not exported
 export { ContinueButton } from './ContinueButton';
+export { PillButton, type PillButtonProps } from './PillButton';

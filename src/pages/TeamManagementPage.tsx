@@ -599,7 +599,7 @@ function TeamManagementPage() {
                 onClick={handleSave}
                 disabled={selectedSupervisors.length === 0 || isSaving}
                 style={{
-                  height: '72px',
+                  height: '68px',
                   padding: '0 64px',
                   fontSize: '24px',
                   fontWeight: 700,

@@ -717,7 +717,7 @@ function StudentSelectionPage() {
                 onClick={handleAssignTag}
                 disabled={!selectedEntityId || isSaving}
                 style={{
-                  height: '64px',
+                  height: '68px',
                   padding: '0 64px',
                   fontSize: '24px',
                   fontWeight: 700,
