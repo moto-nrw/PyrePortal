@@ -2,7 +2,6 @@
 mod logging;
 mod rfid;
 mod session_storage;
-mod student_cache;
 
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -74,12 +73,7 @@ pub fn run() {
             rfid::scan_rfid_with_timeout,
             session_storage::save_session_settings,
             session_storage::load_session_settings,
-            session_storage::clear_last_session,
-            student_cache::load_student_cache,
-            student_cache::save_student_cache,
-            student_cache::clear_student_cache,
-            student_cache::cleanup_old_student_caches,
-            student_cache::get_cache_stats
+            session_storage::clear_last_session
         ])
         .setup(move |app| {
             // Create the main window with dynamic fullscreen setting
