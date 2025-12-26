@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    pyreportal_lib::run()
+    pyreportal_lib::run();
 }

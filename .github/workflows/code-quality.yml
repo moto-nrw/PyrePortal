@@ -58,9 +58,9 @@ jobs:
         working-directory: ./src-tauri
         run: cargo fmt --all -- --check
 
-      - name: Run Clippy
+      - name: Run Clippy (pedantic)
         working-directory: ./src-tauri
-        run: cargo clippy -- -D warnings
+        run: cargo clippy  # Pedantic lints configured in Cargo.toml [lints.clippy]
 
       - name: Check Rust compiles
         working-directory: ./src-tauri

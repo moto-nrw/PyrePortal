@@ -38,3 +38,8 @@ linux-embedded-hal = { version = "0.3.2", optional = true }
 [features]
 rfid = ["mfrc522", "rppal", "embedded-hal", "linux-embedded-hal"]
 
+[lints.clippy]
+pedantic = { level = "deny", priority = -1 }
+# Allow specific pedantic lints that are too restrictive
+too_many_lines = "allow"  # Platform-conditional code often exceeds 100 lines legitimately
+
