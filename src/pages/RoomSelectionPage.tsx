@@ -260,7 +260,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         disabled={isLoading}
         style={{
           flex: 1,
-          height: '64px',
+          height: '68px',
           fontSize: '20px',
           fontWeight: 600,
           color: '#6B7280',
@@ -294,7 +294,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         disabled={isLoading}
         style={{
           flex: 1,
-          height: '64px',
+          height: '68px',
           fontSize: '20px',
           fontWeight: 600,
           color: '#FFFFFF',
@@ -583,7 +583,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         disabled={isLoading}
         style={{
           flex: 1,
-          height: '64px',
+          height: '68px',
           fontSize: '20px',
           fontWeight: 600,
           color: '#6B7280',
@@ -617,7 +617,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
         disabled={isLoading}
         style={{
           flex: 1,
-          height: '64px',
+          height: '68px',
           fontSize: '20px',
           fontWeight: 600,
           color: '#FFFFFF',

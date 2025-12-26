@@ -783,7 +783,7 @@ function HomeViewPage() {
             onClick={() => setShowConfirmModal(false)}
             style={{
               flex: 1,
-              height: '56px',
+              height: '68px',
               fontSize: '18px',
               fontWeight: 600,
               color: '#6B7280',
@@ -803,7 +803,7 @@ function HomeViewPage() {
             disabled={isValidatingLastSession}
             style={{
               flex: 1,
-              height: '56px',
+              height: '68px',
               fontSize: '18px',
               fontWeight: 600,
               color: '#FFFFFF',

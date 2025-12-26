@@ -8,3 +8,4 @@ export { SuccessModal } from './SuccessModal';
 export { default as BackButton } from './BackButton';
 // Note: ModalTimeoutIndicator is internal to ModalBase and not exported
 export { ContinueButton } from './ContinueButton';
+export { PillButton, type PillButtonProps } from './PillButton';

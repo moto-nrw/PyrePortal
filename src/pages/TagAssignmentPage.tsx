@@ -449,7 +449,7 @@ function TagAssignmentPage() {
                   onClick={handleStartScanning}
                   disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
                   style={{
-                    height: '72px',
+                    height: '68px',
                     padding: '0 64px',
                     fontSize: '24px',
                     fontWeight: 700,
@@ -658,7 +658,7 @@ function TagAssignmentPage() {
                     disabled={isLoading}
                     style={{
                       flex: 1,
-                      height: '64px',
+                      height: '68px',
                       fontSize: '24px',
                       fontWeight: 700,
                       color: '#FFFFFF',
@@ -692,7 +692,7 @@ function TagAssignmentPage() {
                     onClick={handleScanAnother}
                     style={{
                       flex: 1,
-                      height: '64px',
+                      height: '68px',
                       fontSize: '24px',
                       fontWeight: 700,
                       backgroundColor: '#FFFFFF',

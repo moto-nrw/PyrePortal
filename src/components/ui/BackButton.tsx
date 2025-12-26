@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
-import React from 'react';
 
-import { designSystem } from '../../styles/designSystem';
+import { PillButton } from './PillButton';
 
 /** Default back arrow icon */
 const BackArrowIcon = ({ stroke }: { stroke: string }) => (
@@ -53,9 +52,8 @@ interface BackButtonProps {
 }
 
 /**
- * Reusable pill button component with glassmorphism styling
- * Uses designSystem.components.backButton for consistent appearance
- * Default text is "Zurück" with left arrow icon
+ * Navigation back button with glassmorphism styling.
+ * Thin wrapper around PillButton with secondary variant.
  */
 const BackButton: React.FC<BackButtonProps> = ({
   onClick,
@@ -66,8 +64,6 @@ const BackButton: React.FC<BackButtonProps> = ({
   ariaLabel,
 }) => {
   const strokeColor = color === 'blue' ? '#5080d8' : '#374151';
-  const textColor = color === 'blue' ? '#5080d8' : '#374151';
-  const borderColor = color === 'blue' ? 'rgba(80, 128, 216, 0.2)' : 'rgba(0, 0, 0, 0.1)';
 
   const renderIcon = () => {
     if (customIcon) return customIcon;
@@ -75,63 +71,16 @@ const BackButton: React.FC<BackButtonProps> = ({
     return <BackArrowIcon stroke={strokeColor} />;
   };
 
-  /** Reset button to default visual state after touch interaction */
-  const resetTouchStyles = (target: HTMLButtonElement) => {
-    setTimeout(() => {
-      if (target) {
-        target.style.transform = 'scale(1)';
-        target.style.backgroundColor = designSystem.glass.background;
-        target.style.boxShadow = designSystem.shadows.button;
-      }
-    }, 150);
-  };
-
   return (
-    <button
-      type="button"
+    <PillButton
+      variant="secondary"
+      color={color}
       onClick={onClick}
-      aria-label={ariaLabel ?? text}
-      style={{
-        ...designSystem.components.backButton,
-        border: `1px solid ${borderColor}`,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: '12px',
-        cursor: 'pointer',
-        outline: 'none',
-        WebkitTapHighlightColor: 'transparent',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-      onTouchStart={e => {
-        e.currentTarget.style.transform = designSystem.scales.activeSmall;
-        e.currentTarget.style.backgroundColor =
-          color === 'blue' ? 'rgba(80, 128, 216, 0.1)' : 'rgba(249, 250, 251, 0.95)';
-        e.currentTarget.style.boxShadow = designSystem.shadows.button;
-      }}
-      onTouchEnd={e => {
-        // Capture target synchronously - currentTarget becomes null after handler returns
-        const target = e.currentTarget;
-        resetTouchStyles(target);
-      }}
-      onTouchCancel={e => {
-        // Handle system interruptions (e.g., app switch, screen rotation, palm rejection)
-        const target = e.currentTarget;
-        resetTouchStyles(target);
-      }}
+      icon={renderIcon()}
+      ariaLabel={ariaLabel ?? text}
     >
-      {renderIcon()}
-      <span
-        style={{
-          fontSize: '20px',
-          fontWeight: 600,
-          color: textColor,
-        }}
-      >
-        {text}
-      </span>
-    </button>
+      {text}
+    </PillButton>
   );
 };
 
