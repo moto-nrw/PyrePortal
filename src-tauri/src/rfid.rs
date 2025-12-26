@@ -75,7 +75,7 @@ impl RfidBackgroundService {
             .set(Arc::new(Mutex::new({
                 let mut service = Self::new();
                 service.app_handle = Some(app_handle);
-                service.start_background_task()?;
+                service.start_background_task();
                 println!("RFID Background Service initialized");
                 service
             })))
@@ -86,7 +86,7 @@ impl RfidBackgroundService {
         RFID_SERVICE.get().cloned()
     }
 
-    fn start_background_task(&mut self) -> Result<(), String> {
+    fn start_background_task(&mut self) {
         let (tx, mut rx) = mpsc::unbounded_channel::<ServiceCommand>();
         self.command_tx = Some(tx);
 
@@ -96,8 +96,6 @@ impl RfidBackgroundService {
         tokio::spawn(async move {
             Self::background_scanning_loop(state, app_handle, &mut rx).await;
         });
-
-        Ok(())
     }
 
     async fn background_scanning_loop(
@@ -271,7 +269,7 @@ impl RfidBackgroundService {
                         // Emit event to frontend
                         if let Some(ref app) = app_handle {
                             let _ = app.emit("rfid-scan", &scan_event);
-                            println!("Emitted RFID scan event: {}", tag_id);
+                            println!("Emitted RFID scan event: {tag_id}");
                         }
 
                         // Minimal wait after successful scan - frontend handles duplicate prevention
@@ -284,7 +282,7 @@ impl RfidBackgroundService {
                                 state_guard.error_count += 1;
                                 state_guard.last_error = Some(error.clone());
                             }
-                            println!("RFID scan error: {}", error);
+                            println!("RFID scan error: {error}");
                         }
                         // No additional delay needed - our adaptive polling in scan_rfid_hardware_with_timeout handles timing
                     }
@@ -315,7 +313,7 @@ impl RfidBackgroundService {
     pub fn send_command(&self, command: ServiceCommand) -> Result<(), String> {
         if let Some(ref tx) = self.command_tx {
             tx.send(command)
-                .map_err(|e| format!("Failed to send command: {}", e))
+                .map_err(|e| format!("Failed to send command: {e}"))
         } else {
             Err("Service not initialized".to_string())
         }
@@ -325,7 +323,7 @@ impl RfidBackgroundService {
         self.state
             .lock()
             .map(|guard| guard.clone())
-            .map_err(|e| format!("Failed to get state: {}", e))
+            .map_err(|e| format!("Failed to get state: {e}"))
     }
 }
 
@@ -692,7 +690,7 @@ mod raspberry_pi {
 // Mock implementation for development platforms (MacBook, etc.)
 #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
 mod mock_platform {
-    use super::*;
+    use super::{Duration, RfidScannerStatus};
     use std::sync::Mutex;
 
     // Track last scan for duplicate prevention (mimics real hardware behavior)
@@ -702,17 +700,17 @@ mod mock_platform {
         // Simulate variable scan time (200-500ms) like real hardware
         let scan_time = 200 + (rand::random::<u64>() % 300);
         tokio::time::sleep(Duration::from_millis(scan_time)).await;
-        scan_rfid_mock_internal().await
+        scan_rfid_mock_internal()
     }
 
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
         // For single scans, simulate user placing tag (2-3 seconds)
         let scan_time = 2000 + (rand::random::<u64>() % 1000);
         tokio::time::sleep(Duration::from_millis(scan_time)).await;
-        scan_rfid_mock_internal().await
+        scan_rfid_mock_internal()
     }
 
-    async fn scan_rfid_mock_internal() -> Result<String, String> {
+    fn scan_rfid_mock_internal() -> Result<String, String> {
         // Check for duplicate read (2-second cooldown like real hardware)
         let mut last_scan = LAST_SCAN.lock().unwrap();
         if let Some((last_tag, last_time)) = &*last_scan {
@@ -768,7 +766,7 @@ pub async fn start_rfid_service() -> Result<String, String> {
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
         let service = service_arc
             .lock()
-            .map_err(|e| format!("Failed to lock service: {}", e))?;
+            .map_err(|e| format!("Failed to lock service: {e}"))?;
         service.send_command(ServiceCommand::Start)?;
         Ok("RFID service started".to_string())
     } else {
@@ -781,7 +779,7 @@ pub async fn stop_rfid_service() -> Result<String, String> {
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
         let service = service_arc
             .lock()
-            .map_err(|e| format!("Failed to lock service: {}", e))?;
+            .map_err(|e| format!("Failed to lock service: {e}"))?;
         service.send_command(ServiceCommand::Stop)?;
         Ok("RFID service stopped".to_string())
     } else {
@@ -794,7 +792,7 @@ pub async fn get_rfid_service_status() -> Result<RfidServiceState, String> {
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
         let service = service_arc
             .lock()
-            .map_err(|e| format!("Failed to lock service: {}", e))?;
+            .map_err(|e| format!("Failed to lock service: {e}"))?;
         service.get_state()
     } else {
         Err("RFID service not initialized".to_string())
@@ -893,7 +891,7 @@ pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResu
         tokio::time::sleep(Duration::from_secs(std::cmp::min(timeout_seconds, 5))).await;
         Ok(RfidScanResult {
             success: true,
-            tag_id: Some(format!("MOCK:TIMEOUT:{}:SEC", timeout_seconds)),
+            tag_id: Some(format!("MOCK:TIMEOUT:{timeout_seconds}:SEC")),
             error: None,
         })
     }

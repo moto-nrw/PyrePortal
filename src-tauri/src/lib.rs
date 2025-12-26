@@ -32,7 +32,7 @@ fn get_api_config() -> Result<ApiConfig, String> {
 
 #[tauri::command]
 fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
+    format!("Hello, {name}! You've been greeted from Rust!")
 }
 
 #[tauri::command]
@@ -42,6 +42,11 @@ fn restart_app() {
     std::process::exit(0);
 }
 
+/// Initializes and runs the Tauri application.
+///
+/// # Panics
+///
+/// Panics if the Tauri application fails to start (e.g., window creation fails).
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Load environment variables from .env file
