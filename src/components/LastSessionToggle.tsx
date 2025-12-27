@@ -88,8 +88,7 @@ export const LastSessionToggle: React.FC = () => {
                 backgroundColor: '#FFFFFF',
                 borderRadius: '50%',
                 boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                transition: 'transform 200ms ease-out',
-                transform: `translateX(${isEnabled ? '0' : '0'})`,
+                transition: 'left 200ms ease-out',
               }}
             />
             {isEnabled && (
