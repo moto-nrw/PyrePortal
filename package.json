@@ -63,5 +63,16 @@
     "src/**/*.{ts,tsx}": [
       "eslint --fix"
     ]
+  },
+  "knip": {
+    "entry": [
+      "src/main.tsx"
+    ],
+    "project": [
+      "src/**/*.{ts,tsx}"
+    ],
+    "ignore": [
+      "src-tauri/**"
+    ]
   }
 }
