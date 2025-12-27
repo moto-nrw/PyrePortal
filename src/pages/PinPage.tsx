@@ -308,7 +308,7 @@ function PinPage() {
             >
               {Array.from({ length: maxPinLength }).map((_, i) => (
                 <div
-                  key={i}
+                  key={`pin-dot-${i}`}
                   style={{
                     width: '24px',
                     height: '24px',

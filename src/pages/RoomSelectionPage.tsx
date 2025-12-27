@@ -1244,7 +1244,7 @@ function RoomSelectionPage() {
                 {emptySlots > 0 &&
                   Array.from({ length: emptySlots }).map((_, index) => (
                     <div
-                      key={`empty-${index}`}
+                      key={`empty-slot-${currentPage}-${index}`}
                       style={{
                         height: '160px',
                         backgroundColor: '#FAFAFA',
