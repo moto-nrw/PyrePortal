@@ -10,6 +10,7 @@ import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
+import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
 
@@ -175,8 +176,9 @@ function TagAssignmentPage() {
                 '04:11:22:33:44:55:66',
               ];
 
-          // Pick a random tag from the list
-          const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
+          // Pick a random tag from the list using unbiased secure randomness
+          const randomIndex = getSecureRandomInt(mockStudentTags.length);
+          const mockTagId = mockStudentTags[randomIndex];
           logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
           void handleTagScanned(mockTagId);
         }, 2000);

@@ -3,6 +3,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { api, mapApiErrorToGerman, ApiError } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger } from '../utils/logger';
 import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 
@@ -48,11 +49,9 @@ const createOptimisticScan = (scanId: string, tagId: string) => ({
 
 /**
  * Generates a unique scan ID for tracking optimistic updates.
- * Note: Math.random() is intentionally used here as this ID is only for UI tracking,
- * not for security purposes. Cryptographic randomness is not required.
+ * Uses crypto.randomUUID() for cryptographically secure random values.
  */
-const generateScanId = (): string =>
-  `scan_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`; // NOSONAR - not used for security
+const generateScanId = (): string => `scan_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
 /**
  * Handles supervisor authentication from RFID scan.
@@ -541,8 +540,9 @@ export const useRfidScanning = () => {
                   '04:11:22:33:44:55:66',
                 ];
 
-            // Pick a random tag from the list
-            const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
+            // Pick a random tag from the list using unbiased secure randomness
+            const randomIndex = getSecureRandomInt(mockStudentTags.length);
+            const mockTagId = mockStudentTags[randomIndex];
 
             logger.info('Mock RFID scan generated', {
               tagId: mockTagId,
@@ -556,7 +556,7 @@ export const useRfidScanning = () => {
               void processScan(mockTagId);
             }
           },
-          5000 + Math.random() * 5000
+          5000 + getSecureRandomInt(5000)
         ); // Random interval between 5-10 seconds
 
         isServiceStartedRef.current = true;
