@@ -10,7 +10,7 @@ import {
 } from '../components/ui';
 import { useEntityFetching, type AssignableEntity } from '../hooks/useEntityFetching';
 import { usePagination } from '../hooks/usePagination';
-import { api } from '../services/api';
+import { useTagAssignment } from '../hooks/useTagAssignment';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logUserAction } from '../utils/logger';
@@ -82,20 +82,20 @@ function StudentSelectionPage() {
   });
 
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(fetchError);
-  const [showErrorModal, setShowErrorModal] = useState(false);
   const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
 
   const logger = useMemo(() => createLogger('StudentSelectionPage'), []);
 
-  // Sync fetch error to local error state
+  // Use extracted hook for tag assignment (reduces cognitive complexity)
+  const { isSaving, error, showErrorModal, setShowErrorModal, handleAssignTag, handleBack } =
+    useTagAssignment(entities, selectedEntityId, state);
+
+  // Sync fetch error to show modal
   useEffect(() => {
     if (fetchError) {
-      setError(fetchError);
       setShowErrorModal(true);
     }
-  }, [fetchError]);
+  }, [fetchError, setShowErrorModal]);
 
   // Redirect if not authenticated or no tag data
   useEffect(() => {
@@ -147,91 +147,6 @@ function StudentSelectionPage() {
       type: entity.type,
       name: entityName,
       tagId: state.scannedTag,
-    });
-  };
-
-  const handleAssignTag = async () => {
-    if (!selectedEntityId || !authenticatedUser?.pin || !state?.scannedTag) {
-      logger.warn('Invalid assignment attempt');
-      setError('Bitte wählen Sie eine Person aus.');
-      setShowErrorModal(true);
-      return;
-    }
-
-    setIsSaving(true);
-
-    // Find selected entity
-    const selectedEntity = entities.find(e => getEntityId(e) === selectedEntityId);
-
-    if (!selectedEntity) {
-      setError('Ungültige Auswahl');
-      setShowErrorModal(true);
-      setIsSaving(false);
-      return;
-    }
-
-    try {
-      const entityName = getEntityName(selectedEntity);
-
-      logger.info('Assigning tag to entity', {
-        type: selectedEntity.type,
-        tagId: state.scannedTag,
-        entityName,
-      });
-
-      // Route to correct endpoint based on entity type
-      const result =
-        selectedEntity.type === 'teacher'
-          ? await api.assignStaffTag(
-              authenticatedUser.pin,
-              selectedEntity.data.staff_id,
-              state.scannedTag
-            )
-          : await api.assignTag(
-              authenticatedUser.pin,
-              selectedEntity.data.student_id,
-              state.scannedTag
-            );
-
-      if (result.success) {
-        logUserAction('tag_assignment_complete', {
-          type: selectedEntity.type,
-          tagId: state.scannedTag,
-          entityName,
-        });
-
-        // Navigate back with success message
-        void navigate('/tag-assignment', {
-          state: {
-            assignmentSuccess: true,
-            studentName: entityName,
-            previousTag: result.previous_tag,
-            scannedTag: state.scannedTag,
-            tagAssignment: state.tagAssignment,
-          },
-        });
-      } else {
-        throw new Error(result.message ?? 'Armband-Zuweisung fehlgeschlagen');
-      }
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      logger.error('Failed to assign tag', { error });
-      setError('Armband konnte nicht zugewiesen werden. Bitte erneut versuchen.');
-      setShowErrorModal(true);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleBack = () => {
-    logger.info('User navigating back to tag assignment');
-    logUserAction('student_selection_back');
-    // Pass back the scan state so TagAssignmentPage shows the scan result
-    void navigate('/tag-assignment', {
-      state: {
-        scannedTag: state.scannedTag,
-        tagAssignment: state.tagAssignment,
-      },
     });
   };
 
@@ -439,7 +354,7 @@ function StudentSelectionPage() {
       <ErrorModal
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
-        message={error ?? ''}
+        message={error ?? fetchError ?? ''}
         autoCloseDelay={3000}
       />
     </>

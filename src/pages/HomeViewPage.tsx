@@ -1,33 +1,21 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
 import { ErrorModal, ModalBase } from '../components/ui';
-import {
-  api,
-  mapServerErrorToGerman,
-  type SessionStartRequest,
-  type CurrentSession,
-} from '../services/api';
+import { useHomeViewHandlers } from '../hooks/useHomeViewHandlers';
+import type { CurrentSession } from '../services/api';
 import type { SessionSettings } from '../services/sessionStorage';
-import { useUserStore, isNetworkRelatedError } from '../store/userStore';
+import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import { logNavigation, logUserAction } from '../utils/logger';
+import { logNavigation } from '../utils/logger';
 
 // ============================================================================
-// Pure helper functions (moved outside component to reduce cognitive complexity)
+// Pure helper functions (UI-related, kept in component file)
 // ============================================================================
-
-/** Format session recreation error message for display */
-function formatRecreationError(error: unknown): string {
-  const rawMessage = error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
-  return isNetworkRelatedError(error)
-    ? 'Netzwerkfehler beim Starten der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
-    : mapServerErrorToGerman(rawMessage);
-}
 
 /** Get appropriate activity icon based on session state */
 function getActivityIcon(
@@ -147,51 +135,6 @@ function createTouchEndHandler(
   };
 }
 
-/** Validate that all session recreation prerequisites are met */
-function validateSessionRecreationData(): {
-  isValid: boolean;
-  error?: string;
-  sessionRequest?: SessionStartRequest;
-} {
-  const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
-
-  if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
-    return {
-      isValid: false,
-      error:
-        'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.',
-    };
-  }
-
-  return {
-    isValid: true,
-    sessionRequest: {
-      activity_id: selectedActivity.id,
-      room_id: selectedRoom.id,
-      supervisor_ids: selectedSupervisors.map(s => s.id),
-    },
-  };
-}
-
-/** Execute session recreation API call */
-async function executeSessionRecreation(
-  pin: string,
-  sessionRequest: SessionStartRequest
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const sessionResponse = await api.startSession(pin, sessionRequest);
-
-    logUserAction('Session recreated successfully', {
-      sessionId: sessionResponse.active_group_id,
-    });
-
-    await useUserStore.getState().saveLastSessionData();
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: formatRecreationError(error) };
-  }
-}
-
 // ============================================================================
 // Component
 // ============================================================================
@@ -200,12 +143,10 @@ function HomeViewPage() {
   const {
     authenticatedUser,
     currentSession,
-    logout,
-    fetchCurrentSession,
     selectedSupervisors,
     sessionSettings,
     loadSessionSettings,
-    validateAndRecreateSession,
+    fetchCurrentSession,
     isValidatingLastSession,
   } = useUserStore();
   const navigate = useNavigate();
@@ -214,132 +155,28 @@ function HomeViewPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Memoize modal state object to prevent unnecessary re-renders
+  const modalState = useMemo(
+    () => ({
+      setShowErrorModal,
+      setErrorMessage,
+      setShowConfirmModal,
+    }),
+    []
+  );
+
+  // Use extracted handlers hook (reduces cognitive complexity)
+  const {
+    handleLogout,
+    handleTagAssignment,
+    handleStartActivity,
+    handleContinueActivity,
+    handleTeamManagement,
+    handleConfirmRecreation,
+  } = useHomeViewHandlers(modalState);
+
   // Check if supervisors are selected
   const hasSupervisors = selectedSupervisors.length > 0;
-
-  // Helper to end the current session
-  const endCurrentSession = async () => {
-    logUserAction('Ending current session');
-    try {
-      await api.endSession(authenticatedUser!.pin);
-      await fetchCurrentSession();
-      logUserAction('Session ended successfully');
-    } catch (error) {
-      logUserAction('Failed to end session', { error });
-    }
-  };
-
-  // Helper to perform user logout
-  const performLogout = async () => {
-    logUserAction('User logout initiated');
-    await logout();
-    logNavigation('Home View', '/');
-    void navigate('/');
-  };
-
-  const handleLogout = async () => {
-    if (currentSession) {
-      await endCurrentSession();
-    } else {
-      await performLogout();
-    }
-  };
-
-  const handleTagAssignment = () => {
-    if (!hasSupervisors) {
-      logUserAction('NFC-Scan attempted without supervisors');
-      setErrorMessage(
-        "Bitte wählen Sie zuerst mindestens einen Betreuer über 'Team anpassen' aus, bevor Sie die NFC-Scan Funktion nutzen können."
-      );
-      setShowErrorModal(true);
-      return;
-    }
-    logNavigation('Home View', '/tag-assignment');
-    void navigate('/tag-assignment');
-  };
-
-  // Helper to handle last session recreation attempt
-  const attemptSessionRecreation = async () => {
-    logUserAction('Attempting to recreate last session');
-    const success = await validateAndRecreateSession();
-
-    if (success) {
-      setShowConfirmModal(true);
-      return;
-    }
-
-    const latestError =
-      useUserStore.getState().error ??
-      'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.';
-    setErrorMessage(latestError);
-    setShowErrorModal(true);
-    setShowConfirmModal(false);
-  };
-
-  const handleStartActivity = async () => {
-    const shouldRecreateLastSession =
-      sessionSettings?.use_last_session && sessionSettings.last_session;
-
-    if (shouldRecreateLastSession) {
-      await attemptSessionRecreation();
-    } else {
-      logNavigation('Home View', '/activity-selection');
-      void navigate('/activity-selection');
-    }
-  };
-
-  const handleContinueActivity = () => {
-    if (currentSession) {
-      logNavigation('Home View', '/nfc-scanning', {
-        activeGroupId: currentSession.active_group_id,
-        activityName: currentSession.activity_name,
-      });
-      void navigate('/nfc-scanning');
-    }
-  };
-
-  const handleTeamManagement = () => {
-    logNavigation('Home View', '/team-management');
-    void navigate('/team-management');
-  };
-
-  // Helper to show error and close confirm modal
-  const showRecreationError = (message: string) => {
-    setErrorMessage(message);
-    setShowErrorModal(true);
-    setShowConfirmModal(false);
-  };
-
-  const handleConfirmRecreation = async () => {
-    if (!authenticatedUser || !sessionSettings?.last_session) return;
-
-    // Validate session data using extracted helper
-    const validation = validateSessionRecreationData();
-    if (!validation.isValid) {
-      showRecreationError(validation.error!);
-      return;
-    }
-
-    logUserAction('Confirming session recreation', {
-      sessionRequest: validation.sessionRequest,
-    });
-
-    // Execute session recreation using extracted helper
-    const result = await executeSessionRecreation(
-      authenticatedUser.pin,
-      validation.sessionRequest!
-    );
-    setShowConfirmModal(false);
-
-    if (!result.success) {
-      showRecreationError(result.error!);
-      return;
-    }
-
-    await fetchCurrentSession();
-    logNavigation('Home View', '/nfc-scanning');
-    void navigate('/nfc-scanning');
-  };
 
   // Redirect to login if no authenticated user and fetch current session
   useEffect(() => {
