@@ -135,9 +135,10 @@ impl RfidBackgroundService {
 
     /// Handle scan error - update state if it's a real error (not just "no card")
     fn handle_scan_error(state: &Arc<Mutex<RfidServiceState>>, error: &str) {
-        if error.contains("No card")
-            || error.contains("timeout")
-            || error.contains("no card detected")
+        let error_lower = error.to_lowercase();
+        if error_lower.contains("no card")
+            || error_lower.contains("timeout")
+            || error_lower.contains("no card detected")
         {
             return;
         }
