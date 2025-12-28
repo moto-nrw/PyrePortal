@@ -342,6 +342,59 @@ async function ensureInitialized(): Promise<void> {
 }
 
 /**
+ * Handle network-level fetch errors and convert to user-friendly German messages
+ * Extracted to reduce cognitive complexity in apiCall
+ */
+function handleNetworkError(error: unknown, endpoint: string, startTime: number): never {
+  const errorObj = error instanceof Error ? error : new Error(String(error));
+  const responseTime = Date.now() - startTime;
+
+  logger.warn('Network error', {
+    endpoint,
+    responseTime,
+    errorName: errorObj.name,
+    errorMessage: errorObj.message,
+  });
+
+  reportNetworkStatus(responseTime, false);
+
+  // Map error types to German messages
+  if (errorObj.name === 'TypeError' && errorObj.message.includes('fetch')) {
+    throw new Error('Keine Netzwerkverbindung. Bitte WLAN prüfen.');
+  }
+  if (errorObj.name === 'AbortError') {
+    throw new Error('Zeitüberschreitung. Server antwortet nicht.');
+  }
+  if (errorObj.message.includes('NetworkError') || errorObj.message.includes('network')) {
+    throw new Error('Netzwerkfehler. Bitte Verbindung prüfen.');
+  }
+  throw new Error('Verbindungsfehler. Bitte Netzwerkverbindung prüfen.');
+}
+
+/**
+ * Parse error response body and extract structured error data
+ * Extracted to reduce cognitive complexity in apiCall
+ */
+async function parseErrorResponse(
+  response: Response,
+  baseMessage: string
+): Promise<{ message: string; code?: string; details?: ApiErrorResponse['details'] }> {
+  try {
+    const errorData = (await response.json()) as ApiErrorResponse;
+    // Extract error detail from response - check message first, then error field
+    const errorDetail = errorData.message ?? (errorData as { error?: string }).error;
+    const message = errorDetail ? `${baseMessage}: ${errorDetail}` : baseMessage;
+    return { message, code: errorData.code, details: errorData.details };
+  } catch {
+    // JSON parsing failed, use base message
+    return { message: baseMessage };
+  }
+}
+
+/** Endpoints that should always be logged for debugging */
+const ALWAYS_LOG_ENDPOINTS = new Set(['/api/iot/ping', '/api/iot/checkin']);
+
+/**
  * Generic API call function with error handling and response timing
  */
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -370,71 +423,29 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       },
     });
   } catch (error) {
-    // Network-level errors (before server response)
-    const errorObj = error instanceof Error ? error : new Error(String(error));
-
-    // Log network error with timing
-    const responseTime = Date.now() - startTime;
-    logger.warn('Network error', {
-      endpoint,
-      responseTime,
-      errorName: errorObj.name,
-      errorMessage: errorObj.message,
-    });
-
-    // Report network offline
-    reportNetworkStatus(responseTime, false);
-
-    // Differentiate network error types
-    if (errorObj.name === 'TypeError' && errorObj.message.includes('fetch')) {
-      throw new Error('Keine Netzwerkverbindung. Bitte WLAN prüfen.');
-    } else if (errorObj.name === 'AbortError') {
-      throw new Error('Zeitüberschreitung. Server antwortet nicht.');
-    } else if (errorObj.message.includes('NetworkError') || errorObj.message.includes('network')) {
-      throw new Error('Netzwerkfehler. Bitte Verbindung prüfen.');
-    } else {
-      throw new Error('Verbindungsfehler. Bitte Netzwerkverbindung prüfen.');
-    }
+    handleNetworkError(error, endpoint, startTime);
   }
 
   const responseTime = Date.now() - startTime;
 
   if (!response.ok) {
-    // Try to get error details from response body
-    let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
-    let errorCode: string | undefined;
-    let errorDetails: ApiErrorResponse['details'];
+    const baseMessage = `API Error: ${response.status} - ${response.statusText}`;
+    const { message, code, details } = await parseErrorResponse(response, baseMessage);
 
-    try {
-      const errorData = (await response.json()) as ApiErrorResponse;
-      if (errorData.message) {
-        errorMessage = `${errorMessage}: ${errorData.message}`;
-      } else if ((errorData as { error?: string }).error) {
-        errorMessage = `${errorMessage}: ${(errorData as { error?: string }).error}`;
-      }
-      // Capture structured error data
-      errorCode = errorData.code;
-      errorDetails = errorData.details;
-    } catch {
-      // If JSON parsing fails, use the default error message
-    }
-
-    // Log failed request with timing
     logger.warn('API request failed', {
       endpoint,
       status: response.status,
       responseTime,
-      error: errorMessage,
-      errorCode,
-      errorDetails,
+      error: message,
+      errorCode: code,
+      errorDetails: details,
     });
 
-    // Throw structured ApiError for rich error handling
-    throw new ApiError(errorMessage, response.status, errorCode, errorDetails);
+    throw new ApiError(message, response.status, code, details);
   }
 
-  // Log successful request timing for critical endpoints
-  if (endpoint === '/api/iot/ping' || endpoint === '/api/iot/checkin' || responseTime > 1000) {
+  // Log successful request timing for critical endpoints or slow responses
+  if (ALWAYS_LOG_ENDPOINTS.has(endpoint) || responseTime > 1000) {
     logger.info('API request completed', {
       endpoint,
       status: response.status,
@@ -443,7 +454,6 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     });
   }
 
-  // Report network status on successful API call
   reportNetworkStatus(responseTime, true);
 
   return response.json() as Promise<T>;
