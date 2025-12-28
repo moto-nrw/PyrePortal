@@ -299,6 +299,18 @@ function StudentSelectionPage() {
     return null;
   }
 
+  // Touch handlers extracted to reduce nesting depth (SonarCloud S134)
+  const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
+    e.currentTarget.style.transform = 'scale(0.98)';
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
+    const target = e.currentTarget;
+    setTimeout(() => {
+      target.style.transform = 'scale(1)';
+    }, 50);
+  };
+
   // Helper function to render entity content (avoids nested ternary - SonarCloud S3358)
   const renderEntityContent = () => {
     if (isLoading) {
@@ -384,14 +396,8 @@ function StudentSelectionPage() {
               <button
                 key={entityId}
                 onClick={() => handleEntitySelect(entity)}
-                onTouchStart={e => {
-                  e.currentTarget.style.transform = 'scale(0.98)';
-                }}
-                onTouchEnd={e => {
-                  setTimeout(() => {
-                    if (e.currentTarget) e.currentTarget.style.transform = 'scale(1)';
-                  }, 50);
-                }}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
                 style={{
                   width: '100%',
                   height: '160px',
