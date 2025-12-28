@@ -116,6 +116,37 @@ function getSupervisorCountLabel(
   return `${savedCount} Betreuer`;
 }
 
+/** Create touch start handler for glass-style buttons */
+function createTouchStartHandler(
+  activeBackgroundColor: string,
+  isEnabled = true
+): (e: React.TouchEvent<HTMLButtonElement>) => void {
+  return (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (!isEnabled) return;
+    e.currentTarget.style.transform = designSystem.scales.activeSmall;
+    e.currentTarget.style.backgroundColor = activeBackgroundColor;
+    e.currentTarget.style.boxShadow = designSystem.shadows.button;
+  };
+}
+
+/** Create touch end handler for glass-style buttons */
+function createTouchEndHandler(
+  defaultBackgroundColor: string,
+  isEnabled = true
+): (e: React.TouchEvent<HTMLButtonElement>) => void {
+  return (e: React.TouchEvent<HTMLButtonElement>) => {
+    if (!isEnabled) return;
+    const target = e.currentTarget;
+    setTimeout(() => {
+      if (target) {
+        target.style.transform = 'scale(1)';
+        target.style.backgroundColor = defaultBackgroundColor;
+        target.style.boxShadow = designSystem.shadows.button;
+      }
+    }, 150);
+  };
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -340,24 +371,8 @@ function HomeViewPage() {
               WebkitBackdropFilter: designSystem.glass.blur,
               opacity: hasSupervisors ? 1 : 0.6,
             }}
-            onTouchStart={e => {
-              if (hasSupervisors) {
-                e.currentTarget.style.transform = designSystem.scales.activeSmall;
-                e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
-                e.currentTarget.style.boxShadow = designSystem.shadows.button;
-              }
-            }}
-            onTouchEnd={e => {
-              if (hasSupervisors) {
-                setTimeout(() => {
-                  if (e.currentTarget) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                  }
-                }, 150);
-              }
-            }}
+            onTouchStart={createTouchStartHandler('rgba(80, 128, 216, 0.1)', hasSupervisors)}
+            onTouchEnd={createTouchEndHandler(designSystem.glass.background, hasSupervisors)}
           >
             <FontAwesomeIcon
               icon={faWifi}
@@ -406,20 +421,8 @@ function HomeViewPage() {
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
             }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = designSystem.scales.activeSmall;
-              e.currentTarget.style.backgroundColor = 'rgba(255, 49, 48, 0.1)';
-              e.currentTarget.style.boxShadow = designSystem.shadows.button;
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                }
-              }, 150);
-            }}
+            onTouchStart={createTouchStartHandler('rgba(255, 49, 48, 0.1)')}
+            onTouchEnd={createTouchEndHandler(designSystem.glass.background)}
           >
             <svg
               width="28"
