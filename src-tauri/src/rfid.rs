@@ -477,7 +477,7 @@ mod raspberry_pi {
     /// Attempt to select a card with retry logic for IncompleteFrame errors
     fn select_card_with_retry(
         mfrc522: &mut Mfrc522Scanner,
-        atqa: &mfrc522::Atqa,
+        atqa: &mfrc522::AtqA,
     ) -> Result<String, String> {
         const MAX_RETRIES: u32 = 5;
         const RETRY_DELAY_MS: u64 = 10;
