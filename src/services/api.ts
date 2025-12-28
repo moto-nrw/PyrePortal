@@ -381,11 +381,9 @@ async function parseErrorResponse(
 ): Promise<{ message: string; code?: string; details?: ApiErrorResponse['details'] }> {
   try {
     const errorData = (await response.json()) as ApiErrorResponse;
-    const message = errorData.message
-      ? `${baseMessage}: ${errorData.message}`
-      : (errorData as { error?: string }).error
-        ? `${baseMessage}: ${(errorData as { error?: string }).error}`
-        : baseMessage;
+    // Extract error detail from response - check message first, then error field
+    const errorDetail = errorData.message ?? (errorData as { error?: string }).error;
+    const message = errorDetail ? `${baseMessage}: ${errorDetail}` : baseMessage;
     return { message, code: errorData.code, details: errorData.details };
   } catch {
     // JSON parsing failed, use base message
@@ -394,7 +392,7 @@ async function parseErrorResponse(
 }
 
 /** Endpoints that should always be logged for debugging */
-const ALWAYS_LOG_ENDPOINTS = ['/api/iot/ping', '/api/iot/checkin'];
+const ALWAYS_LOG_ENDPOINTS = new Set(['/api/iot/ping', '/api/iot/checkin']);
 
 /**
  * Generic API call function with error handling and response timing
@@ -447,7 +445,7 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
   }
 
   // Log successful request timing for critical endpoints or slow responses
-  if (ALWAYS_LOG_ENDPOINTS.includes(endpoint) || responseTime > 1000) {
+  if (ALWAYS_LOG_ENDPOINTS.has(endpoint) || responseTime > 1000) {
     logger.info('API request completed', {
       endpoint,
       status: response.status,
