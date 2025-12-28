@@ -111,7 +111,7 @@ function createLogoutHandler(
       logUserAction('User logout initiated');
       await logout();
       logNavigation('Home View', '/');
-      void navigate('/');
+      void navigate('/'); // NOSONAR - void required by ESLint for fire-and-forget navigation
     }
   };
 }
@@ -131,7 +131,7 @@ function createTagAssignmentHandler(
       return;
     }
     logNavigation('Home View', '/tag-assignment');
-    void navigate('/tag-assignment');
+    void navigate('/tag-assignment'); // NOSONAR - void required by ESLint for fire-and-forget navigation
   };
 }
 
@@ -162,7 +162,7 @@ function createStartActivityHandler(
       modalState.setShowConfirmModal(false);
     } else {
       logNavigation('Home View', '/activity-selection');
-      void navigate('/activity-selection');
+      void navigate('/activity-selection'); // NOSONAR - void required by ESLint for fire-and-forget navigation
     }
   };
 }
@@ -178,14 +178,14 @@ function createContinueActivityHandler(
       activeGroupId: currentSession.active_group_id,
       activityName: currentSession.activity_name,
     });
-    void navigate('/nfc-scanning');
+    void navigate('/nfc-scanning'); // NOSONAR - void required by ESLint for fire-and-forget navigation
   };
 }
 
 function createTeamManagementHandler(navigate: NavigateFunction): () => void {
   return () => {
     logNavigation('Home View', '/team-management');
-    void navigate('/team-management');
+    void navigate('/team-management'); // NOSONAR - void required by ESLint for fire-and-forget navigation
   };
 }
 
@@ -222,7 +222,7 @@ function createConfirmRecreationHandler(
 
     await fetchCurrentSession();
     logNavigation('Home View', '/nfc-scanning');
-    void navigate('/nfc-scanning');
+    void navigate('/nfc-scanning'); // NOSONAR - void required by ESLint for fire-and-forget navigation
   };
 }
 

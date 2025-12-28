@@ -133,6 +133,7 @@ export function useTagAssignment(
 
       // Navigate back with success message
       void navigate('/tag-assignment', {
+        // NOSONAR - void required by ESLint for fire-and-forget navigation
         state: {
           assignmentSuccess: true,
           studentName: entityName,
@@ -156,12 +157,13 @@ export function useTagAssignment(
     logUserAction('student_selection_back');
 
     if (!state) {
-      void navigate('/tag-assignment');
+      void navigate('/tag-assignment'); // NOSONAR - void required by ESLint for fire-and-forget navigation
       return;
     }
 
     // Pass back the scan state so TagAssignmentPage shows the scan result
     void navigate('/tag-assignment', {
+      // NOSONAR - void required by ESLint for fire-and-forget navigation
       state: {
         scannedTag: state.scannedTag,
         tagAssignment: state.tagAssignment,
