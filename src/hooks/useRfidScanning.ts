@@ -48,9 +48,11 @@ const createOptimisticScan = (scanId: string, tagId: string) => ({
 
 /**
  * Generates a unique scan ID for tracking optimistic updates.
+ * Note: Math.random() is intentionally used here as this ID is only for UI tracking,
+ * not for security purposes. Cryptographic randomness is not required.
  */
 const generateScanId = (): string =>
-  `scan_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  `scan_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`; // NOSONAR - not used for security
 
 /**
  * Handles supervisor authentication from RFID scan.
@@ -62,7 +64,7 @@ interface SupervisorHandlerParams {
   scanId: string;
   currentSession: CurrentSession | null;
   pin: string;
-  scannedSupervisorsRef: React.MutableRefObject<Set<number>>;
+  scannedSupervisorsRef: { current: Set<number> };
   addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
   addActiveSupervisorTag: (tagId: string) => void;
   isActiveSupervisor: (tagId: string) => boolean;
