@@ -53,15 +53,15 @@ export interface EmptySlotProps {
  */
 export interface SelectableGridProps<T> {
   /** Array of items to display in the grid */
-  items: T[];
+  readonly items: readonly T[];
   /** Render function for each item */
-  renderItem: (item: T, index: number) => ReactNode;
+  readonly renderItem: (item: T, index: number) => ReactNode;
   /** Number of empty slots to render */
-  emptySlotCount: number;
+  readonly emptySlotCount: number;
   /** Icon type for empty slots */
-  emptySlotIcon: IconType;
+  readonly emptySlotIcon: IconType;
   /** Unique key prefix for empty slots */
-  keyPrefix?: string;
+  readonly keyPrefix?: string;
 }
 
 /**

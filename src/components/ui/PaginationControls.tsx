@@ -44,8 +44,8 @@ export const PaginationControls = memo(function PaginationControls({
   canGoNext,
 }: PaginationControlsProps) {
   // Derive disabled states if not explicitly provided
-  const isPrevDisabled = canGoPrev !== undefined ? !canGoPrev : currentPage === 0;
-  const isNextDisabled = canGoNext !== undefined ? !canGoNext : currentPage === totalPages - 1;
+  const isPrevDisabled = canGoPrev === undefined ? currentPage === 0 : !canGoPrev;
+  const isNextDisabled = canGoNext === undefined ? currentPage === totalPages - 1 : !canGoNext;
 
   // Don't render if only one page
   if (totalPages <= 1) {
