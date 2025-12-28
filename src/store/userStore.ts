@@ -1152,34 +1152,31 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       // Check if student is already checked in
       const existingStudentIndex = activity.checkedInStudents.findIndex(s => s.id === student.id);
 
-      if (existingStudentIndex !== -1) {
-        // Check if student is already checked in
-        if (activity.checkedInStudents[existingStudentIndex].isCheckedIn) {
-          // Student is already checked in - show error
-          set({
-            error: mapActivityError('student_already_checked_in', {
-              studentName: student.name,
-              activityName: activity.name,
-            }),
-            isLoading: false,
-          });
-          return false;
-        } else {
-          // Student was checked out - re-check them in
-          activity.checkedInStudents[existingStudentIndex] = {
-            ...activity.checkedInStudents[existingStudentIndex],
-            checkInTime: new Date(),
-            checkOutTime: undefined,
-            isCheckedIn: true,
-          };
-        }
-      } else {
+      if (existingStudentIndex === -1) {
         // Add new student to checked in list
         activity.checkedInStudents.push({
           ...student,
           checkInTime: new Date(),
           isCheckedIn: true,
         });
+      } else if (activity.checkedInStudents[existingStudentIndex].isCheckedIn) {
+        // Student is already checked in - show error
+        set({
+          error: mapActivityError('student_already_checked_in', {
+            studentName: student.name,
+            activityName: activity.name,
+          }),
+          isLoading: false,
+        });
+        return false;
+      } else {
+        // Student was checked out - re-check them in
+        activity.checkedInStudents[existingStudentIndex] = {
+          ...activity.checkedInStudents[existingStudentIndex],
+          checkInTime: new Date(),
+          checkOutTime: undefined,
+          isCheckedIn: true,
+        };
       }
 
       // Update activities array
