@@ -281,7 +281,7 @@ export class Logger {
    * @returns Session ID string
    */
   private generateSessionId(): string {
-    return Date.now().toString(36) + Math.random().toString(36).substring(2);
+    return `${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
   }
 }
 

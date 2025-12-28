@@ -45,7 +45,7 @@ export function queueFailedScan(
   roomId: number,
   pin: string
 ): string {
-  const operationId = `sync_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  const operationId = `sync_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 
   const queuedScan: QueuedScan = {
     id: operationId,

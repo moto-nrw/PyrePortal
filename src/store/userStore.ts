@@ -18,6 +18,7 @@ import {
   loadSessionSettings,
   clearLastSession,
 } from '../services/sessionStorage';
+import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -563,9 +564,9 @@ const RFID_SESSION_INITIAL_STATE = {
   optimisticScans: [] as OptimisticScanState[],
 };
 
-// Generate a unique id for new activities
+// Generate a unique id for new activities using unbiased secure randomness
 const generateId = (): number => {
-  return Math.floor(Math.random() * 10000);
+  return getSecureRandomInt(10000);
 };
 
 // Create mock student data
