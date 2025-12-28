@@ -17,23 +17,23 @@ export type EntityColorType = 'staff' | 'person' | 'activity' | 'room';
  */
 export interface SelectableCardProps {
   /** Unique identifier for the card */
-  id: string | number;
+  readonly id: string | number;
   /** Display name for the entity */
-  name: string;
+  readonly name: string;
   /** Icon type to display */
-  icon: IconType;
+  readonly icon: IconType;
   /** Color theme for the icon (when not selected) */
-  colorType: EntityColorType;
+  readonly colorType: EntityColorType;
   /** Whether this card is currently selected */
-  isSelected: boolean;
+  readonly isSelected: boolean;
   /** Whether this card is disabled (e.g., occupied room, active activity) */
-  isDisabled?: boolean;
+  readonly isDisabled?: boolean;
   /** Optional badge text (e.g., class name, capacity) */
-  badge?: string;
+  readonly badge?: string;
   /** Badge color variant */
-  badgeColor?: 'blue' | 'green';
+  readonly badgeColor?: 'blue' | 'green';
   /** Click handler */
-  onClick: () => void;
+  readonly onClick: () => void;
 }
 
 /**
@@ -41,11 +41,11 @@ export interface SelectableCardProps {
  */
 export interface EmptySlotProps {
   /** Icon type to display in the empty slot */
-  icon: IconType;
+  readonly icon: IconType;
   /** Unique key prefix for React */
-  keyPrefix?: string;
+  readonly keyPrefix?: string;
   /** Index for unique key generation */
-  index?: number;
+  readonly index?: number;
 }
 
 /**
@@ -68,7 +68,7 @@ export interface SelectableGridProps<T> {
  * Render props pattern for custom card rendering.
  */
 export interface CardRenderProps<T> {
-  item: T;
-  index: number;
-  isSelected: boolean;
+  readonly item: T;
+  readonly index: number;
+  readonly isSelected: boolean;
 }
