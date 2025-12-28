@@ -106,6 +106,130 @@ const feedbackButtons = [
   { rating: 'negative' as DailyFeedbackRating, icon: faFaceFrown, label: 'Schlecht' },
 ];
 
+// =============================================================================
+// Helper types and functions for scan action handling (extracted to reduce
+// cognitive complexity of the student count useEffect - SonarCloud S3776)
+// =============================================================================
+
+/** Extended scan result type with optional flags */
+interface ExtendedScanResult extends RfidScanResult {
+  showAsError?: boolean;
+  isInfo?: boolean;
+  isSchulhof?: boolean;
+}
+
+/** State for checkout destination modal */
+interface CheckoutDestinationState {
+  rfid: string;
+  studentName: string;
+  studentId: number | null;
+}
+
+/** State for daily checkout confirmation modal */
+interface DailyCheckoutState {
+  rfid: string;
+  studentName: string;
+  showingFarewell: boolean;
+}
+
+/** Tag scan entry from the recentTagScans Map (matches RecentTagScan in userStore) */
+interface TagScanEntry {
+  result?: { student_id?: number | null };
+}
+
+/**
+ * Finds the RFID tag for a given student ID from recent scans.
+ * @param studentId - The student ID to search for (can be null)
+ * @param recentTagScans - Map of recent tag scans
+ * @returns The RFID tag string or empty string if not found
+ */
+const findTagForStudent = (
+  studentId: number | null,
+  recentTagScans: Map<string, TagScanEntry>
+): string => {
+  if (studentId === null) return '';
+  for (const [tag, scan] of recentTagScans.entries()) {
+    if (scan.result?.student_id === studentId) {
+      return tag;
+    }
+  }
+  return '';
+};
+
+/**
+ * Handles check-in action and returns count delta.
+ * Schulhof check-ins don't increment (student is leaving, not entering).
+ */
+const handleCheckinAction = (scan: ExtendedScanResult): number => {
+  if (scan.isSchulhof) {
+    return 0; // No change for Schulhof check-in
+  }
+  return 1; // Increment count
+};
+
+/**
+ * Handles check-out action: sets up destination modal state and returns count delta.
+ */
+const handleCheckoutAction = <T extends TagScanEntry>(
+  scan: RfidScanResult,
+  recentTagScans: Map<string, T>,
+  setCheckoutDestinationState: (state: CheckoutDestinationState) => void
+): number => {
+  const rfidTag = findTagForStudent(scan.student_id, recentTagScans as Map<string, TagScanEntry>);
+  setCheckoutDestinationState({
+    rfid: rfidTag,
+    studentName: scan.student_name,
+    studentId: scan.student_id,
+  });
+  return -1; // Decrement count
+};
+
+/**
+ * Handles pending daily checkout: sets up confirmation modal state.
+ * No count change yet - waiting for user confirmation.
+ */
+const handlePendingDailyCheckoutAction = <T extends TagScanEntry>(
+  scan: RfidScanResult,
+  recentTagScans: Map<string, T>,
+  setDailyCheckoutState: (state: DailyCheckoutState) => void
+): number => {
+  const rfidTag = findTagForStudent(scan.student_id, recentTagScans as Map<string, TagScanEntry>);
+  setDailyCheckoutState({
+    rfid: rfidTag,
+    studentName: scan.student_name,
+    showingFarewell: false,
+  });
+  return 0; // No change yet - awaiting confirmation
+};
+
+/**
+ * Handles transfer action: returns count delta based on room direction.
+ * +1 if incoming to our room, -1 if outgoing from our room.
+ */
+const handleTransferAction = (
+  scan: RfidScanResult,
+  currentRoomName: string | undefined
+): number => {
+  if (scan.room_name === currentRoomName) {
+    return 1; // Student transferred TO our room
+  }
+  if (scan.previous_room === currentRoomName) {
+    return -1; // Student transferred FROM our room
+  }
+  return 0; // Not related to our room
+};
+
+/**
+ * Checks if a scan result represents an error or info state.
+ */
+const isNonActionableScan = (scan: ExtendedScanResult): boolean => {
+  return Boolean(scan.showAsError) || Boolean(scan.isInfo);
+};
+
+// =============================================================================
+// End helper functions
+// =============================================================================
+
 const ActivityScanningPage: React.FC = () => {
   const navigate = useNavigate();
   const {
@@ -323,77 +447,44 @@ const ActivityScanningPage: React.FC = () => {
   }, [authenticatedUser?.pin]);
 
   // Update student count based on scan result
+  // Refactored to use extracted helper functions (SonarCloud S3776 fix)
   useEffect(() => {
-    if (currentScan && showModal) {
-      // Instead of fetching, update count based on scan action
-      logger.debug('Updating student count based on scan', {
-        action: currentScan.action,
-        currentCount: studentCount,
-      });
+    if (!currentScan || !showModal) return;
 
-      // Only update count for successful actions (not errors or info states)
-      const isError = Boolean((currentScan as { showAsError?: boolean }).showAsError);
-      const isInfo = Boolean((currentScan as { isInfo?: boolean }).isInfo);
+    logger.debug('Updating student count based on scan', {
+      action: currentScan.action,
+      currentCount: studentCount,
+    });
 
-      if (!isError && !isInfo) {
-        if (currentScan.action === 'checked_in') {
-          // Don't increment for Schulhof check-in (student is leaving this room, not entering)
-          if (!(currentScan as { isSchulhof?: boolean }).isSchulhof) {
-            setStudentCount(prev => prev + 1);
-          }
-        } else if (currentScan.action === 'checked_out') {
-          // Find the RFID tag from recent scans
-          let rfidTag = '';
-          for (const [tag, scan] of recentTagScans.entries()) {
-            if (scan.result?.student_id === currentScan.student_id) {
-              rfidTag = tag;
-              break;
-            }
-          }
+    // Skip error and info scans - they don't affect count
+    const extendedScan = currentScan as ExtendedScanResult;
+    if (isNonActionableScan(extendedScan)) return;
 
-          // Show destination selection modal
-          setCheckoutDestinationState({
-            rfid: rfidTag,
-            studentName: currentScan.student_name,
-            studentId: currentScan.student_id,
-          });
+    // Process action and get count delta
+    let countDelta = 0;
+    switch (currentScan.action) {
+      case 'checked_in':
+        countDelta = handleCheckinAction(extendedScan);
+        break;
+      case 'checked_out':
+        countDelta = handleCheckoutAction(currentScan, recentTagScans, setCheckoutDestinationState);
+        break;
+      case 'pending_daily_checkout':
+        // NOTE: No count change yet - server waiting for user confirmation
+        countDelta = handlePendingDailyCheckoutAction(
+          currentScan,
+          recentTagScans,
+          setDailyCheckoutState
+        );
+        break;
+      case 'transferred':
+        countDelta = handleTransferAction(currentScan, selectedRoom?.name);
+        break;
+    }
 
-          setStudentCount(prev => Math.max(0, prev - 1));
-        } else if (currentScan.action === 'pending_daily_checkout') {
-          // Handle pending daily checkout - find the RFID tag from recent scans
-          // NOTE: No checkout has happened yet! Server is waiting for user confirmation.
-          let rfidTag = '';
-
-          // Look through recent tag scans to find the one for this student
-          for (const [tag, scan] of recentTagScans.entries()) {
-            if (scan.result?.student_id === currentScan.student_id) {
-              rfidTag = tag;
-              break;
-            }
-          }
-
-          // Set up daily checkout state to show confirmation modal
-          setDailyCheckoutState({
-            rfid: rfidTag,
-            studentName: currentScan.student_name,
-            showingFarewell: false,
-          });
-
-          // DO NOT decrement student count here - checkout hasn't happened yet!
-          // Count will be decremented after user confirms (Ja/Nein/timeout)
-        } else if (currentScan.action === 'transferred') {
-          // For transfers, check if student is coming to or leaving our room
-          const currentRoomName = selectedRoom?.name;
-          if (currentScan.room_name === currentRoomName) {
-            // Student transferred TO our room from another room
-            setStudentCount(prev => prev + 1);
-          } else if (currentScan.previous_room === currentRoomName) {
-            // Student transferred FROM our room to another room
-            setStudentCount(prev => Math.max(0, prev - 1));
-          }
-          // If neither matches, don't change count (shouldn't happen)
-        }
-      }
+    // Apply count delta if needed
+    if (countDelta !== 0) {
+      setStudentCount(prev => Math.max(0, prev + countDelta));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
