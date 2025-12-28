@@ -1137,29 +1137,33 @@ function RoomSelectionPage() {
       </div>
 
       {/* Confirmation Modal */}
-      <ConfirmationModal
-        isOpen={showConfirmModal}
-        activity={selectedActivity}
-        room={selectedRoom!}
-        supervisors={selectedSupervisors}
-        onConfirm={handleConfirmSession}
-        onCancel={() => {
-          setShowConfirmModal(false);
-          setSelectedRoom(null);
-        }}
-        isLoading={isStartingSession}
-      />
+      {selectedRoom && (
+        <ConfirmationModal
+          isOpen={showConfirmModal}
+          activity={selectedActivity}
+          room={selectedRoom}
+          supervisors={selectedSupervisors}
+          onConfirm={handleConfirmSession}
+          onCancel={() => {
+            setShowConfirmModal(false);
+            setSelectedRoom(null);
+          }}
+          isLoading={isStartingSession}
+        />
+      )}
 
       {/* Conflict Resolution Modal */}
-      <ConflictModal
-        isOpen={showConflictModal}
-        activity={selectedActivity}
-        room={selectedRoom!}
-        supervisors={selectedSupervisors}
-        onForceStart={handleForceSessionStart}
-        onCancel={handleConflictCancel}
-        isLoading={isStartingSession}
-      />
+      {selectedRoom && (
+        <ConflictModal
+          isOpen={showConflictModal}
+          activity={selectedActivity}
+          room={selectedRoom}
+          supervisors={selectedSupervisors}
+          onForceStart={handleForceSessionStart}
+          onCancel={handleConflictCancel}
+          isLoading={isStartingSession}
+        />
+      )}
       <ErrorModal
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
