@@ -606,11 +606,10 @@ const ActivityScanningPage: React.FC = () => {
       logger.error('Failed to process daily checkout', { error });
 
       // Show error modal with network-aware message
+      const errorMessage = error instanceof Error ? error.message : 'Abmeldung fehlgeschlagen';
       const userFriendlyError = isNetworkRelatedError(error)
         ? 'Netzwerkfehler beim Abmelden. Bitte Verbindung prüfen und erneut versuchen.'
-        : mapServerErrorToGerman(
-            error instanceof Error ? error.message : 'Abmeldung fehlgeschlagen'
-          );
+        : mapServerErrorToGerman(errorMessage);
 
       const errorResult: RfidScanResult = {
         student_name: 'Abmeldung fehlgeschlagen',
@@ -784,11 +783,11 @@ const ActivityScanningPage: React.FC = () => {
         logger.error('Failed to check into Schulhof', { error });
 
         // Map error to user-friendly German message with network detection
+        const errorMessage =
+          error instanceof Error ? error.message : 'Schulhof Check-in fehlgeschlagen';
         const userFriendlyError = isNetworkRelatedError(error)
           ? 'Netzwerkfehler bei Schulhof-Anmeldung. Bitte Verbindung prüfen und erneut scannen.'
-          : mapServerErrorToGerman(
-              error instanceof Error ? error.message : 'Schulhof Check-in fehlgeschlagen'
-            );
+          : mapServerErrorToGerman(errorMessage);
 
         // Show error modal
         const errorResult: RfidScanResult = {
