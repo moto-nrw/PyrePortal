@@ -147,6 +147,51 @@ function createTouchEndHandler(
   };
 }
 
+/** Validate that all session recreation prerequisites are met */
+function validateSessionRecreationData(): {
+  isValid: boolean;
+  error?: string;
+  sessionRequest?: SessionStartRequest;
+} {
+  const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
+
+  if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
+    return {
+      isValid: false,
+      error:
+        'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.',
+    };
+  }
+
+  return {
+    isValid: true,
+    sessionRequest: {
+      activity_id: selectedActivity.id,
+      room_id: selectedRoom.id,
+      supervisor_ids: selectedSupervisors.map(s => s.id),
+    },
+  };
+}
+
+/** Execute session recreation API call */
+async function executeSessionRecreation(
+  pin: string,
+  sessionRequest: SessionStartRequest
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const sessionResponse = await api.startSession(pin, sessionRequest);
+
+    logUserAction('Session recreated successfully', {
+      sessionId: sessionResponse.active_group_id,
+    });
+
+    await useUserStore.getState().saveLastSessionData();
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: formatRecreationError(error) };
+  }
+}
+
 // ============================================================================
 // Component
 // ============================================================================
@@ -268,45 +313,32 @@ function HomeViewPage() {
   const handleConfirmRecreation = async () => {
     if (!authenticatedUser || !sessionSettings?.last_session) return;
 
-    const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
-
-    // Validate session data is complete
-    if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
-      showRecreationError(
-        'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.'
-      );
+    // Validate session data using extracted helper
+    const validation = validateSessionRecreationData();
+    if (!validation.isValid) {
+      showRecreationError(validation.error!);
       return;
     }
 
     logUserAction('Confirming session recreation', {
-      activityId: selectedActivity.id,
-      roomId: selectedRoom.id,
-      supervisorCount: selectedSupervisors.length,
+      sessionRequest: validation.sessionRequest,
     });
 
-    try {
-      const sessionRequest: SessionStartRequest = {
-        activity_id: selectedActivity.id,
-        room_id: selectedRoom.id,
-        supervisor_ids: selectedSupervisors.map(s => s.id),
-      };
+    // Execute session recreation using extracted helper
+    const result = await executeSessionRecreation(
+      authenticatedUser.pin,
+      validation.sessionRequest!
+    );
+    setShowConfirmModal(false);
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
-
-      logUserAction('Session recreated successfully', {
-        sessionId: sessionResponse.active_group_id,
-      });
-
-      await useUserStore.getState().saveLastSessionData();
-      await fetchCurrentSession();
-
-      logNavigation('Home View', '/nfc-scanning');
-      void navigate('/nfc-scanning');
-    } catch (error) {
-      showRecreationError(formatRecreationError(error));
-    } finally {
-      setShowConfirmModal(false);
+    if (!result.success) {
+      showRecreationError(result.error!);
+      return;
     }
+
+    await fetchCurrentSession();
+    logNavigation('Home View', '/nfc-scanning');
+    void navigate('/nfc-scanning');
   };
 
   // Redirect to login if no authenticated user and fetch current session

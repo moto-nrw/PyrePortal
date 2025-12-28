@@ -8,16 +8,14 @@ import {
   PaginationControls,
   SelectionPageLayout,
 } from '../components/ui';
+import { useEntityFetching, type AssignableEntity } from '../hooks/useEntityFetching';
 import { usePagination } from '../hooks/usePagination';
-import { api, type Student, type Teacher } from '../services/api';
+import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logUserAction } from '../utils/logger';
 
 const ENTITIES_PER_PAGE = 10; // 5x2 grid to use full width
-
-// Union type for assignable entities (students and teachers)
-type AssignableEntity = { type: 'student'; data: Student } | { type: 'teacher'; data: Teacher };
 
 // ============================================================================
 // Pure helper functions (moved outside component to reduce cognitive complexity)
@@ -70,15 +68,34 @@ function StudentSelectionPage() {
   const location = useLocation();
   const state = location.state as LocationState;
 
-  const [entities, setEntities] = useState<AssignableEntity[]>([]);
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null); // Format: "student-{id}" or "teacher-{id}"
-  const [isLoading, setIsLoading] = useState(true);
+  // Use extracted hook for entity fetching (reduces cognitive complexity)
+  const {
+    entities,
+    isLoading,
+    error: fetchError,
+    availableClasses,
+  } = useEntityFetching({
+    pin: authenticatedUser?.pin,
+    staffId: authenticatedUser?.staffId,
+    supervisorIds: selectedSupervisors.map(s => s.id),
+    isAuthenticated: !!authenticatedUser,
+  });
+
+  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(fetchError);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null); // null = all, 'betreuer' = staff only, or class name
+  const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
 
   const logger = useMemo(() => createLogger('StudentSelectionPage'), []);
+
+  // Sync fetch error to local error state
+  useEffect(() => {
+    if (fetchError) {
+      setError(fetchError);
+      setShowErrorModal(true);
+    }
+  }, [fetchError]);
 
   // Redirect if not authenticated or no tag data
   useEffect(() => {
@@ -93,69 +110,6 @@ function StudentSelectionPage() {
       scannedTag: state.scannedTag,
     });
   }, [authenticatedUser, state, navigate, logger]);
-
-  // Fetch students and teachers
-  useEffect(() => {
-    const fetchEntities = async () => {
-      if (!authenticatedUser?.pin) return;
-
-      try {
-        setIsLoading(true);
-        logger.debug('Fetching students and teachers', {
-          supervisorCount: selectedSupervisors.length,
-          authenticatedUserId: authenticatedUser.staffId,
-        });
-
-        // If no supervisors selected, use authenticated user's ID
-        const teacherIds =
-          selectedSupervisors.length > 0
-            ? selectedSupervisors.map(supervisor => supervisor.id)
-            : [authenticatedUser.staffId];
-
-        // Fetch both students and teachers in parallel
-        const [studentList, teacherList] = await Promise.all([
-          api.getStudents(authenticatedUser.pin, teacherIds),
-          api.getTeachers(),
-        ]);
-
-        // Combine into unified entity list
-        const combinedEntities: AssignableEntity[] = [
-          ...studentList.map(s => ({ type: 'student' as const, data: s })),
-          ...teacherList.map(t => ({ type: 'teacher' as const, data: t })),
-        ];
-
-        setEntities(combinedEntities);
-        logger.info('Entities fetched successfully', {
-          students: studentList.length,
-          teachers: teacherList.length,
-          total: combinedEntities.length,
-        });
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        logger.error('Failed to fetch entities', {
-          error: error.message,
-          stack: error.stack,
-        });
-        setError(`Fehler beim Laden: ${error.message}`);
-        setShowErrorModal(true);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    if (authenticatedUser) {
-      void fetchEntities();
-    }
-  }, [authenticatedUser, selectedSupervisors, logger]);
-
-  // Distinct classes from students for quick class filter
-  const availableClasses = useMemo(() => {
-    const classSet = new Set<string>();
-    entities.forEach(e => {
-      if (e.type === 'student' && e.data.school_class) classSet.add(e.data.school_class);
-    });
-    return Array.from(classSet).sort((a, b) => a.localeCompare(b, 'de'));
-  }, [entities]);
 
   // Apply filter by type or class
   const filteredEntities = useMemo(() => {
