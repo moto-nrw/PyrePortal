@@ -146,6 +146,46 @@ const SPECIAL_KEY_HANDLERS: Record<
 };
 
 /**
+ * Process a single key and return its diff entry, or null if no change
+ */
+const processKeyDiff = <T extends Record<string, unknown>>(
+  key: string,
+  prevState: T,
+  nextState: T
+): Record<string, unknown> | null => {
+  const prevValue = prevState[key];
+  const nextValue = nextState[key];
+
+  if (shouldSkipValue(prevValue, nextValue)) {
+    return null;
+  }
+
+  // Handle added keys
+  if (!(key in prevState)) {
+    return { added: true, value: nextValue };
+  }
+
+  // Handle removed keys
+  if (!(key in nextState)) {
+    return { removed: true, value: prevValue };
+  }
+
+  // Handle special keys with dedicated handlers
+  const specialHandler = SPECIAL_KEY_HANDLERS[key];
+  if (specialHandler) {
+    return specialHandler(prevValue, nextValue);
+  }
+
+  // Handle regular arrays
+  if (Array.isArray(prevValue) && Array.isArray(nextValue)) {
+    return handleArrayDiff(prevValue, nextValue);
+  }
+
+  // Default case for primitive values
+  return { prev: prevValue, next: nextValue };
+};
+
+/**
  * Helper to generate a deep diff between two state objects
  * Only includes properties that have actually changed
  */
@@ -157,46 +197,10 @@ const getStateDiff = <T extends Record<string, unknown>>(
   const allKeys = new Set([...Object.keys(prevState), ...Object.keys(nextState)]);
 
   for (const key of allKeys) {
-    const prevValue = prevState[key];
-    const nextValue = nextState[key];
-
-    if (shouldSkipValue(prevValue, nextValue)) {
-      continue;
+    const keyDiff = processKeyDiff(key, prevState, nextState);
+    if (keyDiff) {
+      diff[key] = keyDiff;
     }
-
-    // Handle added keys
-    if (!(key in prevState)) {
-      diff[key] = { added: true, value: nextValue };
-      continue;
-    }
-
-    // Handle removed keys
-    if (!(key in nextState)) {
-      diff[key] = { removed: true, value: prevValue };
-      continue;
-    }
-
-    // Handle special keys with dedicated handlers
-    const specialHandler = SPECIAL_KEY_HANDLERS[key];
-    if (specialHandler) {
-      const result = specialHandler(prevValue, nextValue);
-      if (result) {
-        diff[key] = result;
-      }
-      continue;
-    }
-
-    // Handle regular arrays
-    if (Array.isArray(prevValue) && Array.isArray(nextValue)) {
-      const result = handleArrayDiff(prevValue, nextValue);
-      if (result) {
-        diff[key] = result;
-      }
-      continue;
-    }
-
-    // Default case for primitive values
-    diff[key] = { prev: prevValue, next: nextValue };
   }
 
   return diff;
