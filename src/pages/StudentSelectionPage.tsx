@@ -19,6 +19,40 @@ const ENTITIES_PER_PAGE = 10; // 5x2 grid to use full width
 // Union type for assignable entities (students and teachers)
 type AssignableEntity = { type: 'student'; data: Student } | { type: 'teacher'; data: Teacher };
 
+// ============================================================================
+// Pure helper functions (moved outside component to reduce cognitive complexity)
+// ============================================================================
+
+/** Get unique identifier for an entity */
+function getEntityId(entity: AssignableEntity): string {
+  return entity.type === 'student'
+    ? `student-${entity.data.student_id}`
+    : `teacher-${entity.data.staff_id}`;
+}
+
+/** Get display name for an entity */
+function getEntityName(entity: AssignableEntity): string {
+  return entity.type === 'student'
+    ? `${entity.data.first_name} ${entity.data.last_name}`
+    : entity.data.display_name;
+}
+
+/** Get sortable name for an entity (last name first for students) */
+function getEntitySortName(entity: AssignableEntity): string {
+  return entity.type === 'student'
+    ? `${entity.data.last_name} ${entity.data.first_name}`
+    : entity.data.display_name;
+}
+
+/** Check if entity matches the selected filter */
+function entityMatchesFilter(entity: AssignableEntity, filter: string | null): boolean {
+  if (!filter) return true;
+  if (filter === 'betreuer') return entity.type === 'teacher';
+  // Class filter - only students
+  if (entity.type !== 'student') return false;
+  return (entity.data.school_class ?? '') === filter;
+}
+
 interface LocationState {
   scannedTag: string;
   tagAssignment: {
@@ -125,21 +159,9 @@ function StudentSelectionPage() {
 
   // Apply filter by type or class
   const filteredEntities = useMemo(() => {
-    const filtered = entities.filter(e => {
-      if (!selectedFilter) return true;
-      if (selectedFilter === 'betreuer') return e.type === 'teacher';
-      // Class filter - only students
-      if (e.type !== 'student') return false;
-      return (e.data.school_class ?? '') === selectedFilter;
-    });
-
-    return filtered.sort((a, b) => {
-      const an =
-        a.type === 'student' ? `${a.data.last_name} ${a.data.first_name}` : a.data.display_name;
-      const bn =
-        b.type === 'student' ? `${b.data.last_name} ${b.data.first_name}` : b.data.display_name;
-      return an.localeCompare(bn, 'de');
-    });
+    return entities
+      .filter(e => entityMatchesFilter(e, selectedFilter))
+      .sort((a, b) => getEntitySortName(a).localeCompare(getEntitySortName(b), 'de'));
   }, [entities, selectedFilter]);
 
   // Pagination hook
@@ -162,24 +184,11 @@ function StudentSelectionPage() {
   }, [selectedFilter, resetPage]);
 
   const handleEntitySelect = (entity: AssignableEntity) => {
-    const entityId =
-      entity.type === 'student'
-        ? `student-${entity.data.student_id}`
-        : `teacher-${entity.data.staff_id}`;
+    const entityId = getEntityId(entity);
+    const entityName = getEntityName(entity);
 
-    const entityName =
-      entity.type === 'student'
-        ? `${entity.data.first_name} ${entity.data.last_name}`
-        : entity.data.display_name;
-
-    logger.info('Entity selected', {
-      type: entity.type,
-      name: entityName,
-      id: entityId,
-    });
-
+    logger.info('Entity selected', { type: entity.type, name: entityName, id: entityId });
     setSelectedEntityId(entityId);
-
     logUserAction('entity_selection', {
       type: entity.type,
       name: entityName,
@@ -198,11 +207,7 @@ function StudentSelectionPage() {
     setIsSaving(true);
 
     // Find selected entity
-    const selectedEntity = entities.find(e => {
-      const id =
-        e.type === 'student' ? `student-${e.data.student_id}` : `teacher-${e.data.staff_id}`;
-      return id === selectedEntityId;
-    });
+    const selectedEntity = entities.find(e => getEntityId(e) === selectedEntityId);
 
     if (!selectedEntity) {
       setError('Ungültige Auswahl');
@@ -212,10 +217,7 @@ function StudentSelectionPage() {
     }
 
     try {
-      const entityName =
-        selectedEntity.type === 'student'
-          ? `${selectedEntity.data.first_name} ${selectedEntity.data.last_name}`
-          : selectedEntity.data.display_name;
+      const entityName = getEntityName(selectedEntity);
 
       logger.info('Assigning tag to entity', {
         type: selectedEntity.type,
@@ -293,13 +295,6 @@ function StudentSelectionPage() {
       badge: 'Betreuer',
       badgeColor: 'blue' as const,
     };
-  };
-
-  // Get entity ID for selection tracking
-  const getEntityId = (entity: AssignableEntity): string => {
-    return entity.type === 'student'
-      ? `student-${entity.data.student_id}`
-      : `teacher-${entity.data.staff_id}`;
   };
 
   if (!authenticatedUser || !state?.scannedTag) {
