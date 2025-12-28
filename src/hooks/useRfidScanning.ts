@@ -159,7 +159,7 @@ export const useRfidScanning = () => {
       recordTagScan(tagId, { timestamp: Date.now() });
 
       // Generate unique ID for this scan
-      const scanId = `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const scanId = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 
       const startTime = Date.now();
 
@@ -381,10 +381,10 @@ export const useRfidScanning = () => {
           logger.info(`RFID scan event received: ${tag_id} from ${platform} at ${timestamp}`);
 
           // Check if tag is blocked before processing
-          if (!isTagBlocked(tag_id)) {
-            void processScan(tag_id);
-          } else {
+          if (isTagBlocked(tag_id)) {
             logger.debug(`Tag ${tag_id} is blocked, skipping`);
+          } else {
+            void processScan(tag_id);
           }
         }
       );
@@ -448,10 +448,10 @@ export const useRfidScanning = () => {
             });
 
             // Check if tag is blocked before processing
-            if (!isTagBlocked(mockTagId)) {
-              void processScan(mockTagId);
-            } else {
+            if (isTagBlocked(mockTagId)) {
               logger.debug(`Mock tag ${mockTagId} is blocked, skipping`);
+            } else {
+              void processScan(mockTagId);
             }
           },
           5000 + Math.random() * 5000
@@ -509,13 +509,11 @@ export const useRfidScanning = () => {
           timestamp: callTimestamp,
         });
         await safeInvoke('stop_rfid_service');
-      } else {
+      } else if (mockScanInterval) {
         // Stop mock scanning
-        if (mockScanInterval) {
-          clearInterval(mockScanInterval);
-          mockScanInterval = null;
-          logger.info('Mock RFID scanning stopped');
-        }
+        clearInterval(mockScanInterval);
+        mockScanInterval = null;
+        logger.info('Mock RFID scanning stopped');
       }
       isServiceStartedRef.current = false;
       stopRfidScanning(); // Update store state

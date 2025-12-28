@@ -15,6 +15,16 @@ import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext
 
 const logger = createLogger('TagAssignmentPage');
 
+/**
+ * Helper to get assigned person from TagAssignmentCheck
+ * Handles backward compatibility with deprecated 'student' property
+ */
+const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
+  if (!assignment?.assigned) return null;
+  // Prefer 'person' over deprecated 'student' property
+  return assignment.person ?? assignment.student ?? null;
+};
+
 // RFID scanner types from Tauri backend
 interface RfidScanResult {
   success: boolean;
@@ -578,39 +588,42 @@ function TagAssignmentPage() {
                   </div>
 
                   {/* Current Assignment Status */}
-                  {tagAssignment.assigned && (tagAssignment.person ?? tagAssignment.student) ? (
-                    <div>
-                      <p
-                        style={{
-                          fontSize: '16px',
-                          color: '#6B7280',
-                          marginBottom: '8px',
-                        }}
-                      >
-                        Aktuell zugewiesen an:
-                      </p>
-                      <p
-                        style={{
-                          fontSize: '24px',
-                          fontWeight: 700,
-                          color: '#1F2937',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        {(tagAssignment.person ?? tagAssignment.student)?.name}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: '18px',
-                          color: '#6B7280',
-                        }}
-                      >
-                        {tagAssignment.person_type === 'staff'
-                          ? 'Betreuer'
-                          : (tagAssignment.person ?? tagAssignment.student)?.group}
-                      </p>
-                    </div>
-                  ) : (
+                  {(() => {
+                    const assignedPerson = getAssignedPerson(tagAssignment);
+                    return assignedPerson ? (
+                      <div>
+                        <p
+                          style={{
+                            fontSize: '16px',
+                            color: '#6B7280',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          Aktuell zugewiesen an:
+                        </p>
+                        <p
+                          style={{
+                            fontSize: '24px',
+                            fontWeight: 700,
+                            color: '#1F2937',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          {assignedPerson.name}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: '18px',
+                            color: '#6B7280',
+                          }}
+                        >
+                          {tagAssignment.person_type === 'staff'
+                            ? 'Betreuer'
+                            : assignedPerson.group}
+                        </p>
+                      </div>
+                    ) : null;
+                  })() ?? (
                     <div
                       style={{
                         backgroundColor: '#F9FAFB',

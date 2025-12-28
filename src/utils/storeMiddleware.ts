@@ -357,42 +357,27 @@ export const loggerMiddleware =
         // Standard state change logging
         if (stateChanges) {
           const level = logLevel ?? LogLevel.DEBUG;
+          const logPayload = {
+            changes,
+            timestamp: timestamp.toISOString(),
+            ...(callerInfo ? { source: callerInfo } : {}),
+          };
+          const logMessage = `[${actionId}] State updated: ${actionName}`;
+
           // Use the appropriate public logging method based on level
           switch (level) {
-            case LogLevel.DEBUG:
-              storeLogger.debug(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
-              break;
             case LogLevel.INFO:
-              storeLogger.info(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
+              storeLogger.info(logMessage, logPayload);
               break;
             case LogLevel.WARN:
-              storeLogger.warn(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
+              storeLogger.warn(logMessage, logPayload);
               break;
             case LogLevel.ERROR:
-              storeLogger.error(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
+              storeLogger.error(logMessage, logPayload);
               break;
+            case LogLevel.DEBUG:
             default:
-              storeLogger.debug(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
+              storeLogger.debug(logMessage, logPayload);
           }
         }
 

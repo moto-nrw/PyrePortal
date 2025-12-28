@@ -772,7 +772,8 @@ export const api = {
       params.append('capacity', capacity.toString());
     }
 
-    const endpoint = `/api/iot/rooms/available${params.toString() ? `?${params.toString()}` : ''}`;
+    const queryString = params.toString();
+    const endpoint = `/api/iot/rooms/available${queryString ? `?${queryString}` : ''}`;
 
     const response = await apiCall<RoomsResponse>(endpoint, {
       headers: {
