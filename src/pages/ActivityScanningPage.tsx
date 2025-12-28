@@ -132,30 +132,6 @@ interface DailyCheckoutState {
   showingFarewell: boolean;
 }
 
-/** Tag scan entry from the recentTagScans Map (matches RecentTagScan in userStore) */
-interface TagScanEntry {
-  result?: { student_id?: number | null };
-}
-
-/**
- * Finds the RFID tag for a given student ID from recent scans.
- * @param studentId - The student ID to search for (can be null)
- * @param recentTagScans - Map of recent tag scans
- * @returns The RFID tag string or empty string if not found
- */
-const findTagForStudent = (
-  studentId: number | null,
-  recentTagScans: Map<string, TagScanEntry>
-): string => {
-  if (studentId === null) return '';
-  for (const [tag, scan] of recentTagScans.entries()) {
-    if (scan.result?.student_id === studentId) {
-      return tag;
-    }
-  }
-  return '';
-};
-
 /**
  * Handles check-in action and returns count delta.
  * Schulhof check-ins don't increment (student is leaving, not entering).
@@ -169,15 +145,14 @@ const handleCheckinAction = (scan: ExtendedScanResult): number => {
 
 /**
  * Handles check-out action: sets up destination modal state and returns count delta.
+ * Uses scan.scannedTagId directly instead of looking up from recentTagScans (fixes race condition).
  */
-const handleCheckoutAction = <T extends TagScanEntry>(
+const handleCheckoutAction = (
   scan: RfidScanResult,
-  recentTagScans: Map<string, T>,
   setCheckoutDestinationState: (state: CheckoutDestinationState) => void
 ): number => {
-  const rfidTag = findTagForStudent(scan.student_id, recentTagScans as Map<string, TagScanEntry>);
   setCheckoutDestinationState({
-    rfid: rfidTag,
+    rfid: scan.scannedTagId ?? '',
     studentName: scan.student_name,
     studentId: scan.student_id,
   });
@@ -187,15 +162,14 @@ const handleCheckoutAction = <T extends TagScanEntry>(
 /**
  * Handles pending daily checkout: sets up confirmation modal state.
  * No count change yet - waiting for user confirmation.
+ * Uses scan.scannedTagId directly instead of looking up from recentTagScans (fixes race condition).
  */
-const handlePendingDailyCheckoutAction = <T extends TagScanEntry>(
+const handlePendingDailyCheckoutAction = (
   scan: RfidScanResult,
-  recentTagScans: Map<string, T>,
   setDailyCheckoutState: (state: DailyCheckoutState) => void
 ): number => {
-  const rfidTag = findTagForStudent(scan.student_id, recentTagScans as Map<string, TagScanEntry>);
   setDailyCheckoutState({
-    rfid: rfidTag,
+    rfid: scan.scannedTagId ?? '',
     studentName: scan.student_name,
     showingFarewell: false,
   });
@@ -321,14 +295,8 @@ const ActivityScanningPage: React.FC = () => {
   // This prevents previous student's state from affecting the next scan's modal
   useEffect(() => {
     if (currentScan && dailyCheckoutState) {
-      // Find the current scan's RFID from recent scans
-      let currentRfid = '';
-      for (const [tag, scan] of recentTagScans.entries()) {
-        if (scan.result?.student_id === currentScan.student_id) {
-          currentRfid = tag;
-          break;
-        }
-      }
+      // Use scannedTagId directly instead of looking up from recentTagScans (fixes race condition)
+      const currentRfid = currentScan.scannedTagId ?? '';
 
       // If dailyCheckoutState exists for a DIFFERENT scan, clear it
       if (currentRfid && dailyCheckoutState.rfid !== currentRfid) {
@@ -342,7 +310,7 @@ const ActivityScanningPage: React.FC = () => {
         setShowFeedbackPrompt(false);
       }
     }
-  }, [currentScan, dailyCheckoutState, recentTagScans]);
+  }, [currentScan, dailyCheckoutState]);
 
   // Start scanning when component mounts
   useEffect(() => {
@@ -467,15 +435,13 @@ const ActivityScanningPage: React.FC = () => {
         countDelta = handleCheckinAction(extendedScan);
         break;
       case 'checked_out':
-        countDelta = handleCheckoutAction(currentScan, recentTagScans, setCheckoutDestinationState);
+        // Uses currentScan.scannedTagId directly (no recentTagScans lookup)
+        countDelta = handleCheckoutAction(currentScan, setCheckoutDestinationState);
         break;
       case 'pending_daily_checkout':
         // NOTE: No count change yet - server waiting for user confirmation
-        countDelta = handlePendingDailyCheckoutAction(
-          currentScan,
-          recentTagScans,
-          setDailyCheckoutState
-        );
+        // Uses currentScan.scannedTagId directly (fixes race condition)
+        countDelta = handlePendingDailyCheckoutAction(currentScan, setDailyCheckoutState);
         break;
       case 'transferred':
         countDelta = handleTransferAction(currentScan, selectedRoom?.name);
