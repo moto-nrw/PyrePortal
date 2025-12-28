@@ -236,11 +236,22 @@ const isInternalStackLine = (line: string): boolean => {
 };
 
 /**
- * Extract file name from a cleaned location string
+ * Extract file name from a cleaned location string.
+ * Uses a non-backtracking approach: find the last path separator,
+ * then extract the filename portion before the line:column suffix.
  */
 const extractFileName = (location: string): string => {
-  const fileMatch = /([^/\\]+):\d+:\d+$/.exec(location);
-  return fileMatch ? fileMatch[1] : location;
+  // Find the last path separator
+  const lastSlash = Math.max(location.lastIndexOf('/'), location.lastIndexOf('\\'));
+  const fileWithLineCol = lastSlash >= 0 ? location.slice(lastSlash + 1) : location;
+
+  // Extract filename before :line:column suffix
+  const colonIndex = fileWithLineCol.indexOf(':');
+  if (colonIndex > 0) {
+    return fileWithLineCol.slice(0, colonIndex);
+  }
+
+  return fileWithLineCol;
 };
 
 /**
