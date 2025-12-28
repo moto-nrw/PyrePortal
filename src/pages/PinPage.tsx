@@ -84,8 +84,9 @@ function PinPage() {
     };
   }, [logger]);
 
-  // Maximum PIN length
+  // Maximum PIN length and stable dot identifiers for React keys
   const maxPinLength = 4;
+  const pinDotIds = ['dot-1', 'dot-2', 'dot-3', 'dot-4'] as const;
 
   // Auto-submit when PIN is complete
   useEffect(() => {
@@ -311,9 +312,9 @@ function PinPage() {
                 margin: '0 auto 12px auto',
               }}
             >
-              {Array.from({ length: maxPinLength }).map((_, i) => (
+              {pinDotIds.map((dotId, i) => (
                 <div
-                  key={`pin-dot-${i}`}
+                  key={dotId}
                   style={{
                     width: '24px',
                     height: '24px',
