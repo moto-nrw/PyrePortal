@@ -24,6 +24,15 @@ import { loggerMiddleware } from '../utils/storeMiddleware';
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
 
+/**
+ * Helper to create activity summary for logging (reduces nesting depth)
+ */
+const toActivitySummary = (a: ActivityResponse) => ({
+  id: a.id,
+  name: a.name,
+  category: a.category_name,
+});
+
 // Re-export isNetworkRelatedError for backward compatibility
 export { isNetworkRelatedError } from '../services/api';
 
@@ -928,11 +937,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
           storeLogger.info('Activities loaded successfully', {
             count: activitiesData.length,
-            activities: activitiesData.map(a => ({
-              id: a.id,
-              name: a.name,
-              category: a.category_name,
-            })),
+            activities: activitiesData.map(toActivitySummary),
           });
 
           set({ isLoading: false });
@@ -1045,16 +1050,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const existingStudentIndex = activity.checkedInStudents.findIndex(s => s.id === student.id);
 
       if (existingStudentIndex !== -1) {
-        // If student already checked in but checked out, update their status
-        if (!activity.checkedInStudents[existingStudentIndex].isCheckedIn) {
-          activity.checkedInStudents[existingStudentIndex] = {
-            ...activity.checkedInStudents[existingStudentIndex],
-            checkInTime: new Date(),
-            checkOutTime: undefined,
-            isCheckedIn: true,
-          };
-        } else {
-          // Student is already checked in
+        // Check if student is already checked in
+        if (activity.checkedInStudents[existingStudentIndex].isCheckedIn) {
+          // Student is already checked in - show error
           set({
             error: mapActivityError('student_already_checked_in', {
               studentName: student.name,
@@ -1063,6 +1061,14 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
             isLoading: false,
           });
           return false;
+        } else {
+          // Student was checked out - re-check them in
+          activity.checkedInStudents[existingStudentIndex] = {
+            ...activity.checkedInStudents[existingStudentIndex],
+            checkInTime: new Date(),
+            checkOutTime: undefined,
+            isCheckedIn: true,
+          };
         }
       } else {
         // Add new student to checked in list

@@ -11,6 +11,59 @@ import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
+/**
+ * Custom numpad button component - Phoenix Clean Style
+ * Defined outside PinPage to avoid recreation on each render
+ */
+interface NumpadButtonProps {
+  readonly onClick: () => void;
+  readonly isAction?: boolean;
+  readonly children: React.ReactNode;
+}
+
+function NumpadButton({ onClick, isAction = false, children }: NumpadButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%',
+        height: '95px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: isAction ? '#F9FAFB' : '#FFFFFF',
+        border: isAction ? '3px solid #D1D5DB' : '3px solid #E5E7EB',
+        borderRadius: '24px',
+        fontSize: isAction ? '42px' : '50px',
+        fontWeight: 700,
+        color: isAction ? '#6B7280' : '#111827',
+        cursor: 'pointer',
+        transition: 'all 150ms ease-out',
+        outline: 'none',
+        WebkitTapHighlightColor: 'transparent',
+        touchAction: 'manipulation',
+        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.1)',
+      }}
+      onTouchStart={e => {
+        e.currentTarget.style.transform = 'scale(0.95)';
+        e.currentTarget.style.backgroundColor = isAction ? '#F3F4F6' : '#F9FAFB';
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
+      }}
+      onTouchEnd={e => {
+        setTimeout(() => {
+          if (e.currentTarget) {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+          }
+        }, 100);
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 function PinPage() {
   const { setAuthenticatedUser } = useUserStore();
   const [pin, setPin] = useState<string>('');
@@ -188,54 +241,6 @@ function PinPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Custom numpad button component - Phoenix Clean Style
-  const NumpadButton: React.FC<{
-    onClick: () => void;
-    isAction?: boolean;
-    children: React.ReactNode;
-  }> = ({ onClick, isAction = false, children }) => {
-    return (
-      <button
-        onClick={onClick}
-        style={{
-          width: '100%',
-          height: '95px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: isAction ? '#F9FAFB' : '#FFFFFF',
-          border: isAction ? '3px solid #D1D5DB' : '3px solid #E5E7EB',
-          borderRadius: '24px',
-          fontSize: isAction ? '42px' : '50px',
-          fontWeight: 700,
-          color: isAction ? '#6B7280' : '#111827',
-          cursor: 'pointer',
-          transition: 'all 150ms ease-out',
-          outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
-          touchAction: 'manipulation',
-          boxShadow: '0 3px 8px rgba(0, 0, 0, 0.1)',
-        }}
-        onTouchStart={e => {
-          e.currentTarget.style.transform = 'scale(0.95)';
-          e.currentTarget.style.backgroundColor = isAction ? '#F3F4F6' : '#F9FAFB';
-          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
-        }}
-        onTouchEnd={e => {
-          setTimeout(() => {
-            if (e.currentTarget) {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-            }
-          }, 100);
-        }}
-      >
-        {children}
-      </button>
-    );
   };
 
   return (

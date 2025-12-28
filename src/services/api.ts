@@ -772,7 +772,9 @@ export const api = {
       params.append('capacity', capacity.toString());
     }
 
-    const endpoint = `/api/iot/rooms/available${params.toString() ? `?${params.toString()}` : ''}`;
+    const queryString = params.toString();
+    const queryPart = queryString ? `?${queryString}` : '';
+    const endpoint = `/api/iot/rooms/available${queryPart}`;
 
     const response = await apiCall<RoomsResponse>(endpoint, {
       headers: {
@@ -1224,12 +1226,6 @@ export interface TagAssignmentCheck {
   person?: {
     id: number;
     person_id: number;
-    name: string;
-    group: string;
-  };
-  /** @deprecated Use person instead */
-  student?: {
-    id: number;
     name: string;
     group: string;
   };
