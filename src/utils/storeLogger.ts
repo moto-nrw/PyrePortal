@@ -36,12 +36,19 @@ const productionStoreLogConfig: LoggerMiddlewareOptions = {
   stateChanges: false,
 };
 
+// Get the appropriate configuration based on environment (avoids nested ternary - SonarCloud S3358)
+const getEnvironmentStoreConfig = (): LoggerMiddlewareOptions => {
+  if (import.meta.env.PROD) {
+    return productionStoreLogConfig;
+  }
+  if (import.meta.env.DEV) {
+    return verboseStoreLogConfig;
+  }
+  return defaultStoreLogConfig;
+};
+
 // Export current configuration based on environment
-export const storeLogConfig: LoggerMiddlewareOptions = import.meta.env.PROD
-  ? productionStoreLogConfig
-  : import.meta.env.DEV
-    ? verboseStoreLogConfig
-    : defaultStoreLogConfig;
+export const storeLogConfig: LoggerMiddlewareOptions = getEnvironmentStoreConfig();
 
 // Helper functions for managing store logging behavior at runtime
 export const enableVerboseStoreLogging = (): void => {

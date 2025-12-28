@@ -32,12 +32,19 @@ const testConfig: LoggerConfig = {
   consoleOutput: false,
 };
 
+// Get the appropriate configuration based on environment (avoids nested ternary - SonarCloud S3358)
+const getEnvironmentConfig = (): LoggerConfig => {
+  if (import.meta.env.TEST) {
+    return testConfig;
+  }
+  if (import.meta.env.DEV) {
+    return devConfig;
+  }
+  return defaultConfig;
+};
+
 // Export the appropriate configuration based on environment
-export const loggerConfig: LoggerConfig = import.meta.env.TEST
-  ? testConfig
-  : import.meta.env.DEV
-    ? devConfig
-    : defaultConfig;
+export const loggerConfig: LoggerConfig = getEnvironmentConfig();
 
 // Helper functions for managing logging state at runtime
 export const enableDebugLogging = (): void => {
