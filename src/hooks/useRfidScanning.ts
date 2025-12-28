@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 import { api, mapApiErrorToGerman, ApiError } from '../services/api';
-import type { RfidScanResult } from '../services/api';
+import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger } from '../utils/logger';
 import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
@@ -13,6 +13,230 @@ let eventListener: (() => void) | null = null;
 let mockScanInterval: ReturnType<typeof setInterval> | null = null;
 
 const logger = createLogger('useRfidScanning');
+
+// ============================================================================
+// Helper functions to reduce cognitive complexity in processScan
+// ============================================================================
+
+/**
+ * Creates a session expired error result for display.
+ */
+const createSessionExpiredResult = (): RfidScanResult & { navigateOnClose: string } => ({
+  student_name: 'Sitzung abgelaufen',
+  student_id: null,
+  action: 'error',
+  message: 'Bitte melden Sie sich erneut an.',
+  showAsError: true,
+  navigateOnClose: '/home',
+});
+
+/**
+ * Creates the initial optimistic scan object for UI feedback.
+ */
+const createOptimisticScan = (scanId: string, tagId: string) => ({
+  id: scanId,
+  tagId,
+  status: 'pending' as const,
+  optimisticAction: 'checkin' as const,
+  optimisticStudentCount: 0,
+  timestamp: Date.now(),
+  studentInfo: {
+    name: 'Processing...',
+    id: 0,
+  },
+});
+
+/**
+ * Generates a unique scan ID for tracking optimistic updates.
+ */
+const generateScanId = (): string =>
+  `scan_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+
+/**
+ * Handles supervisor authentication from RFID scan.
+ * Returns true if supervisor was handled (caller should return early).
+ */
+interface SupervisorHandlerParams {
+  result: RfidScanResult;
+  tagId: string;
+  scanId: string;
+  currentSession: CurrentSession | null;
+  pin: string;
+  scannedSupervisorsRef: React.MutableRefObject<Set<number>>;
+  addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
+  addActiveSupervisorTag: (tagId: string) => void;
+  isActiveSupervisor: (tagId: string) => boolean;
+  setScanResult: (result: RfidScanResult) => void;
+  removeOptimisticScan: (scanId: string) => void;
+  showScanModal: () => void;
+  showSupervisorRedirect: (scanId?: string) => void;
+}
+
+const handleSupervisorAuthentication = async (
+  params: SupervisorHandlerParams
+): Promise<boolean> => {
+  const {
+    result,
+    tagId,
+    scanId,
+    currentSession,
+    pin,
+    scannedSupervisorsRef,
+    addSupervisorFromRfid,
+    addActiveSupervisorTag,
+    isActiveSupervisor,
+    setScanResult,
+    removeOptimisticScan,
+    showScanModal,
+    showSupervisorRedirect,
+  } = params;
+
+  if (result.action !== 'supervisor_authenticated') {
+    return false;
+  }
+
+  const staffId = result.student_id;
+  const staffName = result.student_name;
+
+  if (staffId === null) {
+    return false;
+  }
+
+  const alreadySelected = addSupervisorFromRfid(staffId, staffName);
+  const wasSeenThisSession = scannedSupervisorsRef.current.has(staffId);
+  const isRepeatSupervisor = alreadySelected || wasSeenThisSession || isActiveSupervisor(tagId);
+
+  // Track in-memory and mark tag active for fast return
+  scannedSupervisorsRef.current.add(staffId);
+  addActiveSupervisorTag(tagId);
+
+  // Sync supervisors with backend (fire-and-forget)
+  if (currentSession && pin) {
+    void syncSupervisorsWithBackend(currentSession, pin, staffId);
+  }
+
+  logger.info('Betreuer erfolgreich authentifiziert', {
+    supervisorName: staffName,
+    message: result.message,
+    staffId,
+    isRepeatSupervisor,
+    alreadySelected,
+  });
+
+  // Show redirect for repeat supervisors
+  if (isRepeatSupervisor) {
+    showSupervisorRedirect(scanId);
+    return true;
+  }
+
+  // First-time supervisor scan - show added message
+  const firstScanResult: RfidScanResult = {
+    ...result,
+    student_name: 'Betreuer erkannt',
+    message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
+  };
+  setScanResult(firstScanResult);
+  removeOptimisticScan(scanId);
+  showScanModal();
+  return true;
+};
+
+/**
+ * Syncs supervisor list with backend after RFID authentication.
+ */
+const syncSupervisorsWithBackend = async (
+  currentSession: CurrentSession,
+  pin: string,
+  staffId: number
+): Promise<void> => {
+  try {
+    const updatedSupervisorIds = useUserStore.getState().selectedSupervisors.map(s => s.id);
+    await api.updateSessionSupervisors(pin, currentSession.active_group_id, updatedSupervisorIds);
+    logger.info('Betreuer per RFID synchronisiert (Netzwerkpfad)', {
+      staffId,
+      sessionId: currentSession.active_group_id,
+    });
+  } catch (error) {
+    logger.warn('Sync der Betreuer fehlgeschlagen (Netzwerkpfad)', {
+      error: error instanceof Error ? error.message : String(error),
+      staffId,
+    });
+  }
+};
+
+/**
+ * Processes successful student scan - updates bookkeeping and cache.
+ */
+interface StudentBookkeepingParams {
+  result: RfidScanResult;
+  tagId: string;
+  mapTagToStudent: (tagId: string, studentId: string) => void;
+  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
+  recordTagScan: (
+    tagId: string,
+    data: { timestamp: number; studentId?: string; result?: RfidScanResult }
+  ) => void;
+}
+
+const processStudentBookkeeping = (params: StudentBookkeepingParams): void => {
+  const { result, tagId, mapTagToStudent, updateStudentHistory, recordTagScan } = params;
+
+  if (!result.student_id) {
+    return;
+  }
+
+  const studentId = result.student_id.toString();
+  const action = result.action === 'checked_in' ? 'checkin' : 'checkout';
+
+  mapTagToStudent(tagId, studentId);
+  updateStudentHistory(studentId, action);
+
+  // Short-lived duplicate prevention cache (in-memory only)
+  recordTagScan(tagId, {
+    timestamp: Date.now(),
+    studentId,
+    result,
+  });
+};
+
+/**
+ * Determines error title based on error type.
+ */
+const getErrorTitle = (error: unknown): string => {
+  if (error instanceof ApiError) {
+    if (error.code === 'ROOM_CAPACITY_EXCEEDED') return 'Raum voll';
+    if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED') return 'Aktivität voll';
+  }
+  return 'Scan fehlgeschlagen';
+};
+
+/**
+ * Creates an error result for display when scan fails.
+ */
+const createScanErrorResult = (error: unknown): RfidScanResult => {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
+  // Special handling for "already checked in" scenario
+  if (errorMessage.includes('already has an active visit')) {
+    return {
+      student_name: 'Bereits eingecheckt',
+      student_id: null,
+      action: 'already_in',
+      message: 'Dieser Schüler ist bereits in diesem Raum eingecheckt',
+      isInfo: true,
+    };
+  }
+
+  // Generic error handling
+  const userFriendlyMessage = mapApiErrorToGerman(error);
+  return {
+    student_name: getErrorTitle(error),
+    student_id: null,
+    action: 'error',
+    message: userFriendlyMessage || 'Bitte erneut versuchen',
+    showAsError: true,
+  };
+};
 
 export const useRfidScanning = () => {
   // Note: Navigation is now handled by page components via navigateOnClose flag in scan result
@@ -110,24 +334,15 @@ export const useRfidScanning = () => {
 
   const processScan = useCallback(
     async (tagId: string) => {
+      // Validate authentication state
       if (!authenticatedUser?.pin || !selectedRoom) {
         logger.error('Missing authentication or room selection');
-        // Show error with navigation flag - page will handle timeout and navigation
-        const sessionExpiredResult: RfidScanResult = {
-          student_name: 'Sitzung abgelaufen',
-          student_id: null,
-          action: 'error',
-          message: 'Bitte melden Sie sich erneut an.',
-          showAsError: true,
-          navigateOnClose: '/home',
-        } as RfidScanResult & { navigateOnClose: string };
-        setScanResult(sessionExpiredResult);
+        setScanResult(createSessionExpiredResult());
         showScanModal();
-        // Modal timeout and navigation handled by ActivityScanningPage via useModalTimeout
         return;
       }
 
-      // Sofortiger Rückweg für bereits angemeldete Betreuer
+      // Fast path for already-authenticated supervisors
       if (isActiveSupervisor(tagId)) {
         logger.info('Aktiver Betreuer-Tag erkannt, leite sofort um', { tagId });
         showSupervisorRedirect();
@@ -136,60 +351,35 @@ export const useRfidScanning = () => {
 
       logger.info(`Processing RFID scan for tag: ${tagId}`);
 
-      // Enhanced duplicate prevention - check all layers
+      // Handle duplicate prevention
       if (!canProcessTag(tagId)) {
         logger.info(`Tag ${tagId} blocked by duplicate prevention`);
-
-        // Check if we have a recent cached result to show
         const recentScan = rfid.recentTagScans.get(tagId);
         if (recentScan?.result && Date.now() - recentScan.timestamp < 2000) {
-          // Show the cached result instead of making a new API call
           setScanResult(recentScan.result);
           showScanModal();
-          // Modal timeout handled by ActivityScanningPage via useModalTimeout
         } else {
-          // Just show a quick message that scan is processing
           logger.debug('Scan already in progress, please wait');
         }
         return;
       }
 
-      // Add to processing queue immediately
+      // Initialize scan tracking
       addToProcessingQueue(tagId);
       recordTagScan(tagId, { timestamp: Date.now() });
-
-      // Generate unique ID for this scan
-      const scanId = `scan_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
-
+      const scanId = generateScanId();
       const startTime = Date.now();
 
       try {
-        // IMMEDIATE OPTIMISTIC UI FEEDBACK
-        const optimisticScan = {
-          id: scanId,
-          tagId,
-          status: 'pending' as const,
-          optimisticAction: 'checkin' as const,
-          optimisticStudentCount: 0,
-          timestamp: Date.now(),
-          studentInfo: {
-            name: 'Processing...',
-            id: 0,
-          },
-        };
-
-        addOptimisticScan(optimisticScan);
+        // Show optimistic UI feedback
+        addOptimisticScan(createOptimisticScan(scanId, tagId));
         showScanModal();
         logger.info('Starting network scan (cache disabled)');
         updateOptimisticScan(scanId, 'processing');
 
-        // NETWORK API CALL (single source of truth)
+        // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
-          {
-            student_rfid: tagId,
-            action: 'checkin',
-            room_id: selectedRoom.id,
-          },
+          { student_rfid: tagId, action: 'checkin', room_id: selectedRoom.id },
           authenticatedUser.pin
         );
 
@@ -200,143 +390,51 @@ export const useRfidScanning = () => {
         updateOptimisticScan(scanId, 'success');
         setScanResult(result);
 
-        // Supervisor handling (no cache path)
-        if (result.action === 'supervisor_authenticated') {
-          const staffId = result.student_id;
-          const staffName = result.student_name;
-          if (staffId !== null) {
-            const alreadySelected = addSupervisorFromRfid(staffId, staffName); // true if existed
-            const wasSeenThisSession = scannedSupervisorsRef.current.has(staffId);
-            const isRepeatSupervisor =
-              alreadySelected || wasSeenThisSession || isActiveSupervisor(tagId);
+        // Handle supervisor authentication (returns true if handled)
+        const supervisorHandled = await handleSupervisorAuthentication({
+          result,
+          tagId,
+          scanId,
+          currentSession,
+          pin: authenticatedUser.pin,
+          scannedSupervisorsRef,
+          addSupervisorFromRfid,
+          addActiveSupervisorTag,
+          isActiveSupervisor,
+          setScanResult,
+          removeOptimisticScan,
+          showScanModal,
+          showSupervisorRedirect,
+        });
 
-            // Track in-memory and mark tag active for fast return
-            scannedSupervisorsRef.current.add(staffId);
-            addActiveSupervisorTag(tagId);
-
-            if (currentSession && authenticatedUser?.pin) {
-              void (async () => {
-                try {
-                  const updatedSupervisorIds = useUserStore
-                    .getState()
-                    .selectedSupervisors.map(s => s.id);
-                  await api.updateSessionSupervisors(
-                    authenticatedUser.pin,
-                    currentSession.active_group_id,
-                    updatedSupervisorIds
-                  );
-                  logger.info('Betreuer per RFID synchronisiert (Netzwerkpfad)', {
-                    staffId,
-                    sessionId: currentSession.active_group_id,
-                  });
-                } catch (error) {
-                  logger.warn('Sync der Betreuer fehlgeschlagen (Netzwerkpfad)', {
-                    error: error instanceof Error ? error.message : String(error),
-                    staffId,
-                  });
-                }
-              })();
-            }
-
-            logger.info('Betreuer erfolgreich authentifiziert', {
-              supervisorName: staffName,
-              message: result.message,
-              staffId,
-              isRepeatSupervisor,
-              alreadySelected,
-            });
-
-            // Nur zwei Varianten: Redirect oder Hinzufügen
-            if (isRepeatSupervisor) {
-              showSupervisorRedirect(scanId);
-              return;
-            }
-
-            const firstScanResult: RfidScanResult = {
-              ...result,
-              student_name: 'Betreuer erkannt',
-              message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
-            };
-            setScanResult(firstScanResult);
-            removeOptimisticScan(scanId);
-            showScanModal();
-            // Modal timeout handled by ActivityScanningPage via useModalTimeout
-            return;
-          }
+        if (supervisorHandled) {
+          return;
         }
 
-        // Student bookkeeping (no caching)
-        if (result.student_id) {
-          const studentId = result.student_id.toString();
-          const action = result.action === 'checked_in' ? 'checkin' : 'checkout';
+        // Process student bookkeeping
+        processStudentBookkeeping({
+          result,
+          tagId,
+          mapTagToStudent,
+          updateStudentHistory,
+          recordTagScan,
+        });
 
-          mapTagToStudent(tagId, studentId);
-          updateStudentHistory(studentId, action);
-
-          // short-lived duplicate prevention cache (in-memory only)
-          recordTagScan(tagId, {
-            timestamp: Date.now(),
-            studentId,
-            result,
-          });
-        }
-
+        // Update session activity (fire-and-forget)
         try {
           await api.updateSessionActivity(authenticatedUser.pin);
           logger.debug('Session activity updated');
-        } catch (error) {
-          logger.warn('Failed to update session activity', { error });
+        } catch (activityError) {
+          logger.warn('Failed to update session activity', { error: activityError });
         }
 
-        // Clean up optimistic scan immediately; modal timeout handled by ActivityScanningPage
         removeOptimisticScan(scanId);
-        // Modal timeout handled by ActivityScanningPage via useModalTimeout
       } catch (error) {
         logger.error('Failed to process RFID scan', { error });
-
-        const errorMessage = error instanceof Error ? error.message : String(error);
-
-        if (errorMessage.includes('already has an active visit')) {
-          logger.info('Student already has active visit - showing info to user');
-          updateOptimisticScan(scanId, 'failed');
-
-          const infoResult: RfidScanResult = {
-            student_name: 'Bereits eingecheckt',
-            student_id: null,
-            action: 'already_in',
-            message: 'Dieser Schüler ist bereits in diesem Raum eingecheckt',
-            isInfo: true,
-          };
-          setScanResult(infoResult);
-        } else {
-          updateOptimisticScan(scanId, 'failed');
-          // Use mapApiErrorToGerman for rich error messages (e.g., capacity errors with details)
-          const userFriendlyMessage = mapApiErrorToGerman(error);
-
-          // Customize title for capacity errors
-          let errorTitle = 'Scan fehlgeschlagen';
-          if (error instanceof ApiError) {
-            if (error.code === 'ROOM_CAPACITY_EXCEEDED') {
-              errorTitle = 'Raum voll';
-            } else if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED') {
-              errorTitle = 'Aktivität voll';
-            }
-          }
-
-          const errorResult: RfidScanResult = {
-            student_name: errorTitle,
-            student_id: null,
-            action: 'error',
-            message: userFriendlyMessage || 'Bitte erneut versuchen',
-            showAsError: true,
-          };
-          setScanResult(errorResult);
-        }
-
-        // Clean up optimistic scan immediately
+        updateOptimisticScan(scanId, 'failed');
+        setScanResult(createScanErrorResult(error));
         removeOptimisticScan(scanId);
         showScanModal();
-        // Modal timeout handled by ActivityScanningPage via useModalTimeout
       } finally {
         removeFromProcessingQueue(tagId);
       }
