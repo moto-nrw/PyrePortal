@@ -1278,6 +1278,8 @@ export interface RfidScanResult {
   showAsError?: boolean;
   /** Indicates this result is informational (not a scan result) */
   isInfo?: boolean;
+  /** The RFID tag that was scanned (added by frontend, not from server) */
+  scannedTagId?: string;
 }
 
 /**

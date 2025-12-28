@@ -390,7 +390,9 @@ export const useRfidScanning = () => {
         });
 
         updateOptimisticScan(scanId, 'success');
-        setScanResult(result);
+        // Include scannedTagId so ActivityScanningPage can use it directly
+        // instead of looking it up from recentTagScans (fixes race condition)
+        setScanResult({ ...result, scannedTagId: tagId });
 
         // Handle supervisor authentication (returns true if handled)
         const supervisorHandled = await handleSupervisorAuthentication({
