@@ -201,14 +201,8 @@ function TeamManagementPage() {
         logger.info('Successfully updated session supervisors');
       }
 
-      // Show success modal
+      // Show success modal - navigation happens when modal closes
       setShowSuccessModal(true);
-
-      // Navigate back to home after a short delay
-      setTimeout(() => {
-        logNavigation('TeamManagementPage', 'HomeViewPage');
-        void navigate('/home');
-      }, 1500);
     } catch (error) {
       logger.error('Failed to update supervisors', { error });
       setErrorMessage('Fehler beim Aktualisieren der Betreuer. Bitte versuchen Sie es erneut.');
@@ -317,11 +311,15 @@ function TeamManagementPage() {
 
       <SuccessModal
         isOpen={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
+        onClose={() => {
+          setShowSuccessModal(false);
+          logNavigation('TeamManagementPage', 'HomeViewPage');
+          void navigate('/home');
+        }}
         message={
           currentSession ? 'Team erfolgreich aktualisiert!' : 'Team erfolgreich gespeichert!'
         }
-        autoCloseDelay={1500}
+        autoCloseDelay={1000}
       />
 
       <ErrorModal
