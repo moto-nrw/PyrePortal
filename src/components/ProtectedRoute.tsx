@@ -3,11 +3,11 @@ import { Navigate } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 
 interface ProtectedRouteProps {
-  children: React.ReactNode;
+  readonly children: React.ReactNode;
   /** Additional condition that must be true (beyond authentication) */
-  condition?: boolean;
+  readonly condition?: boolean;
   /** Where to redirect if condition fails (defaults to '/home' if authenticated, '/' otherwise) */
-  fallbackPath?: string;
+  readonly fallbackPath?: string;
 }
 
 /**
