@@ -1,20 +1,18 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { BackgroundWrapper } from '../components/background-wrapper';
 import {
   ErrorModal,
   SuccessModal,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
+  SelectionPageLayout,
 } from '../components/ui';
-import BackButton from '../components/ui/BackButton';
 import { usePagination } from '../hooks/usePagination';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction } from '../utils/logger';
 
 function TeamManagementPage() {
@@ -247,187 +245,93 @@ function TeamManagementPage() {
   }
 
   return (
-    <BackgroundWrapper>
-      <div
-        style={{
-          width: '100vw',
-          height: '100vh',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
-      >
-        {/* Modern back button following tablet/mobile conventions */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            zIndex: 10,
-          }}
-        >
-          <BackButton onClick={handleBack} />
-        </div>
+    <SelectionPageLayout
+      title="Team anpassen"
+      onBack={handleBack}
+      isLoading={isLoading}
+      error={error}
+    >
+      <SelectableGrid
+        items={paginatedUsers}
+        renderItem={user => (
+          <SelectableCard
+            key={user.id}
+            id={user.id}
+            name={user.name}
+            icon="person"
+            colorType="person"
+            isSelected={isUserSelected(user.id)}
+            onClick={() => handleUserToggle(user)}
+          />
+        )}
+        emptySlotCount={emptySlotCount}
+        emptySlotIcon="person"
+        keyPrefix={`team-page-${currentPage}`}
+      />
 
-        <h1
+      <PaginationControls
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onPrevPage={handlePrevPage}
+        onNextPage={handleNextPage}
+        canGoPrev={canGoPrev}
+        canGoNext={canGoNext}
+      />
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+        <button
+          onClick={handleSave}
+          disabled={selectedSupervisors.length === 0 || isSaving}
           style={{
-            fontSize: '56px',
+            height: '68px',
+            padding: '0 64px',
+            fontSize: '24px',
             fontWeight: 700,
-            marginTop: '40px',
-            marginBottom: '20px',
-            textAlign: 'center',
-            color: '#111827',
+            color: '#FFFFFF',
+            backgroundColor: selectedSupervisors.length === 0 || isSaving ? '#9CA3AF' : '#83CD2D',
+            border: 'none',
+            borderRadius: '9999px',
+            cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',
+            transition: designSystem.transitions.base,
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+            boxShadow:
+              selectedSupervisors.length === 0 || isSaving ? 'none' : designSystem.shadows.green,
+            opacity: selectedSupervisors.length === 0 || isSaving ? 0.6 : 1,
+          }}
+          onTouchStart={e => {
+            if (selectedSupervisors.length > 0 && !isSaving) {
+              e.currentTarget.style.transform = designSystem.scales.active;
+              e.currentTarget.style.boxShadow = designSystem.shadows.button;
+            }
+          }}
+          onTouchEnd={e => {
+            if (selectedSupervisors.length > 0 && !isSaving) {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = designSystem.shadows.green;
+            }
           }}
         >
-          Team anpassen
-        </h1>
-
-        {error && (
-          <div
-            style={{
-              backgroundColor: '#FEE2E2',
-              color: '#DC2626',
-              padding: theme.spacing.md,
-              borderRadius: theme.borders.radius.md,
-              marginBottom: '12px',
-              textAlign: 'center',
-              fontSize: '16px',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {isLoading ? (
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              minHeight: '400px',
-            }}
-          >
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                border: '3px solid #E5E7EB',
-                borderTopColor: '#5080D8',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }}
-            />
-          </div>
-        ) : (
-          <>
-            {/* User Grid */}
-            <SelectableGrid
-              items={paginatedUsers}
-              renderItem={user => (
-                <SelectableCard
-                  key={user.id}
-                  id={user.id}
-                  name={user.name}
-                  icon="person"
-                  colorType="person"
-                  isSelected={isUserSelected(user.id)}
-                  onClick={() => handleUserToggle(user)}
-                />
-              )}
-              emptySlotCount={emptySlotCount}
-              emptySlotIcon="person"
-              keyPrefix={`team-page-${currentPage}`}
-            />
-
-            {/* Pagination Controls */}
-            <PaginationControls
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrevPage={handlePrevPage}
-              onNextPage={handleNextPage}
-              canGoPrev={canGoPrev}
-              canGoNext={canGoNext}
-            />
-
-            {/* Save button - Larger */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                marginTop: '24px',
-              }}
-            >
-              <button
-                onClick={handleSave}
-                disabled={selectedSupervisors.length === 0 || isSaving}
-                style={{
-                  height: '68px',
-                  padding: '0 64px',
-                  fontSize: '24px',
-                  fontWeight: 700,
-                  color: '#FFFFFF',
-                  backgroundColor:
-                    selectedSupervisors.length === 0 || isSaving ? '#9CA3AF' : '#83CD2D',
-                  border: 'none',
-                  borderRadius: '9999px',
-                  cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',
-                  transition: designSystem.transitions.base,
-                  outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
-                  boxShadow:
-                    selectedSupervisors.length === 0 || isSaving
-                      ? 'none'
-                      : designSystem.shadows.green,
-                  opacity: selectedSupervisors.length === 0 || isSaving ? 0.6 : 1,
-                }}
-                onTouchStart={e => {
-                  if (selectedSupervisors.length > 0 && !isSaving) {
-                    e.currentTarget.style.transform = designSystem.scales.active;
-                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                  }
-                }}
-                onTouchEnd={e => {
-                  if (selectedSupervisors.length > 0 && !isSaving) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.boxShadow = designSystem.shadows.green;
-                  }
-                }}
-              >
-                {isSaving ? 'Speichern...' : 'Team speichern'}
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Success Modal */}
-        <SuccessModal
-          isOpen={showSuccessModal}
-          onClose={() => setShowSuccessModal(false)}
-          message={
-            currentSession ? 'Team erfolgreich aktualisiert!' : 'Team erfolgreich gespeichert!'
-          }
-          autoCloseDelay={1500}
-        />
-
-        {/* Error Modal */}
-        <ErrorModal
-          isOpen={showErrorModal}
-          onClose={() => setShowErrorModal(false)}
-          message={errorMessage}
-          autoCloseDelay={3000}
-        />
-
-        {/* Add animation keyframes */}
-        <style>
-          {`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-        `}
-        </style>
+          {isSaving ? 'Speichern...' : 'Team speichern'}
+        </button>
       </div>
-    </BackgroundWrapper>
+
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        message={
+          currentSession ? 'Team erfolgreich aktualisiert!' : 'Team erfolgreich gespeichert!'
+        }
+        autoCloseDelay={1500}
+      />
+
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        message={errorMessage}
+        autoCloseDelay={3000}
+      />
+    </SelectionPageLayout>
   );
 }
 

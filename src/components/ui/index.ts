@@ -22,3 +22,5 @@ export {
   type EntityColorType,
 } from './SelectableGrid';
 export { PaginationControls, type PaginationControlsProps } from './PaginationControls';
+export { LoadingSpinner, SpinKeyframes } from './LoadingSpinner';
+export { SelectionPageLayout } from './SelectionPageLayout';

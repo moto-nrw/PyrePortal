@@ -1,15 +1,14 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { BackgroundWrapper } from '../components/background-wrapper';
 import {
   ErrorModal,
   ModalBase,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
+  SelectionPageLayout,
 } from '../components/ui';
-import BackButton from '../components/ui/BackButton';
 import { usePagination } from '../hooks/usePagination';
 import {
   api,
@@ -21,7 +20,6 @@ import {
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 interface ConfirmationModalProps {
@@ -969,174 +967,91 @@ function RoomSelectionPage() {
   }
 
   return (
-    <BackgroundWrapper>
-      <div
-        style={{
-          width: '100vw',
-          height: '100vh',
-          padding: '16px',
-          display: 'flex',
-          flexDirection: 'column',
-        }}
+    <>
+      <SelectionPageLayout
+        title="Raum auswählen"
+        onBack={handleGoBack}
+        isLoading={isLoading}
+        error={error}
+        spinnerColor="#f87C10"
       >
-        {/* Modern back button following tablet/mobile conventions */}
-        <div
-          style={{
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            zIndex: 10,
-          }}
-        >
-          <BackButton onClick={handleGoBack} />
-        </div>
-
-        <h1
-          style={{
-            fontSize: '56px',
-            fontWeight: 700,
-            marginTop: '40px',
-            marginBottom: '20px',
-            textAlign: 'center',
-            color: '#111827',
-          }}
-        >
-          Raum auswählen
-        </h1>
-
-        {error && (
-          <div
-            style={{
-              backgroundColor: '#FEE2E2',
-              color: '#DC2626',
-              padding: theme.spacing.md,
-              borderRadius: theme.borders.radius.md,
-              marginBottom: theme.spacing.lg,
-              textAlign: 'center',
-              fontSize: '16px',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {isLoading ? (
+        {rooms.length === 0 ? (
           <div
             style={{
               display: 'flex',
               justifyContent: 'center',
               alignItems: 'center',
               minHeight: '400px',
+              flexDirection: 'column',
+              gap: '16px',
             }}
           >
+            <svg
+              width="64"
+              height="64"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#9CA3AF"
+              strokeWidth="2"
+            >
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+              <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+              <circle cx="11" cy="12" r="1" />
+            </svg>
             <div
               style={{
-                width: '48px',
-                height: '48px',
-                border: '3px solid #E5E7EB',
-                borderTopColor: '#f87C10',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
+                fontSize: '24px',
+                color: '#6B7280',
+                fontWeight: 600,
+                textAlign: 'center',
               }}
-            />
+            >
+              Keine Räume verfügbar
+            </div>
+            <div
+              style={{
+                fontSize: '16px',
+                color: '#9CA3AF',
+                textAlign: 'center',
+              }}
+            >
+              Es sind derzeit keine Räume für die Auswahl verfügbar.
+            </div>
           </div>
         ) : (
           <>
-            {/* No rooms state */}
-            {rooms.length === 0 && (
-              <div
-                style={{
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  minHeight: '400px',
-                  flexDirection: 'column',
-                  gap: '16px',
-                }}
-              >
-                <svg
-                  width="64"
-                  height="64"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#9CA3AF"
-                  strokeWidth="2"
-                >
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-                  <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
-                  <circle cx="11" cy="12" r="1" />
-                </svg>
-                <div
-                  style={{
-                    fontSize: '24px',
-                    color: '#6B7280',
-                    fontWeight: 600,
-                    textAlign: 'center',
-                  }}
-                >
-                  Keine Räume verfügbar
-                </div>
-                <div
-                  style={{
-                    fontSize: '16px',
-                    color: '#9CA3AF',
-                    textAlign: 'center',
-                  }}
-                >
-                  Es sind derzeit keine Räume für die Auswahl verfügbar.
-                </div>
-              </div>
-            )}
-
-            {/* Rooms Grid */}
-            {rooms.length > 0 && (
-              <>
-                <SelectableGrid
-                  items={paginatedRooms}
-                  renderItem={room => (
-                    <SelectableCard
-                      key={room.id}
-                      id={room.id}
-                      name={room.name}
-                      icon="door"
-                      colorType="room"
-                      isSelected={selectedRoom?.id === room.id}
-                      isDisabled={room.is_occupied}
-                      badge={room.capacity ? `${room.capacity} Plätze` : undefined}
-                      onClick={() => handleRoomSelect(room)}
-                    />
-                  )}
-                  emptySlotCount={emptySlotCount}
-                  emptySlotIcon="door"
-                  keyPrefix={`room-page-${currentPage}`}
+            <SelectableGrid
+              items={paginatedRooms}
+              renderItem={room => (
+                <SelectableCard
+                  key={room.id}
+                  id={room.id}
+                  name={room.name}
+                  icon="door"
+                  colorType="room"
+                  isSelected={selectedRoom?.id === room.id}
+                  isDisabled={room.is_occupied}
+                  badge={room.capacity ? `${room.capacity} Plätze` : undefined}
+                  onClick={() => handleRoomSelect(room)}
                 />
+              )}
+              emptySlotCount={emptySlotCount}
+              emptySlotIcon="door"
+              keyPrefix={`room-page-${currentPage}`}
+            />
 
-                {/* Pagination Controls */}
-                <PaginationControls
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPrevPage={handlePrevPage}
-                  onNextPage={handleNextPage}
-                  canGoPrev={canGoPrev}
-                  canGoNext={canGoNext}
-                />
-              </>
-            )}
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevPage={handlePrevPage}
+              onNextPage={handleNextPage}
+              canGoPrev={canGoPrev}
+              canGoNext={canGoNext}
+            />
           </>
         )}
+      </SelectionPageLayout>
 
-        {/* Add animation keyframes */}
-        <style>
-          {`
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          `}
-        </style>
-      </div>
-
-      {/* Confirmation Modal */}
       {selectedRoom && (
         <ConfirmationModal
           isOpen={showConfirmModal}
@@ -1152,7 +1067,6 @@ function RoomSelectionPage() {
         />
       )}
 
-      {/* Conflict Resolution Modal */}
       {selectedRoom && (
         <ConflictModal
           isOpen={showConflictModal}
@@ -1164,13 +1078,14 @@ function RoomSelectionPage() {
           isLoading={isStartingSession}
         />
       )}
+
       <ErrorModal
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
         message={errorMessage}
         autoCloseDelay={5000}
       />
-    </BackgroundWrapper>
+    </>
   );
 }
 

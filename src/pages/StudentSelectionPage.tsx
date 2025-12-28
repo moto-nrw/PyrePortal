@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal, SelectableGrid, SelectableCard, PaginationControls } from '../components/ui';
-import BackButton from '../components/ui/BackButton';
+import {
+  ErrorModal,
+  SelectableGrid,
+  SelectableCard,
+  PaginationControls,
+  SelectionPageLayout,
+} from '../components/ui';
 import { usePagination } from '../hooks/usePagination';
 import { api, type Student, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
@@ -302,160 +306,94 @@ function StudentSelectionPage() {
     return null;
   }
 
-  return (
-    <BackgroundWrapper>
+  const filterContent = (
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '8px',
+        marginTop: '8px',
+      }}
+    >
+      <div style={{ color: '#6B7280', fontSize: '14px', fontWeight: 600 }}>Filter:</div>
       <div
         style={{
-          width: '100vw',
-          height: '100vh',
-          padding: '16px',
           display: 'flex',
-          flexDirection: 'column',
-          position: 'relative',
+          flexWrap: 'wrap',
+          justifyContent: 'center',
+          gap: '8px',
+          maxWidth: '100%',
         }}
       >
-        {/* Back button */}
-        <div
+        <button
+          onClick={() => setSelectedFilter(null)}
           style={{
-            position: 'absolute',
-            top: '20px',
-            left: '20px',
-            zIndex: 10,
+            height: '40px',
+            padding: '0 14px',
+            borderRadius: designSystem.borderRadius.full,
+            border: selectedFilter === null ? 'none' : '1px solid #E5E7EB',
+            background: selectedFilter === null ? designSystem.gradients.blueRight : '#FFFFFF',
+            color: selectedFilter === null ? '#FFFFFF' : '#374151',
+            fontSize: '14px',
+            fontWeight: 600,
+            boxShadow: selectedFilter === null ? designSystem.shadows.blue : 'none',
           }}
         >
-          <BackButton onClick={handleBack} />
-        </div>
-
-        <h1
+          Alle
+        </button>
+        <button
+          onClick={() => setSelectedFilter('betreuer')}
           style={{
-            fontSize: '56px',
-            fontWeight: 700,
-            marginTop: '40px',
-            marginBottom: '20px',
-            textAlign: 'center',
-            color: '#111827',
+            height: '40px',
+            padding: '0 14px',
+            borderRadius: designSystem.borderRadius.full,
+            border: selectedFilter === 'betreuer' ? 'none' : '1px solid #E5E7EB',
+            background:
+              selectedFilter === 'betreuer' ? designSystem.gradients.blueRight : '#FFFFFF',
+            color: selectedFilter === 'betreuer' ? '#FFFFFF' : '#374151',
+            fontSize: '14px',
+            fontWeight: 600,
+            boxShadow: selectedFilter === 'betreuer' ? designSystem.shadows.blue : 'none',
           }}
         >
-          Person auswählen
-        </h1>
-
-        {/* Error display */}
-        {error && !showErrorModal && (
-          <div
-            style={{
-              backgroundColor: '#FEE2E2',
-              color: '#DC2626',
-              padding: '16px',
-              borderRadius: '8px',
-              marginBottom: '16px',
-              textAlign: 'center',
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {/* Filter (chips wrap, no scrolling) */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            gap: '8px',
-            marginTop: '8px',
-          }}
-        >
-          <div style={{ color: '#6B7280', fontSize: '14px', fontWeight: 600 }}>Filter:</div>
-          <div
-            style={{
-              display: 'flex',
-              flexWrap: 'wrap',
-              justifyContent: 'center',
-              gap: '8px',
-              maxWidth: '100%',
-            }}
-          >
+          Betreuer
+        </button>
+        {availableClasses.map(cls => {
+          const active = selectedFilter === cls;
+          return (
             <button
-              onClick={() => setSelectedFilter(null)}
+              key={cls}
+              onClick={() => setSelectedFilter(cls)}
               style={{
                 height: '40px',
                 padding: '0 14px',
                 borderRadius: designSystem.borderRadius.full,
-                border: selectedFilter === null ? 'none' : '1px solid #E5E7EB',
-                background: selectedFilter === null ? designSystem.gradients.blueRight : '#FFFFFF',
-                color: selectedFilter === null ? '#FFFFFF' : '#374151',
+                border: active ? 'none' : '1px solid #E5E7EB',
+                background: active ? designSystem.gradients.blueRight : '#FFFFFF',
+                color: active ? '#FFFFFF' : '#374151',
                 fontSize: '14px',
                 fontWeight: 600,
-                boxShadow: selectedFilter === null ? designSystem.shadows.blue : 'none',
               }}
             >
-              Alle
+              {cls}
             </button>
-            <button
-              onClick={() => setSelectedFilter('betreuer')}
-              style={{
-                height: '40px',
-                padding: '0 14px',
-                borderRadius: designSystem.borderRadius.full,
-                border: selectedFilter === 'betreuer' ? 'none' : '1px solid #E5E7EB',
-                background:
-                  selectedFilter === 'betreuer' ? designSystem.gradients.blueRight : '#FFFFFF',
-                color: selectedFilter === 'betreuer' ? '#FFFFFF' : '#374151',
-                fontSize: '14px',
-                fontWeight: 600,
-                boxShadow: selectedFilter === 'betreuer' ? designSystem.shadows.blue : 'none',
-              }}
-            >
-              Betreuer
-            </button>
-            {availableClasses.map(cls => {
-              const active = selectedFilter === cls;
-              return (
-                <button
-                  key={cls}
-                  onClick={() => setSelectedFilter(cls)}
-                  style={{
-                    height: '40px',
-                    padding: '0 14px',
-                    borderRadius: designSystem.borderRadius.full,
-                    border: active ? 'none' : '1px solid #E5E7EB',
-                    background: active ? designSystem.gradients.blueRight : '#FFFFFF',
-                    color: active ? '#FFFFFF' : '#374151',
-                    fontSize: '14px',
-                    fontWeight: 600,
-                  }}
-                >
-                  {cls}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
-        {isLoading ? (
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              alignItems: 'center',
-              minHeight: '400px',
-              gap: '16px',
-            }}
-          >
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                border: '3px solid #E5E7EB',
-                borderTopColor: '#5080D8',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-              }}
-            />
-            <p style={{ color: '#6B7280', fontSize: '16px' }}>Lade Personen...</p>
-          </div>
-        ) : entities.length === 0 ? (
+  return (
+    <>
+      <SelectionPageLayout
+        title="Person auswählen"
+        onBack={handleBack}
+        isLoading={isLoading}
+        error={showErrorModal ? null : error}
+        headerContent={filterContent}
+      >
+        {entities.length === 0 ? (
           <div
             style={{
               textAlign: 'center',
@@ -485,7 +423,6 @@ function StudentSelectionPage() {
           </div>
         ) : (
           <>
-            {/* Entity Grid (Students + Teachers) */}
             <SelectableGrid
               items={paginatedEntities}
               renderItem={entity => {
@@ -512,7 +449,6 @@ function StudentSelectionPage() {
               keyPrefix={`student-page-${currentPage}`}
             />
 
-            {/* Pagination Controls */}
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
@@ -522,14 +458,7 @@ function StudentSelectionPage() {
               canGoNext={canGoNext}
             />
 
-            {/* Assign button */}
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'center',
-                marginTop: '12px',
-              }}
-            >
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '12px' }}>
               <button
                 onClick={handleAssignTag}
                 disabled={!selectedEntityId || isSaving}
@@ -557,26 +486,15 @@ function StudentSelectionPage() {
             </div>
           </>
         )}
+      </SelectionPageLayout>
 
-        {/* Error Modal */}
-        <ErrorModal
-          isOpen={showErrorModal}
-          onClose={() => setShowErrorModal(false)}
-          message={error ?? ''}
-          autoCloseDelay={3000}
-        />
-
-        {/* Add animation keyframes */}
-        <style>
-          {`
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-          `}
-        </style>
-      </div>
-    </BackgroundWrapper>
+      <ErrorModal
+        isOpen={showErrorModal}
+        onClose={() => setShowErrorModal(false)}
+        message={error ?? ''}
+        autoCloseDelay={3000}
+      />
+    </>
   );
 }
 
