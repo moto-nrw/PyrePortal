@@ -1228,12 +1228,6 @@ export interface TagAssignmentCheck {
     name: string;
     group: string;
   };
-  /** @deprecated Use person instead */
-  student?: {
-    id: number;
-    name: string;
-    group: string;
-  };
 }
 
 /**

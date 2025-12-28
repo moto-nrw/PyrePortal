@@ -17,12 +17,10 @@ const logger = createLogger('TagAssignmentPage');
 
 /**
  * Helper to get assigned person from TagAssignmentCheck
- * Handles backward compatibility with deprecated 'student' property
  */
 const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
   if (!assignment?.assigned) return null;
-  // Prefer 'person' over deprecated 'student' property
-  return assignment.person ?? assignment.student ?? null;
+  return assignment.person ?? null;
 };
 
 // RFID scanner types from Tauri backend
