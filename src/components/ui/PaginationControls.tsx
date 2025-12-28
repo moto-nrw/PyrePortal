@@ -2,7 +2,7 @@ import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { memo } from 'react';
 
-import theme from '../../styles/theme';
+import { designSystem } from '../../styles/designSystem';
 
 export interface PaginationControlsProps {
   /** Current page index (0-based) */
@@ -72,12 +72,12 @@ export const PaginationControls = memo(function PaginationControls({
           fontWeight: 500,
           padding: '8px 16px',
           background: 'transparent',
-          color: isPrevDisabled ? '#9CA3AF' : '#3B82F6',
+          color: isPrevDisabled ? designSystem.colors.textMuted : designSystem.colors.info,
           border: 'none',
           borderRadius: '0',
           cursor: isPrevDisabled ? 'not-allowed' : 'pointer',
           opacity: isPrevDisabled ? 0.5 : 1,
-          transition: 'all 200ms',
+          transition: designSystem.transitions.base,
           outline: 'none',
           WebkitTapHighlightColor: 'transparent',
           boxShadow: 'none',
@@ -91,7 +91,7 @@ export const PaginationControls = memo(function PaginationControls({
       <span
         style={{
           fontSize: '18px',
-          color: theme.colors.text.secondary,
+          color: designSystem.colors.textSecondary,
           fontWeight: 500,
           justifySelf: 'center',
         }}
@@ -109,12 +109,12 @@ export const PaginationControls = memo(function PaginationControls({
           fontWeight: 500,
           padding: '8px 16px',
           background: 'transparent',
-          color: isNextDisabled ? '#9CA3AF' : '#3B82F6',
+          color: isNextDisabled ? designSystem.colors.textMuted : designSystem.colors.info,
           border: 'none',
           borderRadius: '0',
           cursor: isNextDisabled ? 'not-allowed' : 'pointer',
           opacity: isNextDisabled ? 0.5 : 1,
-          transition: 'all 200ms',
+          transition: designSystem.transitions.base,
           outline: 'none',
           WebkitTapHighlightColor: 'transparent',
           boxShadow: 'none',

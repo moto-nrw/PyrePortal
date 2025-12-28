@@ -13,7 +13,7 @@ import type { SelectableGridProps } from './types';
  *   items={paginatedUsers}
  *   renderItem={(user) => (
  *     <SelectableCard
- *       id={user.id}
+ *       key={user.id}
  *       name={user.name}
  *       icon="person"
  *       colorType="staff"

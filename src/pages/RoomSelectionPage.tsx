@@ -1025,7 +1025,6 @@ function RoomSelectionPage() {
               renderItem={room => (
                 <SelectableCard
                   key={room.id}
-                  id={room.id}
                   name={room.name}
                   icon="door"
                   colorType="room"

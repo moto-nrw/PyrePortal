@@ -70,9 +70,17 @@ export const designSystem = {
 
     // Text colors
     textPrimary: '#1F2937',
+    textDark: '#111827',
     textSecondary: '#374151',
     textLight: '#6B7280',
     textMuted: '#9CA3AF',
+
+    // Border colors
+    border: '#E5E7EB',
+    borderLight: '#F3F4F6',
+
+    // Background colors
+    white: '#FFFFFF',
   },
 
   /**

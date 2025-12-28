@@ -117,7 +117,6 @@ function StaffSelectionPage() {
         renderItem={user => (
           <SelectableCard
             key={user.id}
-            id={user.id}
             name={user.name}
             icon="person"
             colorType="staff"

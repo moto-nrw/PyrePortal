@@ -263,7 +263,6 @@ function CreateActivityPage() {
             renderItem={activity => (
               <SelectableCard
                 key={activity.id}
-                id={activity.id}
                 name={activity.name}
                 icon="calendar"
                 colorType="activity"

@@ -14,10 +14,9 @@ export type EntityColorType = 'staff' | 'person' | 'activity' | 'room';
 
 /**
  * Props for the SelectableCard component.
+ * Note: React key should be passed at the call site, not as a prop.
  */
 export interface SelectableCardProps {
-  /** Unique identifier for the card */
-  readonly id: string | number;
   /** Display name for the entity */
   readonly name: string;
   /** Icon type to display */

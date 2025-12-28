@@ -76,9 +76,11 @@ export const SelectableCard = memo(function SelectableCard({
       style={{
         width: '100%',
         height: '160px',
-        backgroundColor: '#FFFFFF',
-        border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
-        borderRadius: '24px',
+        backgroundColor: designSystem.colors.white,
+        border: isSelected
+          ? `3px solid ${designSystem.colors.primaryGreen}`
+          : `2px solid ${designSystem.colors.border}`,
+        borderRadius: designSystem.borderRadius.xl,
         cursor: isDisabled ? 'not-allowed' : 'pointer',
         outline: 'none',
         WebkitTapHighlightColor: 'transparent',
@@ -105,7 +107,9 @@ export const SelectableCard = memo(function SelectableCard({
             width: '24px',
             height: '24px',
             borderRadius: '50%',
-            backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
+            backgroundColor: isSelected
+              ? designSystem.colors.primaryGreen
+              : designSystem.colors.border,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -118,7 +122,7 @@ export const SelectableCard = memo(function SelectableCard({
               height="16"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#FFFFFF"
+              stroke={designSystem.colors.white}
               strokeWidth="3"
             >
               <polyline points="20 6 9 17 4 12"></polyline>
@@ -152,7 +156,7 @@ export const SelectableCard = memo(function SelectableCard({
           maxWidth: '100%',
           wordBreak: 'break-word',
           textAlign: 'center',
-          color: '#111827',
+          color: designSystem.colors.textDark,
         }}
       >
         {name}
@@ -164,9 +168,10 @@ export const SelectableCard = memo(function SelectableCard({
           style={{
             fontSize: '12px',
             padding: '4px 12px',
-            borderRadius: '12px',
-            backgroundColor: badgeColor === 'blue' ? '#3B82F6' : '#83cd2d',
-            color: 'white',
+            borderRadius: designSystem.borderRadius.md,
+            backgroundColor:
+              badgeColor === 'blue' ? designSystem.colors.info : designSystem.colors.primaryGreen,
+            color: designSystem.colors.white,
             fontWeight: 600,
           }}
         >

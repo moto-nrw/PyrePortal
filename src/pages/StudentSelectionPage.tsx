@@ -433,7 +433,6 @@ function StudentSelectionPage() {
                 return (
                   <SelectableCard
                     key={entityId}
-                    id={entityId}
                     name={name}
                     icon="person"
                     colorType="person"
