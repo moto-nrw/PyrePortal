@@ -26,13 +26,8 @@ import type { SelectableGridProps } from './types';
  * />
  * ```
  */
-function SelectableGridComponent<T>({
-  items,
-  renderItem,
-  emptySlotCount,
-  emptySlotIcon,
-  keyPrefix = 'grid',
-}: SelectableGridProps<T>) {
+function SelectableGridComponent<T>(props: Readonly<SelectableGridProps<T>>) {
+  const { items, renderItem, emptySlotCount, emptySlotIcon, keyPrefix = 'grid' } = props;
   return (
     <div
       style={{
