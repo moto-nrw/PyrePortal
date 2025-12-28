@@ -132,8 +132,8 @@ export function useTagAssignment(
       });
 
       // Navigate back with success message
+      // NOSONAR: void required by ESLint for fire-and-forget navigation
       void navigate('/tag-assignment', {
-        // NOSONAR - void required by ESLint for fire-and-forget navigation
         state: {
           assignmentSuccess: true,
           studentName: entityName,
@@ -162,8 +162,8 @@ export function useTagAssignment(
     }
 
     // Pass back the scan state so TagAssignmentPage shows the scan result
+    // NOSONAR: void required by ESLint for fire-and-forget navigation
     void navigate('/tag-assignment', {
-      // NOSONAR - void required by ESLint for fire-and-forget navigation
       state: {
         scannedTag: state.scannedTag,
         tagAssignment: state.tagAssignment,
