@@ -75,6 +75,43 @@ export const designSystem = {
     textMuted: '#9CA3AF',
   },
 
+  /**
+   * Entity-specific colors for SelectableCard icons.
+   * Each entity type has an icon color and a background tint (15% opacity).
+   */
+  entityColors: {
+    /** Staff/Supervisor selection - orange theme */
+    staff: {
+      icon: '#e57a00',
+      background: 'rgba(229,122,0,0.15)',
+    },
+    /** Person/Team/Student selection - blue theme */
+    person: {
+      icon: '#2563EB',
+      background: 'rgba(37,99,235,0.15)',
+    },
+    /** Activity selection - red theme */
+    activity: {
+      icon: '#e02020',
+      background: 'rgba(224,32,32,0.15)',
+    },
+    /** Room selection - indigo theme */
+    room: {
+      icon: '#4f46e5',
+      background: 'rgba(79,70,229,0.15)',
+    },
+    /** Selected state (all entities) - green theme */
+    selected: {
+      icon: '#16A34A',
+      background: 'rgba(131,205,45,0.15)',
+    },
+    /** Disabled/Occupied state - gray theme */
+    disabled: {
+      icon: '#9CA3AF',
+      background: '#F3F4F6',
+    },
+  },
+
   // Gradient Definitions
   gradients: {
     // Primary gradients

@@ -1,17 +1,18 @@
-import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, useEffect, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ContinueButton } from '../components/ui';
+import {
+  ContinueButton,
+  SelectableGrid,
+  SelectableCard,
+  PaginationControls,
+} from '../components/ui';
 import BackButton from '../components/ui/BackButton';
+import { usePagination } from '../hooks/usePagination';
 import { useUserStore } from '../store/userStore';
-import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction } from '../utils/logger';
-
-const USERS_PER_PAGE = 10; // 5x2 grid to use full width
 
 function StaffSelectionPage() {
   const {
@@ -24,11 +25,23 @@ function StaffSelectionPage() {
     selectedActivity,
     authenticatedUser,
   } = useUserStore();
-  const [currentPage, setCurrentPage] = useState(0);
+
   const navigate = useNavigate();
 
   // Create stable logger instance for this component
   const logger = useMemo(() => createLogger('StaffSelectionPage'), []);
+
+  // Pagination hook
+  const {
+    currentPage,
+    totalPages,
+    paginatedItems: paginatedUsers,
+    emptySlotCount,
+    canGoNext,
+    canGoPrev,
+    goToNextPage,
+    goToPrevPage,
+  } = usePagination(users, { itemsPerPage: 10 });
 
   // Redirect if missing authentication or selected activity
   useEffect(() => {
@@ -61,23 +74,6 @@ function StaffSelectionPage() {
       logger.error('Failed to fetch teachers on mount', { error });
     });
   }, [fetchTeachers, logger]);
-
-  // Calculate pagination
-  const totalPages = Math.ceil(users.length / USERS_PER_PAGE);
-  const paginatedUsers = useMemo(() => {
-    const start = currentPage * USERS_PER_PAGE;
-    const end = start + USERS_PER_PAGE;
-    return users.slice(start, end);
-  }, [users, currentPage]);
-
-  // Calculate empty slots to maintain grid layout
-  const emptySlots = useMemo(() => {
-    const usersOnPage = paginatedUsers.length;
-    if (usersOnPage < USERS_PER_PAGE) {
-      return USERS_PER_PAGE - usersOnPage;
-    }
-    return 0;
-  }, [paginatedUsers]);
 
   const handleUserToggle = (user: { id: number; name: string }) => {
     logger.info('Toggling supervisor selection', {
@@ -116,17 +112,13 @@ function StaffSelectionPage() {
   };
 
   const handleNextPage = () => {
-    if (currentPage < totalPages - 1) {
-      setCurrentPage(currentPage + 1);
-      logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
-    }
+    goToNextPage();
+    logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
   };
 
   const handlePrevPage = () => {
-    if (currentPage > 0) {
-      setCurrentPage(currentPage - 1);
-      logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
-    }
+    goToPrevPage();
+    logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
   };
 
   // Handle back navigation
@@ -219,260 +211,34 @@ function StaffSelectionPage() {
           </div>
         ) : (
           <>
-            {/* User Grid (Team-style cards) */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: '14px',
-                marginTop: '24px',
-                marginBottom: '0px',
-                alignContent: 'start',
-              }}
-            >
-              {paginatedUsers.map(user => {
-                const isSelected = isUserSelected(user.id);
-                return (
-                  <button
-                    key={user.id}
-                    onClick={() => handleUserToggle(user)}
-                    onTouchStart={e => {
-                      e.currentTarget.style.transform = 'scale(0.98)';
-                    }}
-                    onTouchEnd={e => {
-                      setTimeout(() => {
-                        if (e.currentTarget) {
-                          e.currentTarget.style.transform = 'scale(1)';
-                        }
-                      }, 50);
-                    }}
-                    style={{
-                      width: '100%',
-                      height: '160px',
-                      backgroundColor: '#FFFFFF',
-                      border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
-                      borderRadius: '24px',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '16px',
-                      position: 'relative',
-                      transition: 'all 150ms ease-out',
-                      boxShadow: isSelected
-                        ? '0 8px 30px rgba(131, 205, 45, 0.2)'
-                        : '0 4px 12px rgba(0, 0, 0, 0.08)',
-                    }}
-                  >
-                    {/* Selection indicator */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '12px',
-                        right: '12px',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        transition: 'all 200ms',
-                      }}
-                    >
-                      {isSelected && (
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#FFFFFF"
-                          strokeWidth="3"
-                        >
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      )}
-                    </div>
-
-                    {/* User Icon - circle tint + dark icon color per spec */}
-                    <div
-                      style={{
-                        width: '64px',
-                        height: '64px',
-                        backgroundColor: isSelected
-                          ? 'rgba(131,205,45,0.15)'
-                          : 'rgba(247,140,16,0.15)',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: isSelected ? designSystem.colors.primaryGreen : '#e57a00',
-                      }}
-                    >
-                      <svg
-                        width="36"
-                        height="36"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    </div>
-
-                    {/* User Name - Clean black */}
-                    <span
-                      style={{
-                        fontSize: '18px',
-                        fontWeight: 700,
-                        lineHeight: '1.2',
-                        maxWidth: '100%',
-                        wordBreak: 'break-word',
-                        textAlign: 'center',
-                        color: '#111827',
-                      }}
-                    >
-                      {user.name}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* Empty placeholder slots */}
-              {emptySlots > 0 &&
-                Array.from({ length: emptySlots }).map((_, index) => (
-                  <div
-                    key={`empty-slot-${currentPage}-${index}`}
-                    style={{
-                      height: '160px',
-                      backgroundColor: '#FAFAFA',
-                      border: '2px dashed #E5E7EB',
-                      borderRadius: '20px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      position: 'relative',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        gap: '8px',
-                        opacity: 0.4,
-                      }}
-                    >
-                      <svg
-                        width="32"
-                        height="32"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#9CA3AF"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                      <span
-                        style={{
-                          fontSize: '14px',
-                          color: '#9CA3AF',
-                          fontWeight: 400,
-                        }}
-                      >
-                        Leer
-                      </span>
-                    </div>
-                  </div>
-                ))}
-            </div>
+            {/* User Grid */}
+            <SelectableGrid
+              items={paginatedUsers}
+              renderItem={user => (
+                <SelectableCard
+                  key={user.id}
+                  id={user.id}
+                  name={user.name}
+                  icon="person"
+                  colorType="staff"
+                  isSelected={isUserSelected(user.id)}
+                  onClick={() => handleUserToggle(user)}
+                />
+              )}
+              emptySlotCount={emptySlotCount}
+              emptySlotIcon="person"
+              keyPrefix={`staff-page-${currentPage}`}
+            />
 
             {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto 1fr',
-                  alignItems: 'center',
-                  marginTop: '24px',
-                  width: '100%',
-                }}
-              >
-                <button
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 0}
-                  style={{
-                    height: 'auto',
-                    width: 'auto',
-                    fontSize: '18px',
-                    fontWeight: 500,
-                    padding: '8px 16px',
-                    background: 'transparent',
-                    color: currentPage === 0 ? '#9CA3AF' : '#3B82F6',
-                    border: 'none',
-                    borderRadius: '0',
-                    cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === 0 ? 0.5 : 1,
-                    transition: 'all 200ms',
-                    outline: 'none',
-                    WebkitTapHighlightColor: 'transparent',
-                    boxShadow: 'none',
-                    justifySelf: 'start',
-                  }}
-                >
-                  <FontAwesomeIcon icon={faChevronLeft} style={{ marginRight: '6px' }} />
-                  Vorherige
-                </button>
-
-                <span
-                  style={{
-                    fontSize: '18px',
-                    color: theme.colors.text.secondary,
-                    fontWeight: 500,
-                    justifySelf: 'center',
-                  }}
-                >
-                  Seite {currentPage + 1} von {totalPages}
-                </span>
-
-                <button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages - 1}
-                  style={{
-                    height: 'auto',
-                    width: 'auto',
-                    fontSize: '18px',
-                    fontWeight: 500,
-                    padding: '8px 16px',
-                    background: 'transparent',
-                    color: currentPage === totalPages - 1 ? '#9CA3AF' : '#3B82F6',
-                    border: 'none',
-                    borderRadius: '0',
-                    cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === totalPages - 1 ? 0.5 : 1,
-                    transition: 'all 200ms',
-                    outline: 'none',
-                    WebkitTapHighlightColor: 'transparent',
-                    boxShadow: 'none',
-                    justifySelf: 'end',
-                  }}
-                >
-                  Nächste
-                  <FontAwesomeIcon icon={faChevronRight} style={{ marginLeft: '6px' }} />
-                </button>
-              </div>
-            )}
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevPage={handlePrevPage}
+              onNextPage={handleNextPage}
+              canGoPrev={canGoPrev}
+              canGoNext={canGoNext}
+            />
 
             {/* Continue button */}
             <div

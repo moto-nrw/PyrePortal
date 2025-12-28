@@ -1,15 +1,13 @@
-import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal } from '../components/ui';
+import { ErrorModal, SelectableGrid, SelectableCard, PaginationControls } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
+import { usePagination } from '../hooks/usePagination';
 import { api, type Student, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import theme from '../styles/theme';
 import { createLogger, logUserAction } from '../utils/logger';
 
 const ENTITIES_PER_PAGE = 10; // 5x2 grid to use full width
@@ -36,7 +34,6 @@ function StudentSelectionPage() {
 
   const [entities, setEntities] = useState<AssignableEntity[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null); // Format: "student-{id}" or "teacher-{id}"
-  const [currentPage, setCurrentPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,29 +138,24 @@ function StudentSelectionPage() {
     });
   }, [entities, selectedFilter]);
 
-  // Calculate pagination on filtered list
-  // Fallback to 1 to avoid 0 pages when list is empty
-  const totalPages = Math.ceil(filteredEntities.length / ENTITIES_PER_PAGE) || 1;
-  const paginatedEntities = useMemo(() => {
-    const start = currentPage * ENTITIES_PER_PAGE;
-    const end = start + ENTITIES_PER_PAGE;
-    return filteredEntities.slice(start, end);
-  }, [filteredEntities, currentPage]);
-
-  // Calculate empty slots to maintain grid layout
-  const emptySlots = useMemo(() => {
-    const entitiesOnPage = paginatedEntities.length;
-    if (entitiesOnPage < ENTITIES_PER_PAGE) {
-      return ENTITIES_PER_PAGE - entitiesOnPage;
-    }
-    return 0;
-  }, [paginatedEntities]);
+  // Pagination hook
+  const {
+    currentPage,
+    totalPages,
+    paginatedItems: paginatedEntities,
+    emptySlotCount,
+    canGoNext,
+    canGoPrev,
+    goToNextPage,
+    goToPrevPage,
+    resetPage,
+  } = usePagination(filteredEntities, { itemsPerPage: ENTITIES_PER_PAGE });
 
   // Reset pagination and selection when filter changes
   useEffect(() => {
-    setCurrentPage(0);
+    resetPage();
     setSelectedEntityId(null);
-  }, [selectedFilter]);
+  }, [selectedFilter, resetPage]);
 
   const handleEntitySelect = (entity: AssignableEntity) => {
     const entityId =
@@ -283,16 +275,27 @@ function StudentSelectionPage() {
     });
   };
 
-  const handleNextPage = () => {
-    if (currentPage < totalPages - 1) {
-      setCurrentPage(currentPage + 1);
+  // Get display name and badge info from entity
+  const getEntityDisplayInfo = (entity: AssignableEntity) => {
+    if (entity.type === 'student') {
+      return {
+        name: `${entity.data.first_name} ${entity.data.last_name}`,
+        badge: entity.data.school_class ?? 'Schüler',
+        badgeColor: 'green' as const,
+      };
     }
+    return {
+      name: entity.data.display_name,
+      badge: 'Betreuer',
+      badgeColor: 'blue' as const,
+    };
   };
 
-  const handlePrevPage = () => {
-    if (currentPage > 0) {
-      setCurrentPage(currentPage - 1);
-    }
+  // Get entity ID for selection tracking
+  const getEntityId = (entity: AssignableEntity): string => {
+    return entity.type === 'student'
+      ? `student-${entity.data.student_id}`
+      : `teacher-${entity.data.staff_id}`;
   };
 
   if (!authenticatedUser || !state?.scannedTag) {
@@ -483,227 +486,41 @@ function StudentSelectionPage() {
         ) : (
           <>
             {/* Entity Grid (Students + Teachers) */}
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(5, 1fr)',
-                gap: '14px',
-                marginTop: '24px',
-                marginBottom: '0px',
-                alignContent: 'start',
-              }}
-            >
-              {paginatedEntities.map(entity => {
-                const entityId =
-                  entity.type === 'student'
-                    ? `student-${entity.data.student_id}`
-                    : `teacher-${entity.data.staff_id}`;
+            <SelectableGrid
+              items={paginatedEntities}
+              renderItem={entity => {
+                const entityId = getEntityId(entity);
+                const { name, badge, badgeColor } = getEntityDisplayInfo(entity);
                 const isSelected = selectedEntityId === entityId;
 
                 return (
-                  <button
+                  <SelectableCard
                     key={entityId}
+                    id={entityId}
+                    name={name}
+                    icon="person"
+                    colorType="person"
+                    isSelected={isSelected}
+                    badge={badge}
+                    badgeColor={badgeColor}
                     onClick={() => handleEntitySelect(entity)}
-                    onTouchStart={e => {
-                      e.currentTarget.style.transform = 'scale(0.98)';
-                    }}
-                    onTouchEnd={e => {
-                      setTimeout(() => {
-                        if (e.currentTarget) e.currentTarget.style.transform = 'scale(1)';
-                      }, 50);
-                    }}
-                    style={{
-                      width: '100%',
-                      height: '160px',
-                      backgroundColor: '#FFFFFF',
-                      border: isSelected ? '3px solid #83CD2D' : '2px solid #E5E7EB',
-                      borderRadius: '24px',
-                      cursor: 'pointer',
-                      outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '12px',
-                      position: 'relative',
-                      transition: 'all 150ms ease-out',
-                      boxShadow: isSelected
-                        ? '0 8px 30px rgba(131, 205, 45, 0.2)'
-                        : '0 4px 12px rgba(0, 0, 0, 0.08)',
-                    }}
-                  >
-                    {/* Selection indicator */}
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '12px',
-                        right: '12px',
-                        width: '24px',
-                        height: '24px',
-                        borderRadius: '50%',
-                        backgroundColor: isSelected ? designSystem.colors.primaryGreen : '#E5E7EB',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      {isSelected && (
-                        <svg
-                          width="16"
-                          height="16"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#FFFFFF"
-                          strokeWidth="3"
-                        >
-                          <polyline points="20 6 9 17 4 12"></polyline>
-                        </svg>
-                      )}
-                    </div>
-
-                    {/* Student Icon */}
-                    <div
-                      style={{
-                        width: '64px',
-                        height: '64px',
-                        backgroundColor: isSelected ? 'rgba(131,205,45,0.15)' : '#DBEAFE',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        color: isSelected ? designSystem.colors.primaryGreen : '#2563EB',
-                      }}
-                    >
-                      <svg
-                        width="36"
-                        height="36"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                        <circle cx="12" cy="7" r="4" />
-                      </svg>
-                    </div>
-
-                    {/* Entity Name */}
-                    <span
-                      style={{
-                        fontSize: '18px',
-                        fontWeight: 700,
-                        lineHeight: '1.2',
-                        textAlign: 'center',
-                        color: '#111827',
-                      }}
-                    >
-                      {entity.type === 'student'
-                        ? `${entity.data.first_name} ${entity.data.last_name}`
-                        : entity.data.display_name}
-                    </span>
-
-                    {/* Role Badge or Class */}
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        padding: '4px 12px',
-                        borderRadius: '12px',
-                        backgroundColor: entity.type === 'teacher' ? '#3B82F6' : '#83cd2d',
-                        color: 'white',
-                        fontWeight: 600,
-                      }}
-                    >
-                      {entity.type === 'teacher'
-                        ? 'Betreuer'
-                        : (entity.data.school_class ?? 'Schüler')}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* Empty placeholder slots */}
-              {emptySlots > 0 &&
-                Array.from({ length: emptySlots }).map((_, index) => (
-                  <div
-                    key={`empty-slot-${currentPage}-${index}`}
-                    style={{
-                      height: '160px',
-                      backgroundColor: '#FAFAFA',
-                      border: '2px dashed #E5E7EB',
-                      borderRadius: '20px',
-                    }}
                   />
-                ))}
-            </div>
+                );
+              }}
+              emptySlotCount={emptySlotCount}
+              emptySlotIcon="person"
+              keyPrefix={`student-page-${currentPage}`}
+            />
 
             {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto 1fr',
-                  alignItems: 'center',
-                  marginTop: '12px',
-                  width: '100%',
-                }}
-              >
-                <button
-                  onClick={handlePrevPage}
-                  disabled={currentPage === 0}
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: 500,
-                    padding: '8px 16px',
-                    background: 'transparent',
-                    color: currentPage === 0 ? '#9CA3AF' : '#3B82F6',
-                    border: 'none',
-                    cursor: currentPage === 0 ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === 0 ? 0.5 : 1,
-                    outline: 'none',
-                    WebkitTapHighlightColor: 'transparent',
-                    justifySelf: 'start',
-                  }}
-                >
-                  <FontAwesomeIcon icon={faChevronLeft} style={{ marginRight: '6px' }} />
-                  Vorherige
-                </button>
-
-                <span
-                  style={{
-                    fontSize: '18px',
-                    color: theme.colors.text.secondary,
-                    fontWeight: 500,
-                    justifySelf: 'center',
-                  }}
-                >
-                  Seite {currentPage + 1} von {totalPages}
-                </span>
-
-                <button
-                  onClick={handleNextPage}
-                  disabled={currentPage === totalPages - 1}
-                  style={{
-                    fontSize: '18px',
-                    fontWeight: 500,
-                    padding: '8px 16px',
-                    background: 'transparent',
-                    color: currentPage === totalPages - 1 ? '#9CA3AF' : '#3B82F6',
-                    border: 'none',
-                    cursor: currentPage === totalPages - 1 ? 'not-allowed' : 'pointer',
-                    opacity: currentPage === totalPages - 1 ? 0.5 : 1,
-                    outline: 'none',
-                    WebkitTapHighlightColor: 'transparent',
-                    justifySelf: 'end',
-                  }}
-                >
-                  Nächste
-                  <FontAwesomeIcon icon={faChevronRight} style={{ marginLeft: '6px' }} />
-                </button>
-              </div>
-            )}
+            <PaginationControls
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPrevPage={goToPrevPage}
+              onNextPage={goToNextPage}
+              canGoPrev={canGoPrev}
+              canGoNext={canGoNext}
+            />
 
             {/* Assign button */}
             <div
