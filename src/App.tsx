@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
+import ProtectedRoute from './components/ProtectedRoute';
 import { RfidServiceInitializer } from './components/RfidServiceInitializer';
 import NetworkStatus from './components/ui/NetworkStatus';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
@@ -23,7 +24,6 @@ import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
   const {
-    authenticatedUser,
     selectedRoom,
     selectedActivity,
     setNetworkStatus,
@@ -67,14 +67,10 @@ function App() {
     };
   }, [appLogger]);
 
-  // Auth states
-  const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authenticated
-
-  // Check if a room is selected for the activity creation page
+  // Conditions for protected routes with additional requirements
+  // Note: Authentication is handled by ProtectedRoute component
   const hasSelectedRoom = !!selectedRoom;
-
-  // Check if session is active (has activity, room, and authenticated user)
-  const hasActiveSession = isFullyAuthenticated && !!selectedActivity && !!selectedRoom;
+  const hasActiveSession = !!selectedActivity && !!selectedRoom;
 
   return (
     <ErrorBoundary>
@@ -96,58 +92,87 @@ function App() {
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">
         <BrowserRouter>
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/pin" element={<PinPage />} />
+
+            {/* Protected routes - require authentication */}
             <Route
               path="/home"
-              element={isFullyAuthenticated ? <HomeViewPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <HomeViewPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/tag-assignment"
-              element={isFullyAuthenticated ? <TagAssignmentPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <TagAssignmentPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/student-selection"
               element={
-                isFullyAuthenticated ? <StudentSelectionPage /> : <Navigate to="/" replace />
+                <ProtectedRoute>
+                  <StudentSelectionPage />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/activity-selection"
-              element={isFullyAuthenticated ? <CreateActivityPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <CreateActivityPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/staff-selection"
-              element={isFullyAuthenticated ? <StaffSelectionPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <StaffSelectionPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/team-management"
-              element={isFullyAuthenticated ? <TeamManagementPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <TeamManagementPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/rooms"
-              element={isFullyAuthenticated ? <RoomSelectionPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <RoomSelectionPage />
+                </ProtectedRoute>
+              }
             />
+
+            {/* Protected routes with additional conditions */}
             <Route
               path="/nfc-scanning"
               element={
-                hasActiveSession ? (
+                <ProtectedRoute condition={hasActiveSession}>
                   <ActivityScanningPage />
-                ) : (
-                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
-                )
+                </ProtectedRoute>
               }
             />
             <Route
               path="/create-activity"
               element={
-                isFullyAuthenticated && hasSelectedRoom ? (
+                <ProtectedRoute condition={hasSelectedRoom}>
                   <CreateActivityPage />
-                ) : (
-                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
-                )
+                </ProtectedRoute>
               }
             />
+
+            {/* Catch-all redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
