@@ -160,6 +160,89 @@ function HomeViewPage() {
     }
   };
 
+  // Helper functions to avoid nested ternaries (SonarCloud S3358)
+  const getActivityIcon = () => {
+    if (currentSession) {
+      // Play/Continue Icon
+      return (
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="#83cd2d" stroke="none">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      );
+    }
+    if (sessionSettings?.use_last_session && sessionSettings.last_session) {
+      // Repeat/Replay Icon
+      return (
+        <svg
+          width="52"
+          height="52"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#83cd2d"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+          <path d="M21 3v5h-5" />
+          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+          <path d="M3 21v-5h5" />
+        </svg>
+      );
+    }
+    // Plus Icon
+    return (
+      <svg
+        width="52"
+        height="52"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#83cd2d"
+        strokeWidth="2.5"
+      >
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="16" />
+        <line x1="8" y1="12" x2="16" y2="12" />
+      </svg>
+    );
+  };
+
+  const getActivityHeading = () => {
+    if (currentSession) {
+      return currentSession.activity_name ?? 'Aktivität';
+    }
+    if (sessionSettings?.use_last_session && sessionSettings.last_session) {
+      return 'Aktivität wiederholen';
+    }
+    return 'Neue Aktivität';
+  };
+
+  const getActivitySubtitle = () => {
+    if (currentSession) {
+      return 'Fortsetzen';
+    }
+    if (sessionSettings?.use_last_session && sessionSettings.last_session) {
+      return sessionSettings.last_session.activity_name;
+    }
+    return 'Starten';
+  };
+
+  const getSupervisorCountLabel = () => {
+    if (!sessionSettings?.last_session) {
+      return '';
+    }
+    const savedCount = sessionSettings.last_session.supervisor_names.length;
+    const currentCount = selectedSupervisors.length;
+
+    if (currentCount > 0 && currentCount !== savedCount) {
+      return `${currentCount} Betreuer (gespeichert: ${savedCount})`;
+    }
+    if (currentCount > 0) {
+      return `${currentCount} Betreuer`;
+    }
+    return `${savedCount} Betreuer`;
+  };
+
   // Redirect to login if no authenticated user and fetch current session
   useEffect(() => {
     if (!authenticatedUser) {
@@ -412,43 +495,7 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    {currentSession ? (
-                      // Play/Continue Icon
-                      <svg width="52" height="52" viewBox="0 0 24 24" fill="#83cd2d" stroke="none">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    ) : sessionSettings?.use_last_session && sessionSettings.last_session ? (
-                      // Repeat/Replay Icon
-                      <svg
-                        width="52"
-                        height="52"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#83cd2d"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                        <path d="M21 3v5h-5" />
-                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                        <path d="M3 21v-5h5" />
-                      </svg>
-                    ) : (
-                      // Plus Icon
-                      <svg
-                        width="52"
-                        height="52"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#83cd2d"
-                        strokeWidth="2.5"
-                      >
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="16" />
-                        <line x1="8" y1="12" x2="16" y2="12" />
-                      </svg>
-                    )}
+                    {getActivityIcon()}
                   </div>
 
                   <h3
@@ -460,11 +507,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {currentSession
-                      ? (currentSession.activity_name ?? 'Aktivität')
-                      : sessionSettings?.use_last_session && sessionSettings.last_session
-                        ? 'Aktivität wiederholen'
-                        : 'Neue Aktivität'}
+                    {getActivityHeading()}
                   </h3>
                   <p
                     style={{
@@ -474,11 +517,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {currentSession
-                      ? 'Fortsetzen'
-                      : sessionSettings?.use_last_session && sessionSettings.last_session
-                        ? sessionSettings.last_session.activity_name
-                        : 'Starten'}
+                    {getActivitySubtitle()}
                   </p>
 
                   {/* Show room and supervisor info for saved session */}
@@ -551,13 +590,7 @@ function HomeViewPage() {
                               <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                             </svg>
-                            {selectedSupervisors.length > 0 &&
-                            selectedSupervisors.length !==
-                              sessionSettings.last_session.supervisor_names.length
-                              ? `${selectedSupervisors.length} Betreuer (gespeichert: ${sessionSettings.last_session.supervisor_names.length})`
-                              : selectedSupervisors.length > 0
-                                ? `${selectedSupervisors.length} Betreuer`
-                                : `${sessionSettings.last_session.supervisor_names.length} Betreuer`}
+                            {getSupervisorCountLabel()}
                           </span>
                         </div>
                       </div>
