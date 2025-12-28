@@ -78,6 +78,79 @@ interface ActivityErrorContext {
 }
 
 /**
+ * Builds network error message for check-in/check-out failures
+ */
+const buildNetworkErrorMessage = (
+  errorType: 'checkin_failed' | 'checkout_failed',
+  studentName?: string
+): string => {
+  const action = errorType === 'checkin_failed' ? 'Einchecken' : 'Auschecken';
+  const name = studentName ? ` von ${studentName}` : '';
+  return `Netzwerkfehler beim ${action}${name}. Bitte Verbindung prüfen und erneut scannen.`;
+};
+
+/**
+ * Error message handlers for each activity error type (reduces switch complexity)
+ */
+const activityErrorMessages: Record<ActivityErrorType, (context: ActivityErrorContext) => string> =
+  {
+    activity_not_found: ({ activityName, activityId }) =>
+      activityName
+        ? `Aktivität '${activityName}' nicht gefunden. Bitte Seite neu laden.`
+        : `Aktivität (ID: ${activityId}) nicht gefunden. Bitte Seite neu laden.`,
+
+    student_already_checked_in: ({ studentName, activityName }) =>
+      studentName && activityName
+        ? `${studentName} ist bereits in '${activityName}' eingecheckt.`
+        : 'Schüler/in ist bereits eingecheckt.',
+
+    no_students_checked_in: ({ activityName }) =>
+      activityName
+        ? `In '${activityName}' sind keine Schüler/innen eingecheckt.`
+        : 'Keine Schüler/innen eingecheckt.',
+
+    student_not_checked_in: ({ studentName, activityName }) => {
+      if (studentName && activityName) {
+        return `${studentName} ist in '${activityName}' nicht eingecheckt.`;
+      }
+      return activityName
+        ? `Schüler/in ist in '${activityName}' nicht eingecheckt.`
+        : 'Schüler/in ist nicht eingecheckt.';
+    },
+
+    checkin_failed: ({ studentName }) =>
+      studentName ? `Fehler beim Einchecken von ${studentName}.` : 'Fehler beim Einchecken.',
+
+    checkout_failed: ({ studentName }) =>
+      studentName ? `Fehler beim Auschecken von ${studentName}.` : 'Fehler beim Auschecken.',
+  };
+
+/**
+ * Handles network-related errors for check-in/check-out operations.
+ * Returns error message if network error, null otherwise.
+ */
+const handleCheckinCheckoutNetworkError = (
+  errorType: ActivityErrorType,
+  context: ActivityErrorContext,
+  originalError?: unknown
+): string | null => {
+  if (errorType !== 'checkin_failed' && errorType !== 'checkout_failed') {
+    return null;
+  }
+
+  if (isNetworkRelatedError(originalError)) {
+    return buildNetworkErrorMessage(errorType, context.studentName);
+  }
+
+  const rawMessage = originalError instanceof Error ? originalError.message : '';
+  if (rawMessage) {
+    return mapServerErrorToGerman(rawMessage);
+  }
+
+  return null;
+};
+
+/**
  * Maps activity-related errors to user-friendly German messages with context
  */
 const mapActivityError = (
@@ -85,55 +158,159 @@ const mapActivityError = (
   context: ActivityErrorContext = {},
   originalError?: unknown
 ): string => {
-  const { activityName, studentName, activityId } = context;
+  // Handle network errors for checkin/checkout first
+  const networkError = handleCheckinCheckoutNetworkError(errorType, context, originalError);
+  if (networkError) {
+    return networkError;
+  }
 
-  // For catch block errors, check network first
-  if (errorType === 'checkin_failed' || errorType === 'checkout_failed') {
-    if (isNetworkRelatedError(originalError)) {
-      const action = errorType === 'checkin_failed' ? 'Einchecken' : 'Auschecken';
-      const name = studentName ? ` von ${studentName}` : '';
-      return `Netzwerkfehler beim ${action}${name}. Bitte Verbindung prüfen und erneut scannen.`;
+  // Use message handler lookup instead of switch
+  const messageHandler = activityErrorMessages[errorType];
+  if (messageHandler) {
+    return messageHandler(context);
+  }
+
+  return 'Ein unbekannter Fehler ist aufgetreten.';
+};
+
+/**
+ * Creates a fallback activity object when full data is unavailable.
+ * Used during session restoration when the activity API call fails or returns no match.
+ */
+const createFallbackActivity = (
+  session: CurrentSession,
+  supervisorName: string
+): ActivityResponse => ({
+  id: session.activity_id,
+  name: session.activity_name ?? '',
+  category: '',
+  category_name: '',
+  category_color: '',
+  room_name: session.room_name ?? '',
+  enrollment_count: 0,
+  max_participants: 0,
+  has_spots: true,
+  supervisor_name: supervisorName,
+  is_active: session.is_active ?? true,
+});
+
+/**
+ * Fetches activity data from API during session restoration.
+ * Returns the matching activity or a fallback if not found.
+ */
+const fetchActivityForSession = async (
+  session: CurrentSession,
+  pin: string,
+  supervisorName: string
+): Promise<ActivityResponse> => {
+  try {
+    storeLogger.debug('Fetching activities to restore complete session activity data', {
+      activityId: session.activity_id,
+    });
+
+    const activities = await api.getActivities(pin);
+    const matchingActivity = activities.find(activity => activity.id === session.activity_id);
+
+    if (matchingActivity) {
+      storeLogger.info('Session activity restored from API with complete data', {
+        activityId: session.activity_id,
+        maxParticipants: matchingActivity.max_participants,
+        enrollmentCount: matchingActivity.enrollment_count,
+      });
+      return matchingActivity;
     }
-    const rawMessage = originalError instanceof Error ? originalError.message : '';
-    if (rawMessage) {
-      return mapServerErrorToGerman(rawMessage);
+
+    storeLogger.warn(
+      'Activity not found in API response during session restoration, using fallback with limited data',
+      {
+        activityId: session.activity_id,
+        availableActivityIds: activities.map(a => a.id),
+      }
+    );
+    return createFallbackActivity(session, supervisorName);
+  } catch (error) {
+    storeLogger.error('Failed to fetch activities during session restoration, using fallback', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      activityId: session.activity_id,
+    });
+    return createFallbackActivity(session, supervisorName);
+  }
+};
+
+/**
+ * Resolves activity data for session restoration.
+ * Uses cached data if available, otherwise fetches from API.
+ */
+const resolveSessionActivity = async (
+  session: CurrentSession,
+  currentSelectedActivity: ActivityResponse | null,
+  pin: string,
+  supervisorName: string
+): Promise<ActivityResponse | null> => {
+  if (!session.activity_name) {
+    return null;
+  }
+
+  // If we already have a selectedActivity with the same ID, preserve its data
+  if (currentSelectedActivity && currentSelectedActivity.id === session.activity_id) {
+    return currentSelectedActivity;
+  }
+
+  return fetchActivityForSession(session, pin, supervisorName);
+};
+
+/**
+ * Creates room object from session data if available.
+ */
+const createSessionRoom = (session: CurrentSession): Room | null => {
+  if (!session.room_id || !session.room_name) {
+    return null;
+  }
+
+  return {
+    id: session.room_id,
+    name: session.room_name,
+    is_occupied: true, // Current session room is always occupied
+  };
+};
+
+/**
+ * Validates and resolves supervisors from saved session data.
+ * Loads users if not already loaded, then maps supervisor IDs to User objects.
+ */
+const resolveSupervisorsForSession = async (
+  supervisorIds: number[],
+  currentUsers: User[],
+  fetchTeachers: () => Promise<void>,
+  getUpdatedUsers: () => User[]
+): Promise<User[]> => {
+  let usersToSearch = currentUsers;
+
+  // Load users if not already loaded
+  if (usersToSearch.length === 0) {
+    storeLogger.debug('Loading teachers to validate supervisors');
+    await fetchTeachers();
+    usersToSearch = getUpdatedUsers();
+
+    if (usersToSearch.length === 0) {
+      throw new Error('Fehler beim Laden der Betreuer');
     }
   }
 
-  switch (errorType) {
-    case 'activity_not_found':
-      return activityName
-        ? `Aktivität '${activityName}' nicht gefunden. Bitte Seite neu laden.`
-        : `Aktivität (ID: ${activityId}) nicht gefunden. Bitte Seite neu laden.`;
+  // Map supervisor IDs to User objects
+  const supervisors = supervisorIds
+    .map(id => usersToSearch.find(u => u.id === id))
+    .filter((u): u is User => u !== undefined);
 
-    case 'student_already_checked_in':
-      if (studentName && activityName) {
-        return `${studentName} ist bereits in '${activityName}' eingecheckt.`;
-      }
-      return 'Schüler/in ist bereits eingecheckt.';
-
-    case 'no_students_checked_in':
-      return activityName
-        ? `In '${activityName}' sind keine Schüler/innen eingecheckt.`
-        : 'Keine Schüler/innen eingecheckt.';
-
-    case 'student_not_checked_in':
-      if (studentName && activityName) {
-        return `${studentName} ist in '${activityName}' nicht eingecheckt.`;
-      }
-      return activityName
-        ? `Schüler/in ist in '${activityName}' nicht eingecheckt.`
-        : 'Schüler/in ist nicht eingecheckt.';
-
-    case 'checkin_failed':
-      return studentName ? `Fehler beim Einchecken von ${studentName}.` : 'Fehler beim Einchecken.';
-
-    case 'checkout_failed':
-      return studentName ? `Fehler beim Auschecken von ${studentName}.` : 'Fehler beim Auschecken.';
-
-    default:
-      return 'Ein unbekannter Fehler ist aufgetreten.';
+  if (supervisors.length === 0) {
+    storeLogger.warn('No valid supervisors found', {
+      savedIds: supervisorIds,
+      availableUsers: usersToSearch.map(u => u.id),
+    });
+    throw new Error('Keine gültigen Betreuer gefunden');
   }
+
+  return supervisors;
 };
 
 // Define the ActivityCategory enum
@@ -560,111 +737,36 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.info('Fetching current session for device');
       const session = await api.getCurrentSession(authenticatedUser.pin);
 
-      if (session) {
-        storeLogger.info('Active session found', {
-          activeGroupId: session.active_group_id,
-          activityId: session.activity_id,
-          activityName: session.activity_name,
-          roomName: session.room_name,
-          startTime: session.start_time,
-          duration: session.duration,
-        });
-
-        // Also set selected activity and room based on session if we have the data
-        let sessionActivity: ActivityResponse | null = null;
-        let sessionRoom: Room | null = null;
-
-        // Get the current selectedActivity to preserve its data
-        const currentSelectedActivity = get().selectedActivity;
-
-        if (session.activity_name) {
-          // If we already have a selectedActivity with the same ID, preserve its data
-          if (currentSelectedActivity && currentSelectedActivity.id === session.activity_id) {
-            sessionActivity = currentSelectedActivity;
-          } else {
-            // Fetch complete activity data to get accurate max_participants and other fields
-            try {
-              storeLogger.debug('Fetching activities to restore complete session activity data', {
-                activityId: session.activity_id,
-              });
-              const activities = await api.getActivities(authenticatedUser.pin);
-              const matchingActivity = activities.find(
-                activity => activity.id === session.activity_id
-              );
-
-              if (matchingActivity) {
-                sessionActivity = matchingActivity;
-                storeLogger.info('Session activity restored from API with complete data', {
-                  activityId: session.activity_id,
-                  maxParticipants: matchingActivity.max_participants,
-                  enrollmentCount: matchingActivity.enrollment_count,
-                });
-              } else {
-                // Fallback to minimal activity object if activity not found in API response
-                sessionActivity = {
-                  id: session.activity_id,
-                  name: session.activity_name,
-                  category: '',
-                  category_name: '',
-                  category_color: '',
-                  room_name: session.room_name ?? '',
-                  enrollment_count: 0,
-                  max_participants: 0,
-                  has_spots: true,
-                  supervisor_name: authenticatedUser.staffName,
-                  is_active: session.is_active ?? true,
-                };
-                storeLogger.warn(
-                  'Activity not found in API response during session restoration, using fallback with limited data',
-                  {
-                    activityId: session.activity_id,
-                    availableActivityIds: activities.map(a => a.id),
-                  }
-                );
-              }
-            } catch (error) {
-              // If API call fails, use minimal activity object as fallback
-              sessionActivity = {
-                id: session.activity_id,
-                name: session.activity_name,
-                category: '',
-                category_name: '',
-                category_color: '',
-                room_name: session.room_name ?? '',
-                enrollment_count: 0,
-                max_participants: 0,
-                has_spots: true,
-                supervisor_name: authenticatedUser.staffName,
-                is_active: session.is_active ?? true,
-              };
-              storeLogger.error(
-                'Failed to fetch activities during session restoration, using fallback',
-                {
-                  error: error instanceof Error ? error.message : 'Unknown error',
-                  activityId: session.activity_id,
-                }
-              );
-            }
-          }
-        }
-
-        if (session.room_id && session.room_name) {
-          sessionRoom = {
-            id: session.room_id,
-            name: session.room_name,
-            is_occupied: true, // Current session room is always occupied
-          };
-        }
-
-        set({
-          currentSession: session,
-          selectedActivity: sessionActivity,
-          selectedRoom: sessionRoom,
-        });
-      } else {
+      if (!session) {
         storeLogger.debug('No active session found for device, clearing session state');
         get().clearSessionState();
+        return;
       }
+
+      storeLogger.info('Active session found', {
+        activeGroupId: session.active_group_id,
+        activityId: session.activity_id,
+        activityName: session.activity_name,
+        roomName: session.room_name,
+        startTime: session.start_time,
+        duration: session.duration,
+      });
+
+      // Resolve activity and room data using extracted helpers
+      const currentSelectedActivity = get().selectedActivity;
+      const sessionActivity = await resolveSessionActivity(
+        session,
+        currentSelectedActivity,
+        authenticatedUser.pin,
+        authenticatedUser.staffName
+      );
+      const sessionRoom = createSessionRoom(session);
+
+      set({
+        currentSession: session,
+        selectedActivity: sessionActivity,
+        selectedRoom: sessionRoom,
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       storeLogger.error('Failed to fetch current session', { error: errorMessage });
@@ -1532,40 +1634,17 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         throw new Error('Gespeicherter Raum nicht verfügbar');
       }
 
-      // Check supervisors - use current if already selected, otherwise validate saved ones
+      // Resolve supervisors - use current if already selected, otherwise validate saved ones
       const { selectedSupervisors, users } = get();
-      let supervisors = selectedSupervisors;
-
-      if (supervisors.length === 0) {
-        // Ensure we have teachers loaded first
-        if (users.length === 0) {
-          storeLogger.debug('Loading teachers to validate supervisors');
-          await get().fetchTeachers();
-          const updatedUsers = get().users;
-
-          if (updatedUsers.length === 0) {
-            throw new Error('Fehler beim Laden der Betreuer');
-          }
-
-          // Now try to find supervisors with loaded users
-          supervisors = sessionSettings.last_session.supervisor_ids
-            .map(id => updatedUsers.find(u => u.id === id))
-            .filter((u): u is User => u !== undefined);
-        } else {
-          // Users already loaded, validate saved supervisors
-          supervisors = sessionSettings.last_session.supervisor_ids
-            .map(id => users.find(u => u.id === id))
-            .filter((u): u is User => u !== undefined);
-        }
-
-        if (supervisors.length === 0) {
-          storeLogger.warn('No valid supervisors found', {
-            savedIds: sessionSettings.last_session.supervisor_ids,
-            availableUsers: users.length === 0 ? get().users.map(u => u.id) : users.map(u => u.id),
-          });
-          throw new Error('Keine gültigen Betreuer gefunden');
-        }
-      }
+      const supervisors =
+        selectedSupervisors.length > 0
+          ? selectedSupervisors
+          : await resolveSupervisorsForSession(
+              sessionSettings.last_session.supervisor_ids,
+              users,
+              get().fetchTeachers,
+              () => get().users
+            );
 
       // Set validated data in store
       set({
