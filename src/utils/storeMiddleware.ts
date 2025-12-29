@@ -4,7 +4,6 @@
  * This middleware provides detailed logging for Zustand store state changes,
  * with special attention to activity name tracking and state transitions.
  */
-import { create } from 'zustand';
 import type { StoreApi } from 'zustand';
 
 import { createLogger, LogLevel } from './logger';
@@ -498,13 +497,3 @@ export const loggerMiddleware =
       api
     );
   };
-
-/**
- * Convenience function to create a store with logging middleware
- */
-export const createStoreWithLogging = <T>(
-  storeCreator: StateCreator<T>,
-  options?: LoggerMiddlewareOptions
-): StoreApi<T> => {
-  return create<T>(loggerMiddleware(storeCreator, options));
-};

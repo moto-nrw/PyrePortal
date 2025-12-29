@@ -68,8 +68,8 @@ import { api } from '../services/api';
 
 - `services/api.ts` - All HTTP API calls to Project Phoenix backend
 - (removed) früher: `services/studentCache.ts` für Offline-Cache; Live-Scans sind jetzt ausschließlich server-first
+- (removed) früher: `services/syncQueue.ts` für Offline-Retry-Queue; wurde nie vollständig implementiert
 - `services/sessionStorage.ts` - Session persistence (Tauri IPC)
-- `services/syncQueue.ts` - Offline operation retry queue
 
 ### State Management
 

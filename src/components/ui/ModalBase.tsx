@@ -5,7 +5,7 @@ import { useModalTimeout } from '../../hooks/useModalTimeout';
 import { ModalTimeoutIndicator } from './ModalTimeoutIndicator';
 
 /** Modal size preset */
-export type ModalSize = 'sm' | 'md' | 'lg';
+type ModalSize = 'sm' | 'md' | 'lg';
 
 /** Size preset configurations matching existing modal dimensions */
 const SIZE_PRESETS = {

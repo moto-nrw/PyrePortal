@@ -71,33 +71,9 @@ interface SessionSettings {
 
 Die frühere Offline-Studenten-Cache-Implementierung wurde entfernt. Live-RFID-Scans arbeiten ausschließlich server-first; es gibt keinen lokalen Cache oder Persistenzpfad mehr. Sollte künftig wieder ein Offline-Feature benötigt werden, müsste der Cache neu eingeführt oder serverseitig unterstützt werden.
 
-### syncQueue.ts
+### syncQueue.ts (entfernt)
 
-**Purpose**: Queue failed operations for retry when network returns
-
-**Key Exports**:
-
-- `queueFailedScan(tagId, action, roomId, pin)` - Queue failed RFID scan
-- `processQueue()` - Process all queued operations
-- `getSyncQueueStatus()` - Get queue stats
-
-**Retry Strategy**:
-
-- Exponential backoff: 1s, 2s, 4s, 8s, 16s
-- Max retries: 5
-- Auto-retry on network quality improvement
-
-**Usage in Hook**:
-
-```typescript
-try {
-  const result = await api.processRfidScan(...);
-} catch (error) {
-  // Queue for retry
-  const operationId = queueFailedScan(tagId, 'checkin', roomId, pin);
-  logger.info('Scan queued', { operationId });
-}
-```
+Die Offline-Retry-Queue wurde entfernt, da sie nie vollständig implementiert wurde. Der Timer lief, aber `queueFailedScan` wurde nirgends aufgerufen. Sollte ein Offline-Feature benötigt werden, muss es neu implementiert werden.
 
 ## Service Layer Patterns
 

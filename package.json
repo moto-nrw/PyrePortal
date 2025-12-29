@@ -15,6 +15,7 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,css,md}\"",
     "clean:target": "cd src-tauri && cargo clean",
+    "knip": "knip",
     "prepare": "husky"
   },
   "dependencies": {
@@ -47,6 +48,7 @@
     "eslint-plugin-security": "^3.0.1",
     "globals": "^16.5.0",
     "husky": "^9.1.7",
+    "knip": "^5.78.0",
     "lint-staged": "^16.2.7",
     "postcss": "^8.5.3",
     "prettier": "^3.7.4",
@@ -73,6 +75,9 @@
     ],
     "ignore": [
       "src-tauri/**"
+    ],
+    "ignoreDependencies": [
+      "@tauri-apps/plugin-opener"
     ]
   }
 }

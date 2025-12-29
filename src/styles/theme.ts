@@ -1,6 +1,6 @@
 // Design tokens for consistent styling across the application
 
-export const theme = {
+const theme = {
   // Colors
   colors: {
     primary: '#24c8db',

@@ -62,12 +62,3 @@ export interface SelectableGridProps<T> {
   /** Unique key prefix for empty slots */
   readonly keyPrefix?: string;
 }
-
-/**
- * Render props pattern for custom card rendering.
- */
-export interface CardRenderProps<T> {
-  readonly item: T;
-  readonly index: number;
-  readonly isSelected: boolean;
-}
