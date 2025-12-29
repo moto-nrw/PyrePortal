@@ -128,5 +128,3 @@ export function PillButton({
     </button>
   );
 }
-
-export default PillButton;

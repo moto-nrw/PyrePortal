@@ -213,25 +213,3 @@ export const designSystem = {
     modalPadding: '24px',
   },
 };
-
-// Helper function to apply glassmorphism effect
-export const applyGlassmorphism = (opacity = 0.9, blurAmount = 20) => ({
-  background: `rgba(255,255,255,${opacity})`,
-  backdropFilter: `blur(${blurAmount}px)`,
-  WebkitBackdropFilter: `blur(${blurAmount}px)`,
-});
-
-// Helper function for card hover state
-export const cardHoverState = {
-  transform: designSystem.scales.hover,
-  boxShadow: designSystem.shadows.cardHover,
-  backgroundColor: '#FFFFFF',
-};
-
-// Helper function for button active state
-export const buttonActiveState = {
-  transform: designSystem.scales.active,
-  boxShadow: designSystem.shadows.button,
-};
-
-export default designSystem;

@@ -43,19 +43,11 @@ const getEnvironmentConfig = (): LoggerConfig => {
   return defaultConfig;
 };
 
-// Export the appropriate configuration based on environment
-export const loggerConfig: LoggerConfig = getEnvironmentConfig();
+// Configuration based on environment
+const loggerConfig: LoggerConfig = getEnvironmentConfig();
 
-// Helper functions for managing logging state at runtime
-export const enableDebugLogging = (): void => {
-  localStorage.setItem('pyrePortalDebugLogging', 'true');
-};
-
-export const disableDebugLogging = (): void => {
-  localStorage.setItem('pyrePortalDebugLogging', 'false');
-};
-
-export const isDebugLoggingEnabled = (): boolean => {
+// Check if debug logging was manually enabled via localStorage
+const isDebugLoggingEnabled = (): boolean => {
   return localStorage.getItem('pyrePortalDebugLogging') === 'true';
 };
 

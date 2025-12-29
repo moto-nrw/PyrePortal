@@ -1375,11 +1375,3 @@ export interface DailyFeedbackResponse {
     created_at: string; // ISO 8601
   };
 }
-
-/**
- * Configuration utilities
- */
-export const config = {
-  getApiBaseUrl: (): string => API_BASE_URL,
-  getDeviceApiKey: (): string => DEVICE_API_KEY,
-};

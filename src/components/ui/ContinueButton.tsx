@@ -26,5 +26,3 @@ export function ContinueButton({
     </PillButton>
   );
 }
-
-export default ContinueButton;
