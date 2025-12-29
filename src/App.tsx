@@ -16,7 +16,6 @@ import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
 import { setNetworkStatusCallback } from './services/api';
-import { startAutoSync } from './services/syncQueue';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
 import { createLogger, logger } from './utils/logger';
@@ -54,18 +53,6 @@ function App() {
     setNetworkStatusCallback(updateNetworkQuality);
     return () => setNetworkStatusCallback(null);
   }, [updateNetworkQuality]);
-
-  // Start automatic sync queue processing for offline operations
-  useEffect(() => {
-    appLogger.info('Starting automatic sync queue processing');
-    const stopAutoSync = startAutoSync(30000); // Check every 30 seconds
-
-    // Cleanup on unmount
-    return () => {
-      appLogger.info('Stopping automatic sync queue processing');
-      stopAutoSync();
-    };
-  }, [appLogger]);
 
   // Conditions for protected routes with additional requirements
   // Note: Authentication is handled by ProtectedRoute component

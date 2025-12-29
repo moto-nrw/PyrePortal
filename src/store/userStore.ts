@@ -315,7 +315,7 @@ const resolveSupervisorsForSession = async (
 };
 
 // Define the ActivityCategory enum
-export enum ActivityCategory {
+enum ActivityCategory {
   SPORT = 'Sport',
   SCIENCE = 'Wissenschaft',
   ART = 'Kunst',
@@ -326,7 +326,7 @@ export enum ActivityCategory {
 }
 
 // Define the Activity interface
-export interface Activity {
+interface Activity {
   id: number;
   name: string;
   category: ActivityCategory;
@@ -338,7 +338,7 @@ export interface Activity {
   checkedInStudents?: Student[];
 }
 
-export interface Student {
+interface Student {
   id: number;
   name: string;
   checkInTime?: Date;

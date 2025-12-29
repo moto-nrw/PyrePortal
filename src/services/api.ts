@@ -212,7 +212,7 @@ export function isNetworkRelatedError(error: unknown): boolean {
  * Map attendance-specific errors to German user-friendly messages
  * Provides context-aware error messages for attendance operations
  */
-export function mapAttendanceErrorToGerman(
+function mapAttendanceErrorToGerman(
   errorMessage: string,
   context: 'status' | 'toggle' | 'feedback'
 ): string {
@@ -1307,15 +1307,6 @@ export interface AttendanceStatusResponse {
     };
   };
   message: string;
-}
-
-/**
- * Attendance toggle request for POST /api/iot/attendance/toggle
- */
-export interface AttendanceToggleRequest {
-  rfid: string;
-  action: 'confirm' | 'cancel' | 'confirm_daily_checkout';
-  destination?: 'zuhause' | 'unterwegs';
 }
 
 /**
