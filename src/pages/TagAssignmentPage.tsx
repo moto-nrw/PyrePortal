@@ -1,6 +1,6 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
@@ -63,6 +63,10 @@ function TagAssignmentPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
 
+  // Refs for scan cancellation
+  const mockScanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanCancelledRef = useRef(false);
+
   const clearStates = useCallback(() => {
     setScannedTag(null);
     setTagAssignment(null);
@@ -70,11 +74,38 @@ function TagAssignmentPage() {
     setSuccess(null);
   }, []);
 
+  // Cancel ongoing scan operation
+  const cancelScan = useCallback(() => {
+    logUserAction('RFID scanning cancelled by user');
+
+    // Mark scan as cancelled to prevent processing results
+    scanCancelledRef.current = true;
+
+    // Clear mock scan timeout if running
+    if (mockScanTimeoutRef.current) {
+      clearTimeout(mockScanTimeoutRef.current);
+      mockScanTimeoutRef.current = null;
+    }
+
+    // Close modal and reset loading state
+    setShowScanner(false);
+    setIsLoading(false);
+  }, []);
+
   // Handle back navigation
   const handleBack = () => {
     logNavigation('Tag Assignment', '/home');
     void navigate('/home');
   };
+
+  // Cleanup timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (mockScanTimeoutRef.current) {
+        clearTimeout(mockScanTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle state from student selection page (success or back navigation)
   useEffect(() => {
@@ -155,14 +186,23 @@ function TagAssignmentPage() {
   const handleStartScanning = async () => {
     logUserAction('RFID scanning started');
 
+    // Reset cancellation flag at start of new scan
+    scanCancelledRef.current = false;
+
     clearStates();
     setShowScanner(true);
     setIsLoading(true);
 
     try {
       if (!isRfidEnabled()) {
-        // Development mock behavior
-        setTimeout(() => {
+        // Development mock behavior - store timeout ref for cancellation
+        mockScanTimeoutRef.current = setTimeout(() => {
+          // Check if scan was cancelled before processing
+          if (scanCancelledRef.current) {
+            logger.debug('Mock scan completed but was cancelled, ignoring result');
+            return;
+          }
+
           // Get mock tags from environment variable or use defaults
           const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
           const mockStudentTags: string[] = envTags
@@ -180,6 +220,7 @@ function TagAssignmentPage() {
           const randomIndex = getSecureRandomInt(mockStudentTags.length);
           const mockTagId = mockStudentTags[randomIndex];
           logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
+          mockScanTimeoutRef.current = null;
           void handleTagScanned(mockTagId);
         }, 2000);
         return;
@@ -187,6 +228,12 @@ function TagAssignmentPage() {
 
       // Use real RFID scanner through Tauri
       const result = await safeInvoke<RfidScanResult>('scan_rfid_single');
+
+      // Check if scan was cancelled while waiting for result
+      if (scanCancelledRef.current) {
+        logger.debug('RFID scan completed but was cancelled, ignoring result');
+        return;
+      }
 
       if (result.success && result.tag_id) {
         logUserAction('RFID tag scanned successfully', {
@@ -202,13 +249,22 @@ function TagAssignmentPage() {
         setShowScanner(false);
       }
     } catch (err) {
+      // Check if error was due to cancellation
+      if (scanCancelledRef.current) {
+        logger.debug('RFID scan error after cancellation, ignoring');
+        return;
+      }
+
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
       setError('Verbindung zum Scanner unterbrochen. Bitte App neu starten.');
       setShowErrorModal(true);
       setShowScanner(false);
     } finally {
-      setIsLoading(false);
+      // Only update loading state if not cancelled (cancelScan handles this)
+      if (!scanCancelledRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -326,7 +382,7 @@ function TagAssignmentPage() {
               IMPORTANT: timeout must match Rust scan_rfid_hardware_single() timeout in src-tauri/src/rfid.rs (currently 10s) */}
           <ModalBase
             isOpen={showScanner}
-            onClose={() => setShowScanner(false)}
+            onClose={cancelScan}
             size="md"
             backgroundColor="#5080D8"
             timeout={10000}
@@ -392,7 +448,7 @@ function TagAssignmentPage() {
             </p>
 
             <button
-              onClick={() => setShowScanner(false)}
+              onClick={cancelScan}
               style={{
                 padding: '12px 32px',
                 fontSize: '18px',
