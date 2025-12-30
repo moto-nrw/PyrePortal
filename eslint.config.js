@@ -1,5 +1,4 @@
 import { FlatCompat } from '@eslint/eslintrc';
-import eslint from '@eslint/js';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import a11yPlugin from 'eslint-plugin-jsx-a11y';
