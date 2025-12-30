@@ -4,13 +4,185 @@
  * This middleware provides detailed logging for Zustand store state changes,
  * with special attention to activity name tracking and state transitions.
  */
-import { create } from 'zustand';
 import type { StoreApi } from 'zustand';
 
 import { createLogger, LogLevel } from './logger';
 
 // Counter for unique action IDs
 let actionCounter = 0;
+
+/**
+ * Fields of interest when tracking activity changes
+ */
+const ACTIVITY_TRACKED_FIELDS = ['id', 'name', 'category', 'roomId', 'supervisorId'] as const;
+
+/**
+ * Compare two activity objects and return the diff of tracked fields
+ */
+const getActivityDiff = (
+  prevActivity: Record<string, unknown>,
+  nextActivity: Record<string, unknown>
+): Record<string, unknown> | null => {
+  const activityDiff: Record<string, unknown> = {};
+
+  for (const field of ACTIVITY_TRACKED_FIELDS) {
+    if (prevActivity[field] !== nextActivity[field]) {
+      activityDiff[field] = {
+        prev: prevActivity[field],
+        next: nextActivity[field],
+      };
+    }
+  }
+
+  return Object.keys(activityDiff).length > 0 ? activityDiff : null;
+};
+
+/**
+ * Extract safe info from a newly added activity
+ */
+const extractAddedActivityInfo = (activity: unknown): { id: unknown; name: unknown } | null => {
+  if (!activity || typeof activity !== 'object') {
+    return null;
+  }
+  const activityRecord = activity as Record<string, unknown>;
+  return {
+    id: 'id' in activityRecord ? activityRecord.id : undefined,
+    name: 'name' in activityRecord ? activityRecord.name : undefined,
+  };
+};
+
+/**
+ * Handle diff for currentActivity state changes
+ */
+const handleCurrentActivityDiff = (
+  prevValue: unknown,
+  nextValue: unknown
+): Record<string, unknown> | null => {
+  const prevActivity = (prevValue ?? {}) as Record<string, unknown>;
+  const nextActivity = (nextValue ?? {}) as Record<string, unknown>;
+
+  if (prevActivity === nextActivity) {
+    return null;
+  }
+
+  return getActivityDiff(prevActivity, nextActivity);
+};
+
+/**
+ * Handle diff for activities array state changes
+ */
+const handleActivitiesArrayDiff = (
+  prevValue: unknown,
+  nextValue: unknown
+): Record<string, unknown> | null => {
+  const prevActivities = prevValue ?? [];
+  const nextActivities = nextValue ?? [];
+
+  if (!Array.isArray(prevActivities) || !Array.isArray(nextActivities)) {
+    return null;
+  }
+
+  if (prevActivities.length === nextActivities.length) {
+    return null;
+  }
+
+  const result: Record<string, unknown> = {
+    count: {
+      prev: prevActivities.length,
+      next: nextActivities.length,
+    },
+  };
+
+  // If activities were added, show the new one
+  if (nextActivities.length > prevActivities.length) {
+    const addedInfo = extractAddedActivityInfo(nextActivities[nextActivities.length - 1]);
+    if (addedInfo) {
+      result.added = addedInfo;
+    }
+  }
+
+  return result;
+};
+
+/**
+ * Handle diff for regular array state changes
+ */
+const handleArrayDiff = (
+  prevValue: unknown[],
+  nextValue: unknown[]
+): Record<string, unknown> | null => {
+  if (prevValue.length === nextValue.length) {
+    return null;
+  }
+
+  return {
+    type: 'array',
+    count: {
+      prev: prevValue.length,
+      next: nextValue.length,
+    },
+  };
+};
+
+/**
+ * Check if a value should be skipped in diff calculation
+ */
+const shouldSkipValue = (prevValue: unknown, nextValue: unknown): boolean => {
+  return (
+    typeof nextValue === 'function' || typeof prevValue === 'function' || prevValue === nextValue
+  );
+};
+
+/**
+ * Handler map for special state keys
+ */
+const SPECIAL_KEY_HANDLERS: Record<
+  string,
+  (prev: unknown, next: unknown) => Record<string, unknown> | null
+> = {
+  currentActivity: handleCurrentActivityDiff,
+  activities: handleActivitiesArrayDiff,
+};
+
+/**
+ * Process a single key and return its diff entry, or null if no change
+ */
+const processKeyDiff = <T extends Record<string, unknown>>(
+  key: string,
+  prevState: T,
+  nextState: T
+): Record<string, unknown> | null => {
+  const prevValue = prevState[key];
+  const nextValue = nextState[key];
+
+  if (shouldSkipValue(prevValue, nextValue)) {
+    return null;
+  }
+
+  // Handle added keys
+  if (!(key in prevState)) {
+    return { added: true, value: nextValue };
+  }
+
+  // Handle removed keys
+  if (!(key in nextState)) {
+    return { removed: true, value: prevValue };
+  }
+
+  // Handle special keys with dedicated handlers
+  const specialHandler = SPECIAL_KEY_HANDLERS[key];
+  if (specialHandler) {
+    return specialHandler(prevValue, nextValue);
+  }
+
+  // Handle regular arrays
+  if (Array.isArray(prevValue) && Array.isArray(nextValue)) {
+    return handleArrayDiff(prevValue, nextValue);
+  }
+
+  // Default case for primitive values
+  return { prev: prevValue, next: nextValue };
+};
 
 /**
  * Helper to generate a deep diff between two state objects
@@ -21,128 +193,14 @@ const getStateDiff = <T extends Record<string, unknown>>(
   nextState: T
 ): Record<string, unknown> => {
   const diff: Record<string, unknown> = {};
-
-  // Track all keys from both objects
   const allKeys = new Set([...Object.keys(prevState), ...Object.keys(nextState)]);
 
-  // Process each key
-  allKeys.forEach(key => {
-    // Skip functions and unchanged values
-    if (
-      typeof nextState[key] === 'function' ||
-      typeof prevState[key] === 'function' ||
-      prevState[key] === nextState[key]
-    ) {
-      return;
+  for (const key of allKeys) {
+    const keyDiff = processKeyDiff(key, prevState, nextState);
+    if (keyDiff) {
+      diff[key] = keyDiff;
     }
-
-    // Track new or deleted keys
-    if (!(key in prevState)) {
-      diff[key] = {
-        added: true,
-        value: nextState[key],
-      };
-      return;
-    }
-
-    if (!(key in nextState)) {
-      diff[key] = {
-        removed: true,
-        value: prevState[key],
-      };
-      return;
-    }
-
-    // Handle special cases for certain state types
-
-    // Activity tracking
-    if (key === 'currentActivity') {
-      const prevActivity = prevState[key] ?? {};
-      const nextActivity = nextState[key] ?? {};
-
-      // Only include activities if they're actually different objects
-      if (prevActivity !== nextActivity) {
-        const activityDiff: Record<string, unknown> = {};
-
-        // Focus on fields of interest
-        ['id', 'name', 'category', 'roomId', 'supervisorId'].forEach(field => {
-          const typedPrevActivity = prevActivity as Record<string, unknown>;
-          const typedNextActivity = nextActivity as Record<string, unknown>;
-
-          if (typedPrevActivity[field] !== typedNextActivity[field]) {
-            activityDiff[field] = {
-              prev: typedPrevActivity[field],
-              next: typedNextActivity[field],
-            };
-          }
-        });
-
-        if (Object.keys(activityDiff).length > 0) {
-          diff[key] = activityDiff;
-        }
-      }
-      return;
-    }
-
-    // Activities array
-    if (key === 'activities') {
-      const prevActivities = prevState[key] ?? [];
-      const nextActivities = nextState[key] ?? [];
-
-      // Compare array length changes
-      if (
-        Array.isArray(prevActivities) &&
-        Array.isArray(nextActivities) &&
-        prevActivities.length !== nextActivities.length
-      ) {
-        diff[key] = {
-          count: {
-            prev: prevActivities.length,
-            next: nextActivities.length,
-          },
-        };
-
-        // If activities were added, show the new ones
-        if (nextActivities.length > prevActivities.length) {
-          // Use type assertion to ensure newActivity is properly typed
-          const newActivity: unknown = nextActivities[nextActivities.length - 1];
-          if (newActivity && typeof newActivity === 'object') {
-            const activityRecord = newActivity as Record<string, unknown>;
-            const safeAddedInfo = {
-              id: 'id' in activityRecord ? activityRecord.id : undefined,
-              name: 'name' in activityRecord ? activityRecord.name : undefined,
-            };
-
-            diff[key] = {
-              ...(diff[key] as Record<string, unknown>),
-              added: safeAddedInfo,
-            };
-          }
-        }
-      }
-      return;
-    }
-
-    // Regular arrays - compare length
-    if (Array.isArray(prevState[key]) && Array.isArray(nextState[key])) {
-      if (prevState[key].length !== nextState[key].length) {
-        diff[key] = {
-          type: 'array',
-          count: {
-            prev: prevState[key].length,
-            next: nextState[key].length,
-          },
-        };
-      }
-      return;
-    }
-
-    // Default case for primitive values
-    diff[key] = {
-      prev: prevState[key],
-      next: nextState[key],
-    };
-  });
+  }
 
   return diff;
 };
@@ -174,38 +232,67 @@ const getActionName = (args: unknown): string => {
 };
 
 /**
+ * Check if a stack line is from internal middleware or Zustand
+ */
+const isInternalStackLine = (line: string): boolean => {
+  return line.includes('node_modules/zustand') || line.includes('storeMiddleware.ts');
+};
+
+/**
+ * Extract file name from a cleaned location string.
+ * Uses a non-backtracking approach: find the last path separator,
+ * then extract the filename portion before the line:column suffix.
+ */
+const extractFileName = (location: string): string => {
+  // Find the last path separator
+  const lastSlash = Math.max(location.lastIndexOf('/'), location.lastIndexOf('\\'));
+  const fileWithLineCol = lastSlash >= 0 ? location.slice(lastSlash + 1) : location;
+
+  // Extract filename before :line:column suffix
+  const colonIndex = fileWithLineCol.indexOf(':');
+  if (colonIndex > 0) {
+    return fileWithLineCol.slice(0, colonIndex);
+  }
+
+  return fileWithLineCol;
+};
+
+/**
+ * Parse a stack trace line and return formatted caller info
+ */
+const parseStackLine = (line: string): string => {
+  const match = /at\s(.+?)\s\((.+?)\)/.exec(line) ?? /at\s(.+)/.exec(line);
+
+  if (!match) {
+    return line.replace(/^at\s/, '');
+  }
+
+  const [, fnName, location = ''] = match;
+  const cleanedLocation = location.replace(/webpack-internal:\/\/\//, '');
+
+  if (cleanedLocation) {
+    const fileName = extractFileName(cleanedLocation);
+    return `${fnName} (${fileName})`;
+  }
+
+  return fnName;
+};
+
+/**
  * Extract caller information from the stack trace
  * This helps identify which component/function triggered a state change
  */
 const getCallerInfo = (): string => {
   try {
-    const stack = new Error().stack ?? '';
+    const stack = new Error('stack trace').stack ?? '';
     const stackLines = stack.split('\n');
 
     // Skip the first few lines related to this middleware
     for (let i = 3; i < stackLines.length; i++) {
       const line = stackLines[i].trim();
 
-      // Skip internal Zustand calls and middleware functions
-      if (!line.includes('node_modules/zustand') && !line.includes('storeMiddleware.ts')) {
-        // Extract the most useful part of the stack trace line
-        const match = /at\s(.+?)\s\((.+?)\)/.exec(line) ?? /at\s(.+)/.exec(line);
-
-        if (match) {
-          const [, fnName, location] = [...match, ''];
-          const cleanedLocation = location.replace(/webpack-internal:\/\/\//, '');
-
-          if (cleanedLocation) {
-            // Extract just the file name without the path
-            const fileMatch = /([^/\\]+):\d+:\d+$/.exec(cleanedLocation);
-            const fileName = fileMatch ? fileMatch[1] : cleanedLocation;
-            return `${fnName} (${fileName})`;
-          }
-
-          return fnName;
-        }
-
-        return line.replace(/^at\s/, '');
+      if (!isInternalStackLine(line)) {
+        return parseStackLine(line);
       }
     }
 
@@ -265,10 +352,7 @@ const defaultOptions: LoggerMiddlewareOptions = {
 };
 
 // Define types for Zustand set and get functions
-type SetState<T> = (
-  partial: T | Partial<T> | ((state: T) => T | Partial<T>),
-  replace?: false
-) => void;
+type SetState<T> = (partial: Partial<T> | ((state: T) => Partial<T>), replace?: false) => void;
 
 type GetState<T> = () => T;
 
@@ -360,42 +444,27 @@ export const loggerMiddleware =
         // Standard state change logging
         if (stateChanges) {
           const level = logLevel ?? LogLevel.DEBUG;
+          const logPayload = {
+            changes,
+            timestamp: timestamp.toISOString(),
+            ...(callerInfo ? { source: callerInfo } : {}),
+          };
+          const logMessage = `[${actionId}] State updated: ${actionName}`;
+
           // Use the appropriate public logging method based on level
           switch (level) {
-            case LogLevel.DEBUG:
-              storeLogger.debug(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
-              break;
             case LogLevel.INFO:
-              storeLogger.info(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
+              storeLogger.info(logMessage, logPayload);
               break;
             case LogLevel.WARN:
-              storeLogger.warn(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
+              storeLogger.warn(logMessage, logPayload);
               break;
             case LogLevel.ERROR:
-              storeLogger.error(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
+              storeLogger.error(logMessage, logPayload);
               break;
+            case LogLevel.DEBUG:
             default:
-              storeLogger.debug(`[${actionId}] State updated: ${actionName}`, {
-                changes,
-                timestamp: timestamp.toISOString(),
-                ...(callerInfo ? { source: callerInfo } : {}),
-              });
+              storeLogger.debug(logMessage, logPayload);
           }
         }
 
@@ -428,13 +497,3 @@ export const loggerMiddleware =
       api
     );
   };
-
-/**
- * Convenience function to create a store with logging middleware
- */
-export const createStoreWithLogging = <T>(
-  storeCreator: StateCreator<T>,
-  options?: LoggerMiddlewareOptions
-): StoreApi<T> => {
-  return create<T>(loggerMiddleware(storeCreator, options));
-};

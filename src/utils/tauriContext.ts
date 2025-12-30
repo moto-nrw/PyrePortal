@@ -73,7 +73,7 @@ export const isRfidEnabled = (): boolean => {
       window__TAURI_INTERNALS__: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window,
       window__TAURI_INVOKE__: typeof window !== 'undefined' && '__TAURI_INVOKE__' in window,
       isProd: import.meta.env.PROD,
-      userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'undefined',
+      userAgent: typeof navigator === 'undefined' ? 'undefined' : navigator.userAgent,
     });
   }
 

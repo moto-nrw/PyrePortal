@@ -27,11 +27,11 @@ fn get_session_settings_path(app_handle: &AppHandle) -> Result<PathBuf, String> 
     let app_data_dir = app_handle
         .path()
         .app_data_dir()
-        .map_err(|e| format!("Failed to get app data directory: {}", e))?;
+        .map_err(|e| format!("Failed to get app data directory: {e}"))?;
 
     // Ensure the directory exists
     fs::create_dir_all(&app_data_dir)
-        .map_err(|e| format!("Failed to create app data directory: {}", e))?;
+        .map_err(|e| format!("Failed to create app data directory: {e}"))?;
 
     Ok(app_data_dir.join("session-settings.json"))
 }
@@ -44,10 +44,10 @@ pub async fn save_session_settings(
     let settings_path = get_session_settings_path(&app_handle)?;
 
     let json_data = serde_json::to_string_pretty(&settings)
-        .map_err(|e| format!("Failed to serialize session settings: {}", e))?;
+        .map_err(|e| format!("Failed to serialize session settings: {e}"))?;
 
     fs::write(&settings_path, json_data)
-        .map_err(|e| format!("Failed to write session settings file: {}", e))?;
+        .map_err(|e| format!("Failed to write session settings file: {e}"))?;
 
     Ok(())
 }
@@ -64,10 +64,10 @@ pub async fn load_session_settings(
     }
 
     let json_data = fs::read_to_string(&settings_path)
-        .map_err(|e| format!("Failed to read session settings file: {}", e))?;
+        .map_err(|e| format!("Failed to read session settings file: {e}"))?;
 
     let settings: SessionSettings = serde_json::from_str(&json_data)
-        .map_err(|e| format!("Failed to parse session settings: {}", e))?;
+        .map_err(|e| format!("Failed to parse session settings: {e}"))?;
 
     Ok(Some(settings))
 }
@@ -79,10 +79,10 @@ pub async fn clear_last_session(app_handle: AppHandle) -> Result<(), String> {
     // Load existing settings if available
     if settings_path.exists() {
         let json_data = fs::read_to_string(&settings_path)
-            .map_err(|e| format!("Failed to read session settings file: {}", e))?;
+            .map_err(|e| format!("Failed to read session settings file: {e}"))?;
 
         let mut settings: SessionSettings = serde_json::from_str(&json_data)
-            .map_err(|e| format!("Failed to parse session settings: {}", e))?;
+            .map_err(|e| format!("Failed to parse session settings: {e}"))?;
 
         // Clear only the last session data, keep toggle state
         settings.last_session = None;
@@ -90,10 +90,10 @@ pub async fn clear_last_session(app_handle: AppHandle) -> Result<(), String> {
 
         // Save updated settings
         let json_data = serde_json::to_string_pretty(&settings)
-            .map_err(|e| format!("Failed to serialize session settings: {}", e))?;
+            .map_err(|e| format!("Failed to serialize session settings: {e}"))?;
 
         fs::write(&settings_path, json_data)
-            .map_err(|e| format!("Failed to write session settings file: {}", e))?;
+            .map_err(|e| format!("Failed to write session settings file: {e}"))?;
     }
 
     Ok(())

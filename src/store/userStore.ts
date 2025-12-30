@@ -3,6 +3,8 @@ import { create } from 'zustand';
 import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import {
   api,
+  mapServerErrorToGerman,
+  isNetworkRelatedError,
   type Teacher,
   type ActivityResponse,
   type Room,
@@ -16,24 +18,304 @@ import {
   loadSessionSettings,
   clearLastSession,
 } from '../services/sessionStorage';
-import {
-  type StudentCacheData,
-  type CachedStudent,
-  loadStudentCache,
-  saveStudentCache,
-  getCachedStudent,
-  setCachedStudent,
-  scanResultToCachedStudent,
-} from '../services/studentCache';
+import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
-import { safeInvoke } from '../utils/tauriContext';
 
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
 
+/**
+ * Helper to create activity summary for logging (reduces nesting depth)
+ */
+const toActivitySummary = (a: ActivityResponse) => ({
+  id: a.id,
+  name: a.name,
+  category: a.category_name,
+});
+
+// Re-export isNetworkRelatedError for backward compatibility
+export { isNetworkRelatedError } from '../services/api';
+
+const mapSessionValidationError = (error: unknown): string => {
+  const rawMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
+
+  if (isNetworkRelatedError(error)) {
+    return 'Netzwerkfehler bei der Überprüfung der gespeicherten Sitzung. Bitte Verbindung prüfen und erneut versuchen.';
+  }
+
+  switch (rawMessage) {
+    case 'Gespeicherte Aktivität nicht mehr verfügbar':
+      return 'Die gespeicherte Aktivität wurde gelöscht oder ist nicht mehr verfügbar. Bitte wählen Sie eine neue Aktivität aus.';
+    case 'Gespeicherter Raum nicht verfügbar':
+      return 'Der gespeicherte Raum ist nicht mehr verfügbar. Bitte wählen Sie einen anderen Raum.';
+    case 'Fehler beim Laden der Betreuer':
+      return 'Die Betreuer konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.';
+    case 'Keine gültigen Betreuer gefunden':
+      return 'Die gespeicherten Betreuer sind nicht mehr gültig. Bitte wählen Sie das Team erneut aus.';
+    case 'Validierung fehlgeschlagen':
+      return 'Die gespeicherte Sitzung ist nicht mehr gültig. Bitte erstellen Sie sie erneut.';
+    default:
+      return mapServerErrorToGerman(rawMessage);
+  }
+};
+
+/**
+ * Error types for activity check-in/check-out operations
+ */
+type ActivityErrorType =
+  | 'activity_not_found'
+  | 'student_already_checked_in'
+  | 'no_students_checked_in'
+  | 'student_not_checked_in'
+  | 'checkin_failed'
+  | 'checkout_failed';
+
+interface ActivityErrorContext {
+  activityName?: string;
+  studentName?: string;
+  activityId?: number;
+  studentId?: number;
+}
+
+/**
+ * Builds network error message for check-in/check-out failures
+ */
+const buildNetworkErrorMessage = (
+  errorType: 'checkin_failed' | 'checkout_failed',
+  studentName?: string
+): string => {
+  const action = errorType === 'checkin_failed' ? 'Einchecken' : 'Auschecken';
+  const name = studentName ? ` von ${studentName}` : '';
+  return `Netzwerkfehler beim ${action}${name}. Bitte Verbindung prüfen und erneut scannen.`;
+};
+
+/**
+ * Error message handlers for each activity error type (reduces switch complexity)
+ */
+const activityErrorMessages: Record<ActivityErrorType, (context: ActivityErrorContext) => string> =
+  {
+    activity_not_found: ({ activityName, activityId }) =>
+      activityName
+        ? `Aktivität '${activityName}' nicht gefunden. Bitte Seite neu laden.`
+        : `Aktivität (ID: ${activityId}) nicht gefunden. Bitte Seite neu laden.`,
+
+    student_already_checked_in: ({ studentName, activityName }) =>
+      studentName && activityName
+        ? `${studentName} ist bereits in '${activityName}' eingecheckt.`
+        : 'Schüler/in ist bereits eingecheckt.',
+
+    no_students_checked_in: ({ activityName }) =>
+      activityName
+        ? `In '${activityName}' sind keine Schüler/innen eingecheckt.`
+        : 'Keine Schüler/innen eingecheckt.',
+
+    student_not_checked_in: ({ studentName, activityName }) => {
+      if (studentName && activityName) {
+        return `${studentName} ist in '${activityName}' nicht eingecheckt.`;
+      }
+      return activityName
+        ? `Schüler/in ist in '${activityName}' nicht eingecheckt.`
+        : 'Schüler/in ist nicht eingecheckt.';
+    },
+
+    checkin_failed: ({ studentName }) =>
+      studentName ? `Fehler beim Einchecken von ${studentName}.` : 'Fehler beim Einchecken.',
+
+    checkout_failed: ({ studentName }) =>
+      studentName ? `Fehler beim Auschecken von ${studentName}.` : 'Fehler beim Auschecken.',
+  };
+
+/**
+ * Handles network-related errors for check-in/check-out operations.
+ * Returns error message if network error, null otherwise.
+ */
+const handleCheckinCheckoutNetworkError = (
+  errorType: ActivityErrorType,
+  context: ActivityErrorContext,
+  originalError?: unknown
+): string | null => {
+  if (errorType !== 'checkin_failed' && errorType !== 'checkout_failed') {
+    return null;
+  }
+
+  if (isNetworkRelatedError(originalError)) {
+    return buildNetworkErrorMessage(errorType, context.studentName);
+  }
+
+  const rawMessage = originalError instanceof Error ? originalError.message : '';
+  if (rawMessage) {
+    return mapServerErrorToGerman(rawMessage);
+  }
+
+  return null;
+};
+
+/**
+ * Maps activity-related errors to user-friendly German messages with context
+ */
+const mapActivityError = (
+  errorType: ActivityErrorType,
+  context: ActivityErrorContext = {},
+  originalError?: unknown
+): string => {
+  // Handle network errors for checkin/checkout first
+  const networkError = handleCheckinCheckoutNetworkError(errorType, context, originalError);
+  if (networkError) {
+    return networkError;
+  }
+
+  // Use message handler lookup instead of switch
+  const messageHandler = activityErrorMessages[errorType];
+  if (messageHandler) {
+    return messageHandler(context);
+  }
+
+  return 'Ein unbekannter Fehler ist aufgetreten.';
+};
+
+/**
+ * Creates a fallback activity object when full data is unavailable.
+ * Used during session restoration when the activity API call fails or returns no match.
+ */
+const createFallbackActivity = (
+  session: CurrentSession,
+  supervisorName: string
+): ActivityResponse => ({
+  id: session.activity_id,
+  name: session.activity_name ?? '',
+  category: '',
+  category_name: '',
+  category_color: '',
+  room_name: session.room_name ?? '',
+  enrollment_count: 0,
+  max_participants: 0,
+  has_spots: true,
+  supervisor_name: supervisorName,
+  is_active: session.is_active ?? true,
+});
+
+/**
+ * Fetches activity data from API during session restoration.
+ * Returns the matching activity or a fallback if not found.
+ */
+const fetchActivityForSession = async (
+  session: CurrentSession,
+  pin: string,
+  supervisorName: string
+): Promise<ActivityResponse> => {
+  try {
+    storeLogger.debug('Fetching activities to restore complete session activity data', {
+      activityId: session.activity_id,
+    });
+
+    const activities = await api.getActivities(pin);
+    const matchingActivity = activities.find(activity => activity.id === session.activity_id);
+
+    if (matchingActivity) {
+      storeLogger.info('Session activity restored from API with complete data', {
+        activityId: session.activity_id,
+        maxParticipants: matchingActivity.max_participants,
+        enrollmentCount: matchingActivity.enrollment_count,
+      });
+      return matchingActivity;
+    }
+
+    storeLogger.warn(
+      'Activity not found in API response during session restoration, using fallback with limited data',
+      {
+        activityId: session.activity_id,
+        availableActivityIds: activities.map(a => a.id),
+      }
+    );
+    return createFallbackActivity(session, supervisorName);
+  } catch (error) {
+    storeLogger.error('Failed to fetch activities during session restoration, using fallback', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      activityId: session.activity_id,
+    });
+    return createFallbackActivity(session, supervisorName);
+  }
+};
+
+/**
+ * Resolves activity data for session restoration.
+ * Uses cached data if available, otherwise fetches from API.
+ */
+const resolveSessionActivity = async (
+  session: CurrentSession,
+  currentSelectedActivity: ActivityResponse | null,
+  pin: string,
+  supervisorName: string
+): Promise<ActivityResponse | null> => {
+  if (!session.activity_name) {
+    return null;
+  }
+
+  // If we already have a selectedActivity with the same ID, preserve its data
+  if (currentSelectedActivity && currentSelectedActivity.id === session.activity_id) {
+    return currentSelectedActivity;
+  }
+
+  return fetchActivityForSession(session, pin, supervisorName);
+};
+
+/**
+ * Creates room object from session data if available.
+ */
+const createSessionRoom = (session: CurrentSession): Room | null => {
+  if (!session.room_id || !session.room_name) {
+    return null;
+  }
+
+  return {
+    id: session.room_id,
+    name: session.room_name,
+    is_occupied: true, // Current session room is always occupied
+  };
+};
+
+/**
+ * Validates and resolves supervisors from saved session data.
+ * Loads users if not already loaded, then maps supervisor IDs to User objects.
+ */
+const resolveSupervisorsForSession = async (
+  supervisorIds: number[],
+  currentUsers: User[],
+  fetchTeachers: () => Promise<void>,
+  getUpdatedUsers: () => User[]
+): Promise<User[]> => {
+  let usersToSearch = currentUsers;
+
+  // Load users if not already loaded
+  if (usersToSearch.length === 0) {
+    storeLogger.debug('Loading teachers to validate supervisors');
+    await fetchTeachers();
+    usersToSearch = getUpdatedUsers();
+
+    if (usersToSearch.length === 0) {
+      throw new Error('Fehler beim Laden der Betreuer');
+    }
+  }
+
+  // Map supervisor IDs to User objects
+  const supervisors = supervisorIds
+    .map(id => usersToSearch.find(u => u.id === id))
+    .filter((u): u is User => u !== undefined);
+
+  if (supervisors.length === 0) {
+    storeLogger.warn('No valid supervisors found', {
+      savedIds: supervisorIds,
+      availableUsers: usersToSearch.map(u => u.id),
+    });
+    throw new Error('Keine gültigen Betreuer gefunden');
+  }
+
+  return supervisors;
+};
+
 // Define the ActivityCategory enum
-export enum ActivityCategory {
+enum ActivityCategory {
   SPORT = 'Sport',
   SCIENCE = 'Wissenschaft',
   ART = 'Kunst',
@@ -44,7 +326,7 @@ export enum ActivityCategory {
 }
 
 // Define the Activity interface
-export interface Activity {
+interface Activity {
   id: number;
   name: string;
   category: ActivityCategory;
@@ -56,7 +338,7 @@ export interface Activity {
   checkedInStudents?: Student[];
 }
 
-export interface Student {
+interface Student {
   id: number;
   name: string;
   checkInTime?: Date;
@@ -155,6 +437,7 @@ interface UserState {
   error: string | null;
   nfcScanActive: boolean;
   selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
+  activeSupervisorTags: Set<string>; // Locally tracked supervisor tagIds for instant re-entry
 
   // RFID scanning state
   rfid: RfidState;
@@ -166,10 +449,6 @@ interface UserState {
   // Network status state
   networkStatus: NetworkStatusData;
 
-  // Student cache state
-  studentCache: StudentCacheData | null;
-  isCacheLoading: boolean;
-
   // Actions
   setSelectedUser: (userName: string, userId: number | null) => void;
   setAuthenticatedUser: (userData: {
@@ -179,7 +458,7 @@ interface UserState {
     pin: string;
   }) => void;
   setSelectedActivity: (activity: ActivityResponse) => void;
-  fetchTeachers: () => Promise<void>;
+  fetchTeachers: (forceRefresh?: boolean) => Promise<void>;
   fetchRooms: () => Promise<void>;
   selectRoom: (roomId: number) => void;
   fetchCurrentSession: () => Promise<void>;
@@ -196,6 +475,10 @@ interface UserState {
   setSelectedSupervisors: (supervisors: User[]) => void;
   toggleSupervisor: (user: User) => void;
   clearSelectedSupervisors: () => void;
+  addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
+  addActiveSupervisorTag: (tagId: string) => void;
+  isActiveSupervisor: (tagId: string) => boolean;
+  clearActiveSupervisorTags: () => void;
 
   // Check-in/check-out actions
   startNfcScan: () => void;
@@ -229,6 +512,7 @@ interface UserState {
   // Enhanced duplicate prevention actions
   canProcessTag: (tagId: string) => boolean;
   recordTagScan: (tagId: string, scan: RecentTagScan) => void;
+  clearTagScan: (tagId: string) => void;
   mapTagToStudent: (tagId: string, studentId: string) => void;
   getCachedStudentId: (tagId: string) => string | undefined;
   clearOldTagScans: () => void;
@@ -245,36 +529,44 @@ interface UserState {
   setNetworkStatus: (status: NetworkStatusData) => void;
   updateNetworkQuality: (quality: NetworkStatusData['quality'], responseTime: number) => void;
 
-  // Student cache actions
-  loadStudentCache: () => Promise<void>;
-  getCachedStudentData: (rfidTag: string) => CachedStudent | null;
-  cacheStudentData: (
-    rfidTag: string,
-    scanResult: RfidScanResult,
-    additionalData?: { room?: string; activity?: string }
-  ) => Promise<void>;
-  updateCachedStudentStatus: (
-    rfidTag: string,
-    status: 'checked_in' | 'checked_out'
-  ) => Promise<void>;
-  clearStudentCache: () => Promise<void>;
-
   // Daily feedback action
   submitDailyFeedback: (studentId: number, rating: DailyFeedbackRating) => Promise<boolean>;
+
+  // Session state cleanup action
+  clearSessionState: () => void;
 }
 
 // Define the type for the Zustand set function
-type SetState<T> = (
-  partial: T | Partial<T> | ((state: T) => T | Partial<T>),
-  replace?: false
-) => void;
+type SetState<T> = (partial: Partial<T> | ((state: T) => Partial<T>), replace?: false) => void;
 
 // Define the type for the Zustand get function
 type GetState<T> = () => T;
 
-// Generate a unique id for new activities
+// Session-scoped state that should be cleared when session ends
+// This prevents stale room/activity data from being used after session change
+// NOTE: selectedSupervisors is NOT included here - supervisors persist independently
+// for Tag Assignment feature (team selection without active session). Supervisors are
+// cleared explicitly in logout() and when a session ends via endSession().
+const SESSION_INITIAL_STATE = {
+  selectedRoom: null as Room | null,
+  selectedActivity: null as ActivityResponse | null,
+  currentSession: null as CurrentSession | null,
+  activeSupervisorTags: new Set<string>(),
+};
+
+// RFID state that should be cleared on session change
+// Note: tagToStudentMap is intentionally NOT cleared - it maps RFID tags to student IDs
+// which remains useful across sessions
+const RFID_SESSION_INITIAL_STATE = {
+  recentTagScans: new Map<string, RecentTagScan>(),
+  studentHistory: new Map<string, StudentActionHistory>(),
+  processingQueue: new Set<string>(),
+  optimisticScans: [] as OptimisticScanState[],
+};
+
+// Generate a unique id for new activities using unbiased secure randomness
 const generateId = (): number => {
-  return Math.floor(Math.random() * 10000);
+  return getSecureRandomInt(10000);
 };
 
 // Create mock student data
@@ -304,6 +596,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   error: null,
   nfcScanActive: false,
   selectedSupervisors: [] as User[], // New state for multi-supervisor selection
+  activeSupervisorTags: new Set<string>(),
 
   // RFID initial state
   rfid: {
@@ -330,15 +623,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   // Network status initial state
   networkStatus: {
-    isOnline: navigator.onLine,
+    isOnline: true,
     responseTime: 0,
     lastChecked: Date.now(),
-    quality: 'excellent' as const,
+    quality: 'online' as const,
   },
-
-  // Student cache initial state
-  studentCache: null,
-  isCacheLoading: false,
 
   // Actions
   setSelectedUser: (userName: string, userId: number | null) =>
@@ -363,24 +652,23 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   setSelectedActivity: (activity: ActivityResponse) => set({ selectedActivity: activity }),
 
-  fetchTeachers: async () => {
+  fetchTeachers: async (forceRefresh = false) => {
     const { isLoading, users } = get();
 
-    // Prevent duplicate requests
-    if (isLoading) {
+    // Prevent unnecessary or duplicate requests unless explicitly forced
+    if (isLoading && !forceRefresh) {
       storeLogger.debug('Teachers fetch already in progress, skipping');
       return;
     }
 
-    // Skip if we already have teachers
-    if (users.length > 0) {
+    if (!forceRefresh && users.length > 0) {
       storeLogger.debug('Teachers already loaded, skipping fetch');
       return;
     }
 
     set({ isLoading: true, error: null });
     try {
-      storeLogger.info('Fetching teachers from API');
+      storeLogger.info('Fetching teachers from API', { forceRefresh });
       const teachers = await api.getTeachers();
       const users = teachers.map(teacherToUser);
 
@@ -390,7 +678,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       storeLogger.error('Failed to fetch teachers', { error: errorMessage });
       set({
-        error: 'Fehler beim Laden der Lehrer. Bitte versuchen Sie es erneut.',
+        error: mapServerErrorToGerman(errorMessage),
         isLoading: false,
       });
       throw error;
@@ -401,8 +689,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     const { authenticatedUser } = get();
 
     if (!authenticatedUser?.pin) {
+      const errorMsg = 'Keine Authentifizierung für das Laden von Räumen';
       storeLogger.warn('Cannot fetch rooms: no authenticated user or PIN');
-      set({ error: 'Keine Authentifizierung für das Laden von Räumen', isLoading: false });
+      set({ error: mapServerErrorToGerman(errorMsg), isLoading: false });
       return;
     }
 
@@ -420,7 +709,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Fehler beim Laden der Räume';
       storeLogger.error('Failed to fetch available rooms', { error: errorMessage });
-      set({ error: errorMessage, isLoading: false });
+      set({ error: mapServerErrorToGerman(errorMessage), isLoading: false });
     }
   },
 
@@ -449,111 +738,36 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.info('Fetching current session for device');
       const session = await api.getCurrentSession(authenticatedUser.pin);
 
-      if (session) {
-        storeLogger.info('Active session found', {
-          activeGroupId: session.active_group_id,
-          activityId: session.activity_id,
-          activityName: session.activity_name,
-          roomName: session.room_name,
-          startTime: session.start_time,
-          duration: session.duration,
-        });
-
-        // Also set selected activity and room based on session if we have the data
-        let sessionActivity: ActivityResponse | null = null;
-        let sessionRoom: Room | null = null;
-
-        // Get the current selectedActivity to preserve its data
-        const currentSelectedActivity = get().selectedActivity;
-
-        if (session.activity_name) {
-          // If we already have a selectedActivity with the same ID, preserve its data
-          if (currentSelectedActivity && currentSelectedActivity.id === session.activity_id) {
-            sessionActivity = currentSelectedActivity;
-          } else {
-            // Fetch complete activity data to get accurate max_participants and other fields
-            try {
-              storeLogger.debug('Fetching activities to restore complete session activity data', {
-                activityId: session.activity_id,
-              });
-              const activities = await api.getActivities(authenticatedUser.pin);
-              const matchingActivity = activities.find(
-                activity => activity.id === session.activity_id
-              );
-
-              if (matchingActivity) {
-                sessionActivity = matchingActivity;
-                storeLogger.info('Session activity restored from API with complete data', {
-                  activityId: session.activity_id,
-                  maxParticipants: matchingActivity.max_participants,
-                  enrollmentCount: matchingActivity.enrollment_count,
-                });
-              } else {
-                // Fallback to minimal activity object if activity not found in API response
-                sessionActivity = {
-                  id: session.activity_id,
-                  name: session.activity_name,
-                  category: '',
-                  category_name: '',
-                  category_color: '',
-                  room_name: session.room_name ?? '',
-                  enrollment_count: 0,
-                  max_participants: 0,
-                  has_spots: true,
-                  supervisor_name: authenticatedUser.staffName,
-                  is_active: session.is_active ?? true,
-                };
-                storeLogger.warn(
-                  'Activity not found in API response during session restoration, using fallback with limited data',
-                  {
-                    activityId: session.activity_id,
-                    availableActivityIds: activities.map(a => a.id),
-                  }
-                );
-              }
-            } catch (error) {
-              // If API call fails, use minimal activity object as fallback
-              sessionActivity = {
-                id: session.activity_id,
-                name: session.activity_name,
-                category: '',
-                category_name: '',
-                category_color: '',
-                room_name: session.room_name ?? '',
-                enrollment_count: 0,
-                max_participants: 0,
-                has_spots: true,
-                supervisor_name: authenticatedUser.staffName,
-                is_active: session.is_active ?? true,
-              };
-              storeLogger.error(
-                'Failed to fetch activities during session restoration, using fallback',
-                {
-                  error: error instanceof Error ? error.message : 'Unknown error',
-                  activityId: session.activity_id,
-                }
-              );
-            }
-          }
-        }
-
-        if (session.room_id && session.room_name) {
-          sessionRoom = {
-            id: session.room_id,
-            name: session.room_name,
-            is_occupied: true, // Current session room is always occupied
-          };
-        }
-
-        set({
-          currentSession: session,
-          selectedActivity: sessionActivity,
-          selectedRoom: sessionRoom,
-        });
-      } else {
-        storeLogger.debug('No active session found for device');
-        set({ currentSession: null });
+      if (!session) {
+        storeLogger.debug('No active session found for device, clearing session state');
+        get().clearSessionState();
+        return;
       }
+
+      storeLogger.info('Active session found', {
+        activeGroupId: session.active_group_id,
+        activityId: session.activity_id,
+        activityName: session.activity_name,
+        roomName: session.room_name,
+        startTime: session.start_time,
+        duration: session.duration,
+      });
+
+      // Resolve activity and room data using extracted helpers
+      const currentSelectedActivity = get().selectedActivity;
+      const sessionActivity = await resolveSessionActivity(
+        session,
+        currentSelectedActivity,
+        authenticatedUser.pin,
+        authenticatedUser.staffName
+      );
+      const sessionRoom = createSessionRoom(session);
+
+      set({
+        currentSession: session,
+        selectedActivity: sessionActivity,
+        selectedRoom: sessionRoom,
+      });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       storeLogger.error('Failed to fetch current session', { error: errorMessage });
@@ -590,6 +804,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       currentSession: null,
       currentActivity: null,
       selectedSupervisors: [],
+      activeSupervisorTags: new Set<string>(),
     });
   },
 
@@ -603,7 +818,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   // Supervisor selection actions
-  setSelectedSupervisors: (supervisors: User[]) => set({ selectedSupervisors: supervisors }),
+  setSelectedSupervisors: (supervisors: User[]) =>
+    set({ selectedSupervisors: supervisors, activeSupervisorTags: new Set<string>() }),
 
   toggleSupervisor: (user: User) => {
     const { selectedSupervisors } = get();
@@ -613,16 +829,64 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       // Remove supervisor
       set({
         selectedSupervisors: selectedSupervisors.filter(s => s.id !== user.id),
+        activeSupervisorTags: new Set<string>(),
       });
     } else {
       // Add supervisor
       set({
         selectedSupervisors: [...selectedSupervisors, user],
+        activeSupervisorTags: new Set<string>(),
       });
     }
   },
 
-  clearSelectedSupervisors: () => set({ selectedSupervisors: [] }),
+  clearSelectedSupervisors: () =>
+    set({ selectedSupervisors: [], activeSupervisorTags: new Set<string>() }),
+
+  addSupervisorFromRfid: (staffId: number, staffName: string) => {
+    const { selectedSupervisors } = get();
+    const isAlreadySelected = selectedSupervisors.some(s => s.id === staffId);
+
+    if (isAlreadySelected) {
+      storeLogger.info('Supervisor already in selectedSupervisors via RFID', {
+        staffId,
+        staffName,
+      });
+      return true; // Already present - second scan
+    }
+
+    const newSupervisor: User = { id: staffId, name: staffName };
+    set({
+      selectedSupervisors: [...selectedSupervisors, newSupervisor],
+      activeSupervisorTags: new Set<string>(),
+    });
+
+    storeLogger.info('Supervisor added to selectedSupervisors via RFID', {
+      staffId,
+      staffName,
+      totalSupervisors: selectedSupervisors.length + 1,
+    });
+
+    return false; // Was not present - first scan
+  },
+
+  addActiveSupervisorTag: (tagId: string) => {
+    set(state => {
+      const updatedTags = new Set(state.activeSupervisorTags);
+      updatedTags.add(tagId);
+      return { activeSupervisorTags: updatedTags };
+    });
+    storeLogger.debug('RFID-Tag für Betreuer gespeichert', { tagId });
+  },
+
+  isActiveSupervisor: (tagId: string) => {
+    return get().activeSupervisorTags.has(tagId);
+  },
+
+  clearActiveSupervisorTags: () => {
+    set({ activeSupervisorTags: new Set<string>() });
+    storeLogger.debug('Aktive Betreuer-Tags geleert');
+  },
 
   // Activity-related actions
   initializeActivity: (roomId: number) => {
@@ -722,8 +986,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         stack: error.stack,
       });
 
+      const errorMsg = isNetworkRelatedError(err)
+        ? 'Netzwerkfehler beim Erstellen der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
+        : mapServerErrorToGerman(error.message);
       set({
-        error: 'Fehler beim Erstellen der Aktivität',
+        error: errorMsg,
         isLoading: false,
       });
       return false;
@@ -744,16 +1011,18 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       set({ isLoading: true, error: null });
 
       if (!authenticatedUser) {
+        const errorMsg = 'Keine Authentifizierung für das Laden von Aktivitäten';
         set({
-          error: 'Keine Authentifizierung für das Laden von Aktivitäten',
+          error: mapServerErrorToGerman(errorMsg),
           isLoading: false,
         });
         return null;
       }
 
       if (!authenticatedUser.pin) {
+        const errorMsg = 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.';
         set({
-          error: 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.',
+          error: mapServerErrorToGerman(errorMsg),
           isLoading: false,
         });
         return null;
@@ -771,11 +1040,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
           storeLogger.info('Activities loaded successfully', {
             count: activitiesData.length,
-            activities: activitiesData.map(a => ({
-              id: a.id,
-              name: a.name,
-              category: a.category_name,
-            })),
+            activities: activitiesData.map(toActivitySummary),
           });
 
           set({ isLoading: false });
@@ -789,7 +1054,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
           });
 
           set({
-            error: 'Fehler beim Laden der Aktivitäten',
+            error: mapServerErrorToGerman(errorMessage),
             isLoading: false,
           });
 
@@ -870,7 +1135,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const activityIndex = activities.findIndex(a => a.id === activityId);
 
       if (activityIndex === -1) {
-        set({ error: 'Aktivität nicht gefunden', isLoading: false });
+        set({
+          error: mapActivityError('activity_not_found', { activityId }),
+          isLoading: false,
+        });
         return false;
       }
 
@@ -884,49 +1152,65 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       // Check if student is already checked in
       const existingStudentIndex = activity.checkedInStudents.findIndex(s => s.id === student.id);
 
-      if (existingStudentIndex !== -1) {
-        // If student already checked in but checked out, update their status
-        if (!activity.checkedInStudents[existingStudentIndex].isCheckedIn) {
-          activity.checkedInStudents[existingStudentIndex] = {
-            ...activity.checkedInStudents[existingStudentIndex],
-            checkInTime: new Date(),
-            checkOutTime: undefined,
-            isCheckedIn: true,
-          };
-        } else {
-          // Student is already checked in
-          set({ error: 'Schüler/in ist bereits eingecheckt', isLoading: false });
-          return false;
-        }
-      } else {
+      if (existingStudentIndex === -1) {
         // Add new student to checked in list
         activity.checkedInStudents.push({
           ...student,
           checkInTime: new Date(),
           isCheckedIn: true,
         });
+      } else if (activity.checkedInStudents[existingStudentIndex].isCheckedIn) {
+        // Student is already checked in - show error
+        set({
+          error: mapActivityError('student_already_checked_in', {
+            studentName: student.name,
+            activityName: activity.name,
+          }),
+          isLoading: false,
+        });
+        return false;
+      } else {
+        // Student was checked out - re-check them in
+        activity.checkedInStudents[existingStudentIndex] = {
+          ...activity.checkedInStudents[existingStudentIndex],
+          checkInTime: new Date(),
+          checkOutTime: undefined,
+          isCheckedIn: true,
+        };
       }
 
       // Update activities array
       set({ activities: updatedActivities, isLoading: false });
       return true;
-    } catch {
-      set({ error: 'Fehler beim Einchecken des Schülers/der Schülerin', isLoading: false });
+    } catch (error) {
+      set({
+        error: mapActivityError('checkin_failed', { studentName: student.name }, error),
+        isLoading: false,
+      });
       return false;
     }
   },
 
   checkOutStudent: async (activityId: number, studentId: number) => {
     set({ isLoading: true, error: null });
+
+    // Get student name early for error context (before try block)
+    const { activities } = get();
+    const activity = activities.find(a => a.id === activityId);
+    const student = activity?.checkedInStudents?.find(s => s.id === studentId);
+    const studentName = student?.name;
+
     try {
       // Simulate API call
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      const { activities } = get();
       const activityIndex = activities.findIndex(a => a.id === activityId);
 
       if (activityIndex === -1) {
-        set({ error: 'Aktivität nicht gefunden', isLoading: false });
+        set({
+          error: mapActivityError('activity_not_found', { activityId }),
+          isLoading: false,
+        });
         return false;
       }
 
@@ -936,7 +1220,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
       // Check if there are any checked in students
       if (!activity.checkedInStudents || activity.checkedInStudents.length === 0) {
-        set({ error: 'Keine Schüler/innen eingecheckt', isLoading: false });
+        set({
+          error: mapActivityError('no_students_checked_in', { activityName: activity.name }),
+          isLoading: false,
+        });
         return false;
       }
 
@@ -946,7 +1233,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       );
 
       if (studentIndex === -1) {
-        set({ error: 'Schüler/in ist nicht eingecheckt', isLoading: false });
+        set({
+          error: mapActivityError('student_not_checked_in', { activityName: activity.name }),
+          isLoading: false,
+        });
         return false;
       }
 
@@ -960,8 +1250,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       // Update activities array
       set({ activities: updatedActivities, isLoading: false });
       return true;
-    } catch {
-      set({ error: 'Fehler beim Auschecken des Schülers/der Schülerin', isLoading: false });
+    } catch (error) {
+      set({
+        error: mapActivityError('checkout_failed', { studentName }, error),
+        isLoading: false,
+      });
       return false;
     }
   },
@@ -1160,6 +1453,16 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     });
   },
 
+  clearTagScan: (tagId: string) => {
+    set(state => {
+      const newScans = new Map(state.rfid.recentTagScans);
+      newScans.delete(tagId);
+      return {
+        rfid: { ...state.rfid, recentTagScans: newScans },
+      };
+    });
+  },
+
   mapTagToStudent: (tagId: string, studentId: string) => {
     set(state => {
       const newMap = new Map(state.rfid.tagToStudentMap);
@@ -1227,146 +1530,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         isOnline: quality !== 'offline',
       },
     }));
-  },
-
-  // Student cache actions
-  loadStudentCache: async () => {
-    const state = get();
-    if (state.isCacheLoading) {
-      storeLogger.debug('Student cache already loading, skipping');
-      return;
-    }
-
-    set({ isCacheLoading: true });
-
-    try {
-      storeLogger.debug('Loading student cache from storage');
-      const cache = await loadStudentCache();
-
-      set({
-        studentCache: cache,
-        isCacheLoading: false,
-      });
-
-      storeLogger.info('Student cache loaded successfully', {
-        hasCache: !!cache,
-        entryCount: cache ? Object.keys(cache.students).length : 0,
-      });
-    } catch (error) {
-      storeLogger.error('Failed to load student cache', { error });
-      set({
-        studentCache: null,
-        isCacheLoading: false,
-      });
-    }
-  },
-
-  getCachedStudentData: (rfidTag: string) => {
-    const { studentCache } = get();
-    if (!studentCache) {
-      return null;
-    }
-
-    const cachedStudent = getCachedStudent(studentCache, rfidTag);
-    if (cachedStudent) {
-      storeLogger.debug('Found cached student data', {
-        rfidTag,
-        studentId: cachedStudent.id,
-        studentName: cachedStudent.name,
-        status: cachedStudent.status,
-      });
-    }
-
-    return cachedStudent;
-  },
-
-  cacheStudentData: async (
-    rfidTag: string,
-    scanResult: RfidScanResult,
-    additionalData?: { room?: string; activity?: string }
-  ) => {
-    const { studentCache } = get();
-
-    try {
-      // Create or use existing cache
-      const cache = studentCache ?? (await loadStudentCache());
-
-      // Convert scan result to cached student format
-      const studentData = scanResultToCachedStudent(scanResult, additionalData);
-
-      // Update cache
-      const updatedCache = setCachedStudent(cache, rfidTag, studentData);
-
-      // Update store state
-      set({ studentCache: updatedCache });
-
-      // Persist to storage
-      await saveStudentCache(updatedCache);
-
-      storeLogger.info('Student data cached successfully', {
-        rfidTag,
-        studentId: studentData.id,
-        studentName: studentData.name,
-        status: studentData.status,
-      });
-    } catch (error) {
-      storeLogger.error('Failed to cache student data', {
-        error,
-        rfidTag,
-        studentId: scanResult.student_id,
-      });
-    }
-  },
-
-  updateCachedStudentStatus: async (rfidTag: string, status: 'checked_in' | 'checked_out') => {
-    const { studentCache } = get();
-    if (!studentCache?.students[rfidTag]) {
-      storeLogger.debug('No cached student to update status for', { rfidTag });
-      return;
-    }
-
-    try {
-      const existingStudent = studentCache.students[rfidTag];
-      const updatedStudent: Omit<CachedStudent, 'cachedAt'> = {
-        ...existingStudent,
-        status,
-        lastSeen: new Date().toISOString(),
-      };
-
-      const updatedCache = setCachedStudent(studentCache, rfidTag, updatedStudent);
-
-      // Update store state
-      set({ studentCache: updatedCache });
-
-      // Persist to storage
-      await saveStudentCache(updatedCache);
-
-      storeLogger.info('Cached student status updated', {
-        rfidTag,
-        studentId: existingStudent.id,
-        newStatus: status,
-      });
-    } catch (error) {
-      storeLogger.error('Failed to update cached student status', {
-        error,
-        rfidTag,
-        status,
-      });
-    }
-  },
-
-  clearStudentCache: async () => {
-    try {
-      // Clear from storage
-      await safeInvoke('clear_student_cache');
-
-      // Clear from store
-      set({ studentCache: null });
-
-      storeLogger.info('Student cache cleared successfully');
-    } catch (error) {
-      storeLogger.error('Failed to clear student cache', { error });
-    }
   },
 
   // Session settings actions
@@ -1469,46 +1632,24 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         throw new Error('Gespeicherter Raum nicht verfügbar');
       }
 
-      // Check supervisors - use current if already selected, otherwise validate saved ones
+      // Resolve supervisors - use current if already selected, otherwise validate saved ones
       const { selectedSupervisors, users } = get();
-      let supervisors = selectedSupervisors;
-
-      if (supervisors.length === 0) {
-        // Ensure we have teachers loaded first
-        if (users.length === 0) {
-          storeLogger.debug('Loading teachers to validate supervisors');
-          await get().fetchTeachers();
-          const updatedUsers = get().users;
-
-          if (updatedUsers.length === 0) {
-            throw new Error('Fehler beim Laden der Betreuer');
-          }
-
-          // Now try to find supervisors with loaded users
-          supervisors = sessionSettings.last_session.supervisor_ids
-            .map(id => updatedUsers.find(u => u.id === id))
-            .filter((u): u is User => u !== undefined);
-        } else {
-          // Users already loaded, validate saved supervisors
-          supervisors = sessionSettings.last_session.supervisor_ids
-            .map(id => users.find(u => u.id === id))
-            .filter((u): u is User => u !== undefined);
-        }
-
-        if (supervisors.length === 0) {
-          storeLogger.warn('No valid supervisors found', {
-            savedIds: sessionSettings.last_session.supervisor_ids,
-            availableUsers: users.length === 0 ? get().users.map(u => u.id) : users.map(u => u.id),
-          });
-          throw new Error('Keine gültigen Betreuer gefunden');
-        }
-      }
+      const supervisors =
+        selectedSupervisors.length > 0
+          ? selectedSupervisors
+          : await resolveSupervisorsForSession(
+              sessionSettings.last_session.supervisor_ids,
+              users,
+              get().fetchTeachers,
+              () => get().users
+            );
 
       // Set validated data in store
       set({
         selectedActivity: activity,
         selectedRoom: room,
         selectedSupervisors: supervisors,
+        activeSupervisorTags: new Set<string>(),
         isValidatingLastSession: false,
       });
 
@@ -1520,15 +1661,20 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
       return true;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
-      storeLogger.error('Session validation failed', { error: errorMessage });
+      const userMessage = mapSessionValidationError(error);
+      storeLogger.error('Session validation failed', {
+        error: userMessage,
+        rawError: error instanceof Error ? error.message : error,
+      });
 
       // Clear invalid session data
       await clearLastSession();
       set({
-        sessionSettings: { ...sessionSettings, last_session: null, use_last_session: false },
+        sessionSettings: sessionSettings
+          ? { ...sessionSettings, last_session: null, use_last_session: false }
+          : null,
         isValidatingLastSession: false,
-        error: errorMessage,
+        error: userMessage,
       });
 
       return false;
@@ -1543,6 +1689,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         sessionSettings: sessionSettings
           ? { ...sessionSettings, last_session: null, use_last_session: false }
           : null,
+        activeSupervisorTags: new Set<string>(),
       });
       storeLogger.info('Session settings cleared');
     } catch (error) {
@@ -1581,6 +1728,20 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       storeLogger.error('Failed to submit daily feedback', { error: errorMessage });
       return false;
     }
+  },
+
+  // Clear all session-scoped state when session ends
+  // This prevents stale room/activity data from causing issues (Issue #129 Bug 1)
+  clearSessionState: () => {
+    storeLogger.info('Clearing session-scoped state');
+    set(state => ({
+      ...SESSION_INITIAL_STATE,
+      rfid: {
+        ...state.rfid,
+        ...RFID_SESSION_INITIAL_STATE,
+        // Preserve tagToStudentMap - useful across sessions for tag-to-student lookups
+      },
+    }));
   },
 });
 

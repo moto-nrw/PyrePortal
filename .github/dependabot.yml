@@ -1,0 +1,61 @@
+# Dependabot configuration for PyrePortal
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+#
+# Strategy: Minimize PRs - one per ecosystem (npm, cargo, actions)
+
+version: 2
+updates:
+  # npm packages - ALL in one PR
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Berlin"
+    groups:
+      all-npm:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+
+  # Cargo/Rust - ALL in one PR
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Berlin"
+    groups:
+      all-cargo:
+        patterns:
+          - "*"
+    # Ignore embedded-hal ecosystem - major updates break mfrc522 compatibility
+    # mfrc522 0.8 requires embedded-hal 0.2, not 1.0
+    ignore:
+      - dependency-name: "embedded-hal"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "linux-embedded-hal"
+        update-types: ["version-update:semver-major"]
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+
+  # GitHub Actions - ALL in one PR
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Berlin"
+    groups:
+      all-actions:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"

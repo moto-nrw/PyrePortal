@@ -15,10 +15,67 @@ interface ApiConfig {
 }
 
 /**
+ * Structured API error response with optional details
+ * Used for rich error responses like capacity exceeded
+ */
+export interface ApiErrorResponse {
+  status: string;
+  message: string;
+  code?: string;
+  details?: {
+    // Room capacity fields
+    room_id?: number;
+    room_name?: string;
+    current_occupancy?: number;
+    max_capacity?: number;
+    // Activity capacity fields
+    activity_id?: number;
+    activity_name?: string;
+    current_participants?: number;
+    max_participants?: number;
+  };
+}
+
+/**
+ * Custom error class that preserves structured API error data
+ */
+export class ApiError extends Error {
+  public readonly code?: string;
+  public readonly details?: ApiErrorResponse['details'];
+  public readonly statusCode: number;
+
+  constructor(
+    message: string,
+    statusCode: number,
+    code?: string,
+    details?: ApiErrorResponse['details']
+  ) {
+    super(message);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+/**
  * Map server error messages to German user-friendly messages
  * This enables better debugging by distinguishing different error types
  */
-function mapServerErrorToGerman(errorMessage: string): string {
+export function mapServerErrorToGerman(errorMessage: string): string {
+  // Activity capacity exceeded (409)
+  if (errorMessage.includes('ACTIVITY_CAPACITY_EXCEEDED')) {
+    return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
+  }
+
+  // Room capacity exceeded (409)
+  if (
+    errorMessage.includes('capacity exceeded') ||
+    errorMessage.includes('ROOM_CAPACITY_EXCEEDED')
+  ) {
+    return 'Raum ist voll. Kein Platz mehr verfügbar.';
+  }
+
   // API-Key Fehler
   if (errorMessage.includes('invalid device API key')) {
     return 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.';
@@ -41,6 +98,15 @@ function mapServerErrorToGerman(errorMessage: string): string {
     return 'Konto gesperrt. Bitte später erneut versuchen.';
   }
 
+  // RFID/Student nicht gefunden (404)
+  if (
+    errorMessage.includes('404') ||
+    errorMessage.includes('not found') ||
+    errorMessage.includes('Not Found')
+  ) {
+    return 'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.';
+  }
+
   // Server-Fehler
   if (
     errorMessage.includes('500') ||
@@ -54,10 +120,182 @@ function mapServerErrorToGerman(errorMessage: string): string {
   return errorMessage;
 }
 
+/** Type guard to check if value is a string or number */
+function isStringOrNumber(value: unknown): value is string | number {
+  return typeof value === 'string' || typeof value === 'number';
+}
+
+/**
+ * Format activity capacity error message from details
+ */
+function formatActivityCapacityError(details: Record<string, unknown>): string {
+  const activityName = details.activity_name;
+  const currentParticipants = details.current_participants;
+  const maxParticipants = details.max_participants;
+
+  if (isStringOrNumber(activityName) && isStringOrNumber(maxParticipants)) {
+    const current = isStringOrNumber(currentParticipants) ? currentParticipants : maxParticipants;
+    return `${activityName} ist voll (${current}/${maxParticipants} Teilnehmer).`;
+  }
+  return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
+}
+
+/**
+ * Format room capacity error message from details
+ */
+function formatRoomCapacityError(details: Record<string, unknown>): string {
+  const roomName = details.room_name;
+  const currentOccupancy = details.current_occupancy;
+  const maxCapacity = details.max_capacity;
+
+  if (isStringOrNumber(roomName) && isStringOrNumber(maxCapacity)) {
+    const current = isStringOrNumber(currentOccupancy) ? currentOccupancy : maxCapacity;
+    return `${roomName} ist voll (${current}/${maxCapacity} Plätze belegt).`;
+  }
+  return 'Raum ist voll. Kein Platz mehr verfügbar.';
+}
+
+/**
+ * Map API errors to German user-friendly messages with rich details support
+ * Handles structured error responses (e.g., capacity errors with room/activity details)
+ */
+export function mapApiErrorToGerman(error: unknown): string {
+  // Handle non-ApiError cases first
+  if (!(error instanceof ApiError)) {
+    const message = error instanceof Error ? error.message : String(error);
+    return mapServerErrorToGerman(message);
+  }
+
+  // Activity capacity exceeded
+  if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED' && error.details) {
+    return formatActivityCapacityError(error.details);
+  }
+
+  // Room capacity exceeded
+  if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
+    return formatRoomCapacityError(error.details);
+  }
+
+  // Fall back to message-based mapping
+  return mapServerErrorToGerman(error.message);
+}
+
+/**
+ * Patterns that indicate a network-related error
+ * Includes both English (technical) and German (translated) patterns
+ */
+const NETWORK_ERROR_PATTERNS = [
+  'network',
+  'netzwerk',
+  'failed to fetch',
+  'fetch',
+  'networkerror',
+  'timeout',
+  'timed out',
+  'connection',
+  'verbindung',
+  'offline',
+];
+
+/**
+ * Check if an error (object or message) indicates a network-level error
+ * Checks navigator.onLine first, then pattern-matches the error message
+ */
+export function isNetworkRelatedError(error: unknown): boolean {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return NETWORK_ERROR_PATTERNS.some(pattern => message.includes(pattern));
+}
+
+/**
+ * Map attendance-specific errors to German user-friendly messages
+ * Provides context-aware error messages for attendance operations
+ */
+function mapAttendanceErrorToGerman(
+  errorMessage: string,
+  context: 'status' | 'toggle' | 'feedback'
+): string {
+  // Network errors - use consolidated handler
+  if (isNetworkRelatedError(errorMessage)) {
+    return 'Netzwerkfehler. Bitte Verbindung prüfen.';
+  }
+
+  // 404 errors - context-specific messages
+  if (errorMessage.includes('404')) {
+    switch (context) {
+      case 'status':
+        return 'Schüler nicht gefunden oder keine Anwesenheitsdaten für heute verfügbar.';
+      case 'toggle':
+        return 'Schüler nicht gefunden. RFID-Tag möglicherweise nicht zugewiesen.';
+      case 'feedback':
+        return 'Feedback-Service nicht erreichbar. Bitte später versuchen.';
+    }
+  }
+
+  // 403 errors - permission denied
+  if (errorMessage.includes('403')) {
+    switch (context) {
+      case 'status':
+        return 'Keine Berechtigung für Anwesenheitsstatus dieses Schülers.';
+      case 'toggle':
+        return 'Keine Berechtigung für An-/Abmeldung dieses Schülers.';
+      case 'feedback':
+        return 'Keine Berechtigung für Feedback-Übermittlung.';
+    }
+  }
+
+  // 401 errors - authentication issues
+  if (errorMessage.includes('401')) {
+    return 'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.';
+  }
+
+  // 400 errors - bad request
+  if (errorMessage.includes('400')) {
+    return 'Ungültige Anfrage. Bitte Eingaben prüfen.';
+  }
+
+  // Fallback - use generic mapper (handles 5xx errors and other cases)
+  return mapServerErrorToGerman(errorMessage);
+}
+
 // Environment configuration - will be loaded at runtime
 let API_BASE_URL = '';
 let DEVICE_API_KEY = '';
 let isInitialized = false;
+
+// Network status callback - set by the app to receive status updates from API calls
+type NetworkStatusCallback = (quality: 'online' | 'poor' | 'offline', responseTime: number) => void;
+let networkStatusCallback: NetworkStatusCallback | null = null;
+
+const POOR_THRESHOLD_MS = 1000;
+
+/**
+ * Register a callback to receive network status updates from API calls
+ */
+export function setNetworkStatusCallback(callback: NetworkStatusCallback | null): void {
+  networkStatusCallback = callback;
+}
+
+/**
+ * Report network status based on API call result
+ */
+function reportNetworkStatus(responseTime: number, success: boolean): void {
+  if (!networkStatusCallback) {
+    logger.debug('Network status callback not registered, skipping update');
+    return;
+  }
+
+  let quality: 'online' | 'poor' | 'offline';
+  if (success) {
+    quality = responseTime > POOR_THRESHOLD_MS ? 'poor' : 'online';
+  } else {
+    quality = 'offline';
+  }
+  logger.debug('Reporting network status', { quality, responseTime, success });
+
+  networkStatusCallback(quality, responseTime);
+}
 
 /**
  * Initialize API configuration from Tauri backend
@@ -104,6 +342,59 @@ async function ensureInitialized(): Promise<void> {
 }
 
 /**
+ * Handle network-level fetch errors and convert to user-friendly German messages
+ * Extracted to reduce cognitive complexity in apiCall
+ */
+function handleNetworkError(error: unknown, endpoint: string, startTime: number): never {
+  const errorObj = error instanceof Error ? error : new Error(String(error));
+  const responseTime = Date.now() - startTime;
+
+  logger.warn('Network error', {
+    endpoint,
+    responseTime,
+    errorName: errorObj.name,
+    errorMessage: errorObj.message,
+  });
+
+  reportNetworkStatus(responseTime, false);
+
+  // Map error types to German messages
+  if (errorObj.name === 'TypeError' && errorObj.message.includes('fetch')) {
+    throw new Error('Keine Netzwerkverbindung. Bitte WLAN prüfen.');
+  }
+  if (errorObj.name === 'AbortError') {
+    throw new Error('Zeitüberschreitung. Server antwortet nicht.');
+  }
+  if (errorObj.message.includes('NetworkError') || errorObj.message.includes('network')) {
+    throw new Error('Netzwerkfehler. Bitte Verbindung prüfen.');
+  }
+  throw new Error('Verbindungsfehler. Bitte Netzwerkverbindung prüfen.');
+}
+
+/**
+ * Parse error response body and extract structured error data
+ * Extracted to reduce cognitive complexity in apiCall
+ */
+async function parseErrorResponse(
+  response: Response,
+  baseMessage: string
+): Promise<{ message: string; code?: string; details?: ApiErrorResponse['details'] }> {
+  try {
+    const errorData = (await response.json()) as ApiErrorResponse;
+    // Extract error detail from response - check message first, then error field
+    const errorDetail = errorData.message ?? (errorData as { error?: string }).error;
+    const message = errorDetail ? `${baseMessage}: ${errorDetail}` : baseMessage;
+    return { message, code: errorData.code, details: errorData.details };
+  } catch {
+    // JSON parsing failed, use base message
+    return { message: baseMessage };
+  }
+}
+
+/** Endpoints that should always be logged for debugging */
+const ALWAYS_LOG_ENDPOINTS = new Set(['/api/iot/ping', '/api/iot/checkin']);
+
+/**
  * Generic API call function with error handling and response timing
  */
 async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -132,72 +423,38 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
       },
     });
   } catch (error) {
-    // Network-level errors (before server response)
-    const errorObj = error instanceof Error ? error : new Error(String(error));
-
-    // Log network error with timing
-    const responseTime = Date.now() - startTime;
-    logger.warn('Network error', {
-      endpoint,
-      responseTime,
-      errorName: errorObj.name,
-      errorMessage: errorObj.message,
-    });
-
-    // Differentiate network error types
-    if (errorObj.name === 'TypeError' && errorObj.message.includes('fetch')) {
-      throw new Error('Keine Netzwerkverbindung. Bitte WLAN prüfen.');
-    } else if (errorObj.name === 'AbortError') {
-      throw new Error('Zeitüberschreitung. Server antwortet nicht.');
-    } else if (errorObj.message.includes('NetworkError') || errorObj.message.includes('network')) {
-      throw new Error('Netzwerkfehler. Bitte Verbindung prüfen.');
-    } else {
-      throw new Error('Verbindungsfehler. Bitte Netzwerkverbindung prüfen.');
-    }
+    handleNetworkError(error, endpoint, startTime);
   }
 
   const responseTime = Date.now() - startTime;
 
   if (!response.ok) {
-    // Try to get error details from response body
-    let errorMessage = `API Error: ${response.status} - ${response.statusText}`;
-    let detailMessage = '';
-    try {
-      const errorData = (await response.json()) as { message?: string; error?: string };
-      if (errorData.message) {
-        detailMessage = errorData.message;
-      } else if (errorData.error) {
-        detailMessage = errorData.error;
-      }
-    } catch {
-      // If JSON parsing fails, use the default error message
-    }
+    const baseMessage = `API Error: ${response.status} - ${response.statusText}`;
+    const { message, code, details } = await parseErrorResponse(response, baseMessage);
 
-    // Include both status code and detail message for better error handling
-    if (detailMessage) {
-      errorMessage = `${errorMessage}: ${detailMessage}`;
-    }
-
-    // Log failed request with timing
     logger.warn('API request failed', {
       endpoint,
       status: response.status,
       responseTime,
-      error: errorMessage,
+      error: message,
+      errorCode: code,
+      errorDetails: details,
     });
 
-    throw new Error(errorMessage);
+    throw new ApiError(message, response.status, code, details);
   }
 
-  // Log successful request timing for critical endpoints
-  if (endpoint === '/api/iot/ping' || endpoint === '/api/iot/checkin' || responseTime > 1000) {
+  // Log successful request timing for critical endpoints or slow responses
+  if (ALWAYS_LOG_ENDPOINTS.has(endpoint) || responseTime > 1000) {
     logger.info('API request completed', {
       endpoint,
       status: response.status,
       responseTime,
-      quality: responseTime < 500 ? 'excellent' : responseTime < 1000 ? 'good' : 'poor',
+      quality: responseTime < POOR_THRESHOLD_MS ? 'online' : 'poor',
     });
   }
+
+  reportNetworkStatus(responseTime, true);
 
   return response.json() as Promise<T>;
 }
@@ -488,11 +745,17 @@ export const api = {
   /**
    * Device health check (unauthenticated)
    * Endpoint: GET /health
+   * Note: Returns plain text "OK", not JSON, so we don't use apiCall
    */
   async healthCheck(): Promise<void> {
-    await apiCall('/health', {
+    const response = await fetch(`${API_BASE_URL}/health`, {
       method: 'GET',
     });
+
+    if (!response.ok) {
+      throw new Error(`Health check failed: ${response.status}`);
+    }
+    // Response is plain text "OK", not JSON - no parsing needed
   },
 
   /**
@@ -519,7 +782,9 @@ export const api = {
       params.append('capacity', capacity.toString());
     }
 
-    const endpoint = `/api/iot/rooms/available${params.toString() ? `?${params.toString()}` : ''}`;
+    const queryString = params.toString();
+    const queryPart = queryString ? `?${queryString}` : '';
+    const endpoint = `/api/iot/rooms/available${queryPart}`;
 
     const response = await apiCall<RoomsResponse>(endpoint, {
       headers: {
@@ -882,13 +1147,7 @@ export const api = {
       return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('404')) {
-        throw new Error('Schüler nicht gefunden oder keine Anwesenheitsdaten verfügbar');
-      }
-      if (errorMessage.includes('403')) {
-        throw new Error('Keine Berechtigung für diesen Schüler');
-      }
-      throw error;
+      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'status'));
     }
   },
 
@@ -899,31 +1158,33 @@ export const api = {
   async toggleAttendance(
     pin: string,
     rfid: string,
-    action: 'confirm' | 'cancel'
+    action: 'confirm' | 'cancel' | 'confirm_daily_checkout',
+    destination?: 'zuhause' | 'unterwegs'
   ): Promise<AttendanceToggleResponse> {
     try {
+      const body: { rfid: string; action: string; destination?: string } = {
+        rfid,
+        action,
+      };
+
+      // Add destination for confirm_daily_checkout action
+      if (action === 'confirm_daily_checkout' && destination) {
+        body.destination = destination;
+      }
+
       const response = await apiCall<AttendanceToggleResponse>('/api/iot/attendance/toggle', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${DEVICE_API_KEY}`,
           'X-Staff-PIN': pin,
         },
-        body: JSON.stringify({
-          rfid,
-          action,
-        }),
+        body: JSON.stringify(body),
       });
 
       return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('404')) {
-        throw new Error('Schüler nicht gefunden');
-      }
-      if (errorMessage.includes('403')) {
-        throw new Error('Keine Berechtigung für diesen Schüler');
-      }
-      throw error;
+      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'toggle'));
     }
   },
 
@@ -948,13 +1209,7 @@ export const api = {
       return response;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('404')) {
-        throw new Error('Feedback-Service nicht verfügbar');
-      }
-      if (errorMessage.includes('403')) {
-        throw new Error('Keine Berechtigung für Feedback-Übermittlung');
-      }
-      throw error;
+      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'feedback'));
     }
   },
 };
@@ -984,12 +1239,6 @@ export interface TagAssignmentCheck {
     name: string;
     group: string;
   };
-  /** @deprecated Use person instead */
-  student?: {
-    id: number;
-    name: string;
-    group: string;
-  };
 }
 
 /**
@@ -1008,9 +1257,16 @@ export interface TagAssignmentResult {
  * RFID scan result from POST /api/iot/checkin
  */
 export interface RfidScanResult {
-  student_id: number;
+  student_id: number | null;
   student_name: string;
-  action: 'checked_in' | 'checked_out' | 'transferred' | 'supervisor_authenticated';
+  action:
+    | 'checked_in'
+    | 'checked_out'
+    | 'pending_daily_checkout'
+    | 'transferred'
+    | 'supervisor_authenticated'
+    | 'error'
+    | 'already_in';
   greeting?: string;
   visit_id?: number;
   room_name?: string;
@@ -1018,6 +1274,12 @@ export interface RfidScanResult {
   processed_at?: string;
   message?: string;
   status?: string;
+  /** Indicates this result should be displayed as an error state */
+  showAsError?: boolean;
+  /** Indicates this result is informational (not a scan result) */
+  isInfo?: boolean;
+  /** The RFID tag that was scanned (added by frontend, not from server) */
+  scannedTagId?: string;
 }
 
 /**
@@ -1045,14 +1307,6 @@ export interface AttendanceStatusResponse {
     };
   };
   message: string;
-}
-
-/**
- * Attendance toggle request for POST /api/iot/attendance/toggle
- */
-export interface AttendanceToggleRequest {
-  rfid: string;
-  action: 'confirm' | 'cancel';
 }
 
 /**
@@ -1112,11 +1366,3 @@ export interface DailyFeedbackResponse {
     created_at: string; // ISO 8601
   };
 }
-
-/**
- * Configuration utilities
- */
-export const config = {
-  getApiBaseUrl: (): string => API_BASE_URL,
-  getDeviceApiKey: (): string => DEVICE_API_KEY,
-};

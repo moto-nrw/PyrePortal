@@ -67,63 +67,13 @@ interface SessionSettings {
 }
 ```
 
-### studentCache.ts
+### studentCache.ts (entfernt)
 
-**Purpose**: Cache student data for offline operation and instant RFID responses
+Die frühere Offline-Studenten-Cache-Implementierung wurde entfernt. Live-RFID-Scans arbeiten ausschließlich server-first; es gibt keinen lokalen Cache oder Persistenzpfad mehr. Sollte künftig wieder ein Offline-Feature benötigt werden, müsste der Cache neu eingeführt oder serverseitig unterstützt werden.
 
-**Key Functions**:
+### syncQueue.ts (entfernt)
 
-- `getCachedStudentData(tagId)` - Get cached student by RFID tag
-- `cacheStudentData(tagId, student)` - Cache student data
-- `clearStudentCache()` - Clear all cached data
-
-**Cache Strategy**:
-
-- Daily cache invalidation (new JSON file per day)
-- Stores: student ID, name, last action, last scan time, tag ID
-- Location: Platform-specific app data directory
-
-**Usage**:
-
-```typescript
-// Check cache first (instant)
-const cached = getCachedStudentData(tagId);
-if (cached) {
-  // Show UI immediately with cached data
-  showResult(cached);
-
-  // Background sync with server
-  void syncWithServer(tagId);
-}
-```
-
-### syncQueue.ts
-
-**Purpose**: Queue failed operations for retry when network returns
-
-**Key Exports**:
-
-- `queueFailedScan(tagId, action, roomId, pin)` - Queue failed RFID scan
-- `processQueue()` - Process all queued operations
-- `getSyncQueueStatus()` - Get queue stats
-
-**Retry Strategy**:
-
-- Exponential backoff: 1s, 2s, 4s, 8s, 16s
-- Max retries: 5
-- Auto-retry on network quality improvement
-
-**Usage in Hook**:
-
-```typescript
-try {
-  const result = await api.processRfidScan(...);
-} catch (error) {
-  // Queue for retry
-  const operationId = queueFailedScan(tagId, 'checkin', roomId, pin);
-  logger.info('Scan queued', { operationId });
-}
-```
+Die Offline-Retry-Queue wurde entfernt, da sie nie vollständig implementiert wurde. Der Timer lief, aber `queueFailedScan` wurde nirgends aufgerufen. Sollte ein Offline-Feature benötigt werden, muss es neu implementiert werden.
 
 ## Service Layer Patterns
 
@@ -154,15 +104,7 @@ try {
 
 ### Logging
 
-All services use logger:
-
-```typescript
-import { createLogger } from '../utils/logger';
-const logger = createLogger('ServiceName');
-
-logger.info('Operation started', { context });
-logger.error('Operation failed', { error });
-```
+All services use `createLogger()` - see root `CLAUDE.md` → "Three-Layer Logging System" for details.
 
 ### Tauri IPC Wrapper
 
@@ -198,11 +140,12 @@ interface NewDataResponse {
 export const api = {
   // ... existing methods
 
-  async getNewData(pin: string): Promise<NewDataType[]> {
+  async getNewData(pin: string, staffId?: number): Promise<NewDataType[]> {
     const response = await apiCall<NewDataResponse>('/api/new-endpoint', {
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
         'X-Staff-PIN': pin,
+        ...(staffId != null && { 'X-Staff-ID': staffId.toString() }),
       },
     });
     return response.data;
@@ -212,18 +155,7 @@ export const api = {
 
 ### Tauri IPC Service Template
 
-```typescript
-// 1. Define Rust command in src-tauri/src/lib.rs
-#[tauri::command]
-fn do_something(param: String) -> Result<ReturnType, String> {
-  // Implementation
-}
-
-// 2. Add to frontend service
-export async function doSomething(param: string): Promise<ReturnType> {
-  return await safeInvoke<ReturnType>('do_something', { param });
-}
-```
+For Rust command definitions, see `src-tauri/CLAUDE.md`. Frontend services call Rust via `safeInvoke` (see pattern above).
 
 ## Network Quality Tracking
 
@@ -247,11 +179,10 @@ Used by `useNetworkStatus` hook for UI indicator.
 
 ## Performance Considerations
 
-### Caching
+### Server-First
 
-- Always check cache before API call (instant UI)
-- Background sync to keep cache fresh
-- Daily cache invalidation (prevent stale data)
+- No local student cache for RFID scans; API is the source of truth
+- Use the sync queue to retry failed operations when the network recovers
 
 ### Deduplication
 

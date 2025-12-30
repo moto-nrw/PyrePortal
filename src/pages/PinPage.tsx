@@ -1,12 +1,68 @@
+import { faDeleteLeft } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal } from '../components/ui';
+import BackButton from '../components/ui/BackButton';
 import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+
+/**
+ * Custom numpad button component - Phoenix Clean Style
+ * Defined outside PinPage to avoid recreation on each render
+ */
+interface NumpadButtonProps {
+  readonly onClick: () => void;
+  readonly isAction?: boolean;
+  readonly children: React.ReactNode;
+}
+
+function NumpadButton({ onClick, isAction = false, children }: NumpadButtonProps) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: '100%',
+        height: '95px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: isAction ? '#F9FAFB' : '#FFFFFF',
+        border: isAction ? '3px solid #D1D5DB' : '3px solid #E5E7EB',
+        borderRadius: '24px',
+        fontSize: isAction ? '42px' : '50px',
+        fontWeight: 700,
+        color: isAction ? '#6B7280' : '#111827',
+        cursor: 'pointer',
+        transition: 'all 150ms ease-out',
+        outline: 'none',
+        WebkitTapHighlightColor: 'transparent',
+        touchAction: 'manipulation',
+        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.1)',
+      }}
+      onTouchStart={e => {
+        e.currentTarget.style.transform = 'scale(0.95)';
+        e.currentTarget.style.backgroundColor = isAction ? '#F3F4F6' : '#F9FAFB';
+        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
+      }}
+      onTouchEnd={e => {
+        setTimeout(() => {
+          if (e.currentTarget) {
+            e.currentTarget.style.transform = 'scale(1)';
+            e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
+            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
+          }
+        }, 100);
+      }}
+    >
+      {children}
+    </button>
+  );
+}
 
 function PinPage() {
   const { setAuthenticatedUser } = useUserStore();
@@ -28,8 +84,9 @@ function PinPage() {
     };
   }, [logger]);
 
-  // Maximum PIN length
+  // Maximum PIN length and stable dot identifiers for React keys
   const maxPinLength = 4;
+  const pinDotIds = ['dot-1', 'dot-2', 'dot-3', 'dot-4'] as const;
 
   // Auto-submit when PIN is complete
   useEffect(() => {
@@ -187,54 +244,6 @@ function PinPage() {
     }
   };
 
-  // Custom numpad button component - Phoenix Clean Style
-  const NumpadButton: React.FC<{
-    onClick: () => void;
-    isAction?: boolean;
-    children: React.ReactNode;
-  }> = ({ onClick, isAction = false, children }) => {
-    return (
-      <button
-        onClick={onClick}
-        style={{
-          width: '100%',
-          height: '95px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: isAction ? '#F9FAFB' : '#FFFFFF',
-          border: isAction ? '3px solid #D1D5DB' : '3px solid #E5E7EB',
-          borderRadius: '24px',
-          fontSize: isAction ? '42px' : '50px',
-          fontWeight: 700,
-          color: isAction ? '#6B7280' : '#111827',
-          cursor: 'pointer',
-          transition: 'all 150ms ease-out',
-          outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
-          touchAction: 'manipulation',
-          boxShadow: '0 3px 8px rgba(0, 0, 0, 0.1)',
-        }}
-        onTouchStart={e => {
-          e.currentTarget.style.transform = 'scale(0.95)';
-          e.currentTarget.style.backgroundColor = isAction ? '#F3F4F6' : '#F9FAFB';
-          e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
-        }}
-        onTouchEnd={e => {
-          setTimeout(() => {
-            if (e.currentTarget) {
-              e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
-              e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-            }
-          }, 100);
-        }}
-      >
-        {children}
-      </button>
-    );
-  };
-
   return (
     <BackgroundWrapper>
       {/* Back button - positioned at top-left of viewport */}
@@ -246,66 +255,7 @@ function PinPage() {
           zIndex: 50,
         }}
       >
-        <button
-          type="button"
-          onClick={handleBack}
-          style={{
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '10px',
-            padding: '0 28px',
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            border: '1px solid rgba(0, 0, 0, 0.1)',
-            borderRadius: '28px',
-            cursor: 'pointer',
-            transition: 'all 200ms',
-            outline: 'none',
-            WebkitTapHighlightColor: 'transparent',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            position: 'relative',
-            overflow: 'hidden',
-            backdropFilter: 'blur(8px)',
-          }}
-          onTouchStart={e => {
-            e.currentTarget.style.transform = 'scale(0.95)';
-            e.currentTarget.style.backgroundColor = 'rgba(249, 250, 251, 0.95)';
-            e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.2)';
-          }}
-          onTouchEnd={e => {
-            setTimeout(() => {
-              if (e.currentTarget) {
-                e.currentTarget.style.transform = 'scale(1)';
-                e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.9)';
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-              }
-            }, 150);
-          }}
-        >
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#374151"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M19 12H5" />
-            <path d="M12 19l-7-7 7-7" />
-          </svg>
-          <span
-            style={{
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#374151',
-            }}
-          >
-            Zurück
-          </span>
-        </button>
+        <BackButton onClick={handleBack} />
       </div>
 
       <div className="flex min-h-screen items-center justify-center">
@@ -362,9 +312,9 @@ function PinPage() {
                 margin: '0 auto 12px auto',
               }}
             >
-              {Array.from({ length: maxPinLength }).map((_, i) => (
+              {pinDotIds.map((dotId, i) => (
                 <div
-                  key={i}
+                  key={dotId}
                   style={{
                     width: '24px',
                     height: '24px',
@@ -401,8 +351,8 @@ function PinPage() {
 
               <NumpadButton onClick={() => handleNumpadClick(0)}>0</NumpadButton>
 
-              <NumpadButton onClick={handleDelete} isAction>
-                ⌫
+              <NumpadButton onClick={handleDelete} isAction aria-label="Delete last digit">
+                <FontAwesomeIcon icon={faDeleteLeft} />
               </NumpadButton>
             </div>
 

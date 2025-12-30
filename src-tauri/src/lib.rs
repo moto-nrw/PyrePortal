@@ -2,7 +2,6 @@
 mod logging;
 mod rfid;
 mod session_storage;
-mod student_cache;
 
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -32,17 +31,17 @@ fn get_api_config() -> Result<ApiConfig, String> {
 }
 
 #[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
 fn restart_app() {
     // Exit with code 0 - Balena's restart: always policy will restart the container
     // On macOS/dev mode, the app simply exits
     std::process::exit(0);
 }
 
+/// Initializes and runs the Tauri application.
+///
+/// # Panics
+///
+/// Panics if the Tauri application fails to start (e.g., window creation fails).
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Load environment variables from .env file
@@ -58,7 +57,6 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_api_config,
-            greet,
             restart_app,
             logging::write_log,
             logging::get_log_files,
@@ -74,12 +72,7 @@ pub fn run() {
             rfid::scan_rfid_with_timeout,
             session_storage::save_session_settings,
             session_storage::load_session_settings,
-            session_storage::clear_last_session,
-            student_cache::load_student_cache,
-            student_cache::save_student_cache,
-            student_cache::clear_student_cache,
-            student_cache::cleanup_old_student_caches,
-            student_cache::get_cache_stats
+            session_storage::clear_last_session
         ])
         .setup(move |app| {
             // Create the main window with dynamic fullscreen setting

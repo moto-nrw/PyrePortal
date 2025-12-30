@@ -5,16 +5,121 @@ import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
-import { ErrorModal } from '../components/ui';
-import { api, type SessionStartRequest } from '../services/api';
-import { useUserStore } from '../store/userStore';
+import { ErrorModal, ModalBase } from '../components/ui';
+import {
+  api,
+  mapServerErrorToGerman,
+  type SessionStartRequest,
+  type CurrentSession,
+} from '../services/api';
+import type { SessionSettings } from '../services/sessionStorage';
+import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { logNavigation, logUserAction } from '../utils/logger';
 
-/**
- * Home View Page - Modern tablet-optimized dashboard
- * Displays after successful PIN validation
- */
+// ============================================================================
+// Pure helper functions (moved outside component to reduce cognitive complexity)
+// ============================================================================
+
+/** Format session recreation error message for display */
+function formatRecreationError(error: unknown): string {
+  const rawMessage = error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
+  return isNetworkRelatedError(error)
+    ? 'Netzwerkfehler beim Starten der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
+    : mapServerErrorToGerman(rawMessage);
+}
+
+/** Get appropriate activity icon based on session state */
+function getActivityIcon(
+  currentSession: CurrentSession | null,
+  sessionSettings: SessionSettings | null
+): React.ReactNode {
+  if (currentSession) {
+    return (
+      <svg width="52" height="52" viewBox="0 0 24 24" fill="#83cd2d" stroke="none">
+        <path d="M8 5v14l11-7z" />
+      </svg>
+    );
+  }
+  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
+    return (
+      <svg
+        width="52"
+        height="52"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="#83cd2d"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+        <path d="M21 3v5h-5" />
+        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+        <path d="M3 21v-5h5" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#83cd2d" strokeWidth="2.5">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="16" />
+      <line x1="8" y1="12" x2="16" y2="12" />
+    </svg>
+  );
+}
+
+/** Get activity heading text based on session state */
+function getActivityHeading(
+  currentSession: CurrentSession | null,
+  sessionSettings: SessionSettings | null
+): string {
+  if (currentSession) {
+    return currentSession.activity_name ?? 'Aktivität';
+  }
+  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
+    return 'Aktivität wiederholen';
+  }
+  return 'Neue Aktivität';
+}
+
+/** Get activity subtitle text based on session state */
+function getActivitySubtitle(
+  currentSession: CurrentSession | null,
+  sessionSettings: SessionSettings | null
+): string {
+  if (currentSession) {
+    return 'Fortsetzen';
+  }
+  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
+    return sessionSettings.last_session.activity_name;
+  }
+  return 'Starten';
+}
+
+/** Get supervisor count label for saved session display */
+function getSupervisorCountLabel(
+  sessionSettings: SessionSettings | null,
+  selectedSupervisorsCount: number
+): string {
+  if (!sessionSettings?.last_session) {
+    return '';
+  }
+  const savedCount = sessionSettings.last_session.supervisor_names.length;
+
+  if (selectedSupervisorsCount > 0 && selectedSupervisorsCount !== savedCount) {
+    return `${selectedSupervisorsCount} Betreuer (gespeichert: ${savedCount})`;
+  }
+  if (selectedSupervisorsCount > 0) {
+    return `${selectedSupervisorsCount} Betreuer`;
+  }
+  return `${savedCount} Betreuer`;
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
 function HomeViewPage() {
   const {
     authenticatedUser,
@@ -36,23 +141,31 @@ function HomeViewPage() {
   // Check if supervisors are selected
   const hasSupervisors = selectedSupervisors.length > 0;
 
+  // Helper to end the current session
+  const endCurrentSession = async () => {
+    logUserAction('Ending current session');
+    try {
+      await api.endSession(authenticatedUser!.pin);
+      await fetchCurrentSession();
+      logUserAction('Session ended successfully');
+    } catch (error) {
+      logUserAction('Failed to end session', { error });
+    }
+  };
+
+  // Helper to perform user logout
+  const performLogout = async () => {
+    logUserAction('User logout initiated');
+    await logout();
+    logNavigation('Home View', '/');
+    void navigate('/');
+  };
+
   const handleLogout = async () => {
     if (currentSession) {
-      // End the current session
-      logUserAction('Ending current session');
-      try {
-        await api.endSession(authenticatedUser!.pin);
-        await fetchCurrentSession(); // Refresh session state
-        logUserAction('Session ended successfully');
-      } catch (error) {
-        logUserAction('Failed to end session', { error });
-      }
+      await endCurrentSession();
     } else {
-      // Logout and redirect to landing page
-      logUserAction('User logout initiated');
-      await logout();
-      logNavigation('Home View', '/');
-      void navigate('/');
+      await performLogout();
     }
   };
 
@@ -69,18 +182,31 @@ function HomeViewPage() {
     void navigate('/tag-assignment');
   };
 
-  const handleStartActivity = async () => {
-    // Check if we should recreate last session
-    if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-      logUserAction('Attempting to recreate last session');
-      const success = await validateAndRecreateSession();
+  // Helper to handle last session recreation attempt
+  const attemptSessionRecreation = async () => {
+    logUserAction('Attempting to recreate last session');
+    const success = await validateAndRecreateSession();
 
-      if (success) {
-        // Show confirmation modal with session details
-        setShowConfirmModal(true);
-      }
+    if (success) {
+      setShowConfirmModal(true);
+      return;
+    }
+
+    const latestError =
+      useUserStore.getState().error ??
+      'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.';
+    setErrorMessage(latestError);
+    setShowErrorModal(true);
+    setShowConfirmModal(false);
+  };
+
+  const handleStartActivity = async () => {
+    const shouldRecreateLastSession =
+      sessionSettings?.use_last_session && sessionSettings.last_session;
+
+    if (shouldRecreateLastSession) {
+      await attemptSessionRecreation();
     } else {
-      // Normal flow
       logNavigation('Home View', '/activity-selection');
       void navigate('/activity-selection');
     }
@@ -101,26 +227,33 @@ function HomeViewPage() {
     void navigate('/team-management');
   };
 
+  // Helper to show error and close confirm modal
+  const showRecreationError = (message: string) => {
+    setErrorMessage(message);
+    setShowErrorModal(true);
+    setShowConfirmModal(false);
+  };
+
   const handleConfirmRecreation = async () => {
     if (!authenticatedUser || !sessionSettings?.last_session) return;
 
+    const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
+
+    // Validate session data is complete
+    if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
+      showRecreationError(
+        'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.'
+      );
+      return;
+    }
+
+    logUserAction('Confirming session recreation', {
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+      supervisorCount: selectedSupervisors.length,
+    });
+
     try {
-      const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
-
-      if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
-        setErrorMessage('Fehler bei der Validierung der gespeicherten Sitzung');
-        setShowErrorModal(true);
-        setShowConfirmModal(false);
-        return;
-      }
-
-      logUserAction('Confirming session recreation', {
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-        supervisorCount: selectedSupervisors.length,
-      });
-
-      // Start the session
       const sessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id,
@@ -133,19 +266,13 @@ function HomeViewPage() {
         sessionId: sessionResponse.active_group_id,
       });
 
-      // Save the new session data
       await useUserStore.getState().saveLastSessionData();
-
-      // Fetch current session to update state
       await fetchCurrentSession();
 
-      // Navigate to NFC scanning
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
-      setErrorMessage(errorMsg);
-      setShowErrorModal(true);
+      showRecreationError(formatRecreationError(error));
     } finally {
       setShowConfirmModal(false);
     }
@@ -189,19 +316,19 @@ function HomeViewPage() {
             type="button"
             onClick={handleTagAssignment}
             style={{
-              height: '56px',
+              height: '68px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
-              padding: '0 28px',
+              gap: '12px',
+              padding: '0 32px',
               backgroundColor: hasSupervisors
                 ? designSystem.glass.background
                 : 'rgba(255, 255, 255, 0.6)',
               border: hasSupervisors
                 ? '1px solid rgba(80, 128, 216, 0.2)'
                 : '1px solid rgba(156, 163, 175, 0.2)',
-              borderRadius: '28px',
+              borderRadius: '34px',
               cursor: hasSupervisors ? 'pointer' : 'not-allowed',
               transition: designSystem.transitions.base,
               outline: 'none',
@@ -234,12 +361,12 @@ function HomeViewPage() {
           >
             <FontAwesomeIcon
               icon={faWifi}
-              size="lg"
+              size="xl"
               style={{ color: hasSupervisors ? '#5080D8' : '#9CA3AF', transform: 'rotate(90deg)' }}
             />
             <span
               style={{
-                fontSize: '18px',
+                fontSize: '20px',
                 fontWeight: 600,
                 color: hasSupervisors ? '#5080D8' : '#9CA3AF',
               }}
@@ -262,15 +389,15 @@ function HomeViewPage() {
             type="button"
             onClick={handleLogout}
             style={{
-              height: '56px',
+              height: '68px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '10px',
-              padding: '0 28px',
+              gap: '12px',
+              padding: '0 32px',
               backgroundColor: designSystem.glass.background,
               border: '1px solid rgba(255, 49, 48, 0.2)',
-              borderRadius: '28px',
+              borderRadius: '34px',
               cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
@@ -295,8 +422,8 @@ function HomeViewPage() {
             }}
           >
             <svg
-              width="24"
-              height="24"
+              width="28"
+              height="28"
               viewBox="0 0 24 24"
               fill="none"
               stroke="#FF3130"
@@ -310,7 +437,7 @@ function HomeViewPage() {
             </svg>
             <span
               style={{
-                fontSize: '18px',
+                fontSize: '20px',
                 fontWeight: 600,
                 color: '#FF3130',
               }}
@@ -369,12 +496,12 @@ function HomeViewPage() {
                 style={{
                   backgroundColor: '#FFFFFF',
                   border: '2px solid #E5E7EB',
-                  borderRadius: '24px',
-                  padding: '32px',
+                  borderRadius: '28px',
+                  padding: '36px',
                   transition: 'all 300ms ease-out',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '280px',
+                  minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -393,8 +520,8 @@ function HomeViewPage() {
                 <div>
                   <div
                     style={{
-                      width: '80px',
-                      height: '80px',
+                      width: '88px',
+                      height: '88px',
                       backgroundColor: '#EFF9E5',
                       borderRadius: '50%',
                       display: 'flex',
@@ -403,73 +530,29 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    {currentSession ? (
-                      // Play/Continue Icon
-                      <svg width="48" height="48" viewBox="0 0 24 24" fill="#83cd2d" stroke="none">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    ) : sessionSettings?.use_last_session && sessionSettings.last_session ? (
-                      // Repeat/Replay Icon
-                      <svg
-                        width="48"
-                        height="48"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#83cd2d"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                        <path d="M21 3v5h-5" />
-                        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                        <path d="M3 21v-5h5" />
-                      </svg>
-                    ) : (
-                      // Plus Icon
-                      <svg
-                        width="48"
-                        height="48"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="#83cd2d"
-                        strokeWidth="2.5"
-                      >
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="16" />
-                        <line x1="8" y1="12" x2="16" y2="12" />
-                      </svg>
-                    )}
+                    {getActivityIcon(currentSession, sessionSettings)}
                   </div>
 
                   <h3
                     style={{
-                      fontSize: '24px',
+                      fontSize: '28px',
                       fontWeight: 700,
                       color: '#1F2937',
                       margin: '0 0 8px 0',
                       textAlign: 'center',
                     }}
                   >
-                    {currentSession
-                      ? (currentSession.activity_name ?? 'Aktivität')
-                      : sessionSettings?.use_last_session && sessionSettings.last_session
-                        ? 'Aktivität wiederholen'
-                        : 'Neue Aktivität'}
+                    {getActivityHeading(currentSession, sessionSettings)}
                   </h3>
                   <p
                     style={{
-                      fontSize: '16px',
+                      fontSize: '18px',
                       color: '#6B7280',
                       margin: 0,
                       textAlign: 'center',
                     }}
                   >
-                    {currentSession
-                      ? 'Fortsetzen'
-                      : sessionSettings?.use_last_session && sessionSettings.last_session
-                        ? sessionSettings.last_session.activity_name
-                        : 'Starten'}
+                    {getActivitySubtitle(currentSession, sessionSettings)}
                   </p>
 
                   {/* Show room and supervisor info for saved session */}
@@ -542,13 +625,7 @@ function HomeViewPage() {
                               <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                             </svg>
-                            {selectedSupervisors.length > 0 &&
-                            selectedSupervisors.length !==
-                              sessionSettings.last_session.supervisor_names.length
-                              ? `${selectedSupervisors.length} Betreuer (gespeichert: ${sessionSettings.last_session.supervisor_names.length})`
-                              : selectedSupervisors.length > 0
-                                ? `${selectedSupervisors.length} Betreuer`
-                                : `${sessionSettings.last_session.supervisor_names.length} Betreuer`}
+                            {getSupervisorCountLabel(sessionSettings, selectedSupervisors.length)}
                           </span>
                         </div>
                       </div>
@@ -564,13 +641,13 @@ function HomeViewPage() {
                 style={{
                   backgroundColor: '#FFFFFF',
                   border: '2px solid #E5E7EB',
-                  borderRadius: '24px',
-                  padding: '32px',
+                  borderRadius: '28px',
+                  padding: '36px',
                   cursor: 'pointer',
                   transition: 'all 300ms ease-out',
                   outline: 'none',
                   WebkitTapHighlightColor: 'transparent',
-                  minHeight: '280px',
+                  minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
@@ -587,8 +664,8 @@ function HomeViewPage() {
                 <div>
                   <div
                     style={{
-                      width: '80px',
-                      height: '80px',
+                      width: '88px',
+                      height: '88px',
                       backgroundColor: '#EDE9FE',
                       borderRadius: '50%',
                       display: 'flex',
@@ -598,8 +675,8 @@ function HomeViewPage() {
                     }}
                   >
                     <svg
-                      width="48"
-                      height="48"
+                      width="52"
+                      height="52"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke="#9333EA"
@@ -614,7 +691,7 @@ function HomeViewPage() {
 
                   <h3
                     style={{
-                      fontSize: '24px',
+                      fontSize: '28px',
                       fontWeight: 700,
                       color: '#1F2937',
                       margin: '0 0 8px 0',
@@ -625,7 +702,7 @@ function HomeViewPage() {
                   </h3>
                   <p
                     style={{
-                      fontSize: '16px',
+                      fontSize: '18px',
                       color: '#6B7280',
                       margin: 0,
                       textAlign: 'center',
@@ -669,184 +746,151 @@ function HomeViewPage() {
       />
 
       {/* Confirmation Modal for Recreation */}
-      {showConfirmModal && sessionSettings?.last_session && (
+      <ModalBase
+        isOpen={showConfirmModal && !!sessionSettings?.last_session}
+        onClose={() => setShowConfirmModal(false)}
+        size="sm"
+        backgroundColor="#FFFFFF"
+        closeOnBackdropClick={!isValidatingLastSession}
+      >
+        {/* Success Icon */}
         <div
           style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            width: '64px',
+            height: '64px',
+            background: 'linear-gradient(to right, #83CD2D, #70B525)',
+            borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 1000,
-            backdropFilter: 'blur(4px)',
-          }}
-          onClick={e => {
-            if (e.target === e.currentTarget) {
-              setShowConfirmModal(false);
-            }
+            margin: '0 auto 24px auto',
+            boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
           }}
         >
-          <div
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: designSystem.borderRadius.xl,
-              padding: '32px',
-              maxWidth: '480px',
-              width: '90%',
-              textAlign: 'center',
-              boxShadow:
-                '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              position: 'relative',
-              overflow: 'hidden',
-            }}
-          >
-            {/* Success Icon */}
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M5 12l5 5L20 7"
+              stroke="white"
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
+
+        {/* Title */}
+        <h2
+          style={{
+            fontSize: '24px',
+            fontWeight: 700,
+            color: '#1F2937',
+            marginBottom: '12px',
+          }}
+        >
+          Aktivität wiederholen?
+        </h2>
+
+        {/* Activity Details */}
+        {useUserStore.getState().selectedActivity && useUserStore.getState().selectedRoom && (
+          <div style={{ marginBottom: '24px' }}>
             <div
               style={{
-                width: '64px',
-                height: '64px',
-                background: 'linear-gradient(to right, #83CD2D, #70B525)',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                margin: '0 auto 24px auto',
-                boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
+                fontSize: '18px',
+                fontWeight: 600,
+                color: '#374151',
+                marginBottom: '16px',
               }}
             >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-                <path
-                  d="M5 12l5 5L20 7"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              {useUserStore.getState().selectedActivity?.name}
             </div>
 
-            {/* Title */}
-            <h2
+            <div
               style={{
-                fontSize: '24px',
-                fontWeight: 700,
-                color: '#1F2937',
-                marginBottom: '12px',
+                backgroundColor: '#F3F4F6',
+                borderRadius: designSystem.borderRadius.lg,
+                padding: '16px',
+                textAlign: 'left',
               }}
             >
-              Aktivität wiederholen?
-            </h2>
-
-            {/* Activity Details */}
-            {useUserStore.getState().selectedActivity && useUserStore.getState().selectedRoom && (
-              <div style={{ marginBottom: '24px' }}>
-                <div
+              <div style={{ marginBottom: '8px' }}>
+                <span style={{ color: '#6B7280', fontSize: '14px' }}>Raum:</span>
+                <span
                   style={{
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: '#374151',
-                    marginBottom: '16px',
+                    color: '#1F2937',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    marginLeft: '8px',
                   }}
                 >
-                  {useUserStore.getState().selectedActivity?.name}
-                </div>
-
-                <div
-                  style={{
-                    backgroundColor: '#F3F4F6',
-                    borderRadius: designSystem.borderRadius.lg,
-                    padding: '16px',
-                    textAlign: 'left',
-                  }}
-                >
-                  <div style={{ marginBottom: '8px' }}>
-                    <span style={{ color: '#6B7280', fontSize: '14px' }}>Raum:</span>
-                    <span
-                      style={{
-                        color: '#1F2937',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        marginLeft: '8px',
-                      }}
-                    >
-                      {useUserStore.getState().selectedRoom?.name}
-                    </span>
-                  </div>
-                  <div>
-                    <span style={{ color: '#6B7280', fontSize: '14px' }}>Betreuer:</span>
-                    <span
-                      style={{
-                        color: '#1F2937',
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        marginLeft: '8px',
-                      }}
-                    >
-                      {useUserStore
-                        .getState()
-                        .selectedSupervisors.map(s => s.name)
-                        .join(', ')}
-                    </span>
-                  </div>
-                </div>
+                  {useUserStore.getState().selectedRoom?.name}
+                </span>
               </div>
-            )}
-
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-              <button
-                onClick={() => setShowConfirmModal(false)}
-                style={{
-                  flex: 1,
-                  height: '48px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#6B7280',
-                  backgroundColor: 'transparent',
-                  border: '2px solid #E5E7EB',
-                  borderRadius: designSystem.borderRadius.lg,
-                  cursor: 'pointer',
-                  transition: 'all 200ms',
-                  outline: 'none',
-                }}
-              >
-                Abbrechen
-              </button>
-
-              <button
-                onClick={handleConfirmRecreation}
-                disabled={isValidatingLastSession}
-                style={{
-                  flex: 1,
-                  height: '48px',
-                  fontSize: '16px',
-                  fontWeight: 600,
-                  color: '#FFFFFF',
-                  background: isValidatingLastSession
-                    ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                    : 'linear-gradient(to right, #83CD2D, #70B525)',
-                  border: 'none',
-                  borderRadius: designSystem.borderRadius.lg,
-                  cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
-                  transition: 'all 200ms',
-                  outline: 'none',
-                  boxShadow: isValidatingLastSession
-                    ? 'none'
-                    : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
-                  opacity: isValidatingLastSession ? 0.6 : 1,
-                }}
-              >
-                {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
-              </button>
+              <div>
+                <span style={{ color: '#6B7280', fontSize: '14px' }}>Betreuer:</span>
+                <span
+                  style={{
+                    color: '#1F2937',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    marginLeft: '8px',
+                  }}
+                >
+                  {useUserStore
+                    .getState()
+                    .selectedSupervisors.map(s => s.name)
+                    .join(', ')}
+                </span>
+              </div>
             </div>
           </div>
+        )}
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={() => setShowConfirmModal(false)}
+            style={{
+              flex: 1,
+              height: '68px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#6B7280',
+              backgroundColor: 'transparent',
+              border: '2px solid #E5E7EB',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+            }}
+          >
+            Abbrechen
+          </button>
+
+          <button
+            onClick={handleConfirmRecreation}
+            disabled={isValidatingLastSession}
+            style={{
+              flex: 1,
+              height: '68px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#FFFFFF',
+              background: isValidatingLastSession
+                ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                : 'linear-gradient(to right, #83CD2D, #70B525)',
+              border: 'none',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              boxShadow: isValidatingLastSession ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
+              opacity: isValidatingLastSession ? 0.6 : 1,
+            }}
+          >
+            {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
+          </button>
         </div>
-      )}
+      </ModalBase>
     </BackgroundWrapper>
   );
 }

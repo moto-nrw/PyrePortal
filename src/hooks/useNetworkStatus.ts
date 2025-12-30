@@ -6,63 +6,37 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('useNetworkStatus');
 
-// Network quality thresholds (in milliseconds)
-const QUALITY_THRESHOLDS = {
-  excellent: 500, // < 500ms
-  good: 1000, // 500-1000ms
-  poor: 2000, // 1000-2000ms
-  // > 2000ms = poor/timeout
-};
+// Threshold for "poor" quality (in milliseconds)
+// Below this = online, above this = poor, failed = offline
+const POOR_THRESHOLD_MS = 1000;
 
 const CHECK_INTERVAL = 30000; // Check every 30 seconds
-const TIMEOUT_THRESHOLD = 5000; // Consider offline after 5 seconds
 
 export const useNetworkStatus = () => {
   // Network status state
   const [networkStatus, setNetworkStatus] = useState<NetworkStatusData>({
-    isOnline: navigator.onLine,
+    isOnline: true,
     responseTime: 0,
     lastChecked: Date.now(),
-    quality: 'excellent',
+    quality: 'online',
   });
 
   // Refs for cleanup
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isCheckingRef = useRef<boolean>(false);
 
-  // Determine quality based on response time and online status
-  const determineQuality = useCallback(
-    (isOnline: boolean, responseTime: number): NetworkStatusData['quality'] => {
-      if (!isOnline) return 'offline';
-
-      if (responseTime < QUALITY_THRESHOLDS.excellent) return 'excellent';
-      if (responseTime < QUALITY_THRESHOLDS.good) return 'good';
-      return 'poor';
-    },
-    []
-  );
-
   // Perform network connectivity check using unauthenticated health endpoint
+  // This is the ONLY source of truth - no navigator.onLine, no browser events
   const checkNetworkStatus = useCallback(async (): Promise<NetworkStatusData> => {
     const startTime = Date.now();
-    const isOnline = navigator.onLine;
-
-    // If browser thinks we're offline, don't bother with API call
-    if (!isOnline) {
-      return {
-        isOnline: false,
-        responseTime: 0,
-        lastChecked: Date.now(),
-        quality: 'offline',
-      };
-    }
 
     try {
       // Use unauthenticated health check endpoint
       await api.healthCheck();
 
       const responseTime = Date.now() - startTime;
-      const quality = determineQuality(true, responseTime);
+      const quality: NetworkStatusData['quality'] =
+        responseTime > POOR_THRESHOLD_MS ? 'poor' : 'online';
 
       logger.debug('Network check successful', {
         responseTime,
@@ -78,23 +52,20 @@ export const useNetworkStatus = () => {
     } catch (error) {
       const responseTime = Date.now() - startTime;
 
-      // If it took too long, consider it poor connectivity rather than offline
-      const isStillOnline = responseTime < TIMEOUT_THRESHOLD;
-
       logger.warn('Network check failed', {
         error: error instanceof Error ? error.message : String(error),
         responseTime,
-        isStillOnline,
       });
 
+      // Health check failed = offline
       return {
-        isOnline: isStillOnline,
-        responseTime: isStillOnline ? responseTime : 0,
+        isOnline: false,
+        responseTime,
         lastChecked: Date.now(),
-        quality: isStillOnline ? 'poor' : 'offline',
+        quality: 'offline',
       };
     }
-  }, [determineQuality]);
+  }, []);
 
   // Perform network check and update state
   const performNetworkCheck = useCallback(async () => {
@@ -118,36 +89,17 @@ export const useNetworkStatus = () => {
     } catch (error) {
       logger.error('Failed to check network status', { error });
 
-      // Fallback to basic online status
+      // Fallback to offline (health check itself failed unexpectedly)
       setNetworkStatus({
-        isOnline: navigator.onLine,
+        isOnline: false,
         responseTime: 0,
         lastChecked: Date.now(),
-        quality: navigator.onLine ? 'excellent' : 'offline',
+        quality: 'offline',
       });
     } finally {
       isCheckingRef.current = false;
     }
   }, [checkNetworkStatus]);
-
-  // Handle browser online/offline events
-  const handleOnlineStatusChange = useCallback(() => {
-    const isOnline = navigator.onLine;
-    logger.info('Browser online status changed', { isOnline });
-
-    if (isOnline) {
-      // When coming back online, immediately check actual connectivity
-      void performNetworkCheck();
-    } else {
-      // When going offline, immediately update status
-      setNetworkStatus(prev => ({
-        ...prev,
-        isOnline: false,
-        quality: 'offline',
-        lastChecked: Date.now(),
-      }));
-    }
-  }, [performNetworkCheck]);
 
   // Start monitoring network status
   const startMonitoring = useCallback(() => {
@@ -162,11 +114,7 @@ export const useNetworkStatus = () => {
 
       logger.info('Network monitoring started', { checkInterval: CHECK_INTERVAL });
     }
-
-    // Listen to browser online/offline events
-    window.addEventListener('online', handleOnlineStatusChange);
-    window.addEventListener('offline', handleOnlineStatusChange);
-  }, [performNetworkCheck, handleOnlineStatusChange]);
+  }, [performNetworkCheck]);
 
   // Stop monitoring network status
   const stopMonitoring = useCallback(() => {
@@ -175,10 +123,7 @@ export const useNetworkStatus = () => {
       checkIntervalRef.current = null;
       logger.info('Network monitoring stopped');
     }
-
-    window.removeEventListener('online', handleOnlineStatusChange);
-    window.removeEventListener('offline', handleOnlineStatusChange);
-  }, [handleOnlineStatusChange]);
+  }, []);
 
   // Manual network check trigger
   const refreshNetworkStatus = useCallback(() => {

@@ -1,10 +1,13 @@
 name: PyrePortal CI
 run-name: CI workflow
 
-on: 
+on:
   pull_request:
     branches:
       - main
+      - development
+  push:
+    branches:
       - development
   workflow_dispatch:
 
@@ -15,7 +18,3 @@ defaults:
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
-    
-  build:
-    needs: [lint]
-    uses: ./.github/workflows/build.yml

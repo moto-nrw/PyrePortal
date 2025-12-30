@@ -32,23 +32,22 @@ const testConfig: LoggerConfig = {
   consoleOutput: false,
 };
 
-// Export the appropriate configuration based on environment
-export const loggerConfig: LoggerConfig = import.meta.env.TEST
-  ? testConfig
-  : import.meta.env.DEV
-    ? devConfig
-    : defaultConfig;
-
-// Helper functions for managing logging state at runtime
-export const enableDebugLogging = (): void => {
-  localStorage.setItem('pyrePortalDebugLogging', 'true');
+// Get the appropriate configuration based on environment (avoids nested ternary - SonarCloud S3358)
+const getEnvironmentConfig = (): LoggerConfig => {
+  if (import.meta.env.TEST) {
+    return testConfig;
+  }
+  if (import.meta.env.DEV) {
+    return devConfig;
+  }
+  return defaultConfig;
 };
 
-export const disableDebugLogging = (): void => {
-  localStorage.setItem('pyrePortalDebugLogging', 'false');
-};
+// Configuration based on environment
+const loggerConfig: LoggerConfig = getEnvironmentConfig();
 
-export const isDebugLoggingEnabled = (): boolean => {
+// Check if debug logging was manually enabled via localStorage
+const isDebugLoggingEnabled = (): boolean => {
   return localStorage.getItem('pyrePortalDebugLogging') === 'true';
 };
 

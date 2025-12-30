@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 'lts/*'
           cache: 'npm'
@@ -36,23 +36,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
+      - name: Setup Rust cache with sccache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          workspaces: "src-tauri -> target"
+          cache-on-failure: true
 
       - name: Install Ubuntu dependencies
         run: |
@@ -63,13 +58,13 @@ jobs:
         working-directory: ./src-tauri
         run: cargo fmt --all -- --check
 
-      - name: Run Clippy
+      - name: Run Clippy (pedantic)
         working-directory: ./src-tauri
-        run: cargo clippy -- -D warnings
+        run: cargo clippy  # Pedantic lints configured in Cargo.toml [lints.clippy]
 
-      - name: Build Rust (Debug)
+      - name: Check Rust compiles
         working-directory: ./src-tauri
-        run: cargo build
+        run: cargo check
 
   test-integration:
     name: Integration Test
@@ -77,10 +72,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 'lts/*'
           cache: 'npm'
@@ -88,16 +83,11 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache Rust dependencies
-        uses: actions/cache@v4
+      - name: Setup Rust cache with sccache
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          workspaces: "src-tauri -> target"
+          cache-on-failure: true
 
       - name: Install Ubuntu dependencies
         run: |
@@ -110,5 +100,6 @@ jobs:
       - name: Build frontend
         run: npm run build
 
-      - name: Verify Tauri build works
-        run: npm run tauri build -- --debug
+      - name: Verify Rust compiles
+        working-directory: ./src-tauri
+        run: cargo check

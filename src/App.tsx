@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
+import ProtectedRoute from './components/ProtectedRoute';
 import { RfidServiceInitializer } from './components/RfidServiceInitializer';
 import NetworkStatus from './components/ui/NetworkStatus';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
@@ -14,141 +15,151 @@ import StaffSelectionPage from './pages/StaffSelectionPage';
 import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
-import { initializeApi } from './services/api';
-import { startAutoSync } from './services/syncQueue';
+import { setNetworkStatusCallback } from './services/api';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
 import { createLogger, logger } from './utils/logger';
 import { getRuntimeConfig } from './utils/loggerConfig';
 
 function App() {
-  const { authenticatedUser, selectedRoom, selectedActivity, setNetworkStatus } = useUserStore();
-  const { networkStatus } = useNetworkStatus();
+  const {
+    selectedRoom,
+    selectedActivity,
+    setNetworkStatus,
+    updateNetworkQuality,
+    networkStatus: storeNetworkStatus,
+  } = useUserStore();
+  const { networkStatus: hookNetworkStatus } = useNetworkStatus();
   const appLogger = createLogger('App');
 
-  // Initialize logger with runtime config and API
+  // Initialize logger with runtime config
   useEffect(() => {
-    const initApp = async () => {
-      // Initialize logger
-      const config = getRuntimeConfig();
-      logger.updateConfig(config);
+    const config = getRuntimeConfig();
+    logger.updateConfig(config);
 
-      // Initialize API configuration
-      try {
-        await initializeApi();
-        appLogger.info('API configuration loaded successfully');
-      } catch (error) {
-        appLogger.error('Failed to initialize API configuration', { error });
-      }
-
-      appLogger.info('Application initialized', {
-        version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
-        environment: import.meta.env.MODE,
-      });
-    };
-
-    void initApp();
-  }, [appLogger]); // Include appLogger in dependency array
-
-  // Sync network status from hook to store
-  useEffect(() => {
-    setNetworkStatus(networkStatus);
-  }, [networkStatus, setNetworkStatus]);
-
-  // Start automatic sync queue processing for offline operations
-  useEffect(() => {
-    appLogger.info('Starting automatic sync queue processing');
-    const stopAutoSync = startAutoSync(30000); // Check every 30 seconds
-
-    // Cleanup on unmount
-    return () => {
-      appLogger.info('Stopping automatic sync queue processing');
-      stopAutoSync();
-    };
+    appLogger.info('Application initialized', {
+      version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
+      environment: import.meta.env.MODE,
+    });
   }, [appLogger]);
 
-  // Auth states
-  const isFullyAuthenticated = !!authenticatedUser; // PIN validated, fully authenticated
+  // Sync network status from hook to store (for periodic health checks)
+  useEffect(() => {
+    setNetworkStatus(hookNetworkStatus);
+  }, [hookNetworkStatus, setNetworkStatus]);
 
-  // Check if a room is selected for the activity creation page
+  // Register API callback to update network status on every API call
+  useEffect(() => {
+    setNetworkStatusCallback(updateNetworkQuality);
+    return () => setNetworkStatusCallback(null);
+  }, [updateNetworkQuality]);
+
+  // Conditions for protected routes with additional requirements
+  // Note: Authentication is handled by ProtectedRoute component
   const hasSelectedRoom = !!selectedRoom;
-
-  // Check if session is active (has activity, room, and authenticated user)
-  const hasActiveSession = isFullyAuthenticated && !!selectedActivity && !!selectedRoom;
+  const hasActiveSession = !!selectedActivity && !!selectedRoom;
 
   return (
     <ErrorBoundary>
       <RfidServiceInitializer />
-      {/* Network Status Indicator - only shown when poor/offline */}
-      {isFullyAuthenticated &&
-        (networkStatus.quality === 'poor' || networkStatus.quality === 'offline') && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '8px',
-              right: '8px',
-              zIndex: 1000,
-              pointerEvents: 'none', // Doesn't interfere with interactions
-            }}
-          >
-            <NetworkStatus status={networkStatus} size="sm" />
-          </div>
-        )}
+      {/* Network Status Indicator - shown on all pages when poor/offline */}
+      {(storeNetworkStatus.quality === 'poor' || storeNetworkStatus.quality === 'offline') && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '8px',
+            right: '8px',
+            zIndex: 1000,
+            pointerEvents: 'none', // Doesn't interfere with interactions
+          }}
+        >
+          <NetworkStatus status={storeNetworkStatus} />
+        </div>
+      )}
       <main className="relative z-[1] m-0 flex h-screen flex-col items-center justify-center text-center">
         <BrowserRouter>
           <Routes>
+            {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/pin" element={<PinPage />} />
+
+            {/* Protected routes - require authentication */}
             <Route
               path="/home"
-              element={isFullyAuthenticated ? <HomeViewPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <HomeViewPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/tag-assignment"
-              element={isFullyAuthenticated ? <TagAssignmentPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <TagAssignmentPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/student-selection"
               element={
-                isFullyAuthenticated ? <StudentSelectionPage /> : <Navigate to="/" replace />
+                <ProtectedRoute>
+                  <StudentSelectionPage />
+                </ProtectedRoute>
               }
             />
             <Route
               path="/activity-selection"
-              element={isFullyAuthenticated ? <CreateActivityPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <CreateActivityPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/staff-selection"
-              element={isFullyAuthenticated ? <StaffSelectionPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <StaffSelectionPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/team-management"
-              element={isFullyAuthenticated ? <TeamManagementPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <TeamManagementPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/rooms"
-              element={isFullyAuthenticated ? <RoomSelectionPage /> : <Navigate to="/" replace />}
+              element={
+                <ProtectedRoute>
+                  <RoomSelectionPage />
+                </ProtectedRoute>
+              }
             />
+
+            {/* Protected routes with additional conditions */}
             <Route
               path="/nfc-scanning"
               element={
-                hasActiveSession ? (
+                <ProtectedRoute condition={hasActiveSession}>
                   <ActivityScanningPage />
-                ) : (
-                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
-                )
+                </ProtectedRoute>
               }
             />
             <Route
               path="/create-activity"
               element={
-                isFullyAuthenticated && hasSelectedRoom ? (
+                <ProtectedRoute condition={hasSelectedRoom}>
                   <CreateActivityPage />
-                ) : (
-                  <Navigate to={isFullyAuthenticated ? '/home' : '/'} replace />
-                )
+                </ProtectedRoute>
               }
             />
+
+            {/* Catch-all redirect */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>

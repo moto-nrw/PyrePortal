@@ -1,3 +1,5 @@
+import { faArrowsRotate, faCheck, faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useState } from 'react';
 
 import { getRelativeTime } from '../services/sessionStorage';
@@ -35,23 +37,23 @@ export const LastSessionToggle: React.FC = () => {
           bottom: '20px',
           left: '20px',
           zIndex: 30,
-          height: '56px',
+          height: '68px',
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(12px)',
-          borderRadius: '28px',
+          borderRadius: '34px',
           boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
           border: '1px solid rgba(229, 231, 235, 0.5)',
-          padding: '0 28px',
+          padding: '0 32px',
           display: 'flex',
           alignItems: 'center',
-          gap: '10px',
+          gap: '12px',
         }}
       >
         <label
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '10px',
+            gap: '12px',
             cursor: hasLastSession ? 'pointer' : 'not-allowed',
             opacity: hasLastSession ? 1 : 0.5,
           }}
@@ -86,8 +88,7 @@ export const LastSessionToggle: React.FC = () => {
                 backgroundColor: '#FFFFFF',
                 borderRadius: '50%',
                 boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)',
-                transition: 'transform 200ms ease-out',
-                transform: `translateX(${isEnabled ? '0' : '0'})`,
+                transition: 'left 200ms ease-out',
               }}
             />
             {isEnabled && (
@@ -101,22 +102,22 @@ export const LastSessionToggle: React.FC = () => {
                   color: '#FFFFFF',
                 }}
               >
-                ✓
+                <FontAwesomeIcon icon={faCheck} style={{ fontSize: '12px' }} />
               </div>
             )}
           </div>
 
           <span
             style={{
-              fontSize: '18px',
+              fontSize: '20px',
               fontWeight: 600,
               color: '#374151',
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
+              gap: '8px',
             }}
           >
-            <span style={{ fontSize: '20px' }}>↻</span>
+            <FontAwesomeIcon icon={faArrowsRotate} style={{ fontSize: '20px' }} />
             Letzte Sitzung
           </span>
 
@@ -159,7 +160,7 @@ export const LastSessionToggle: React.FC = () => {
             e.currentTarget.style.backgroundColor = '#F3F4F6';
           }}
         >
-          ⓘ
+          <FontAwesomeIcon icon={faCircleInfo} />
         </button>
       </div>
 
@@ -168,14 +169,14 @@ export const LastSessionToggle: React.FC = () => {
         isOpen={showInfoModal}
         onClose={() => setShowInfoModal(false)}
         title="Letzte Sitzung verwenden"
-        message="Diese Funktion ermöglicht es Ihnen, die zuletzt gestartete Aktivität mit einem Klick zu wiederholen.
+        message={`Diese Funktion ermöglicht es Ihnen, die zuletzt gestartete Aktivität mit einem Klick zu wiederholen.
 
 Die gespeicherten Daten umfassen:
-• Aktivität
-• Raum
-• Betreuer
+- Aktivität
+- Raum
+- Betreuer
 
-Die Daten werden automatisch bei jedem erfolgreichen Start einer neuen Aktivität aktualisiert. Wenn eine der gespeicherten Komponenten nicht mehr verfügbar ist, wird die Speicherung gelöscht und Sie müssen die Aktivität neu erstellen."
+Die Daten werden automatisch bei jedem erfolgreichen Start einer neuen Aktivität aktualisiert. Wenn eine der gespeicherten Komponenten nicht mehr verfügbar ist, wird die Speicherung gelöscht und Sie müssen die Aktivität neu erstellen.`}
       />
     </>
   );

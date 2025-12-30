@@ -1,0 +1,20 @@
+name: Production Build
+run-name: Build for production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    uses: ./.github/workflows/lint.yml
+
+  build:
+    needs: [lint]
+    uses: ./.github/workflows/build.yml

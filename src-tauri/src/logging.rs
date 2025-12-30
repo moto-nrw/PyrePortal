@@ -24,16 +24,15 @@ pub struct LogEntry {
 pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(), String> {
     let log_entry = match serde_json::from_str::<LogEntry>(&entry) {
         Ok(entry) => entry,
-        Err(e) => return Err(format!("Failed to parse log entry: {}", e)),
+        Err(e) => return Err(format!("Failed to parse log entry: {e}")),
     };
 
     let log_dir = get_log_directory(&app).map_err(|e| e.to_string())?;
-    let log_file = get_log_file_path(&log_dir).map_err(|e| e.to_string())?;
+    let log_file = get_log_file_path(&log_dir);
 
     // Create log directory if it doesn't exist
     if !log_dir.exists() {
-        fs::create_dir_all(&log_dir)
-            .map_err(|e| format!("Failed to create log directory: {}", e))?;
+        fs::create_dir_all(&log_dir).map_err(|e| format!("Failed to create log directory: {e}"))?;
     }
 
     // Open log file for appending, create if it doesn't exist
@@ -41,14 +40,14 @@ pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(
         .append(true)
         .create(true)
         .open(&log_file)
-        .map_err(|e| format!("Failed to open log file: {}", e))?;
+        .map_err(|e| format!("Failed to open log file: {e}"))?;
 
     // Format the log entry as a JSON line
     let log_line = format!("{}\n", serde_json::to_string(&log_entry).unwrap());
 
     // Write to file
     file.write_all(log_line.as_bytes())
-        .map_err(|e| format!("Failed to write to log file: {}", e))?;
+        .map_err(|e| format!("Failed to write to log file: {e}"))?;
 
     Ok(())
 }
@@ -62,10 +61,10 @@ fn get_log_directory<R: Runtime>(
 }
 
 /// Get the path to the current log file
-fn get_log_file_path(log_dir: &std::path::Path) -> Result<PathBuf, Box<dyn std::error::Error>> {
+fn get_log_file_path(log_dir: &std::path::Path) -> PathBuf {
     let now: DateTime<Utc> = Utc::now();
     let filename = format!("pyre-portal-{}.log", now.format("%Y-%m-%d"));
-    Ok(log_dir.join(filename))
+    log_dir.join(filename)
 }
 
 /// Command to retrieve log file list
@@ -73,7 +72,7 @@ fn get_log_file_path(log_dir: &std::path::Path) -> Result<PathBuf, Box<dyn std::
 pub async fn get_log_files<R: Runtime>(app: AppHandle<R>) -> Result<Vec<String>, String> {
     let log_dir = match get_log_directory(&app) {
         Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to get log directory: {}", e)),
+        Err(e) => return Err(format!("Failed to get log directory: {e}")),
     };
 
     if !log_dir.exists() {
@@ -81,12 +80,15 @@ pub async fn get_log_files<R: Runtime>(app: AppHandle<R>) -> Result<Vec<String>,
     }
 
     let entries =
-        fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log directory: {}", e))?;
+        fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log directory: {e}"))?;
 
     let mut log_files = Vec::new();
     for entry in entries.flatten() {
         if let Some(file_name) = entry.file_name().to_str() {
-            if file_name.ends_with(".log") {
+            if std::path::Path::new(file_name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))
+            {
                 log_files.push(file_name.to_string());
             }
         }
@@ -105,7 +107,7 @@ pub async fn read_log_file<R: Runtime>(
 ) -> Result<String, String> {
     let log_dir = match get_log_directory(&app) {
         Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to get log directory: {}", e)),
+        Err(e) => return Err(format!("Failed to get log directory: {e}")),
     };
 
     let file_path = log_dir.join(file_name);
@@ -115,7 +117,7 @@ pub async fn read_log_file<R: Runtime>(
         return Err("Invalid log file path".to_string());
     }
 
-    fs::read_to_string(&file_path).map_err(|e| format!("Failed to read log file: {}", e))
+    fs::read_to_string(&file_path).map_err(|e| format!("Failed to read log file: {e}"))
 }
 
 /// Command to clear a specific log file
@@ -126,7 +128,7 @@ pub async fn clear_log_file<R: Runtime>(
 ) -> Result<(), String> {
     let log_dir = match get_log_directory(&app) {
         Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to get log directory: {}", e)),
+        Err(e) => return Err(format!("Failed to get log directory: {e}")),
     };
 
     let file_path = log_dir.join(file_name);
@@ -137,7 +139,7 @@ pub async fn clear_log_file<R: Runtime>(
     }
 
     // Truncate the file by opening it with create mode
-    File::create(&file_path).map_err(|e| format!("Failed to clear log file: {}", e))?;
+    File::create(&file_path).map_err(|e| format!("Failed to clear log file: {e}"))?;
 
     Ok(())
 }
@@ -150,7 +152,7 @@ pub async fn cleanup_old_logs<R: Runtime>(
 ) -> Result<u32, String> {
     let log_dir = match get_log_directory(&app) {
         Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to get log directory: {}", e)),
+        Err(e) => return Err(format!("Failed to get log directory: {e}")),
     };
 
     if !log_dir.exists() {
@@ -158,18 +160,20 @@ pub async fn cleanup_old_logs<R: Runtime>(
     }
 
     let now = Utc::now();
-    let cutoff = now - chrono::Duration::days(days_to_keep as i64);
+    let cutoff = now - chrono::Duration::days(i64::from(days_to_keep));
     let cutoff_str = cutoff.format("%Y-%m-%d").to_string();
-    let cutoff_filename = format!("pyre-portal-{}.log", cutoff_str);
+    let cutoff_filename = format!("pyre-portal-{cutoff_str}.log");
 
     let entries =
-        fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log directory: {}", e))?;
+        fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log directory: {e}"))?;
 
     let mut deleted_count = 0;
     for entry in entries.flatten() {
         let path = entry.path();
         if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
-            if file_name.ends_with(".log")
+            if std::path::Path::new(file_name)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))
                 && file_name < &cutoff_filename[..]
                 && fs::remove_file(&path).is_ok()
             {

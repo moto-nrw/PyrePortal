@@ -66,8 +66,8 @@ flowchart TB
 
     Backend --> |API Calls| Server
 
-    Note[✅ Teacher List API: IMPLEMENTED\n⏳ Other APIs: Mock data (planned)]
-    Backend --- Note
+    Note["Teacher List API: IMPLEMENTED | Other APIs: In Development"]
+    Backend -.- Note
 ```
 
 ### Components

@@ -1,18 +1,28 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal } from '../components/ui';
+import { ErrorModal, ModalBase } from '../components/ui';
+import BackButton from '../components/ui/BackButton';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
+import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
+
+/**
+ * Helper to get assigned person from TagAssignmentCheck
+ */
+const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
+  if (!assignment?.assigned) return null;
+  return assignment.person ?? null;
+};
 
 // RFID scanner types from Tauri backend
 interface RfidScanResult {
@@ -53,6 +63,10 @@ function TagAssignmentPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
 
+  // Refs for scan cancellation
+  const mockScanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scanCancelledRef = useRef(false);
+
   const clearStates = useCallback(() => {
     setScannedTag(null);
     setTagAssignment(null);
@@ -60,11 +74,38 @@ function TagAssignmentPage() {
     setSuccess(null);
   }, []);
 
+  // Cancel ongoing scan operation
+  const cancelScan = useCallback(() => {
+    logUserAction('RFID scanning cancelled by user');
+
+    // Mark scan as cancelled to prevent processing results
+    scanCancelledRef.current = true;
+
+    // Clear mock scan timeout if running
+    if (mockScanTimeoutRef.current) {
+      clearTimeout(mockScanTimeoutRef.current);
+      mockScanTimeoutRef.current = null;
+    }
+
+    // Close modal and reset loading state
+    setShowScanner(false);
+    setIsLoading(false);
+  }, []);
+
   // Handle back navigation
   const handleBack = () => {
     logNavigation('Tag Assignment', '/home');
     void navigate('/home');
   };
+
+  // Cleanup timeout on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (mockScanTimeoutRef.current) {
+        clearTimeout(mockScanTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle state from student selection page (success or back navigation)
   useEffect(() => {
@@ -145,14 +186,23 @@ function TagAssignmentPage() {
   const handleStartScanning = async () => {
     logUserAction('RFID scanning started');
 
+    // Reset cancellation flag at start of new scan
+    scanCancelledRef.current = false;
+
     clearStates();
     setShowScanner(true);
     setIsLoading(true);
 
     try {
       if (!isRfidEnabled()) {
-        // Development mock behavior
-        setTimeout(() => {
+        // Development mock behavior - store timeout ref for cancellation
+        mockScanTimeoutRef.current = setTimeout(() => {
+          // Check if scan was cancelled before processing
+          if (scanCancelledRef.current) {
+            logger.debug('Mock scan completed but was cancelled, ignoring result');
+            return;
+          }
+
           // Get mock tags from environment variable or use defaults
           const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
           const mockStudentTags: string[] = envTags
@@ -166,9 +216,11 @@ function TagAssignmentPage() {
                 '04:11:22:33:44:55:66',
               ];
 
-          // Pick a random tag from the list
-          const mockTagId = mockStudentTags[Math.floor(Math.random() * mockStudentTags.length)];
+          // Pick a random tag from the list using unbiased secure randomness
+          const randomIndex = getSecureRandomInt(mockStudentTags.length);
+          const mockTagId = mockStudentTags[randomIndex];
           logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
+          mockScanTimeoutRef.current = null;
           void handleTagScanned(mockTagId);
         }, 2000);
         return;
@@ -176,6 +228,12 @@ function TagAssignmentPage() {
 
       // Use real RFID scanner through Tauri
       const result = await safeInvoke<RfidScanResult>('scan_rfid_single');
+
+      // Check if scan was cancelled while waiting for result
+      if (scanCancelledRef.current) {
+        logger.debug('RFID scan completed but was cancelled, ignoring result');
+        return;
+      }
 
       if (result.success && result.tag_id) {
         logUserAction('RFID tag scanned successfully', {
@@ -191,13 +249,22 @@ function TagAssignmentPage() {
         setShowScanner(false);
       }
     } catch (err) {
+      // Check if error was due to cancellation
+      if (scanCancelledRef.current) {
+        logger.debug('RFID scan error after cancellation, ignoring');
+        return;
+      }
+
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
       setError('Verbindung zum Scanner unterbrochen. Bitte App neu starten.');
       setShowErrorModal(true);
       setShowScanner(false);
     } finally {
-      setIsLoading(false);
+      // Only update loading state if not cancelled (cancelScan handles this)
+      if (!scanCancelledRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -285,7 +352,7 @@ function TagAssignmentPage() {
             position: 'relative',
           }}
         >
-          {/* Modern back button */}
+          {/* Back button */}
           <div
             style={{
               position: 'absolute',
@@ -294,51 +361,7 @@ function TagAssignmentPage() {
               zIndex: 10,
             }}
           >
-            <button
-              type="button"
-              onClick={handleBack}
-              style={{
-                height: '56px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '10px',
-                padding: '0 28px',
-                backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                border: '1px solid rgba(0, 0, 0, 0.1)',
-                borderRadius: '28px',
-                cursor: 'pointer',
-                outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                position: 'relative',
-                overflow: 'hidden',
-                backdropFilter: 'blur(8px)',
-              }}
-            >
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="#374151"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M19 12H5" />
-                <path d="M12 19l-7-7 7-7" />
-              </svg>
-              <span
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 600,
-                  color: '#374151',
-                }}
-              >
-                Zurück
-              </span>
-            </button>
+            <BackButton onClick={handleBack} />
           </div>
 
           {/* Title */}
@@ -355,116 +378,94 @@ function TagAssignmentPage() {
             Armband scannen
           </h1>
 
-          {/* Scanner Modal Overlay */}
-          {showScanner && (
+          {/* Scanner Modal Overlay
+              IMPORTANT: timeout must match Rust scan_rfid_hardware_single() timeout in src-tauri/src/rfid.rs (currently 10s) */}
+          <ModalBase
+            isOpen={showScanner}
+            onClose={cancelScan}
+            size="md"
+            backgroundColor="#5080D8"
+            timeout={10000}
+          >
+            {/* Background pattern */}
             <div
               style={{
-                position: 'fixed',
+                position: 'absolute',
                 top: 0,
                 left: 0,
                 right: 0,
                 bottom: 0,
-                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                background:
+                  'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                pointerEvents: 'none',
+              }}
+            />
+
+            {/* Icon container */}
+            <div
+              style={{
+                width: '120px',
+                height: '120px',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 1000,
+                margin: '0 auto 32px',
+                position: 'relative',
+                zIndex: 2,
               }}
             >
-              <div
-                style={{
-                  backgroundColor: '#5080D8',
-                  borderRadius: '32px',
-                  padding: '64px',
-                  maxWidth: '600px',
-                  width: '90%',
-                  textAlign: 'center',
-                  boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
-                  position: 'relative',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Background pattern */}
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background:
-                      'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                    pointerEvents: 'none',
-                  }}
-                />
-
-                {/* Icon container */}
-                <div
-                  style={{
-                    width: '120px',
-                    height: '120px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-                    borderRadius: '50%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 32px',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  <FontAwesomeIcon
-                    icon={faWifi}
-                    size="4x"
-                    style={{ color: 'white', transform: 'rotate(90deg)' }}
-                  />
-                </div>
-
-                <h2
-                  style={{
-                    fontSize: '36px',
-                    fontWeight: 700,
-                    marginBottom: '16px',
-                    color: '#FFFFFF',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  Armband scannen...
-                </h2>
-                <p
-                  style={{
-                    fontSize: '20px',
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    marginBottom: '32px',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  Halten Sie das Armband an den Scanner
-                </p>
-
-                <button
-                  onClick={() => setShowScanner(false)}
-                  style={{
-                    padding: '12px 32px',
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                    color: 'white',
-                    border: '2px solid rgba(255, 255, 255, 0.3)',
-                    borderRadius: '24px',
-                    cursor: 'pointer',
-                    outline: 'none',
-                    position: 'relative',
-                    zIndex: 2,
-                  }}
-                >
-                  Abbrechen
-                </button>
-              </div>
+              <FontAwesomeIcon
+                icon={faWifi}
+                size="4x"
+                style={{ color: 'white', transform: 'rotate(90deg)' }}
+              />
             </div>
-          )}
+
+            <h2
+              style={{
+                fontSize: '36px',
+                fontWeight: 700,
+                marginBottom: '16px',
+                color: '#FFFFFF',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              Armband scannen...
+            </h2>
+            <p
+              style={{
+                fontSize: '20px',
+                color: 'rgba(255, 255, 255, 0.9)',
+                marginBottom: '32px',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              Halten Sie das Armband an den Scanner
+            </p>
+
+            <button
+              onClick={cancelScan}
+              style={{
+                padding: '12px 32px',
+                fontSize: '18px',
+                fontWeight: 600,
+                backgroundColor: 'rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                border: '2px solid rgba(255, 255, 255, 0.3)',
+                borderRadius: '24px',
+                cursor: 'pointer',
+                outline: 'none',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              Abbrechen
+            </button>
+          </ModalBase>
 
           {/* Main Content - Centered */}
           <div
@@ -514,7 +515,7 @@ function TagAssignmentPage() {
                   onClick={handleStartScanning}
                   disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
                   style={{
-                    height: '72px',
+                    height: '68px',
                     padding: '0 64px',
                     fontSize: '24px',
                     fontWeight: 700,
@@ -643,39 +644,42 @@ function TagAssignmentPage() {
                   </div>
 
                   {/* Current Assignment Status */}
-                  {tagAssignment.assigned && (tagAssignment.person ?? tagAssignment.student) ? (
-                    <div>
-                      <p
-                        style={{
-                          fontSize: '16px',
-                          color: '#6B7280',
-                          marginBottom: '8px',
-                        }}
-                      >
-                        Aktuell zugewiesen an:
-                      </p>
-                      <p
-                        style={{
-                          fontSize: '24px',
-                          fontWeight: 700,
-                          color: '#1F2937',
-                          marginBottom: '4px',
-                        }}
-                      >
-                        {(tagAssignment.person ?? tagAssignment.student)?.name}
-                      </p>
-                      <p
-                        style={{
-                          fontSize: '18px',
-                          color: '#6B7280',
-                        }}
-                      >
-                        {tagAssignment.person_type === 'staff'
-                          ? 'Betreuer'
-                          : (tagAssignment.person ?? tagAssignment.student)?.group}
-                      </p>
-                    </div>
-                  ) : (
+                  {(() => {
+                    const assignedPerson = getAssignedPerson(tagAssignment);
+                    return assignedPerson ? (
+                      <div>
+                        <p
+                          style={{
+                            fontSize: '16px',
+                            color: '#6B7280',
+                            marginBottom: '8px',
+                          }}
+                        >
+                          Aktuell zugewiesen an:
+                        </p>
+                        <p
+                          style={{
+                            fontSize: '24px',
+                            fontWeight: 700,
+                            color: '#1F2937',
+                            marginBottom: '4px',
+                          }}
+                        >
+                          {assignedPerson.name}
+                        </p>
+                        <p
+                          style={{
+                            fontSize: '18px',
+                            color: '#6B7280',
+                          }}
+                        >
+                          {tagAssignment.person_type === 'staff'
+                            ? 'Betreuer'
+                            : assignedPerson.group}
+                        </p>
+                      </div>
+                    ) : null;
+                  })() ?? (
                     <div
                       style={{
                         backgroundColor: '#F9FAFB',
@@ -723,7 +727,7 @@ function TagAssignmentPage() {
                     disabled={isLoading}
                     style={{
                       flex: 1,
-                      height: '64px',
+                      height: '68px',
                       fontSize: '24px',
                       fontWeight: 700,
                       color: '#FFFFFF',
@@ -757,7 +761,7 @@ function TagAssignmentPage() {
                     onClick={handleScanAnother}
                     style={{
                       flex: 1,
-                      height: '64px',
+                      height: '68px',
                       fontSize: '24px',
                       fontWeight: 700,
                       backgroundColor: '#FFFFFF',
@@ -841,14 +845,14 @@ function TagAssignmentPage() {
                   <button
                     onClick={handleScanAnother}
                     style={{
-                      height: '56px',
-                      padding: '0 32px',
-                      fontSize: '18px',
+                      height: '68px',
+                      padding: '0 40px',
+                      fontSize: '20px',
                       fontWeight: 600,
                       backgroundColor: '#5080D8',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '28px',
+                      borderRadius: '34px',
                       cursor: 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',
@@ -860,14 +864,14 @@ function TagAssignmentPage() {
                   <button
                     onClick={handleBack}
                     style={{
-                      height: '56px',
-                      padding: '0 32px',
-                      fontSize: '18px',
+                      height: '68px',
+                      padding: '0 40px',
+                      fontSize: '20px',
                       fontWeight: 600,
                       backgroundColor: 'white',
                       color: '#374151',
                       border: '2px solid #E5E7EB',
-                      borderRadius: '28px',
+                      borderRadius: '34px',
                       cursor: 'pointer',
                       outline: 'none',
                       WebkitTapHighlightColor: 'transparent',

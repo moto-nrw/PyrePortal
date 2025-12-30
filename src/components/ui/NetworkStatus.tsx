@@ -1,4 +1,4 @@
-import { faWifi } from '@fortawesome/free-solid-svg-icons';
+import { faWifi, faSlash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 
@@ -6,84 +6,88 @@ export interface NetworkStatusData {
   isOnline: boolean;
   responseTime: number;
   lastChecked: number;
-  quality: 'excellent' | 'good' | 'poor' | 'offline';
+  quality: 'online' | 'poor' | 'offline';
 }
 
 interface NetworkStatusProps {
   status: NetworkStatusData;
-  size?: 'sm' | 'md' | 'lg';
-  showText?: boolean;
 }
 
 /**
- * Network status indicator component with WiFi signal strength visualization
+ * Network status indicator component - only shows when poor or offline
+ * Displays in bottom-right corner with prominent red warning icon
  */
-const NetworkStatus: React.FC<NetworkStatusProps> = ({ status, size = 'md', showText = false }) => {
-  // Determine icon style based on network quality
-  const getIconStyle = () => {
-    const baseStyle = {
-      transition: 'color 0.3s ease',
-    };
+const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
+  // Only render for poor or offline states (not when online)
+  if (status.quality === 'online') {
+    return null;
+  }
 
-    switch (status.quality) {
-      case 'excellent':
-        return { ...baseStyle, color: '#10B981' }; // Green
-      case 'good':
-        return { ...baseStyle, color: '#F59E0B' }; // Amber
-      case 'poor':
-        return { ...baseStyle, color: '#EF4444' }; // Red
-      case 'offline':
-        return { ...baseStyle, color: '#6B7280', opacity: 0.5 }; // Gray
-      default:
-        return baseStyle;
-    }
-  };
+  const isOffline = status.quality === 'offline';
 
-  // Size mapping for FontAwesome
-  const sizeMap = {
-    sm: 'sm' as const,
-    md: 'lg' as const,
-    lg: '2x' as const,
-  };
-
-  // Text description
-  const getStatusText = () => {
-    if (!status.isOnline) return 'Offline';
-
-    switch (status.quality) {
-      case 'excellent':
-        return 'Excellent';
-      case 'good':
-        return 'Good';
-      case 'poor':
-        return 'Poor';
-      default:
-        return 'Unknown';
-    }
-  };
-
-  // Container styles
-  const containerStyle = {
+  // Container styles - transparent, just positions the icon
+  const containerStyle: React.CSSProperties = {
+    position: 'relative',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    padding: '4px 8px',
-    borderRadius: '6px',
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-    backdropFilter: 'blur(4px)',
+    justifyContent: 'center',
+    padding: '12px',
   };
 
-  const textStyle = {
-    fontSize: size === 'sm' ? '12px' : size === 'md' ? '14px' : '16px',
-    fontWeight: '500',
-    color: '#374151',
+  // Icon wrapper for stacking (offline only)
+  const iconWrapperStyle: React.CSSProperties = {
+    position: 'relative',
+    display: 'inline-block',
+  };
+
+  // Red color with pulse animation for both states
+  const wifiIconStyle = {
+    color: '#EF4444',
+    animation: 'pulse-scale 2s ease-in-out infinite',
+    opacity: isOffline ? 0.4 : 1, // Dimmed for offline to show it's not working
+  } as const;
+
+  // Slash overlay for offline state
+  const slashStyle = {
+    position: 'absolute' as const,
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    color: '#EF4444',
+    animation: 'pulse-scale-centered 2s ease-in-out infinite',
   };
 
   return (
-    <div style={containerStyle} title={`Network ${getStatusText()} - ${status.responseTime}ms`}>
-      <FontAwesomeIcon icon={faWifi} size={sizeMap[size]} style={getIconStyle()} />
-      {showText && <span style={textStyle}>{getStatusText()}</span>}
-    </div>
+    <>
+      {/* Add keyframe animations for pulsing scale */}
+      <style>{`
+        @keyframes pulse-scale {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.15);
+          }
+        }
+        @keyframes pulse-scale-centered {
+          0%, 100% {
+            transform: translate(-50%, -50%) scale(1);
+          }
+          50% {
+            transform: translate(-50%, -50%) scale(1.15);
+          }
+        }
+      `}</style>
+      <div
+        style={containerStyle}
+        title={`Network ${isOffline ? 'Offline' : 'Poor Connection'} - ${status.responseTime}ms`}
+      >
+        <div style={iconWrapperStyle}>
+          <FontAwesomeIcon icon={faWifi} size="3x" style={wifiIconStyle} />
+          {isOffline && <FontAwesomeIcon icon={faSlash} size="3x" style={slashStyle} />}
+        </div>
+      </div>
+    </>
   );
 };
 
