@@ -1,3 +1,13 @@
+// Module declarations for RFID reader implementations
+#[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
+mod rfid_mfrc522;
+#[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
+mod rfid_pn5180;
+#[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
+mod rfid_pn5180_defs;
+#[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
+mod rfid_trait;
+
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
@@ -348,6 +358,9 @@ impl RfidBackgroundService {
 #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
 mod raspberry_pi {
     use super::*;
+    use crate::rfid_mfrc522::Mfrc522Reader;
+    use crate::rfid_pn5180::Pn5180Reader;
+    use crate::rfid_trait::RfidReader;
     use linux_embedded_hal::{
         spidev::{SpiModeFlags, SpidevOptions},
         Spidev,
@@ -362,18 +375,39 @@ mod raspberry_pi {
     // Type alias for the complete MFRC522 type with SpiInterface
     type Mfrc522Scanner = Mfrc522<SpiInterface<Spidev, DummyNSS, DummyDelay>, mfrc522::Initialized>;
 
-    // Persistent scanner struct that holds the MFRC522 instance
+    /// Create RFID reader based on RFID_READER environment variable
+    /// Defaults to "mfrc522" if not set
+    fn create_reader() -> Result<Box<dyn RfidReader>, String> {
+        let reader_type =
+            std::env::var("RFID_READER").unwrap_or_else(|_| "mfrc522".to_string());
+
+        println!("Creating RFID reader: {}", reader_type);
+
+        match reader_type.to_lowercase().as_str() {
+            "pn5180" => {
+                let reader = Pn5180Reader::new()?;
+                Ok(Box::new(reader))
+            }
+            "mfrc522" | _ => {
+                let reader = Mfrc522Reader::new()?;
+                Ok(Box::new(reader))
+            }
+        }
+    }
+
+    // Persistent scanner struct that uses the RfidReader trait
     pub struct PersistentRfidScanner {
-        mfrc522: Mfrc522Scanner,
+        reader: Box<dyn RfidReader>,
     }
 
     impl Drop for PersistentRfidScanner {
         fn drop(&mut self) {
-            // Best-effort cleanup: put MFRC522 into halted state
-            // This prevents the chip from being in an inconsistent state
-            // when the next scanner instance tries to initialize
-            let _ = self.mfrc522.hlta();
-            println!("PersistentRfidScanner dropped - MFRC522 halted");
+            // Best-effort cleanup
+            let _ = self.reader.reset();
+            println!(
+                "PersistentRfidScanner dropped - {} cleaned up",
+                self.reader.reader_type()
+            );
         }
     }
 
@@ -407,60 +441,15 @@ mod raspberry_pi {
         Ok(())
     }
 
-    // Initialize a persistent RFID scanner instance
+    // Initialize a persistent RFID scanner instance using the configured reader
     pub fn initialize_persistent_scanner() -> Result<PersistentRfidScanner, String> {
         println!("Initializing persistent RFID scanner...");
-
-        // Initialize SPI device
-        let mut spi = Spidev::open("/dev/spidev0.0")
-            .map_err(|e| format!("Failed to open SPI device 0.0: {:?}", e))?;
-        println!("✓ SPI opened");
-
-        // SPI configuration - 1MHz for maximum detection range
-        let options = SpidevOptions::new()
-            .bits_per_word(8)
-            .max_speed_hz(1_000_000) // 1MHz - matches test_rfid_persistent
-            .mode(SpiModeFlags::SPI_MODE_0)
-            .build();
-        spi.configure(&options)
-            .map_err(|e| format!("Failed to configure SPI: {:?}", e))?;
-        println!("✓ SPI configured at 1MHz");
-
-        // Setup GPIO
-        let gpio = Gpio::new().map_err(|e| format!("Failed to initialize GPIO: {:?}", e))?;
-        let mut reset_pin = gpio
-            .get(22)
-            .map_err(|e| format!("Failed to setup reset pin on GPIO 22: {:?}", e))?
-            .into_output();
-
-        // Hardware reset
-        reset_pin.set_high();
-        reset_pin.set_low();
-        thread::sleep(Duration::from_millis(50));
-        reset_pin.set_high();
-        thread::sleep(Duration::from_millis(50));
-        println!("✓ Hardware reset");
-
-        // Create MFRC522 instance
-        let spi_interface = SpiInterface::new(spi);
-        let mfrc522 = Mfrc522::new(spi_interface);
-        let mut mfrc522 = mfrc522
-            .init()
-            .map_err(|e| format!("Failed to initialize MFRC522: {:?}", e))?;
-        println!("✓ MFRC522 initialized");
-
-        // Verify version
-        if let Ok(v) = mfrc522.version() {
-            println!("✓ Version: 0x{:02X}", v);
-        }
-
-        // Set antenna gain to maximum
-        mfrc522
-            .set_antenna_gain(RxGain::DB48)
-            .map_err(|e| format!("Failed to set antenna gain: {:?}", e))?;
-        println!("✓ Antenna gain: DB48 (maximum)");
-
-        Ok(PersistentRfidScanner { mfrc522 })
+        let reader = create_reader()?;
+        println!(
+            "✓ RFID scanner initialized: {}",
+            reader.reader_type()
+        );
+        Ok(PersistentRfidScanner { reader })
     }
 
     // ========== Helper functions for reduced cognitive complexity ==========
@@ -518,9 +507,9 @@ mod raspberry_pi {
     ) -> Result<String, String> {
         const SCAN_INTERVAL_MS: u64 = 20;
 
-        match scanner.mfrc522.wupa() {
-            Ok(atqa) => select_card_with_retry(&mut scanner.mfrc522, &atqa),
-            Err(_) => {
+        match scanner.reader.scan()? {
+            Some(uid) => Ok(uid),
+            None => {
                 thread::sleep(Duration::from_millis(SCAN_INTERVAL_MS));
                 Err("No card detected".to_string())
             }
