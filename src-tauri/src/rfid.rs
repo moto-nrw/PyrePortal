@@ -240,13 +240,46 @@ impl RfidBackgroundService {
         // Platform-specific scanning implementation
         #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
         {
-            match raspberry_pi::initialize_persistent_scanner() {
-                Ok(mut scanner) => {
-                    println!("RFID scanner initialized for persistent scanning");
-                    Self::run_hardware_scan_loop(&state, &app_handle, &mut scanner).await;
+            const MAX_INIT_RETRIES: u32 = 3;
+            let mut init_attempts: u32 = 0;
+
+            loop {
+                if !Self::should_continue_scanning(&state) {
+                    break;
                 }
-                Err(e) => {
-                    Self::handle_scanner_init_failure(&state, &e);
+
+                match raspberry_pi::initialize_persistent_scanner() {
+                    Ok(mut scanner) => {
+                        println!("RFID scanner initialized for persistent scanning");
+                        init_attempts = 0;
+
+                        let needs_reinit =
+                            Self::run_hardware_scan_loop(&state, &app_handle, &mut scanner).await;
+
+                        if !needs_reinit || !Self::should_continue_scanning(&state) {
+                            break;
+                        }
+
+                        // Scanner gets dropped here (PersistentRfidScanner::drop calls hlta())
+                        println!("RFID: Reinitializing scanner after consecutive errors...");
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
+                    Err(e) => {
+                        init_attempts += 1;
+                        if init_attempts >= MAX_INIT_RETRIES {
+                            Self::handle_scanner_init_failure(
+                                &state,
+                                &format!("{} (after {} attempts)", e, init_attempts),
+                            );
+                            break;
+                        }
+                        println!(
+                            "RFID: Init attempt {}/{} failed: {}, retrying...",
+                            init_attempts, MAX_INIT_RETRIES, e
+                        );
+                        // Exponential backoff: 1s, 2s, 3s
+                        tokio::time::sleep(Duration::from_secs(u64::from(init_attempts))).await;
+                    }
                 }
             }
         }
@@ -258,27 +291,49 @@ impl RfidBackgroundService {
         }
     }
 
-    /// Run the hardware scan loop for Raspberry Pi platform
+    /// Run the hardware scan loop for Raspberry Pi platform.
+    /// Returns `true` if the scanner should be re-initialized (consecutive hardware errors),
+    /// `false` if scanning was stopped normally.
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     async fn run_hardware_scan_loop(
         state: &Arc<Mutex<RfidServiceState>>,
         app_handle: &Option<AppHandle>,
         scanner: &mut raspberry_pi::PersistentRfidScanner,
-    ) {
+    ) -> bool {
+        let mut consecutive_errors: u32 = 0;
+        const MAX_CONSECUTIVE_ERRORS: u32 = 15;
+
         loop {
             if !Self::should_continue_scanning(state) {
                 println!("Continuous scan loop stopping - scanner will be cleaned up");
-                break;
+                return false;
             }
 
             match raspberry_pi::scan_with_persistent_scanner_sync(scanner) {
                 Ok(tag_id) => {
+                    consecutive_errors = 0;
                     Self::handle_successful_scan(state, app_handle.as_ref(), &tag_id);
                     // Wait after successful scan to prevent duplicate reads
                     tokio::time::sleep(Duration::from_millis(200)).await;
                 }
                 Err(error) => {
                     Self::handle_scan_error(state, &error);
+
+                    // Track consecutive real errors (not "no card" which is normal polling)
+                    let error_lower = error.to_lowercase();
+                    if !error_lower.contains("no card")
+                        && !error_lower.contains("timeout")
+                        && !error_lower.contains("no card detected")
+                    {
+                        consecutive_errors += 1;
+                        if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                            println!(
+                                "RFID: {} consecutive hardware errors, requesting scanner re-initialization",
+                                consecutive_errors
+                            );
+                            return true;
+                        }
+                    }
                 }
             }
         }
@@ -426,19 +481,8 @@ mod raspberry_pi {
             .map_err(|e| format!("Failed to configure SPI: {:?}", e))?;
         println!("✓ SPI configured at 1MHz");
 
-        // Setup GPIO
-        let gpio = Gpio::new().map_err(|e| format!("Failed to initialize GPIO: {:?}", e))?;
-        let mut reset_pin = gpio
-            .get(22)
-            .map_err(|e| format!("Failed to setup reset pin on GPIO 22: {:?}", e))?
-            .into_output();
-
-        // Hardware reset
-        reset_pin.set_high();
-        reset_pin.set_low();
-        thread::sleep(Duration::from_millis(50));
-        reset_pin.set_high();
-        thread::sleep(Duration::from_millis(50));
+        // Hardware reset via GPIO 22
+        reset_mfrc522_hardware()?;
         println!("✓ Hardware reset");
 
         // Create MFRC522 instance
@@ -449,10 +493,17 @@ mod raspberry_pi {
             .map_err(|e| format!("Failed to initialize MFRC522: {:?}", e))?;
         println!("✓ MFRC522 initialized");
 
-        // Verify version
-        if let Ok(v) = mfrc522.version() {
-            println!("✓ Version: 0x{:02X}", v);
+        // Verify version - 0x00/0xFF indicate SPI bus failure
+        let version = mfrc522
+            .version()
+            .map_err(|e| format!("Failed to read MFRC522 version: {:?}", e))?;
+        if version == 0x00 || version == 0xFF {
+            return Err(format!(
+                "MFRC522 version 0x{:02X} indicates SPI communication failure",
+                version
+            ));
         }
+        println!("✓ Version: 0x{:02X}", version);
 
         // Set antenna gain to maximum
         mfrc522
@@ -461,6 +512,26 @@ mod raspberry_pi {
         println!("✓ Antenna gain: DB48 (maximum)");
 
         Ok(PersistentRfidScanner { mfrc522 })
+    }
+
+    // ========== Shared hardware helpers ==========
+
+    /// Perform hardware reset of MFRC522 via GPIO 22.
+    /// Uses 100ms delays for reliable reset (some MFRC522 clones need >50ms).
+    fn reset_mfrc522_hardware() -> Result<(), String> {
+        let gpio = Gpio::new().map_err(|e| format!("Failed to initialize GPIO: {:?}", e))?;
+        let mut reset_pin = gpio
+            .get(22)
+            .map_err(|e| format!("Failed to setup reset pin on GPIO 22: {:?}", e))?
+            .into_output();
+
+        reset_pin.set_high();
+        reset_pin.set_low();
+        thread::sleep(Duration::from_millis(100));
+        reset_pin.set_high();
+        thread::sleep(Duration::from_millis(100));
+
+        Ok(())
     }
 
     // ========== Helper functions for reduced cognitive complexity ==========
@@ -518,7 +589,9 @@ mod raspberry_pi {
     ) -> Result<String, String> {
         const SCAN_INTERVAL_MS: u64 = 20;
 
-        match scanner.mfrc522.wupa() {
+        // Try WUPA first, fall back to REQA for maximum card compatibility.
+        // WUPA wakes all cards including halted ones; REQA detects cards in IDLE state.
+        match scanner.mfrc522.wupa().or_else(|_| scanner.mfrc522.reqa()) {
             Ok(atqa) => select_card_with_retry(&mut scanner.mfrc522, &atqa),
             Err(_) => {
                 thread::sleep(Duration::from_millis(SCAN_INTERVAL_MS));
@@ -553,18 +626,8 @@ mod raspberry_pi {
         spi.configure(&options)
             .map_err(|e| format!("Failed to configure SPI: {:?}", e))?;
 
-        // Setup GPIO and perform hardware reset
-        let gpio = Gpio::new().map_err(|e| format!("Failed to initialize GPIO: {:?}", e))?;
-        let mut reset_pin = gpio
-            .get(22)
-            .map_err(|e| format!("Failed to setup reset pin: {:?}", e))?
-            .into_output();
-
-        reset_pin.set_high();
-        reset_pin.set_low();
-        thread::sleep(Duration::from_millis(50));
-        reset_pin.set_high();
-        thread::sleep(Duration::from_millis(50));
+        // Hardware reset via GPIO 22
+        reset_mfrc522_hardware()?;
 
         // Initialize MFRC522
         println!("Attempting to initialize MFRC522...");
