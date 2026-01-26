@@ -481,19 +481,8 @@ mod raspberry_pi {
             .map_err(|e| format!("Failed to configure SPI: {:?}", e))?;
         println!("✓ SPI configured at 1MHz");
 
-        // Setup GPIO
-        let gpio = Gpio::new().map_err(|e| format!("Failed to initialize GPIO: {:?}", e))?;
-        let mut reset_pin = gpio
-            .get(22)
-            .map_err(|e| format!("Failed to setup reset pin on GPIO 22: {:?}", e))?
-            .into_output();
-
-        // Hardware reset - 100ms delays for reliable MFRC522 reset (some clones need >50ms)
-        reset_pin.set_high();
-        reset_pin.set_low();
-        thread::sleep(Duration::from_millis(100));
-        reset_pin.set_high();
-        thread::sleep(Duration::from_millis(100));
+        // Hardware reset via GPIO 22
+        reset_mfrc522_hardware()?;
         println!("✓ Hardware reset");
 
         // Create MFRC522 instance
@@ -523,6 +512,26 @@ mod raspberry_pi {
         println!("✓ Antenna gain: DB48 (maximum)");
 
         Ok(PersistentRfidScanner { mfrc522 })
+    }
+
+    // ========== Shared hardware helpers ==========
+
+    /// Perform hardware reset of MFRC522 via GPIO 22.
+    /// Uses 100ms delays for reliable reset (some MFRC522 clones need >50ms).
+    fn reset_mfrc522_hardware() -> Result<(), String> {
+        let gpio = Gpio::new().map_err(|e| format!("Failed to initialize GPIO: {:?}", e))?;
+        let mut reset_pin = gpio
+            .get(22)
+            .map_err(|e| format!("Failed to setup reset pin on GPIO 22: {:?}", e))?
+            .into_output();
+
+        reset_pin.set_high();
+        reset_pin.set_low();
+        thread::sleep(Duration::from_millis(100));
+        reset_pin.set_high();
+        thread::sleep(Duration::from_millis(100));
+
+        Ok(())
     }
 
     // ========== Helper functions for reduced cognitive complexity ==========
@@ -617,18 +626,8 @@ mod raspberry_pi {
         spi.configure(&options)
             .map_err(|e| format!("Failed to configure SPI: {:?}", e))?;
 
-        // Setup GPIO and perform hardware reset
-        let gpio = Gpio::new().map_err(|e| format!("Failed to initialize GPIO: {:?}", e))?;
-        let mut reset_pin = gpio
-            .get(22)
-            .map_err(|e| format!("Failed to setup reset pin: {:?}", e))?
-            .into_output();
-
-        reset_pin.set_high();
-        reset_pin.set_low();
-        thread::sleep(Duration::from_millis(100));
-        reset_pin.set_high();
-        thread::sleep(Duration::from_millis(100));
+        // Hardware reset via GPIO 22
+        reset_mfrc522_hardware()?;
 
         // Initialize MFRC522
         println!("Attempting to initialize MFRC522...");
