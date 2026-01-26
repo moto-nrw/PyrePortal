@@ -81,9 +81,13 @@ type ErrorMapping = readonly [pattern: string | readonly string[], germanMessage
  */
 const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   // 1. CAPACITY ERRORS (409)
-  ['ACTIVITY_CAPACITY_EXCEEDED', 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.'],
+  // Backend sends both lowercase (Go errors) and capitalized (JSON Message field)
   [
-    ['ROOM_CAPACITY_EXCEEDED', 'Room capacity exceeded'],
+    ['ACTIVITY_CAPACITY_EXCEEDED', 'activity capacity exceeded', 'Activity capacity exceeded'],
+    'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.',
+  ],
+  [
+    ['ROOM_CAPACITY_EXCEEDED', 'room capacity exceeded', 'Room capacity exceeded'],
     'Raum ist voll. Kein Platz mehr verfügbar.',
   ],
 
