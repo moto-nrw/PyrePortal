@@ -98,13 +98,27 @@ export function mapServerErrorToGerman(errorMessage: string): string {
     return 'Konto gesperrt. Bitte später erneut versuchen.';
   }
 
-  // RFID/Student nicht gefunden (404)
+  // RFID-specific errors - match EXACT backend messages
+  // These are the only cases where "Armband nicht zugewiesen" is appropriate
+  if (
+    errorMessage.includes('RFID tag not found') ||
+    errorMessage.includes('RFID tag not assigned')
+  ) {
+    return 'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.';
+  }
+
+  // Session not found/started
+  if (errorMessage.includes('no active session')) {
+    return 'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.';
+  }
+
+  // Generic 404 - likely wrong API URL or endpoint doesn't exist
   if (
     errorMessage.includes('404') ||
     errorMessage.includes('not found') ||
     errorMessage.includes('Not Found')
   ) {
-    return 'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.';
+    return 'Ressource nicht gefunden. Bitte Konfiguration prüfen.';
   }
 
   // Server-Fehler
