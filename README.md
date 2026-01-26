@@ -3,139 +3,150 @@
 ![PyrePortal](public/img/moto_transparent_200.png)
 
 [![Tauri](https://img.shields.io/badge/tauri-v2-blue)](https://tauri.app)
-[![React](https://img.shields.io/badge/react-18.3.1-blue)](https://reactjs.org)
-[![TypeScript](https://img.shields.io/badge/typescript-5.6.2-blue)](https://www.typescriptlang.org)
+[![React](https://img.shields.io/badge/react-19-blue)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/typescript-5.9-blue)](https://www.typescriptlang.org)
 [![Version](https://img.shields.io/badge/version-0.1.0-green)](package.json)
 
-## Overview
+A Raspberry Pi kiosk app for German after-school care (OGS). Staff tap RFID wristbands to check students in and out, pick rooms, run activities, and track attendance — all from a single touchscreen.
 
-PyrePortal is a desktop application built with Tauri, React, and TypeScript that serves as a client for the Project Phoenix system. It provides an intuitive interface for managing room occupancy and activities in educational or organizational settings, allowing users to check into rooms, monitor room status, and create activities.
+## What It Does
 
-### Key Features
+- **RFID check-in/check-out** — Scan a wristband, and the server records the student's arrival or departure instantly.
+- **PIN authentication** — Staff unlock the kiosk with a PIN. Supports both a shared OGS PIN and individual teacher PINs.
+- **Room and activity management** — Choose a room, start an activity session, assign supervisors, and see live occupancy.
+- **Attendance tracking** — View student status, toggle check-in/check-out, and submit daily feedback (positive / neutral / negative).
+- **RFID tag assignment** — Pair wristbands to students or staff directly from the device.
+- **Network-aware** — Shows connection quality and gives clear German-language error messages when things go wrong.
+- **Structured logging** — Logs flow from the browser to Rust to disk, with automatic file rotation.
 
-- **✅ Real API Integration**: Teacher list fetched from live backend API
-- **User Authentication**: Secure login with PIN verification
-- **Room Selection**: View and select available rooms with real-time status
-- **Activity Management**: Create and track activities with category selection
-- **Comprehensive Logging**: Detailed logging of user actions and system events
-- **Cross-Platform**: Runs on Windows, macOS, and Linux
+## Target Hardware
 
-## 🚀 Implementation Status
+**Raspberry Pi 5** (64-bit, `aarch64-unknown-linux-gnu`), fullscreen kiosk mode, MFRC522 RFID reader on SPI.
 
-### ✅ Completed Features
-
-- **Teacher List API Integration** (June 10, 2025)
-  - Real-time teacher data from backend API
-  - Device authentication with API key
-  - Single request with deduplication
-  - Error handling and loading states
-  - Environment-based configuration
-
-### 🏗️ In Development
-
-- PIN validation via `/api/iot/status`
-- Room selection from backend
-- RFID tag assignment workflow
-- Activity session management
-- Student check-in/check-out with RFID
-
-### 📋 Planned Features
-
-- Complete offline support
-- Advanced error recovery
-- Session timeout management
-- Comprehensive audit logging
+The app builds on macOS, Windows, and Linux for development, but the RFID reader only works on ARM/ARM64 Linux with the `rfid` feature flag. On other platforms, a mock scanner fills in for testing.
 
 ## Architecture
 
-PyrePortal follows a modern desktop application architecture using Tauri's capabilities to combine web technologies with native performance.
-
 ```mermaid
 flowchart TB
-    subgraph "PyrePortal Desktop Application"
-        UI[React Frontend] --> |Tauri IPC| Backend[Tauri/Rust Backend]
-        Backend --> |Invoke| UI
-        UI --> |State Management| State[Zustand Store]
-        State --> UI
+    subgraph "PyrePortal (Tauri Desktop App)"
+        UI[React Frontend] -->|Tauri IPC| Backend[Rust Backend]
+        Backend -->|Invoke| UI
+        UI -->|State| Store[Zustand Store]
+        Store --> UI
     end
 
     subgraph "Project Phoenix"
-        Server[Backend Server] --> |API| Database[(Database)]
-        WebUI[Web Frontend] --> |API| Server
+        Server[Backend Server] -->|SQL| DB[(Database)]
     end
 
-    Backend --> |API Calls| Server
-
-    Note["Teacher List API: IMPLEMENTED | Other APIs: In Development"]
-    Backend -.- Note
+    Backend -->|REST API| Server
 ```
 
-### Components
+| Layer              | Role                                               |
+| ------------------ | -------------------------------------------------- |
+| React + TypeScript | UI, routing, state (Zustand), RFID scanning hook   |
+| Rust (Tauri v2)    | Runtime config, file logging, SPI/RFID hardware    |
+| Project Phoenix    | Source of truth for students, staff, rooms, visits |
 
-- **React Frontend**: User interface built with React 18 and TypeScript
-- **Tauri/Rust Backend**: Native functionality and system integration
-- **Zustand Store**: State management for user data, rooms, and activities
-- **Project Phoenix API**: Integration with the server backend (currently mocked)
+### Key Design Decisions
+
+1. **Server-first RFID scans.** Every scan hits the backend before the UI reacts. No local student cache.
+2. **Multi-layer duplicate prevention.** Hardware emits repeated events per tap; three filters (processing queue, 2-second cooldown, student history) stop duplicates.
+3. **Runtime config via Rust.** API keys live in `.env` and are read by Rust at startup — never baked into the frontend build.
+4. **Two-level auth on every request.** Device API key (`Authorization: Bearer ...`) plus staff PIN (`X-Staff-PIN` header).
 
 ## Tech Stack
 
-| Component        | Technology   | Version |
-| ---------------- | ------------ | ------- |
-| Framework        | Tauri        | v2      |
-| Frontend Library | React        | 18.3.1  |
-| Language         | TypeScript   | 5.6.2   |
-| State Management | Zustand      | 5.0.4   |
-| Routing          | React Router | 7.6.0   |
-| Styling          | TailwindCSS  | 4.1.6   |
-| Build Tool       | Vite         | 6.0.3   |
+| Component  | Technology   | Version  |
+| ---------- | ------------ | -------- |
+| Framework  | Tauri        | v2       |
+| Frontend   | React        | 19       |
+| Language   | TypeScript   | 5.9      |
+| State      | Zustand      | 5        |
+| Routing    | React Router | 7        |
+| Styling    | TailwindCSS  | 4        |
+| Build Tool | Vite         | 7        |
+| Backend    | Rust         | 2021 ed. |
 
-## Installation
+## Getting Started
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18 or later)
-- [Rust](https://www.rust-lang.org/tools/install) (stable toolchain)
-- Platform-specific dependencies for Tauri:
-  - [Windows](https://tauri.app/v1/guides/getting-started/prerequisites#setting-up-windows)
-  - [macOS](https://tauri.app/v1/guides/getting-started/prerequisites#setting-up-macos)
-  - [Linux](https://tauri.app/v1/guides/getting-started/prerequisites#setting-up-linux)
+- [Node.js](https://nodejs.org/) v18+
+- [Rust](https://www.rust-lang.org/tools/install) (stable)
+- Platform deps for [Tauri v2](https://v2.tauri.app/start/prerequisites/)
 
-### Development Setup
+### Setup
 
-1. Clone the repository
+```bash
+git clone git@github.com:moto-nrw/PyrePortal.git
+cd PyrePortal
+npm install
+```
 
-   ```bash
-   git clone https://github.com/yourusername/pyreportal.git
-   cd pyreportal
-   ```
+Create a `.env` file in the project root:
 
-2. Install dependencies
+```bash
+API_BASE_URL=http://localhost:8080
+DEVICE_API_KEY=your_device_key
+VITE_ENABLE_RFID=false          # true on Pi with hardware
+VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80
+```
 
-   ```bash
-   npm install
-   ```
+### Run
 
-3. Run in development mode
-   ```bash
-   npm run tauri dev
-   ```
+```bash
+npm run tauri dev    # Full app (Rust + React)
+npm run dev          # Frontend only (faster, no RFID)
+```
 
-### Building for Production
+### Build
 
-1. Build the application
+```bash
+npm run tauri build
+# Output: src-tauri/target/release/bundle/
+```
 
-   ```bash
-   npm run tauri build
-   ```
+### Code Quality
 
-2. Find the packaged application in the `src-tauri/target/release/bundle` directory
+```bash
+npm run check        # ESLint + TypeScript (must pass before committing)
+npm run format       # Prettier auto-format
+cd src-tauri && cargo clippy   # Rust linter
+```
+
+## API Endpoints
+
+PyrePortal talks to the Project Phoenix backend over REST. All requests carry device and staff credentials.
+
+| Endpoint                           | Method | Purpose                   |
+| ---------------------------------- | ------ | ------------------------- |
+| `/api/iot/teachers`                | GET    | Fetch staff list          |
+| `/api/iot/ping`                    | POST   | Validate global PIN       |
+| `/api/iot/status`                  | GET    | Validate teacher PIN      |
+| `/api/iot/activities`              | GET    | Today's activities        |
+| `/api/iot/rooms/available`         | GET    | Available rooms           |
+| `/api/iot/checkin`                 | POST   | RFID check-in/check-out   |
+| `/api/iot/session/start`           | POST   | Start activity session    |
+| `/api/iot/session/end`             | POST   | End session               |
+| `/api/iot/session/current`         | GET    | Current session info      |
+| `/api/iot/session/activity`        | POST   | Prevent session timeout   |
+| `/api/iot/students`                | GET    | Students by teacher       |
+| `/api/iot/rfid/:tagId`             | GET    | Check tag assignment      |
+| `/api/students/:id/rfid`           | POST   | Assign tag to student     |
+| `/api/iot/staff/:id/rfid`          | POST   | Assign tag to staff       |
+| `/api/iot/attendance/status/:rfid` | GET    | Student attendance status |
+| `/api/iot/attendance/toggle`       | POST   | Toggle check-in/check-out |
+| `/api/iot/feedback`                | POST   | Submit daily feedback     |
+| `/health`                          | GET    | Server health check       |
 
 ## Usage
 
 <details>
-<summary>User Authentication</summary>
+<summary>Staff Authentication</summary>
 
-PyrePortal uses a PIN-based authentication system. Enter your PIN on the login screen to access the application.
+Enter your PIN on the login screen. PyrePortal validates it against the backend and grants access.
 
 ![Login Screen](public/img/placeholder_nfc_scan.png)
 
@@ -144,100 +155,73 @@ PyrePortal uses a PIN-based authentication system. Enter your PIN on the login s
 <details>
 <summary>Room Selection</summary>
 
-After logging in, select a room from the room selection screen. Rooms are displayed with their current status:
+Pick a room after logging in. Each room shows its current status:
 
-- ![Checked In](public/img/checked_in.png) Room is occupied
-- ![Checked Out](public/img/checked_out.png) Room is available
+- ![Occupied](public/img/checked_in.png) Occupied
+- ![Available](public/img/checked_out.png) Available
 
-Rooms are categorized by type, including:
+Room types include:
 
 - ![School Yard](public/img/school_yard_icon.png) School Yard
 - ![Toilet](public/img/toilet_icon.png) Toilet
+
 </details>
 
 <details>
-<summary>Activity Creation</summary>
+<summary>Activities and Feedback</summary>
 
-Create new activities by selecting the activity type, assigning a supervisor, and setting other relevant details. The system provides feedback with satisfaction indicators:
+Start an activity, assign supervisors, and scan students in. At checkout, staff can leave daily feedback:
 
 - ![Positive](public/img/positive_smiley1.png) Positive
 - ![Neutral](public/img/neutral_smiley1.png) Neutral
 - ![Negative](public/img/negative_smiley1.png) Negative
+
 </details>
-
-## API Integration with Project Phoenix
-
-> **Note**: The current implementation uses mock data. This section describes the planned integration with Project Phoenix.
-
-### Endpoints
-
-PyrePortal will communicate with the Project Phoenix server through the following endpoints:
-
-| Endpoint                | Method | Description           |
-| ----------------------- | ------ | --------------------- |
-| `/api/auth`             | POST   | User authentication   |
-| `/api/rooms`            | GET    | Get available rooms   |
-| `/api/rooms/:id`        | GET    | Get room details      |
-| `/api/rooms/:id/select` | POST   | Select a room         |
-| `/api/activities`       | POST   | Create a new activity |
-
-### Authentication Flow
-
-1. User enters PIN in PyrePortal
-2. PyrePortal sends authentication request to Project Phoenix
-3. Project Phoenix validates credentials and returns a session token
-4. PyrePortal stores token for subsequent API calls
-
-### Integration Points
-
-The integration with Project Phoenix will be implemented in the following files:
-
-- `src/store/userStore.ts` - Replace mock API calls with real HTTP requests
-- `src-tauri/src/lib.rs` - Add authentication and API proxy commands
 
 ## Troubleshooting
 
 <details>
 <summary>Common Issues</summary>
 
-### Application Won't Start
+### App won't start
 
-- Ensure all prerequisites are installed correctly
-- Check logs in `~/.config/pyreportal/logs/` (Linux/macOS) or `%APPDATA%\pyreportal\logs\` (Windows)
-- Verify Tauri dependencies are installed for your platform
+- Check `.env` for `API_BASE_URL` and `DEVICE_API_KEY`
+- Check logs: `~/Library/Logs/pyreportal/` (macOS) or `~/.config/pyreportal/logs/` (Linux)
+- Verify Tauri platform deps are installed
 
-### Build Errors
+### Build errors
 
-- Run `cargo clean` in the `src-tauri` directory to clean Rust build artifacts
-- Ensure you have the latest Rust toolchain with `rustup update`
-- Check that all npm dependencies are installed with `npm install`
+```bash
+npm run clean:target   # Clean Rust artifacts
+rm -rf node_modules dist
+npm install
+npm run tauri build
+```
 
-### Connection Issues
+### RFID not working
 
-- Verify that mock data is being used (current implementation)
-- Check network connectivity for future Project Phoenix integration
-- Ensure firewall settings allow PyrePortal to connect to the server
+- Development: set `VITE_ENABLE_RFID=false` in `.env`
+- Pi hardware: run `cd src-tauri && ./test_rfid.sh`
+- Console should show "RFID service initialized"
+
+### API connection fails
+
+- Confirm backend is running: `curl http://localhost:8080/health`
+- Check `DEVICE_API_KEY` matches what the server expects
 
 </details>
 
-## Future Development
+## Roadmap
 
-- [ ] Real API integration with Project Phoenix
-- [ ] Offline mode with data synchronization
-- [ ] Enhanced user authentication (biometrics, RFID/NFC)
-- [ ] Rich activity analytics and reporting
+- [ ] Attendance analytics dashboard
+- [ ] Session timeout UI warnings
+- [ ] Offline mode with retry queue
 - [ ] Multi-language support
-- [ ] Dark mode theme
-- [ ] Mobile companion application
-
-## Contributing
-
-Contributions to PyrePortal are welcome! Please see our [contributing guidelines](CONTRIBUTING.md) for more information.
+- [ ] Biometric authentication
+- [ ] Mobile companion app
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+Source-Available License -- see [LICENSE](LICENSE) for details.
 
----
-
-Built with ❤️ using [Tauri](https://tauri.app), [React](https://reactjs.org), and [TypeScript](https://www.typescriptlang.org)
+Copyright (c) 2024-2026 MOTO. For licensing inquiries: kontakt@moto.nrw
