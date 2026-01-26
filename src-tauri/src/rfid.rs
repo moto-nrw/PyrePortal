@@ -582,11 +582,7 @@ mod raspberry_pi {
 
         // Try WUPA first, fall back to REQA for maximum card compatibility.
         // WUPA wakes all cards including halted ones; REQA detects cards in IDLE state.
-        match scanner
-            .mfrc522
-            .wupa()
-            .or_else(|_| scanner.mfrc522.reqa())
-        {
+        match scanner.mfrc522.wupa().or_else(|_| scanner.mfrc522.reqa()) {
             Ok(atqa) => select_card_with_retry(&mut scanner.mfrc522, &atqa),
             Err(_) => {
                 thread::sleep(Duration::from_millis(SCAN_INTERVAL_MS));
