@@ -119,6 +119,11 @@ export const useNetworkStatus = () => {
     isCheckingRef.current = true;
 
     try {
+      // Intentionally keep default "online" state during retries rather than updating
+      // on each failure. The Pi boot race condition means WiFi is often just slow to
+      // initialize (not actually down), so we avoid showing a false "offline" status
+      // that would alarm users during normal startup. If truly offline, state updates
+      // after all retries exhaust (~3s).
       for (let attempt = 1; attempt <= INITIAL_CHECK_MAX_RETRIES; attempt++) {
         const status = await checkNetworkStatus();
 
