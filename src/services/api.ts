@@ -59,12 +59,16 @@ export class ApiError extends Error {
 }
 
 /**
- * Map server error messages to German user-friendly messages
+ * Error message mapping entry.
+ * Pattern can be a single string or array of strings (OR logic).
+ */
+type ErrorMapping = readonly [pattern: string | readonly string[], germanMessage: string];
+
+/**
+ * Error message mappings ordered by specificity.
  *
- * IMPORTANT: Order matters! Specific backend messages MUST be checked BEFORE
- * generic HTTP status codes to avoid false matches.
- *
- * Pattern: specific message → generic status code → fallback
+ * IMPORTANT: Order matters! Specific messages MUST come before generic patterns.
+ * The first matching pattern wins.
  *
  * Backend error messages sourced from:
  * - /backend/auth/device/errors.go
@@ -75,242 +79,118 @@ export class ApiError extends Error {
  * - /backend/api/iot/rfid/handlers.go
  * - /backend/api/iot/feedback/handlers.go
  */
+const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
+  // 1. CAPACITY ERRORS (409)
+  ['ACTIVITY_CAPACITY_EXCEEDED', 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.'],
+  [
+    ['ROOM_CAPACITY_EXCEEDED', 'Room capacity exceeded'],
+    'Raum ist voll. Kein Platz mehr verfügbar.',
+  ],
+
+  // 2. AUTHENTICATION ERRORS (401)
+  ['invalid device API key', 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.'],
+  ['device API key is required', 'API-Schlüssel nicht konfiguriert. Bitte .env Datei prüfen.'],
+  ['invalid API key format', 'API-Schlüssel Format ungültig. Bearer Token erwartet.'],
+  ['invalid staff PIN', 'Ungültiger PIN. Bitte erneut versuchen.'],
+  ['staff PIN is required', 'PIN nicht angegeben.'],
+  [
+    'staff account is locked due to failed PIN attempts',
+    'Konto gesperrt wegen zu vieler Fehlversuche. Bitte Administrator kontaktieren.',
+  ],
+  ['maximum PIN attempts exceeded', 'Maximale PIN-Versuche überschritten. Konto gesperrt.'],
+  ['locked', 'Konto gesperrt. Bitte später erneut versuchen.'], // Generic fallback for lock-related
+
+  // 3. AUTHORIZATION ERRORS (403)
+  ['device is not active', 'Gerät ist deaktiviert. Bitte Administrator kontaktieren.'],
+  ['device is offline', 'Gerät ist als offline markiert. Bitte Administrator kontaktieren.'],
+
+  // 4. SESSION ERRORS (400/409)
+  [
+    'device is already running an activity session',
+    'Gerät führt bereits eine Aktivität durch. Bitte zuerst beenden.',
+  ],
+  ['no active session to end', 'Keine aktive Sitzung zum Beenden vorhanden.'],
+  ['no active session', 'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.'],
+  ['invalid session ID', 'Ungültige Sitzungs-ID.'],
+  ['activity_id is required', 'Aktivität muss ausgewählt werden.'],
+  ['at least one supervisor', 'Mindestens ein Betreuer muss ausgewählt werden.'], // Matches both variants
+
+  // 5. RFID ERRORS (400/404) - Only cases where "Armband nicht zugewiesen" is appropriate
+  [
+    ['RFID tag not found', 'RFID tag not assigned'],
+    'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.',
+  ],
+  [
+    'staff RFID authentication must be done via session management',
+    'Betreuer-Armband kann hier nicht verwendet werden.',
+  ],
+  ['RFID parameter is required', 'RFID-Tag fehlt in der Anfrage.'],
+
+  // 6. ATTENDANCE/VISIT ERRORS (404)
+  ['no active visit found for student', 'Kein aktiver Besuch für diesen Schüler gefunden.'],
+  ['person is not a student', 'Person ist kein Schüler.'],
+  ['no active groups in specified room', 'Keine aktiven Gruppen im ausgewählten Raum.'],
+
+  // 7. STAFF ERRORS (400/404)
+  ['invalid staff ID', 'Ungültige Mitarbeiter-ID.'],
+  ['staff not found', 'Mitarbeiter nicht gefunden.'],
+  ['staff has no RFID tag assigned', 'Mitarbeiter hat kein Armband zugewiesen.'],
+
+  // 8. FEEDBACK ERRORS (400/404)
+  ['student_id is required', 'Schüler-ID fehlt.'],
+  ['value is required', 'Bewertung fehlt.'],
+  ['student not found', 'Schüler nicht gefunden.'],
+
+  // 9. VALIDATION ERRORS (400)
+  ['room_id is required for check-in', 'Raum muss für Check-in ausgewählt werden.'],
+  ['tagId parameter is required', 'Tag-ID fehlt in der Anfrage.'],
+  ["destination must be 'zuhause' or 'unterwegs'", "Ziel muss 'zuhause' oder 'unterwegs' sein."],
+  [
+    'destination is required for confirm_daily_checkout',
+    'Ziel muss für endgültiges Auschecken angegeben werden.',
+  ],
+
+  // 10. INTERNAL SERVER ERRORS (500)
+  [
+    'schulhof activity not configured',
+    'Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
+  ],
+  ['failed to create visit record', 'Besuch konnte nicht erstellt werden. Bitte erneut versuchen.'],
+  ['failed to end visit record', 'Besuch konnte nicht beendet werden. Bitte erneut versuchen.'],
+  ['failed to get room information', 'Rauminformationen konnten nicht abgerufen werden.'],
+  ['failed to check room capacity', 'Raumkapazität konnte nicht geprüft werden.'],
+  ['failed to get activity information', 'Aktivitätsinformationen konnten nicht abgerufen werden.'],
+  ['failed to check activity capacity', 'Aktivitätskapazität konnte nicht geprüft werden.'],
+  ['error finding active groups in room', 'Aktive Gruppen im Raum konnten nicht gefunden werden.'],
+  [
+    'failed to get person data for staff',
+    'Personendaten für Mitarbeiter konnten nicht abgerufen werden.',
+  ],
+
+  // 11. GENERIC HTTP STATUS CODES - Fallbacks (must be after specific messages)
+  [['401', 'Unauthorized'], 'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.'],
+  [['403', 'Forbidden'], 'Keine Berechtigung für diese Aktion.'],
+  [['404', 'not found', 'Not Found'], 'Ressource nicht gefunden. Bitte Konfiguration prüfen.'],
+  [['409', 'Conflict'], 'Konflikt bei der Anfrage. Bitte erneut versuchen.'],
+  [['400', 'Bad Request'], 'Ungültige Anfrage. Bitte Eingaben prüfen.'],
+  [
+    ['500', '502', '503', '504', 'Internal Server Error', 'Bad Gateway', 'Service Unavailable'],
+    'Server nicht erreichbar. Bitte später versuchen.',
+  ],
+] as const;
+
+/**
+ * Map server error messages to German user-friendly messages.
+ * Uses a data-driven approach with ordered pattern matching.
+ */
 export function mapServerErrorToGerman(errorMessage: string): string {
-  // ============================================================
-  // 1. CAPACITY ERRORS (409) - Check specific codes first
-  // ============================================================
-  if (errorMessage.includes('ACTIVITY_CAPACITY_EXCEEDED')) {
-    return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
+  for (const [patterns, germanMessage] of ERROR_MESSAGE_MAPPINGS) {
+    const patternList = typeof patterns === 'string' ? [patterns] : patterns;
+    if (patternList.some(pattern => errorMessage.includes(pattern))) {
+      return germanMessage;
+    }
   }
-  if (
-    errorMessage.includes('ROOM_CAPACITY_EXCEEDED') ||
-    errorMessage.includes('Room capacity exceeded')
-  ) {
-    return 'Raum ist voll. Kein Platz mehr verfügbar.';
-  }
-
-  // ============================================================
-  // 2. AUTHENTICATION ERRORS (401) - Specific messages first
-  // ============================================================
-
-  // API Key errors
-  if (errorMessage.includes('invalid device API key')) {
-    return 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.';
-  }
-  if (errorMessage.includes('device API key is required')) {
-    return 'API-Schlüssel nicht konfiguriert. Bitte .env Datei prüfen.';
-  }
-  if (errorMessage.includes('invalid API key format')) {
-    return 'API-Schlüssel Format ungültig. Bearer Token erwartet.';
-  }
-
-  // PIN errors - specific messages
-  if (errorMessage.includes('invalid staff PIN')) {
-    return 'Ungültiger PIN. Bitte erneut versuchen.';
-  }
-  if (errorMessage.includes('staff PIN is required')) {
-    return 'PIN nicht angegeben.';
-  }
-  if (errorMessage.includes('staff account is locked due to failed PIN attempts')) {
-    return 'Konto gesperrt wegen zu vieler Fehlversuche. Bitte Administrator kontaktieren.';
-  }
-  if (errorMessage.includes('maximum PIN attempts exceeded')) {
-    return 'Maximale PIN-Versuche überschritten. Konto gesperrt.';
-  }
-  // Generic "locked" as fallback for lock-related errors
-  if (errorMessage.includes('locked')) {
-    return 'Konto gesperrt. Bitte später erneut versuchen.';
-  }
-
-  // ============================================================
-  // 3. AUTHORIZATION ERRORS (403) - Device status
-  // ============================================================
-  if (errorMessage.includes('device is not active')) {
-    return 'Gerät ist deaktiviert. Bitte Administrator kontaktieren.';
-  }
-  if (errorMessage.includes('device is offline')) {
-    return 'Gerät ist als offline markiert. Bitte Administrator kontaktieren.';
-  }
-
-  // ============================================================
-  // 4. SESSION ERRORS (400/409) - Specific messages
-  // ============================================================
-  if (errorMessage.includes('device is already running an activity session')) {
-    return 'Gerät führt bereits eine Aktivität durch. Bitte zuerst beenden.';
-  }
-  if (errorMessage.includes('no active session to end')) {
-    return 'Keine aktive Sitzung zum Beenden vorhanden.';
-  }
-  if (errorMessage.includes('no active session')) {
-    return 'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.';
-  }
-  if (errorMessage.includes('invalid session ID')) {
-    return 'Ungültige Sitzungs-ID.';
-  }
-  if (errorMessage.includes('activity_id is required')) {
-    return 'Aktivität muss ausgewählt werden.';
-  }
-  // Backend has two variants: "at least one supervisor is required" and "at least one supervisor ID is required"
-  if (errorMessage.includes('at least one supervisor')) {
-    return 'Mindestens ein Betreuer muss ausgewählt werden.';
-  }
-
-  // ============================================================
-  // 5. RFID ERRORS (400/404) - Specific backend messages
-  // These are the ONLY cases where "Armband nicht zugewiesen" is appropriate
-  // ============================================================
-  if (
-    errorMessage.includes('RFID tag not found') ||
-    errorMessage.includes('RFID tag not assigned')
-  ) {
-    return 'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.';
-  }
-  if (errorMessage.includes('staff RFID authentication must be done via session management')) {
-    return 'Betreuer-Armband kann hier nicht verwendet werden.';
-  }
-  if (errorMessage.includes('RFID parameter is required')) {
-    return 'RFID-Tag fehlt in der Anfrage.';
-  }
-
-  // ============================================================
-  // 6. ATTENDANCE/VISIT ERRORS (404) - Specific messages
-  // ============================================================
-  if (errorMessage.includes('no active visit found for student')) {
-    return 'Kein aktiver Besuch für diesen Schüler gefunden.';
-  }
-  if (errorMessage.includes('person is not a student')) {
-    return 'Person ist kein Schüler.';
-  }
-  if (errorMessage.includes('no active groups in specified room')) {
-    return 'Keine aktiven Gruppen im ausgewählten Raum.';
-  }
-
-  // ============================================================
-  // 7. STAFF ERRORS (400/404) - Specific messages
-  // ============================================================
-  if (errorMessage.includes('invalid staff ID')) {
-    return 'Ungültige Mitarbeiter-ID.';
-  }
-  if (errorMessage.includes('staff not found')) {
-    return 'Mitarbeiter nicht gefunden.';
-  }
-  if (errorMessage.includes('staff has no RFID tag assigned')) {
-    return 'Mitarbeiter hat kein Armband zugewiesen.';
-  }
-
-  // ============================================================
-  // 8. FEEDBACK ERRORS (400/404) - Specific messages
-  // ============================================================
-  if (errorMessage.includes('student_id is required')) {
-    return 'Schüler-ID fehlt.';
-  }
-  if (errorMessage.includes('value is required')) {
-    return 'Bewertung fehlt.';
-  }
-  if (errorMessage.includes('student not found')) {
-    return 'Schüler nicht gefunden.';
-  }
-
-  // ============================================================
-  // 9. VALIDATION ERRORS (400) - Specific messages
-  // ============================================================
-  if (errorMessage.includes('room_id is required for check-in')) {
-    return 'Raum muss für Check-in ausgewählt werden.';
-  }
-  if (errorMessage.includes('tagId parameter is required')) {
-    return 'Tag-ID fehlt in der Anfrage.';
-  }
-  if (errorMessage.includes("destination must be 'zuhause' or 'unterwegs'")) {
-    return "Ziel muss 'zuhause' oder 'unterwegs' sein.";
-  }
-  if (errorMessage.includes('destination is required for confirm_daily_checkout')) {
-    return 'Ziel muss für endgültiges Auschecken angegeben werden.';
-  }
-
-  // ============================================================
-  // 10. INTERNAL SERVER ERRORS (500) - Specific messages
-  // ============================================================
-  if (errorMessage.includes('schulhof activity not configured')) {
-    return 'Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.';
-  }
-  if (errorMessage.includes('failed to create visit record')) {
-    return 'Besuch konnte nicht erstellt werden. Bitte erneut versuchen.';
-  }
-  if (errorMessage.includes('failed to end visit record')) {
-    return 'Besuch konnte nicht beendet werden. Bitte erneut versuchen.';
-  }
-  if (errorMessage.includes('failed to get room information')) {
-    return 'Rauminformationen konnten nicht abgerufen werden.';
-  }
-  if (errorMessage.includes('failed to check room capacity')) {
-    return 'Raumkapazität konnte nicht geprüft werden.';
-  }
-  if (errorMessage.includes('failed to get activity information')) {
-    return 'Aktivitätsinformationen konnten nicht abgerufen werden.';
-  }
-  if (errorMessage.includes('failed to check activity capacity')) {
-    return 'Aktivitätskapazität konnte nicht geprüft werden.';
-  }
-  if (errorMessage.includes('error finding active groups in room')) {
-    return 'Aktive Gruppen im Raum konnten nicht gefunden werden.';
-  }
-  if (errorMessage.includes('failed to get person data for staff')) {
-    return 'Personendaten für Mitarbeiter konnten nicht abgerufen werden.';
-  }
-
-  // ============================================================
-  // 11. GENERIC HTTP STATUS CODES - Only match if no specific message matched
-  // These are FALLBACKS and should be last before the final fallback
-  // ============================================================
-
-  // Generic 401 - only if no specific auth error matched above
-  if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-    return 'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.';
-  }
-
-  // Generic 403 - only if no specific permission error matched above
-  if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-    return 'Keine Berechtigung für diese Aktion.';
-  }
-
-  // Generic 404 - likely wrong API URL or endpoint doesn't exist
-  // MUST be after all specific "not found" messages
-  // Include lowercase 'not found' to catch unanticipated backend messages
-  if (
-    errorMessage.includes('404') ||
-    errorMessage.includes('not found') ||
-    errorMessage.includes('Not Found')
-  ) {
-    return 'Ressource nicht gefunden. Bitte Konfiguration prüfen.';
-  }
-
-  // Generic 409 - conflict (capacity errors handled above)
-  if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
-    return 'Konflikt bei der Anfrage. Bitte erneut versuchen.';
-  }
-
-  // Generic 400 - bad request (validation errors handled above)
-  if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {
-    return 'Ungültige Anfrage. Bitte Eingaben prüfen.';
-  }
-
-  // Generic 5xx - server errors
-  if (
-    errorMessage.includes('500') ||
-    errorMessage.includes('502') ||
-    errorMessage.includes('503') ||
-    errorMessage.includes('504') ||
-    errorMessage.includes('Internal Server Error') ||
-    errorMessage.includes('Bad Gateway') ||
-    errorMessage.includes('Service Unavailable')
-  ) {
-    return 'Server nicht erreichbar. Bitte später versuchen.';
-  }
-
-  // ============================================================
-  // 12. FINAL FALLBACK - Return original for unknown errors
-  // ============================================================
-  return errorMessage;
+  return errorMessage; // Fallback - return original for unknown errors
 }
 
 /** Type guard to check if value is a string or number */
