@@ -275,7 +275,12 @@ export function mapServerErrorToGerman(errorMessage: string): string {
 
   // Generic 404 - likely wrong API URL or endpoint doesn't exist
   // MUST be after all specific "not found" messages
-  if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+  // Include lowercase 'not found' to catch unanticipated backend messages
+  if (
+    errorMessage.includes('404') ||
+    errorMessage.includes('not found') ||
+    errorMessage.includes('Not Found')
+  ) {
     return 'Ressource nicht gefunden. Bitte Konfiguration prüfen.';
   }
 
@@ -437,7 +442,12 @@ function mapAttendanceErrorToGerman(
   // ============================================================
 
   // 404 errors - context-specific messages
-  if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+  // Include lowercase 'not found' for consistency with main mapper
+  if (
+    errorMessage.includes('404') ||
+    errorMessage.includes('not found') ||
+    errorMessage.includes('Not Found')
+  ) {
     switch (context) {
       case 'status':
         return 'Schüler nicht gefunden oder keine Anwesenheitsdaten für heute verfügbar.';
