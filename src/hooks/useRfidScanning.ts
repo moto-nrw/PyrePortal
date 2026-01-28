@@ -269,9 +269,8 @@ export const useRfidScanning = () => {
     addSupervisorFromRfid,
     addActiveSupervisorTag,
     isActiveSupervisor,
-    // Two-stage modal (immediate RFID feedback)
+    // Two-stage modal (delayed RFID feedback for slow APIs)
     showPendingScan,
-    upgradePendingScanToProcessing,
     clearPendingScan,
   } = useUserStore();
 
@@ -390,14 +389,11 @@ export const useRfidScanning = () => {
         pendingScanTimerRef.current = null;
       }
 
-      // Show immediate "detected" feedback (two-stage modal)
-      showPendingScan(tagId, scanId);
-      logger.info('Showing immediate scan feedback', { tagId, scanId });
-
-      // Set timer to upgrade to "processing" phase after 300ms if API hasn't responded
+      // Delay showing pending modal by 300ms - if API returns faster, skip it entirely
+      // This prevents a brief flash of the pending modal for fast API responses
       pendingScanTimerRef.current = setTimeout(() => {
-        upgradePendingScanToProcessing();
-        logger.debug('Upgraded pending scan to processing phase');
+        showPendingScan(tagId, scanId);
+        logger.info('API taking >300ms, showing pending scan feedback', { tagId, scanId });
       }, 300);
 
       try {
@@ -515,7 +511,6 @@ export const useRfidScanning = () => {
       rfid.recentTagScans,
       showSupervisorRedirect,
       showPendingScan,
-      upgradePendingScanToProcessing,
       clearPendingScan,
     ]
   );

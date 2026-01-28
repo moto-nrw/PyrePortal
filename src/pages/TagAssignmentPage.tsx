@@ -72,8 +72,7 @@ interface RfidScannerStatus {
  * 6. Show confirmation and options to continue or go back
  */
 function TagAssignmentPage() {
-  const { authenticatedUser, showPendingScan, upgradePendingScanToProcessing, clearPendingScan } =
-    useUserStore();
+  const { authenticatedUser, showPendingScan, clearPendingScan } = useUserStore();
   const { activePendingScan } = useUserStore(state => state.rfid);
   const navigate = useNavigate();
   const location = useLocation();
@@ -325,15 +324,12 @@ function TagAssignmentPage() {
       pendingScanTimerRef.current = null;
     }
 
-    // Show immediate "detected" feedback (two-stage modal)
+    // Delay showing pending modal by 300ms - if API returns faster, skip it entirely
+    // This prevents a brief flash of the pending modal for fast API responses
     const scanId = `tag-assign-${Date.now()}`;
-    showPendingScan(tagId, scanId);
-    logger.info('Showing immediate scan feedback for tag assignment', { tagId, scanId });
-
-    // Set timer to upgrade to "processing" phase after 300ms if API hasn't responded
     pendingScanTimerRef.current = setTimeout(() => {
-      upgradePendingScanToProcessing();
-      logger.debug('Upgraded pending scan to processing phase');
+      showPendingScan(tagId, scanId);
+      logger.info('API taking >300ms, showing pending scan feedback', { tagId, scanId });
     }, 300);
 
     try {
