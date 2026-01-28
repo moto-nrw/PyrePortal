@@ -16,6 +16,29 @@ import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext
 
 const logger = createLogger('TagAssignmentPage');
 
+// CSS keyframes for pending scan pulse animation (injected into head)
+const PENDING_SCAN_KEYFRAMES = `
+@keyframes pulse-scale {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 0.8;
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+`;
+
 /**
  * Helper to get assigned person from TagAssignmentCheck
  */
@@ -49,7 +72,9 @@ interface RfidScannerStatus {
  * 6. Show confirmation and options to continue or go back
  */
 function TagAssignmentPage() {
-  const { authenticatedUser } = useUserStore();
+  const { authenticatedUser, showPendingScan, upgradePendingScanToProcessing, clearPendingScan } =
+    useUserStore();
+  const { activePendingScan } = useUserStore(state => state.rfid);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -63,9 +88,10 @@ function TagAssignmentPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
 
-  // Refs for scan cancellation
+  // Refs for scan cancellation and pending scan timer
   const mockScanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanCancelledRef = useRef(false);
+  const pendingScanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearStates = useCallback(() => {
     setScannedTag(null);
@@ -103,6 +129,26 @@ function TagAssignmentPage() {
     return () => {
       if (mockScanTimeoutRef.current) {
         clearTimeout(mockScanTimeoutRef.current);
+      }
+      if (pendingScanTimerRef.current) {
+        clearTimeout(pendingScanTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Inject keyframes for pending scan animation
+  useEffect(() => {
+    const styleId = 'pending-scan-keyframes';
+    if (!document.getElementById(styleId)) {
+      const styleElement = document.createElement('style');
+      styleElement.id = styleId;
+      styleElement.textContent = PENDING_SCAN_KEYFRAMES;
+      document.head.appendChild(styleElement);
+    }
+    return () => {
+      const existing = document.getElementById(styleId);
+      if (existing) {
+        existing.remove();
       }
     };
   }, []);
@@ -270,17 +316,58 @@ function TagAssignmentPage() {
 
   // Handle tag scanned (connection point for RFID module)
   const handleTagScanned = async (tagId: string) => {
-    setIsLoading(true);
     setShowScanner(false);
     setScannedTag(tagId);
+
+    // Clear any existing pending scan timer
+    if (pendingScanTimerRef.current) {
+      clearTimeout(pendingScanTimerRef.current);
+      pendingScanTimerRef.current = null;
+    }
+
+    // Show immediate "detected" feedback (two-stage modal)
+    const scanId = `tag-assign-${Date.now()}`;
+    showPendingScan(tagId, scanId);
+    logger.info('Showing immediate scan feedback for tag assignment', { tagId, scanId });
+
+    // Set timer to upgrade to "processing" phase after 300ms if API hasn't responded
+    pendingScanTimerRef.current = setTimeout(() => {
+      upgradePendingScanToProcessing();
+      logger.debug('Upgraded pending scan to processing phase');
+    }, 300);
 
     try {
       logUserAction('RFID tag scanned', { tagId });
 
+      // DEV ONLY: Simulate API latency for testing two-stage modal
+      const simulatedDelay = import.meta.env.VITE_SIMULATE_API_DELAY_MS as string | undefined;
+      if (simulatedDelay) {
+        const delayMs = parseInt(simulatedDelay, 10);
+        if (delayMs > 0) {
+          logger.warn(`DEV: Simulating ${delayMs}ms API delay`);
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+
       // Check if tag is already assigned
       const assignment = await checkTagAssignment(tagId);
+
+      // Clear pending scan timer and state before showing result
+      if (pendingScanTimerRef.current) {
+        clearTimeout(pendingScanTimerRef.current);
+        pendingScanTimerRef.current = null;
+      }
+      clearPendingScan();
+
       setTagAssignment(assignment);
     } catch (err) {
+      // Clear pending scan on error
+      if (pendingScanTimerRef.current) {
+        clearTimeout(pendingScanTimerRef.current);
+        pendingScanTimerRef.current = null;
+      }
+      clearPendingScan();
+
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'Failed to process scanned tag');
       setError('Armband konnte nicht überprüft werden. Bitte Internetverbindung prüfen.');
@@ -466,6 +553,113 @@ function TagAssignmentPage() {
               Abbrechen
             </button>
           </ModalBase>
+
+          {/* Pending Scan Modal - shows immediate "detected" feedback while API processes */}
+          {activePendingScan && (
+            <ModalBase
+              isOpen={!!activePendingScan}
+              onClose={() => {
+                /* No auto-close for pending modal - it transitions to result */
+              }}
+              backgroundColor="#3B82F6"
+            >
+              {/* Background pattern for visual interest */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background:
+                    'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
+                  pointerEvents: 'none',
+                }}
+              />
+
+              {/* Icon container with pulse or spinner animation */}
+              <div
+                style={{
+                  width: '120px',
+                  height: '120px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 32px',
+                  position: 'relative',
+                  zIndex: 2,
+                  animation:
+                    activePendingScan.phase === 'detected'
+                      ? 'pulse-scale 1s ease-in-out infinite'
+                      : 'none',
+                }}
+              >
+                {activePendingScan.phase === 'detected' ? (
+                  // Pulsing RFID signal icon for "detected" phase
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {/* NFC/RFID icon - signal waves */}
+                    <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36" />
+                    <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58" />
+                    <path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8" />
+                    <path d="M16.37 2a20.16 20.16 0 0 1 0 20" />
+                  </svg>
+                ) : (
+                  // Spinner for "processing" phase
+                  <svg
+                    width="80"
+                    height="80"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    style={{ animation: 'spin 1s linear infinite' }}
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                )}
+              </div>
+
+              <h2
+                style={{
+                  fontSize: '36px',
+                  fontWeight: 700,
+                  marginBottom: '16px',
+                  color: '#FFFFFF',
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              >
+                {activePendingScan.phase === 'detected'
+                  ? 'Armband erkannt...'
+                  : 'Wird verarbeitet...'}
+              </h2>
+
+              <p
+                style={{
+                  fontSize: '20px',
+                  color: 'rgba(255, 255, 255, 0.9)',
+                  position: 'relative',
+                  zIndex: 2,
+                }}
+              >
+                {activePendingScan.phase === 'detected'
+                  ? 'Daten werden geladen'
+                  : 'Bitte kurz warten...'}
+              </p>
+            </ModalBase>
+          )}
 
           {/* Main Content - Centered */}
           <div
