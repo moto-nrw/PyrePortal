@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex as TokioMutex};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct RfidScanResult {
@@ -47,6 +47,11 @@ pub struct RfidBackgroundService {
 
 // Safe global service instance using OnceLock
 static RFID_SERVICE: OnceLock<Arc<Mutex<RfidBackgroundService>>> = OnceLock::new();
+
+// Mutex to prevent concurrent one-shot scans (e.g., when user cancels and restarts quickly)
+// Without this, concurrent SPI access corrupts MFRC522 state causing hangs
+// Uses tokio::sync::Mutex because guard must be held across .await points
+static ONESHOT_SCAN_MUTEX: OnceLock<TokioMutex<()>> = OnceLock::new();
 
 impl RfidBackgroundService {
     pub fn new() -> Self {
@@ -858,6 +863,11 @@ pub async fn initialize_rfid_service(app_handle: tauri::AppHandle) -> Result<Str
 // Legacy commands (kept for compatibility)
 #[tauri::command]
 pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
+    // Acquire mutex to prevent concurrent scans - if user cancels and restarts quickly,
+    // the second scan waits for the first to complete rather than corrupting SPI state
+    let mutex = ONESHOT_SCAN_MUTEX.get_or_init(|| TokioMutex::new(()));
+    let _guard = mutex.lock().await;
+
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
         match raspberry_pi::scan_rfid_hardware_single().await {
