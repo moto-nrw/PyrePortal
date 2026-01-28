@@ -903,6 +903,10 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
 
 #[tauri::command]
 pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResult, String> {
+    // Acquire same mutex as scan_rfid_single to prevent concurrent SPI access
+    let mutex = ONESHOT_SCAN_MUTEX.get_or_init(|| TokioMutex::new(()));
+    let _guard = mutex.lock().await;
+
     // For future implementation - continuous scanning with custom timeout
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
