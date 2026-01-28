@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
+import { PendingScanModal } from '../components/PendingScanModal';
 import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
@@ -98,29 +99,6 @@ const DESTINATION_BUTTON_STYLES = {
     transform: 'scale(1)',
   },
 };
-
-// CSS keyframes for pending scan pulse animation (injected into head)
-const PENDING_SCAN_KEYFRAMES = `
-@keyframes pulse-scale {
-  0%, 100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.8;
-  }
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-`;
 
 // Button configuration arrays
 const feedbackButtons = [
@@ -241,7 +219,7 @@ const ActivityScanningPage: React.FC = () => {
   const { currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
 
   // Get access to the store's RFID functions
-  const { recentTagScans, activePendingScan } = useUserStore(state => state.rfid);
+  const { recentTagScans } = useUserStore(state => state.rfid);
   const { hideScanModal, setScanResult, showScanModal } = useUserStore();
 
   // Debug logging for selectedActivity
@@ -275,23 +253,6 @@ const ActivityScanningPage: React.FC = () => {
       });
     }
   }, [showModal, currentScan]);
-
-  // Inject keyframes for pending scan animation
-  useEffect(() => {
-    const styleId = 'pending-scan-keyframes';
-    if (!document.getElementById(styleId)) {
-      const styleElement = document.createElement('style');
-      styleElement.id = styleId;
-      styleElement.textContent = PENDING_SCAN_KEYFRAMES;
-      document.head.appendChild(styleElement);
-    }
-    return () => {
-      const existing = document.getElementById(styleId);
-      if (existing) {
-        existing.remove();
-      }
-    };
-  }, []);
 
   // State consistency guard - detect and fix stale room state (Issue #129 Bug 1)
   useEffect(() => {
@@ -1152,8 +1113,8 @@ const ActivityScanningPage: React.FC = () => {
     );
   };
 
-  // Show modal for either pending scan (immediate feedback) or completed scan result
-  const shouldShowCheckModal = showModal && (!!currentScan || !!activePendingScan);
+  // Show result modal when scan result is available (pending modal handled by PendingScanModal component)
+  const shouldShowCheckModal = showModal && !!currentScan;
 
   return (
     <>
@@ -1485,112 +1446,8 @@ const ActivityScanningPage: React.FC = () => {
         </ModalBase>
       )}
 
-      {/* Pending Scan Modal - shows immediate "detected" feedback while API processes */}
-      {activePendingScan && !currentScan && (
-        <ModalBase
-          isOpen={showModal && !!activePendingScan && !currentScan}
-          onClose={() => {
-            /* No auto-close for pending modal - it transitions to result modal */
-          }}
-          backgroundColor="#3B82F6"
-        >
-          {/* Background pattern for visual interest */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background:
-                'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-              pointerEvents: 'none',
-            }}
-          />
-
-          {/* Icon container with pulse or spinner animation */}
-          <div
-            style={{
-              width: '120px',
-              height: '120px',
-              backgroundColor: 'rgba(255, 255, 255, 0.3)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 32px',
-              position: 'relative',
-              zIndex: 2,
-              animation:
-                activePendingScan.phase === 'detected'
-                  ? 'pulse-scale 1s ease-in-out infinite'
-                  : 'none',
-            }}
-          >
-            {activePendingScan.phase === 'detected' ? (
-              // Pulsing RFID signal icon for "detected" phase
-              <svg
-                width="80"
-                height="80"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {/* NFC/RFID icon - signal waves */}
-                <path d="M6 8.32a7.43 7.43 0 0 1 0 7.36" />
-                <path d="M9.46 6.21a11.76 11.76 0 0 1 0 11.58" />
-                <path d="M12.91 4.1a15.91 15.91 0 0 1 .01 15.8" />
-                <path d="M16.37 2a20.16 20.16 0 0 1 0 20" />
-              </svg>
-            ) : (
-              // Spinner for "processing" phase
-              <svg
-                width="80"
-                height="80"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                style={{ animation: 'spin 1s linear infinite' }}
-              >
-                <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-              </svg>
-            )}
-          </div>
-
-          <h2
-            style={{
-              fontSize: '48px',
-              fontWeight: 800,
-              marginBottom: '24px',
-              color: '#FFFFFF',
-              lineHeight: 1.2,
-              position: 'relative',
-              zIndex: 2,
-            }}
-          >
-            {activePendingScan.phase === 'detected' ? 'Armband erkannt...' : 'Wird verarbeitet...'}
-          </h2>
-
-          <div
-            style={{
-              fontSize: '28px',
-              color: 'rgba(255, 255, 255, 0.95)',
-              fontWeight: 600,
-              position: 'relative',
-              zIndex: 2,
-            }}
-          >
-            {activePendingScan.phase === 'detected'
-              ? 'Daten werden geladen'
-              : 'Bitte kurz warten...'}
-          </div>
-        </ModalBase>
-      )}
+      {/* Pending Scan Modal - shows "Armband erkannt..." feedback for slow APIs (>300ms) */}
+      <PendingScanModal />
     </>
   );
 };
