@@ -269,11 +269,16 @@ export const useRfidScanning = () => {
     addSupervisorFromRfid,
     addActiveSupervisorTag,
     isActiveSupervisor,
+    // Two-stage modal (immediate RFID feedback)
+    showPendingScan,
+    upgradePendingScanToProcessing,
+    clearPendingScan,
   } = useUserStore();
 
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
   const scannedSupervisorsRef = useRef<Set<number>>(new Set());
+  const pendingScanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showSupervisorRedirect = useCallback(
     (scanId?: string) => {
@@ -357,10 +362,18 @@ export const useRfidScanning = () => {
         logger.info(`Tag ${tagId} blocked by duplicate prevention`);
         const recentScan = rfid.recentTagScans.get(tagId);
         if (recentScan?.result && Date.now() - recentScan.timestamp < 2000) {
+          // Show cached result immediately
           setScanResult(recentScan.result);
           showScanModal();
         } else {
-          logger.debug('Scan already in progress, please wait');
+          // Show brief "detected" feedback for blocked duplicate scans (200ms)
+          // This lets users know the scanner is working even for blocked scans
+          const blockScanId = generateScanId();
+          showPendingScan(tagId, blockScanId);
+          setTimeout(() => {
+            clearPendingScan();
+          }, 200);
+          logger.debug('Scan already in progress, showing brief feedback');
         }
         return;
       }
@@ -371,10 +384,25 @@ export const useRfidScanning = () => {
       const scanId = generateScanId();
       const startTime = Date.now();
 
+      // Clear any existing pending scan timer
+      if (pendingScanTimerRef.current) {
+        clearTimeout(pendingScanTimerRef.current);
+        pendingScanTimerRef.current = null;
+      }
+
+      // Show immediate "detected" feedback (two-stage modal)
+      showPendingScan(tagId, scanId);
+      logger.info('Showing immediate scan feedback', { tagId, scanId });
+
+      // Set timer to upgrade to "processing" phase after 300ms if API hasn't responded
+      pendingScanTimerRef.current = setTimeout(() => {
+        upgradePendingScanToProcessing();
+        logger.debug('Upgraded pending scan to processing phase');
+      }, 300);
+
       try {
-        // Show optimistic UI feedback
+        // Also track in optimistic scans for legacy compatibility
         addOptimisticScan(createOptimisticScan(scanId, tagId));
-        showScanModal();
         logger.info('Starting network scan (cache disabled)');
         updateOptimisticScan(scanId, 'processing');
 
@@ -383,6 +411,13 @@ export const useRfidScanning = () => {
           { student_rfid: tagId, action: 'checkin', room_id: selectedRoom.id },
           authenticatedUser.pin
         );
+
+        // Clear pending scan timer and state before showing result
+        if (pendingScanTimerRef.current) {
+          clearTimeout(pendingScanTimerRef.current);
+          pendingScanTimerRef.current = null;
+        }
+        clearPendingScan();
 
         logger.info(`RFID scan completed via server: ${result.action} for ${result.student_name}`, {
           responseTime: Date.now() - startTime,
@@ -433,6 +468,13 @@ export const useRfidScanning = () => {
 
         removeOptimisticScan(scanId);
       } catch (error) {
+        // Clear pending scan timer and state on error
+        if (pendingScanTimerRef.current) {
+          clearTimeout(pendingScanTimerRef.current);
+          pendingScanTimerRef.current = null;
+        }
+        clearPendingScan();
+
         logger.error('Failed to process RFID scan', { error });
         updateOptimisticScan(scanId, 'failed');
         setScanResult(createScanErrorResult(error));
@@ -462,6 +504,9 @@ export const useRfidScanning = () => {
       isActiveSupervisor,
       rfid.recentTagScans,
       showSupervisorRedirect,
+      showPendingScan,
+      upgradePendingScanToProcessing,
+      clearPendingScan,
     ]
   );
 

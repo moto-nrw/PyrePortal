@@ -401,6 +401,14 @@ interface RecentTagScan {
   syncPromise?: Promise<void>; // Background sync promise (for race condition prevention)
 }
 
+// Pending scan state for immediate feedback (two-stage modal)
+interface PendingScanState {
+  tagId: string;
+  phase: 'detected' | 'processing';
+  startedAt: number;
+  scanId: string;
+}
+
 // RFID scanning state
 interface RfidState {
   isScanning: boolean;
@@ -418,6 +426,9 @@ interface RfidState {
   // New additions for proper duplicate prevention
   recentTagScans: Map<string, RecentTagScan>; // Track recent scans by tagId
   tagToStudentMap: Map<string, string>; // Cache tagId -> studentId mappings
+
+  // Two-stage modal: immediate feedback while API is processing
+  activePendingScan: PendingScanState | null;
 }
 
 // Define the store state interface
@@ -518,6 +529,11 @@ interface UserState {
   clearOldTagScans: () => void;
   isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
 
+  // Two-stage modal actions (immediate RFID feedback)
+  showPendingScan: (tagId: string, scanId: string) => void;
+  upgradePendingScanToProcessing: () => void;
+  clearPendingScan: () => void;
+
   // Session settings actions
   loadSessionSettings: () => Promise<void>;
   toggleUseLastSession: (enabled: boolean) => Promise<void>;
@@ -615,6 +631,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     // New duplicate prevention state
     recentTagScans: new Map<string, RecentTagScan>(),
     tagToStudentMap: new Map<string, string>(),
+
+    // Two-stage modal initial state
+    activePendingScan: null,
   },
 
   // Session settings initial state
@@ -1513,6 +1532,49 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
 
     return true;
+  },
+
+  // Two-stage modal actions for immediate RFID feedback
+  showPendingScan: (tagId: string, scanId: string) => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        activePendingScan: {
+          tagId,
+          phase: 'detected',
+          startedAt: Date.now(),
+          scanId,
+        },
+        showModal: true,
+      },
+    }));
+  },
+
+  upgradePendingScanToProcessing: () => {
+    set(state => {
+      // Only upgrade if still in detected phase (API hasn't responded yet)
+      if (state.rfid.activePendingScan?.phase !== 'detected') {
+        return state;
+      }
+      return {
+        rfid: {
+          ...state.rfid,
+          activePendingScan: {
+            ...state.rfid.activePendingScan,
+            phase: 'processing',
+          },
+        },
+      };
+    });
+  },
+
+  clearPendingScan: () => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        activePendingScan: null,
+      },
+    }));
   },
 
   // Network status actions
