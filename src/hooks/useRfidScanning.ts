@@ -406,6 +406,16 @@ export const useRfidScanning = () => {
         logger.info('Starting network scan (cache disabled)');
         updateOptimisticScan(scanId, 'processing');
 
+        // DEV ONLY: Simulate API latency for testing two-stage modal
+        const simulatedDelay = import.meta.env.VITE_SIMULATE_API_DELAY_MS as string | undefined;
+        if (simulatedDelay) {
+          const delayMs = parseInt(simulatedDelay, 10);
+          if (delayMs > 0) {
+            logger.warn(`DEV: Simulating ${delayMs}ms API delay`);
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
+
         // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
           { student_rfid: tagId, action: 'checkin', room_id: selectedRoom.id },
