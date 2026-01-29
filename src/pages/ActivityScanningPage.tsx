@@ -494,48 +494,18 @@ const ActivityScanningPage: React.FC = () => {
     void navigate('/pin');
   };
 
-  // Handle "nach Hause" button - user wants to go home (daily checkout)
-  const handleNachHause = async () => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+  // Handle "nach Hause" button - student confirmed going home
+  // The checkout already happened on the backend (checked_out_daily),
+  // so no API call needed — just show the feedback prompt
+  const handleNachHause = () => {
+    if (!checkoutDestinationState) return;
 
-    try {
-      logger.info('Processing nach Hause with destination=zuhause', {
-        rfid: checkoutDestinationState.rfid,
-        studentName: checkoutDestinationState.studentName,
-      });
+    logger.info('Student confirmed nach Hause - showing feedback prompt', {
+      rfid: checkoutDestinationState.rfid,
+      studentName: checkoutDestinationState.studentName,
+    });
 
-      await api.toggleAttendance(
-        authenticatedUser.pin,
-        checkoutDestinationState.rfid,
-        'confirm_daily_checkout',
-        'zuhause'
-      );
-
-      logger.info('Daily checkout successful - student going home');
-
-      // Show feedback prompt
-      setShowFeedbackPrompt(true);
-    } catch (error) {
-      logger.error('Failed to process daily checkout', { error });
-
-      const errorMessage = error instanceof Error ? error.message : 'Abmeldung fehlgeschlagen';
-      const userFriendlyError = isNetworkRelatedError(error)
-        ? 'Netzwerkfehler beim Abmelden. Bitte Verbindung prüfen und erneut versuchen.'
-        : mapServerErrorToGerman(errorMessage);
-
-      const errorResult: RfidScanResult = {
-        student_name: 'Abmeldung fehlgeschlagen',
-        student_id: null,
-        action: 'error',
-        message: `${checkoutDestinationState.studentName}: ${userFriendlyError}`,
-        showAsError: true,
-      };
-
-      setScanResult(errorResult);
-      setCheckoutDestinationState(null);
-      setShowFeedbackPrompt(false);
-      showScanModal();
-    }
+    setShowFeedbackPrompt(true);
   };
 
   // Handle feedback submission
