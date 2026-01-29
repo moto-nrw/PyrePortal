@@ -495,17 +495,33 @@ const ActivityScanningPage: React.FC = () => {
   };
 
   // Handle "nach Hause" button - student confirmed going home
-  // The checkout already happened on the backend (checked_out_daily),
-  // so no API call needed — just show the feedback prompt
-  const handleNachHause = () => {
-    if (!checkoutDestinationState) return;
+  // Call confirm_daily_checkout to finalize attendance, then show feedback prompt
+  const handleNachHause = async () => {
+    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
 
-    logger.info('Student confirmed nach Hause - showing feedback prompt', {
+    logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
       rfid: checkoutDestinationState.rfid,
       studentName: checkoutDestinationState.studentName,
     });
 
-    setShowFeedbackPrompt(true);
+    try {
+      await api.toggleAttendance(
+        authenticatedUser.pin,
+        checkoutDestinationState.rfid,
+        'confirm_daily_checkout',
+        'zuhause'
+      );
+      logger.info('Daily checkout confirmed, showing feedback prompt');
+      setShowFeedbackPrompt(true);
+    } catch (error) {
+      logger.error('Failed to confirm daily checkout', {
+        rfid: checkoutDestinationState.rfid,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Still show feedback prompt — the visit is already ended,
+      // attendance sync failure shouldn't block the student
+      setShowFeedbackPrompt(true);
+    }
   };
 
   // Handle feedback submission
