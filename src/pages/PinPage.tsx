@@ -154,9 +154,9 @@ function PinPage() {
   // Handle back button click
   const handleBack = () => {
     try {
-      logger.info('User navigating back to landing page');
-      logNavigation('PinPage', 'LandingPage');
-      void navigate('/');
+      logger.info('User navigating back from PinPage');
+      logNavigation('PinPage', 'back');
+      void navigate(-1);
     } catch (error) {
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleBack');
     }
