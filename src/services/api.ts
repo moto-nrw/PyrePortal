@@ -1173,7 +1173,15 @@ export const api = {
     });
 
     // Extract the actual data from the nested response
-    return response.data;
+    const result = response.data;
+
+    // Normalize backend action: checked_out_daily → checked_out + daily_checkout_available flag
+    if ((result.action as string) === 'checked_out_daily') {
+      result.action = 'checked_out';
+      result.daily_checkout_available = true;
+    }
+
+    return result;
   },
 
   /**
