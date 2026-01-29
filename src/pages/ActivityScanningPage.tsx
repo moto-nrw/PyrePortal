@@ -118,17 +118,12 @@ interface ExtendedScanResult extends RfidScanResult {
   isSchulhof?: boolean;
 }
 
-/** State for checkout destination modal */
+/** State for checkout destination modal (unified checkout + "nach Hause" flow) */
 interface CheckoutDestinationState {
   rfid: string;
   studentName: string;
   studentId: number | null;
-}
-
-/** State for daily checkout confirmation modal */
-interface DailyCheckoutState {
-  rfid: string;
-  studentName: string;
+  dailyCheckoutAvailable: boolean;
   showingFarewell: boolean;
 }
 
@@ -155,25 +150,10 @@ const handleCheckoutAction = (
     rfid: scan.scannedTagId ?? '',
     studentName: scan.student_name,
     studentId: scan.student_id,
-  });
-  return -1; // Decrement count
-};
-
-/**
- * Handles pending daily checkout: sets up confirmation modal state.
- * No count change yet - waiting for user confirmation.
- * Uses scan.scannedTagId directly instead of looking up from recentTagScans (fixes race condition).
- */
-const handlePendingDailyCheckoutAction = (
-  scan: RfidScanResult,
-  setDailyCheckoutState: (state: DailyCheckoutState) => void
-): number => {
-  setDailyCheckoutState({
-    rfid: scan.scannedTagId ?? '',
-    studentName: scan.student_name,
+    dailyCheckoutAvailable: scan.daily_checkout_available ?? false,
     showingFarewell: false,
   });
-  return 0; // No change yet - awaiting confirmation
+  return -1; // Decrement count
 };
 
 /**
@@ -271,19 +251,9 @@ const ActivityScanningPage: React.FC = () => {
   const [studentCount, setStudentCount] = useState(0);
   // Removed initial loading indicator (arrow removed)
 
-  // State for daily checkout flow
-  const [dailyCheckoutState, setDailyCheckoutState] = useState<{
-    rfid: string;
-    studentName: string;
-    showingFarewell: boolean;
-  } | null>(null);
-
-  // State for checkout destination selection (Schulhof or Raumwechsel)
-  const [checkoutDestinationState, setCheckoutDestinationState] = useState<{
-    rfid: string;
-    studentName: string;
-    studentId: number | null;
-  } | null>(null);
+  // State for checkout destination selection (unified: Raumwechsel, Schulhof, nach Hause)
+  const [checkoutDestinationState, setCheckoutDestinationState] =
+    useState<CheckoutDestinationState | null>(null);
 
   // Feedback prompt state
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
@@ -294,23 +264,22 @@ const ActivityScanningPage: React.FC = () => {
   // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
   // This prevents previous student's state from affecting the next scan's modal
   useEffect(() => {
-    if (currentScan && dailyCheckoutState) {
-      // Use scannedTagId directly instead of looking up from recentTagScans (fixes race condition)
+    if (currentScan && checkoutDestinationState) {
       const currentRfid = currentScan.scannedTagId ?? '';
 
-      // If dailyCheckoutState exists for a DIFFERENT scan, clear it
-      if (currentRfid && dailyCheckoutState.rfid !== currentRfid) {
-        logger.debug('Clearing stale dailyCheckoutState for new scan', {
-          oldRfid: dailyCheckoutState.rfid,
+      // If checkoutDestinationState exists for a DIFFERENT scan, clear it
+      if (currentRfid && checkoutDestinationState.rfid !== currentRfid) {
+        logger.debug('Clearing stale checkoutDestinationState for new scan', {
+          oldRfid: checkoutDestinationState.rfid,
           newRfid: currentRfid,
-          oldStudentName: dailyCheckoutState.studentName,
+          oldStudentName: checkoutDestinationState.studentName,
           newStudentName: currentScan.student_name,
         });
-        setDailyCheckoutState(null);
+        setCheckoutDestinationState(null);
         setShowFeedbackPrompt(false);
       }
     }
-  }, [currentScan, dailyCheckoutState]);
+  }, [currentScan, checkoutDestinationState]);
 
   // Start scanning when component mounts
   useEffect(() => {
@@ -438,11 +407,6 @@ const ActivityScanningPage: React.FC = () => {
         // Uses currentScan.scannedTagId directly (no recentTagScans lookup)
         countDelta = handleCheckoutAction(currentScan, setCheckoutDestinationState);
         break;
-      case 'pending_daily_checkout':
-        // NOTE: No count change yet - server waiting for user confirmation
-        // Uses currentScan.scannedTagId directly (fixes race condition)
-        countDelta = handlePendingDailyCheckoutAction(currentScan, setDailyCheckoutState);
-        break;
       case 'transferred':
         countDelta = handleTransferAction(currentScan, selectedRoom?.name);
         break;
@@ -458,67 +422,29 @@ const ActivityScanningPage: React.FC = () => {
   // Determine modal timeout duration based on current state
   const modalTimeoutDuration = useMemo(() => {
     // Farewell messages use shorter timeout (just showing goodbye)
-    if (dailyCheckoutState?.showingFarewell) {
+    if (checkoutDestinationState?.showingFarewell) {
       return FAREWELL_TIMEOUT_MS;
     }
-    // Daily checkout states (confirmation, destination, feedback) use longer timeout
-    if (dailyCheckoutState || checkoutDestinationState) {
+    // Checkout destination states (buttons, feedback) use longer timeout
+    if (checkoutDestinationState || showFeedbackPrompt) {
       return DAILY_CHECKOUT_TIMEOUT_MS;
     }
     // Normal scans use configured display time
     return rfid.modalDisplayTime;
-  }, [dailyCheckoutState, checkoutDestinationState, rfid.modalDisplayTime]);
+  }, [checkoutDestinationState, showFeedbackPrompt, rfid.modalDisplayTime]);
 
   // Handle modal timeout - cleanup state and dismiss modal
-  // For pending_daily_checkout, timeout = implicit "Nein" (room change)
+  // Student is already checked out by the server, so timeout just closes the modal
   const handleModalTimeout = useCallback(() => {
     logger.debug('Modal timeout triggered', {
-      hasDailyCheckout: !!dailyCheckoutState,
       hasDestinationState: !!checkoutDestinationState,
-      showingFarewell: dailyCheckoutState?.showingFarewell,
+      showingFarewell: checkoutDestinationState?.showingFarewell,
       showFeedbackPrompt,
       navigateOnClose: (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose,
     });
 
     // Check if navigation is required after modal close
     const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
-
-    // If pending daily checkout and not showing farewell/feedback, treat timeout as "Nein" (room change)
-    // This sends the API call with destination='unterwegs'
-    if (
-      dailyCheckoutState &&
-      !dailyCheckoutState.showingFarewell &&
-      !showFeedbackPrompt &&
-      authenticatedUser?.pin
-    ) {
-      logger.info('Timeout on pending daily checkout - processing as room change', {
-        rfid: dailyCheckoutState.rfid,
-        studentName: dailyCheckoutState.studentName,
-      });
-
-      // Fire-and-forget API call for room change (destination=unterwegs)
-      void (async () => {
-        try {
-          await api.toggleAttendance(
-            authenticatedUser.pin,
-            dailyCheckoutState.rfid,
-            'confirm_daily_checkout',
-            'unterwegs'
-          );
-          logger.info('Timeout room change successful');
-          // Decrement count after successful API call
-          setStudentCount(prev => Math.max(0, prev - 1));
-        } catch (error) {
-          logger.error('Failed to process timeout room change', { error });
-          // Silently fail - modal is already closing
-        }
-      })();
-    }
-
-    // Always clear daily checkout state on timeout
-    if (dailyCheckoutState) {
-      setDailyCheckoutState(null);
-    }
 
     // Clean up checkout destination state
     if (checkoutDestinationState) {
@@ -535,7 +461,6 @@ const ActivityScanningPage: React.FC = () => {
     // Navigate after modal is closed if required
     if (navigateTo) {
       logger.info('Navigating after modal timeout', { navigateTo });
-      // Navigation is fire-and-forget - errors are logged but don't affect modal flow
       const result = navigate(navigateTo);
       if (result instanceof Promise) {
         result.catch((err: unknown) => {
@@ -543,15 +468,7 @@ const ActivityScanningPage: React.FC = () => {
         });
       }
     }
-  }, [
-    dailyCheckoutState,
-    checkoutDestinationState,
-    showFeedbackPrompt,
-    hideScanModal,
-    currentScan,
-    navigate,
-    authenticatedUser?.pin,
-  ]);
+  }, [checkoutDestinationState, showFeedbackPrompt, hideScanModal, currentScan, navigate]);
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -577,109 +494,39 @@ const ActivityScanningPage: React.FC = () => {
     void navigate('/pin');
   };
 
-  // Handle daily checkout confirmation - user clicked "Ja, nach Hause"
-  const handleDailyCheckoutConfirm = async () => {
-    if (!dailyCheckoutState || !authenticatedUser?.pin) return;
+  // Handle "nach Hause" button - student confirmed going home
+  // Call confirm_daily_checkout to finalize attendance, then show feedback prompt
+  const handleNachHause = async () => {
+    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+
+    logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
+      rfid: checkoutDestinationState.rfid,
+      studentName: checkoutDestinationState.studentName,
+    });
 
     try {
-      logger.info('Processing daily checkout with destination=zuhause', {
-        rfid: dailyCheckoutState.rfid,
-        studentName: dailyCheckoutState.studentName,
-      });
-
-      // Call attendance toggle API with confirm_daily_checkout and destination=zuhause
       await api.toggleAttendance(
         authenticatedUser.pin,
-        dailyCheckoutState.rfid,
+        checkoutDestinationState.rfid,
         'confirm_daily_checkout',
         'zuhause'
       );
-
-      logger.info('Daily checkout successful - student going home');
-
-      // NOW decrement the student count (checkout just happened)
-      setStudentCount(prev => Math.max(0, prev - 1));
-
-      // Show feedback prompt instead of farewell
+      logger.info('Daily checkout confirmed, showing feedback prompt');
       setShowFeedbackPrompt(true);
     } catch (error) {
-      logger.error('Failed to process daily checkout', { error });
-
-      // Show error modal with network-aware message
-      const errorMessage = error instanceof Error ? error.message : 'Abmeldung fehlgeschlagen';
-      const userFriendlyError = isNetworkRelatedError(error)
-        ? 'Netzwerkfehler beim Abmelden. Bitte Verbindung prüfen und erneut versuchen.'
-        : mapServerErrorToGerman(errorMessage);
-
-      const errorResult: RfidScanResult = {
-        student_name: 'Abmeldung fehlgeschlagen',
-        student_id: null,
-        action: 'error',
-        message: `${dailyCheckoutState.studentName}: ${userFriendlyError}`,
-        showAsError: true,
-      };
-
-      setScanResult(errorResult);
-      setDailyCheckoutState(null);
-      setShowFeedbackPrompt(false);
-      showScanModal();
-      // Modal will auto-close via useModalTimeout hook
-    }
-  };
-
-  // Handle daily checkout decline - user clicked "Nein" (wants room change)
-  const handleDailyCheckoutDecline = async () => {
-    if (!dailyCheckoutState || !authenticatedUser?.pin) return;
-
-    try {
-      logger.info('Processing daily checkout decline with destination=unterwegs', {
-        rfid: dailyCheckoutState.rfid,
-        studentName: dailyCheckoutState.studentName,
+      logger.error('Failed to confirm daily checkout', {
+        rfid: checkoutDestinationState.rfid,
+        error: error instanceof Error ? error.message : String(error),
       });
-
-      // Call attendance toggle API with confirm_daily_checkout and destination=unterwegs
-      await api.toggleAttendance(
-        authenticatedUser.pin,
-        dailyCheckoutState.rfid,
-        'confirm_daily_checkout',
-        'unterwegs'
-      );
-
-      logger.info('Room change checkout successful - student changing rooms');
-
-      // NOW decrement the student count (checkout just happened)
-      setStudentCount(prev => Math.max(0, prev - 1));
-
-      // Clear state and hide modal - no feedback for room changes
-      setDailyCheckoutState(null);
-      hideScanModal();
-    } catch (error) {
-      logger.error('Failed to process room change checkout', { error });
-
-      // Show error modal with network-aware message
-      const errorMessage = error instanceof Error ? error.message : 'Raumwechsel fehlgeschlagen';
-      const userFriendlyError = isNetworkRelatedError(error)
-        ? 'Netzwerkfehler beim Raumwechsel. Bitte Verbindung prüfen und erneut versuchen.'
-        : mapServerErrorToGerman(errorMessage);
-
-      const errorResult: RfidScanResult = {
-        student_name: 'Raumwechsel fehlgeschlagen',
-        student_id: null,
-        action: 'error',
-        message: `${dailyCheckoutState.studentName}: ${userFriendlyError}`,
-        showAsError: true,
-      };
-
-      setScanResult(errorResult);
-      setDailyCheckoutState(null);
-      showScanModal();
-      // Modal will auto-close via useModalTimeout hook
+      // Still show feedback prompt — the visit is already ended,
+      // attendance sync failure shouldn't block the student
+      setShowFeedbackPrompt(true);
     }
   };
 
   // Handle feedback submission
   const handleFeedbackSubmit = async (rating: DailyFeedbackRating) => {
-    if (!dailyCheckoutState || !currentScan) return;
+    if (!checkoutDestinationState || !currentScan) return;
 
     const { submitDailyFeedback } = useUserStore.getState();
 
@@ -693,7 +540,7 @@ const ActivityScanningPage: React.FC = () => {
       logger.warn('Cannot submit feedback: student_id is null');
       setShowFeedbackPrompt(false);
       // Show farewell - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
-      setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+      setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
       return;
     }
 
@@ -708,7 +555,7 @@ const ActivityScanningPage: React.FC = () => {
 
     // Show farewell message - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
     setShowFeedbackPrompt(false);
-    setDailyCheckoutState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+    setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
   };
 
   // Handle checkout destination selection (Schulhof or Raumwechsel)
@@ -834,7 +681,7 @@ const ActivityScanningPage: React.FC = () => {
               marginBottom: '40px',
             }}
           >
-            {dailyCheckoutState?.studentName}
+            {checkoutDestinationState?.studentName}
           </div>
 
           {/* Feedback buttons container - centered with consistent spacing */}
@@ -884,8 +731,12 @@ const ActivityScanningPage: React.FC = () => {
       );
     }
 
-    // Daily checkout confirmation UI
-    if (dailyCheckoutState) {
+    // Unified checkout destination selection (Raumwechsel, Schulhof, nach Hause)
+    if (
+      currentScan.action === 'checked_out' &&
+      checkoutDestinationState &&
+      !checkoutDestinationState.showingFarewell
+    ) {
       return (
         <div
           style={{
@@ -896,101 +747,7 @@ const ActivityScanningPage: React.FC = () => {
             alignItems: 'center',
           }}
         >
-          {!dailyCheckoutState.showingFarewell && (
-            <>
-              {/* Student name subtitle */}
-              <div
-                style={{
-                  fontSize: '28px',
-                  color: 'rgba(255, 255, 255, 0.95)',
-                  fontWeight: 600,
-                  marginBottom: '40px',
-                }}
-              >
-                {dailyCheckoutState.studentName}
-              </div>
-
-              {/* Button container for Yes/No options */}
-              <div
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '16px',
-                  alignItems: 'center',
-                }}
-              >
-                {/* Confirm button */}
-                <button
-                  onClick={handleDailyCheckoutConfirm}
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-                    border: '3px solid rgba(255, 255, 255, 0.5)',
-                    borderRadius: '20px',
-                    color: '#FFFFFF',
-                    fontSize: '32px',
-                    fontWeight: 700,
-                    padding: '20px 64px',
-                    cursor: 'pointer',
-                    transition: 'all 200ms',
-                    outline: 'none',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.35)';
-                    e.currentTarget.style.transform = 'scale(1.05)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.25)';
-                    e.currentTarget.style.transform = 'scale(1)';
-                  }}
-                >
-                  Ja, nach Hause
-                </button>
-
-                {/* Decline button - triggers room change (destination=unterwegs) */}
-                <button
-                  onClick={handleDailyCheckoutDecline}
-                  style={{
-                    backgroundColor: 'transparent',
-                    border: '2px solid rgba(255, 255, 255, 0.4)',
-                    borderRadius: '16px',
-                    color: 'rgba(255, 255, 255, 0.9)',
-                    fontSize: '24px',
-                    fontWeight: 600,
-                    padding: '12px 48px',
-                    cursor: 'pointer',
-                    transition: 'all 200ms',
-                    outline: 'none',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.15)';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.6)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.4)';
-                  }}
-                >
-                  Nein
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      );
-    }
-
-    // Combined checkout + destination selection
-    if (currentScan.action === 'checked_out' && checkoutDestinationState) {
-      return (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-          }}
-        >
+          {/* Row 1: Raumwechsel + Schulhof */}
           <div
             style={{
               display: 'flex',
@@ -1062,6 +819,52 @@ const ActivityScanningPage: React.FC = () => {
                 </button>
               ))}
           </div>
+
+          {/* Row 2: "nach Hause" button (conditional on dailyCheckoutAvailable) */}
+          {checkoutDestinationState.dailyCheckoutAvailable && (
+            <button
+              onClick={handleNachHause}
+              style={{
+                ...DESTINATION_BUTTON_STYLES.base,
+                display: 'flex',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '16px',
+                width: '100%',
+                marginTop: '16px',
+                padding: '16px 48px',
+                position: 'relative',
+                zIndex: 2,
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.backgroundColor =
+                  DESTINATION_BUTTON_STYLES.hover.backgroundColor;
+                e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.backgroundColor =
+                  DESTINATION_BUTTON_STYLES.normal.backgroundColor;
+                e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
+              }}
+            >
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
+                nach Hause
+              </span>
+            </button>
+          )}
 
           {!schulhofRoomId && (
             <p
@@ -1232,8 +1035,8 @@ const ActivityScanningPage: React.FC = () => {
           isOpen={shouldShowCheckModal}
           onClose={handleModalTimeout}
           backgroundColor={(() => {
-            // Check for daily checkout state
-            if (dailyCheckoutState) return '#6366f1'; // Blue for daily checkout
+            // "nach Hause" flow states (farewell, feedback) use blue
+            if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) return '#6366f1';
             // Check for Schulhof check-in (special yellow)
             if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
             // Check for supervisor authentication
@@ -1247,7 +1050,7 @@ const ActivityScanningPage: React.FC = () => {
               : '#f87C10';
           })()}
           timeout={modalTimeoutDuration}
-          timeoutResetKey={`${currentScan.student_id}-${currentScan.action}-${dailyCheckoutState?.showingFarewell ?? false}`}
+          timeoutResetKey={`${currentScan.student_id}-${currentScan.action}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`}
         >
           {/* Background pattern for visual interest */}
           <div
@@ -1279,9 +1082,8 @@ const ActivityScanningPage: React.FC = () => {
             }}
           >
             {(() => {
-              // Daily checkout state - Question or Farewell icon
-              if (dailyCheckoutState) {
-                // Home icon (outline) for daily checkout states
+              // "nach Hause" flow - Home icon for farewell and feedback states
+              if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
                 return (
                   <svg
                     width="80"
@@ -1401,15 +1203,10 @@ const ActivityScanningPage: React.FC = () => {
                 return 'Wie war dein Tag?';
               }
 
-              // Daily checkout state
-              if (dailyCheckoutState) {
-                if (dailyCheckoutState.showingFarewell) {
-                  // Extract first name from full name
-                  const firstName = dailyCheckoutState.studentName.split(' ')[0];
-                  return `Auf Wiedersehen, ${firstName}!`;
-                } else {
-                  return 'Gehst du nach Hause?';
-                }
+              // Farewell state after "nach Hause" feedback
+              if (checkoutDestinationState?.showingFarewell) {
+                const firstName = checkoutDestinationState.studentName.split(' ')[0];
+                return `Auf Wiedersehen, ${firstName}!`;
               }
 
               // Supervisor authentication - prefer custom message (e.g., redirect hint)

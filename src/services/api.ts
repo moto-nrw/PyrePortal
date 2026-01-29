@@ -1173,7 +1173,16 @@ export const api = {
     });
 
     // Extract the actual data from the nested response
-    return response.data;
+    const result = response.data;
+
+    // Normalize backend action: checked_out_daily → checked_out + daily_checkout_available
+    // Student is checked out and eligible for "nach Hause" (daily checkout)
+    if ((result.action as string) === 'checked_out_daily') {
+      result.action = 'checked_out';
+      result.daily_checkout_available = true;
+    }
+
+    return result;
   },
 
   /**
@@ -1371,12 +1380,13 @@ export interface RfidScanResult {
   action:
     | 'checked_in'
     | 'checked_out'
-    | 'pending_daily_checkout'
     | 'transferred'
     | 'supervisor_authenticated'
     | 'error'
     | 'already_in';
   greeting?: string;
+  /** Whether the student is eligible for daily checkout ("nach Hause") */
+  daily_checkout_available?: boolean;
   visit_id?: number;
   room_name?: string;
   previous_room?: string;
