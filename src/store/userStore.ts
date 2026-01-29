@@ -767,6 +767,13 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         currentSession: session,
         selectedActivity: sessionActivity,
         selectedRoom: sessionRoom,
+        // Sync supervisors from backend → local cache
+        ...(session.supervisors && {
+          selectedSupervisors: session.supervisors.map(sup => ({
+            id: sup.staff_id,
+            name: sup.display_name,
+          })),
+        }),
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

@@ -94,9 +94,8 @@ function TeamManagementPage() {
         // Always refresh to pick up newly added supervisors
         await fetchTeachers(true);
 
-        // If we have an active session and no supervisors selected yet,
-        // initialize with current session supervisors
-        if (currentSession && selectedSupervisors.length === 0) {
+        // Always refresh supervisors from backend when there's an active session
+        if (currentSession) {
           // Fetch current session details to get supervisors
           const sessionDetails = await api.getCurrentSession(authenticatedUser!.pin);
           if (sessionDetails && 'supervisors' in sessionDetails) {
@@ -117,14 +116,7 @@ function TeamManagementPage() {
     if (authenticatedUser) {
       void initializePage();
     }
-  }, [
-    authenticatedUser,
-    currentSession,
-    fetchTeachers,
-    selectedSupervisors.length,
-    setSelectedSupervisors,
-    logger,
-  ]);
+  }, [authenticatedUser, currentSession, fetchTeachers, setSelectedSupervisors, logger]);
 
   // Initialize selection order from existing selected supervisors (e.g., from session)
   useEffect(() => {
@@ -193,12 +185,22 @@ function TeamManagementPage() {
     try {
       // If we have an active session, update supervisors via API
       if (currentSession) {
-        await api.updateSessionSupervisors(
+        const result = await api.updateSessionSupervisors(
           authenticatedUser!.pin,
           currentSession.active_group_id,
           selectedSupervisors.map(s => s.id)
         );
         logger.info('Successfully updated session supervisors');
+
+        // Sync server-confirmed supervisors back to local cache
+        if (result.supervisors) {
+          setSelectedSupervisors(
+            result.supervisors.map(sup => ({
+              id: sup.staff_id,
+              name: sup.display_name,
+            }))
+          );
+        }
       }
 
       // Show success modal - navigation happens when modal closes
