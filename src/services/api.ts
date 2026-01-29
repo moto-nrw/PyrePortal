@@ -1371,12 +1371,13 @@ export interface RfidScanResult {
   action:
     | 'checked_in'
     | 'checked_out'
-    | 'pending_daily_checkout'
     | 'transferred'
     | 'supervisor_authenticated'
     | 'error'
     | 'already_in';
   greeting?: string;
+  /** Whether the student is eligible for daily checkout ("nach Hause") */
+  daily_checkout_available?: boolean;
   visit_id?: number;
   room_name?: string;
   previous_room?: string;
