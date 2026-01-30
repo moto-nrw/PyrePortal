@@ -868,7 +868,7 @@ const ActivityScanningPage: React.FC = () => {
             <p
               style={{
                 marginTop: '16px',
-                fontSize: '16px',
+                fontSize: '22px',
                 color: 'rgba(255, 255, 255, 0.6)',
                 position: 'relative',
                 zIndex: 2,
