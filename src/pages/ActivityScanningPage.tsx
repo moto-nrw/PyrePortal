@@ -820,8 +820,8 @@ const ActivityScanningPage: React.FC = () => {
               ))}
           </div>
 
-          {/* Row 2: "nach Hause" button (conditional on dailyCheckoutAvailable) */}
-          {checkoutDestinationState.dailyCheckoutAvailable && (
+          {/* Row 2: "nach Hause" button or hint text */}
+          {checkoutDestinationState.dailyCheckoutAvailable ? (
             <button
               onClick={handleNachHause}
               style={{
@@ -864,6 +864,19 @@ const ActivityScanningPage: React.FC = () => {
                 nach Hause
               </span>
             </button>
+          ) : (
+            <p
+              style={{
+                marginTop: '16px',
+                fontSize: '16px',
+                color: 'rgba(255, 255, 255, 0.6)',
+                position: 'relative',
+                zIndex: 2,
+                fontStyle: 'italic',
+              }}
+            >
+              „nach Hause" nur vom Heimatraum möglich
+            </p>
           )}
 
           {!schulhofRoomId && (
