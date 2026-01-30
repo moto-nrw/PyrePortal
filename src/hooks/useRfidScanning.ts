@@ -244,9 +244,6 @@ export const useRfidScanning = () => {
 
   const {
     rfid,
-    authenticatedUser,
-    selectedRoom,
-    currentSession,
     startRfidScanning,
     stopRfidScanning,
     setScanResult,
@@ -335,8 +332,15 @@ export const useRfidScanning = () => {
 
   const processScan = useCallback(
     async (tagId: string) => {
+      // Read fresh state from store to avoid stale closures
+      // (the event listener closure may hold outdated selectedRoom/authenticatedUser)
+      const currentState = useUserStore.getState();
+      const freshRoom = currentState.selectedRoom;
+      const freshUser = currentState.authenticatedUser;
+      const freshSession = currentState.currentSession;
+
       // Validate authentication state
-      if (!authenticatedUser?.pin || !selectedRoom) {
+      if (!freshUser?.pin || !freshRoom) {
         logger.error('Missing authentication or room selection');
         setScanResult(createSessionExpiredResult());
         showScanModal();
@@ -380,8 +384,8 @@ export const useRfidScanning = () => {
 
         // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
-          { student_rfid: tagId, action: 'checkin', room_id: selectedRoom.id },
-          authenticatedUser.pin
+          { student_rfid: tagId, action: 'checkin', room_id: freshRoom.id },
+          freshUser.pin
         );
 
         logger.info(`RFID scan completed via server: ${result.action} for ${result.student_name}`, {
@@ -398,8 +402,8 @@ export const useRfidScanning = () => {
           result,
           tagId,
           scanId,
-          currentSession,
-          pin: authenticatedUser.pin,
+          currentSession: freshSession,
+          pin: freshUser.pin,
           scannedSupervisorsRef,
           addSupervisorFromRfid,
           addActiveSupervisorTag,
@@ -425,7 +429,7 @@ export const useRfidScanning = () => {
 
         // Update session activity (fire-and-forget)
         try {
-          await api.updateSessionActivity(authenticatedUser.pin);
+          await api.updateSessionActivity(freshUser.pin);
           logger.debug('Session activity updated');
         } catch (activityError) {
           logger.warn('Failed to update session activity', { error: activityError });
@@ -443,9 +447,6 @@ export const useRfidScanning = () => {
       }
     },
     [
-      authenticatedUser,
-      selectedRoom,
-      currentSession,
       setScanResult,
       showScanModal,
       addOptimisticScan,
