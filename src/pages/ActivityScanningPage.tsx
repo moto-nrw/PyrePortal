@@ -397,30 +397,31 @@ const ActivityScanningPage: React.FC = () => {
     const extendedScan = currentScan as ExtendedScanResult;
     if (isNonActionableScan(extendedScan)) return;
 
-    // Use authoritative server count when available
-    if (currentScan.active_students != null) {
-      setStudentCount(currentScan.active_students);
-      return;
-    }
+    // Use authoritative server count when available, otherwise fall back to optimistic delta
+    const hasAuthoritativeCount = currentScan.active_students != null;
 
-    // Fallback: optimistic delta (backward compatibility with older backend)
-    let countDelta = 0;
+    // Run action-specific side effects (e.g. checkout destination state) regardless of count source
     switch (currentScan.action) {
       case 'checked_in':
-        countDelta = handleCheckinAction(extendedScan);
+        if (!hasAuthoritativeCount) {
+          const delta = handleCheckinAction(extendedScan);
+          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
+        }
         break;
       case 'checked_out':
-        // Uses currentScan.scannedTagId directly (no recentTagScans lookup)
-        countDelta = handleCheckoutAction(currentScan, setCheckoutDestinationState);
+        handleCheckoutAction(currentScan, setCheckoutDestinationState);
         break;
       case 'transferred':
-        countDelta = handleTransferAction(currentScan, selectedRoom?.name);
+        if (!hasAuthoritativeCount) {
+          const delta = handleTransferAction(currentScan, selectedRoom?.name);
+          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
+        }
         break;
     }
 
-    // Apply count delta if needed
-    if (countDelta !== 0) {
-      setStudentCount(prev => Math.max(0, prev + countDelta));
+    // Apply authoritative count after side effects
+    if (hasAuthoritativeCount) {
+      setStudentCount(currentScan.active_students!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
