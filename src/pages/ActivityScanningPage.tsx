@@ -403,6 +403,7 @@ const ActivityScanningPage: React.FC = () => {
     // Run action-specific side effects (e.g. checkout destination state) regardless of count source
     switch (currentScan.action) {
       case 'checked_in':
+        // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
           const delta = handleCheckinAction(extendedScan);
           if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
@@ -412,6 +413,7 @@ const ActivityScanningPage: React.FC = () => {
         handleCheckoutAction(currentScan, setCheckoutDestinationState);
         break;
       case 'transferred':
+        // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
           const delta = handleTransferAction(currentScan, selectedRoom?.name);
           if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
