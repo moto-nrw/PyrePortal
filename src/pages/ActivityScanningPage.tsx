@@ -397,7 +397,13 @@ const ActivityScanningPage: React.FC = () => {
     const extendedScan = currentScan as ExtendedScanResult;
     if (isNonActionableScan(extendedScan)) return;
 
-    // Process action and get count delta
+    // Use authoritative server count when available
+    if (currentScan.active_students != null) {
+      setStudentCount(currentScan.active_students);
+      return;
+    }
+
+    // Fallback: optimistic delta (backward compatibility with older backend)
     let countDelta = 0;
     switch (currentScan.action) {
       case 'checked_in':

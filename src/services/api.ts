@@ -1399,6 +1399,8 @@ export interface RfidScanResult {
   isInfo?: boolean;
   /** The RFID tag that was scanned (added by frontend, not from server) */
   scannedTagId?: string;
+  /** Authoritative count of active students in the room's session (from server) */
+  active_students?: number;
 }
 
 /**
