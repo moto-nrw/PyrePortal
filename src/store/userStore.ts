@@ -766,22 +766,23 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const sessionRoom = createSessionRoom(session);
 
       // Guard: Don't overwrite selectedRoom if user just manually selected a room
-      // This prevents stale server data from reverting a recent room switch
+      // This prevents stale server data from reverting a recent room switch.
+      // A null sessionRoom during the recent-selection window is treated as stale/partial
+      // data — the manual selection is preserved rather than wiped.
       const currentSelectedRoom = get().selectedRoom;
       const roomSelectedAt = get()._roomSelectedAt;
       const isRecentManualSelection = roomSelectedAt != null && Date.now() - roomSelectedAt < 5000;
       const shouldPreserveRoom =
         isRecentManualSelection &&
         currentSelectedRoom != null &&
-        sessionRoom != null &&
-        currentSelectedRoom.id !== sessionRoom.id;
+        (sessionRoom == null || currentSelectedRoom.id !== sessionRoom.id);
 
       if (shouldPreserveRoom) {
         storeLogger.debug('Preserving manually selected room during fetchCurrentSession', {
           manualRoomId: currentSelectedRoom.id,
           manualRoomName: currentSelectedRoom.name,
-          serverRoomId: sessionRoom.id,
-          serverRoomName: sessionRoom.name,
+          serverRoomId: sessionRoom?.id ?? null,
+          serverRoomName: sessionRoom?.name ?? null,
           roomSelectedAgoMs: Date.now() - roomSelectedAt,
         });
       }
