@@ -409,9 +409,13 @@ const ActivityScanningPage: React.FC = () => {
           if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
         }
         break;
-      case 'checked_out':
-        handleCheckoutAction(currentScan, setCheckoutDestinationState);
+      case 'checked_out': {
+        const delta = handleCheckoutAction(currentScan, setCheckoutDestinationState);
+        // Legacy: optimistic delta fallback for servers that don't provide active_students
+        if (!hasAuthoritativeCount && delta !== 0)
+          setStudentCount(prev => Math.max(0, prev + delta));
         break;
+      }
       case 'transferred':
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
