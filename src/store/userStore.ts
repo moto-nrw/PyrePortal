@@ -429,6 +429,7 @@ interface UserState {
   authenticatedUser: AuthenticatedUser | null;
   rooms: Room[];
   selectedRoom: Room | null;
+  _roomSelectedAt: number | null; // Timestamp of last manual room selection (race condition guard)
   selectedActivity: ActivityResponse | null;
   currentSession: CurrentSession | null;
   activities: Activity[];
@@ -588,6 +589,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   authenticatedUser: null,
   rooms: [] as Room[],
   selectedRoom: null,
+  _roomSelectedAt: null,
   selectedActivity: null,
   currentSession: null,
   activities: [] as Activity[],
@@ -720,7 +722,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
     if (roomToSelect) {
       storeLogger.info('Room selected', { roomId, roomName: roomToSelect.name });
-      set({ selectedRoom: roomToSelect });
+      set({ selectedRoom: roomToSelect, _roomSelectedAt: Date.now() });
     } else {
       storeLogger.warn('Room not found', { roomId });
     }
@@ -763,10 +765,31 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       );
       const sessionRoom = createSessionRoom(session);
 
+      // Guard: Don't overwrite selectedRoom if user just manually selected a room
+      // This prevents stale server data from reverting a recent room switch
+      const currentSelectedRoom = get().selectedRoom;
+      const roomSelectedAt = get()._roomSelectedAt;
+      const isRecentManualSelection = roomSelectedAt != null && Date.now() - roomSelectedAt < 5000;
+      const shouldPreserveRoom =
+        isRecentManualSelection &&
+        currentSelectedRoom != null &&
+        sessionRoom != null &&
+        currentSelectedRoom.id !== sessionRoom.id;
+
+      if (shouldPreserveRoom) {
+        storeLogger.debug('Preserving manually selected room during fetchCurrentSession', {
+          manualRoomId: currentSelectedRoom.id,
+          manualRoomName: currentSelectedRoom.name,
+          serverRoomId: sessionRoom.id,
+          serverRoomName: sessionRoom.name,
+          roomSelectedAgoMs: Date.now() - roomSelectedAt,
+        });
+      }
+
       set({
         currentSession: session,
         selectedActivity: sessionActivity,
-        selectedRoom: sessionRoom,
+        ...(shouldPreserveRoom ? {} : { selectedRoom: sessionRoom }),
         // Sync supervisors from backend → local cache
         ...(session.supervisors && {
           selectedSupervisors: session.supervisors.map(sup => ({

@@ -234,7 +234,16 @@ const ActivityScanningPage: React.FC = () => {
   }, [showModal, currentScan]);
 
   // State consistency guard - detect and fix stale room state (Issue #129 Bug 1)
+  // Skips during recent manual room transitions to avoid ping-pong with stale server data
   useEffect(() => {
+    const roomSelectedAt = useUserStore.getState()._roomSelectedAt;
+    const isRecentTransition = roomSelectedAt != null && Date.now() - roomSelectedAt < 5000;
+
+    if (isRecentTransition) {
+      logger.debug('Skipping room mismatch check during recent room transition');
+      return;
+    }
+
     if (currentSession?.room_id && selectedRoom && selectedRoom.id !== currentSession.room_id) {
       logger.warn('State inconsistency detected: selectedRoom does not match session', {
         selectedRoomId: selectedRoom.id,
