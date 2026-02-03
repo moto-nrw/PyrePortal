@@ -376,9 +376,8 @@ export const useRfidScanning = () => {
       const startTime = Date.now();
 
       try {
-        // Show optimistic UI feedback
+        // Track optimistic scan state (no modal yet - wait for API response)
         addOptimisticScan(createOptimisticScan(scanId, tagId));
-        showScanModal();
         logger.info('Starting network scan (cache disabled)');
         updateOptimisticScan(scanId, 'processing');
 
@@ -426,6 +425,9 @@ export const useRfidScanning = () => {
           updateStudentHistory,
           recordTagScan,
         });
+
+        // Show result modal now that we have real data (not optimistic)
+        showScanModal();
 
         // Update session activity (fire-and-forget)
         try {
