@@ -6,6 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
+import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -893,6 +894,9 @@ function TagAssignmentPage() {
         message={error ?? ''}
         autoCloseDelay={3000}
       />
+
+      {/* Bottom-left spinner: visible between RFID tag detection and API response */}
+      <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />
     </>
   );
 }

@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
+import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
@@ -1296,6 +1297,9 @@ const ActivityScanningPage: React.FC = () => {
           {renderModalContent()}
         </ModalBase>
       )}
+
+      {/* Bottom-left spinner: visible between RFID tag detection and API response */}
+      <RfidProcessingIndicator isVisible={rfid.processingQueue.size > 0} />
     </>
   );
 };
