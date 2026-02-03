@@ -397,24 +397,37 @@ const ActivityScanningPage: React.FC = () => {
     const extendedScan = currentScan as ExtendedScanResult;
     if (isNonActionableScan(extendedScan)) return;
 
-    // Process action and get count delta
-    let countDelta = 0;
+    // Use authoritative server count when available, otherwise fall back to optimistic delta
+    const hasAuthoritativeCount = currentScan.active_students != null;
+
+    // Run action-specific side effects (e.g. checkout destination state) regardless of count source
     switch (currentScan.action) {
       case 'checked_in':
-        countDelta = handleCheckinAction(extendedScan);
+        // Legacy: optimistic delta fallback for servers that don't provide active_students
+        if (!hasAuthoritativeCount) {
+          const delta = handleCheckinAction(extendedScan);
+          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
+        }
         break;
-      case 'checked_out':
-        // Uses currentScan.scannedTagId directly (no recentTagScans lookup)
-        countDelta = handleCheckoutAction(currentScan, setCheckoutDestinationState);
+      case 'checked_out': {
+        const delta = handleCheckoutAction(currentScan, setCheckoutDestinationState);
+        // Legacy: optimistic delta fallback for servers that don't provide active_students
+        if (!hasAuthoritativeCount && delta !== 0)
+          setStudentCount(prev => Math.max(0, prev + delta));
         break;
+      }
       case 'transferred':
-        countDelta = handleTransferAction(currentScan, selectedRoom?.name);
+        // Legacy: optimistic delta fallback for servers that don't provide active_students
+        if (!hasAuthoritativeCount) {
+          const delta = handleTransferAction(currentScan, selectedRoom?.name);
+          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
+        }
         break;
     }
 
-    // Apply count delta if needed
-    if (countDelta !== 0) {
-      setStudentCount(prev => Math.max(0, prev + countDelta));
+    // Apply authoritative count after side effects
+    if (hasAuthoritativeCount) {
+      setStudentCount(currentScan.active_students!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
