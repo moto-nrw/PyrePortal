@@ -410,12 +410,6 @@ export const loggerMiddleware =
           return;
         }
 
-        // Capture caller information if enabled
-        let callerInfo = '';
-        if (actionSource) {
-          callerInfo = getCallerInfo();
-        }
-
         // Get current state before update
         const prevState = get();
 
@@ -434,6 +428,12 @@ export const loggerMiddleware =
         // Skip logging if no meaningful changes detected
         if (Object.keys(changes).length === 0) {
           return;
+        }
+
+        // Capture caller information if enabled (after filtering to avoid unnecessary stack trace parsing)
+        let callerInfo = '';
+        if (actionSource) {
+          callerInfo = getCallerInfo();
         }
 
         // Apply custom state filter if provided

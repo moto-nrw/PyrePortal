@@ -120,7 +120,6 @@ export class Logger {
   private readonly source: string;
   private readonly sessionId: string;
   private static inMemoryLogs: LogEntry[] = [];
-  private static instance: Logger;
 
   /**
    * Create a new logger instance
@@ -132,20 +131,6 @@ export class Logger {
     this.source = source;
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.sessionId = SESSION_ID;
-  }
-
-  /**
-   * Get a singleton instance of the logger
-   *
-   * @param source The source/component name
-   * @param config Configuration options
-   * @returns A logger instance
-   */
-  public static getInstance(source: string, config: LoggerConfig = {}): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger('App', config);
-    }
-    return new Logger(source, Logger.instance.config);
   }
 
   /**
@@ -352,7 +337,7 @@ export class Logger {
  * @returns A configured logger instance
  */
 export function createLogger(source: string, config?: LoggerConfig): Logger {
-  return Logger.getInstance(source, config);
+  return new Logger(source, config);
 }
 
 // Export a default app-level logger
