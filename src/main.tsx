@@ -19,7 +19,7 @@ const logger = createLogger('main');
 try {
   await initializeApi();
 } catch (error) {
-  logger.error('Failed to initialize API:', { error });
+  logger.error('Failed to initialize API', { error });
   // Still render the app even if API init fails - it will show offline status
 }
 

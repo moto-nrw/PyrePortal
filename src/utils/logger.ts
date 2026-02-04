@@ -37,15 +37,62 @@ export interface LoggerConfig {
   contextInfo?: Record<string, unknown>;
 }
 
-// Default configuration
-const DEFAULT_CONFIG: LoggerConfig = {
+// Default production configuration
+const defaultConfig: LoggerConfig = {
   level: import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.WARN,
   persist: true,
-  persistLevel: import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.WARN,
+  persistLevel: import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.INFO,
   maxInMemoryLogs: 1000,
   consoleOutput: true,
   contextInfo: {},
 };
+
+// Development configuration override
+const devConfig: LoggerConfig = {
+  ...defaultConfig,
+  level: LogLevel.DEBUG,
+  persistLevel: LogLevel.DEBUG,
+  maxInMemoryLogs: 5000,
+};
+
+// Test configuration override
+const testConfig: LoggerConfig = {
+  ...defaultConfig,
+  level: LogLevel.NONE,
+  persist: false,
+  consoleOutput: false,
+};
+
+// Get the appropriate configuration based on environment (avoids nested ternary - SonarCloud S3358)
+const getEnvironmentConfig = (): LoggerConfig => {
+  if (import.meta.env.TEST) {
+    return testConfig;
+  }
+  if (import.meta.env.DEV) {
+    return devConfig;
+  }
+  return defaultConfig;
+};
+
+// Check if debug logging was manually enabled via localStorage
+const isDebugLoggingEnabled = (): boolean => {
+  return localStorage.getItem('pyrePortalDebugLogging') === 'true';
+};
+
+// Get runtime configuration with any user preferences
+export const getRuntimeConfig = (): LoggerConfig => {
+  const config = { ...getEnvironmentConfig() };
+
+  // Override with user preferences if debug mode was manually enabled
+  if (isDebugLoggingEnabled()) {
+    config.level = LogLevel.DEBUG;
+  }
+
+  return config;
+};
+
+// Default configuration used by Logger constructor
+const DEFAULT_CONFIG: LoggerConfig = getRuntimeConfig();
 
 /**
  * Logger class for PyrePortal application
@@ -301,16 +348,17 @@ export const logger = createLogger('App');
 
 // Create higher-order logging functions for common scenarios
 export const logUserAction = (action: string, details?: Record<string, unknown>): void => {
-  logger.info(`User Action: ${action}`, details);
+  logger.info('User action', { action, ...details });
 };
 
 export const logNavigation = (from: string, to: string, params?: Record<string, unknown>): void => {
-  logger.info(`Navigation: ${from} → ${to}`, params);
+  logger.info('Navigation', { from, to, ...params });
 };
 
 export const logError = (error: Error, context?: string): void => {
-  const contextSuffix = context ? ` in ${context}` : '';
-  logger.error(`Error${contextSuffix}: ${error.message}`, {
+  logger.error('Unhandled error', {
+    message: error.message,
+    context,
     stack: error.stack,
     name: error.name,
   } as Record<string, unknown>);

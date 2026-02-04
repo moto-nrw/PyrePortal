@@ -205,7 +205,7 @@ const ActivityScanningPage: React.FC = () => {
   // Debug logging for selectedActivity
   useEffect(() => {
     if (selectedActivity) {
-      logger.debug('Selected activity data:', {
+      logger.debug('Selected activity data', {
         id: selectedActivity.id,
         name: selectedActivity.name,
         max_participants: selectedActivity.max_participants,
@@ -315,14 +315,13 @@ const ActivityScanningPage: React.FC = () => {
   // Start scanning when component mounts
   useEffect(() => {
     const mountTimestamp = Date.now();
-    logger.info('[RACE-DEBUG] Activity Scanning Page MOUNTED', {
+    logger.debug('Activity Scanning Page mounted', {
       timestamp: mountTimestamp,
-      page: 'ActivityScanningPage',
     });
 
     // Start scanning and clear initializing state
     const initializeScanning = async () => {
-      logger.info('[RACE-DEBUG] Calling startScanning() from page mount', {
+      logger.debug('Calling startScanning() from page mount', {
         timestamp: Date.now(),
         timeSinceMount: Date.now() - mountTimestamp,
       });
@@ -334,13 +333,9 @@ const ActivityScanningPage: React.FC = () => {
     // Cleanup: stop scanning when component unmounts
     return () => {
       const unmountTimestamp = Date.now();
-      logger.info('[RACE-DEBUG] Activity Scanning Page UNMOUNTING', {
+      logger.debug('Activity Scanning Page unmounting', {
         timestamp: unmountTimestamp,
-        page: 'ActivityScanningPage',
         timeSinceMount: unmountTimestamp - mountTimestamp,
-      });
-      logger.info('[RACE-DEBUG] Calling stopScanning() from page unmount', {
-        timestamp: unmountTimestamp,
       });
       void stopScanning(); // Handle async function
     };
@@ -353,11 +348,11 @@ const ActivityScanningPage: React.FC = () => {
 
     try {
       const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
-      logger.debug('Session info received:', sessionInfo ?? {});
+      logger.debug('Session info received', sessionInfo ?? {});
 
       if (sessionInfo) {
         const count = sessionInfo.active_students ?? 0;
-        logger.info(`Setting student count to: ${count}`);
+        logger.info('Setting student count', { count });
         setStudentCount(count);
       } else {
         logger.warn('No session info received');

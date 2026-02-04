@@ -907,7 +907,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       updatedTags.add(tagId);
       return { activeSupervisorTags: updatedTags };
     });
-    storeLogger.debug('RFID-Tag für Betreuer gespeichert', { tagId });
+    storeLogger.debug('RFID tag saved for supervisor', { tagId });
   },
 
   isActiveSupervisor: (tagId: string) => {
@@ -916,7 +916,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   clearActiveSupervisorTags: () => {
     set({ activeSupervisorTags: new Set<string>() });
-    storeLogger.debug('Aktive Betreuer-Tags geleert');
+    storeLogger.debug('Active supervisor tags cleared');
   },
 
   // Activity-related actions

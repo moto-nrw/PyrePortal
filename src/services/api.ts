@@ -500,9 +500,6 @@ async function parseErrorResponse(
   }
 }
 
-/** Endpoints that should always be logged for debugging */
-const ALWAYS_LOG_ENDPOINTS = new Set(['/api/iot/ping', '/api/iot/checkin']);
-
 /**
  * Generic API call function with error handling and response timing
  */
@@ -511,16 +508,6 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const url = `${API_BASE_URL}${endpoint}`;
   const startTime = Date.now();
-
-  // Debug logging for authentication issues
-  if (endpoint === '/api/iot/ping') {
-    logger.debug('Making ping request', {
-      url,
-      method: options.method,
-      hasAuth: !!(options.headers as Record<string, string>)?.Authorization,
-      hasPin: !!(options.headers as Record<string, string>)?.['X-Staff-PIN'],
-    });
-  }
 
   let response: Response;
   try {
@@ -553,15 +540,12 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new ApiError(message, response.status, code, details);
   }
 
-  // Log successful request timing for critical endpoints or slow responses
-  if (ALWAYS_LOG_ENDPOINTS.has(endpoint) || responseTime > 1000) {
-    logger.info('API request completed', {
-      endpoint,
-      status: response.status,
-      responseTime,
-      quality: responseTime < POOR_THRESHOLD_MS ? 'online' : 'poor',
-    });
-  }
+  logger.info('API request completed', {
+    endpoint,
+    status: response.status,
+    responseTime,
+    quality: responseTime < POOR_THRESHOLD_MS ? 'online' : 'poor',
+  });
 
   reportNetworkStatus(responseTime, true);
 
@@ -910,7 +894,7 @@ export const api = {
    * Endpoint: POST /api/iot/session/start
    */
   async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
-    logger.info('Starting session with request:', { ...request });
+    logger.info('Starting session', { ...request });
 
     const response = await apiCall<{
       status: string;
