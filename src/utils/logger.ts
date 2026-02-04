@@ -86,6 +86,7 @@ export const getRuntimeConfig = (): LoggerConfig => {
   // Override with user preferences if debug mode was manually enabled
   if (isDebugLoggingEnabled()) {
     config.level = LogLevel.DEBUG;
+    config.persistLevel = LogLevel.DEBUG;
   }
 
   return config;
@@ -94,6 +95,23 @@ export const getRuntimeConfig = (): LoggerConfig => {
 // Default configuration used by Logger constructor
 const DEFAULT_CONFIG: LoggerConfig = getRuntimeConfig();
 
+// Shared session ID across all logger instances
+const SESSION_ID = `${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
+
+/**
+ * Serialize an error into a plain object safe for JSON.stringify
+ */
+export function serializeError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      name: error.name,
+      ...(error.stack ? { stack: error.stack } : {}),
+    };
+  }
+  return { message: String(error) };
+}
+
 /**
  * Logger class for PyrePortal application
  */
@@ -101,7 +119,7 @@ export class Logger {
   private config: LoggerConfig;
   private readonly source: string;
   private readonly sessionId: string;
-  private inMemoryLogs: LogEntry[] = [];
+  private static inMemoryLogs: LogEntry[] = [];
   private static instance: Logger;
 
   /**
@@ -113,7 +131,7 @@ export class Logger {
   constructor(source: string, config: LoggerConfig = {}) {
     this.source = source;
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.sessionId = this.generateSessionId();
+    this.sessionId = SESSION_ID;
   }
 
   /**
@@ -187,18 +205,18 @@ export class Logger {
    */
   public getInMemoryLogs(level?: LogLevel): LogEntry[] {
     if (level !== undefined) {
-      return this.inMemoryLogs.filter(
+      return Logger.inMemoryLogs.filter(
         entry => LogLevel[entry.level as keyof typeof LogLevel] >= level
       );
     }
-    return [...this.inMemoryLogs];
+    return [...Logger.inMemoryLogs];
   }
 
   /**
    * Clear in-memory logs
    */
   public clearInMemoryLogs(): void {
-    this.inMemoryLogs = [];
+    Logger.inMemoryLogs = [];
   }
 
   /**
@@ -219,8 +237,11 @@ export class Logger {
    * @param data Additional data to include
    */
   private log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
-    // Skip if logging is disabled or below configured level
-    if (level < this.config.level!) {
+    const consoleLevel = this.config.level!;
+    const persistLvl = this.config.persistLevel!;
+
+    // Skip if below both thresholds
+    if (level < consoleLevel && level < persistLvl) {
       return;
     }
 
@@ -241,13 +262,13 @@ export class Logger {
     // Store in memory (with circular buffer behavior)
     this.storeInMemory(logEntry);
 
-    // Output to console if enabled
-    if (this.config.consoleOutput) {
+    // Output to console if enabled and meets console level
+    if (this.config.consoleOutput && level >= consoleLevel) {
       this.writeToConsole(level, logEntry);
     }
 
-    // Persist if enabled and meets minimum level
-    if (this.config.persist && level >= this.config.persistLevel!) {
+    // Persist if enabled and meets persist level
+    if (this.config.persist && level >= persistLvl) {
       void this.persistLog(logEntry);
     }
   }
@@ -258,11 +279,11 @@ export class Logger {
    * @param logEntry The log entry to store
    */
   private storeInMemory(logEntry: LogEntry): void {
-    this.inMemoryLogs.push(logEntry);
+    Logger.inMemoryLogs.push(logEntry);
 
     // Maintain maximum log count using circular buffer logic
-    if (this.inMemoryLogs.length > this.config.maxInMemoryLogs!) {
-      this.inMemoryLogs.shift(); // Remove oldest entry
+    if (Logger.inMemoryLogs.length > this.config.maxInMemoryLogs!) {
+      Logger.inMemoryLogs.shift(); // Remove oldest entry
     }
   }
 
@@ -320,15 +341,6 @@ export class Logger {
         console.error('Failed to persist log:', errorMessage);
       }
     }
-  }
-
-  /**
-   * Generate a unique session ID
-   *
-   * @returns Session ID string
-   */
-  private generateSessionId(): string {
-    return `${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
   }
 }
 

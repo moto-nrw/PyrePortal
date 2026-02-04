@@ -11,7 +11,13 @@ import {
 import { usePagination } from '../hooks/usePagination';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+import {
+  createLogger,
+  logNavigation,
+  logUserAction,
+  logError,
+  serializeError,
+} from '../utils/logger';
 
 function CreateActivityPage() {
   const {
@@ -94,7 +100,7 @@ function CreateActivityPage() {
         return;
       }
 
-      logger.error('Failed to fetch activities', { error });
+      logger.error('Failed to fetch activities', { error: serializeError(error) });
       logError(
         error instanceof Error ? error : new Error(String(error)),
         'CreateActivityPage.fetchActivitiesData'

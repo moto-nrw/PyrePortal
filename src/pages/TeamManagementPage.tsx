@@ -13,7 +13,7 @@ import { usePagination } from '../hooks/usePagination';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import { createLogger, logNavigation, logUserAction } from '../utils/logger';
+import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 
 function TeamManagementPage() {
   const {
@@ -100,7 +100,7 @@ function TeamManagementPage() {
           }
         }
       } catch (error) {
-        logger.error('Failed to initialize team management page', { error });
+        logger.error('Failed to initialize team management page', { error: serializeError(error) });
       }
     };
 
@@ -177,7 +177,7 @@ function TeamManagementPage() {
       // Show success modal - navigation happens when modal closes
       setShowSuccessModal(true);
     } catch (error) {
-      logger.error('Failed to update supervisors', { error });
+      logger.error('Failed to update supervisors', { error: serializeError(error) });
       setErrorMessage('Fehler beim Aktualisieren der Betreuer. Bitte versuchen Sie es erneut.');
       setShowErrorModal(true);
     } finally {

@@ -12,7 +12,7 @@ import { usePagination } from '../hooks/usePagination';
 import { api, type Student, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import { createLogger, logUserAction } from '../utils/logger';
+import { createLogger, logUserAction, serializeError } from '../utils/logger';
 
 const ENTITIES_PER_PAGE = 10; // 5x2 grid to use full width
 
@@ -254,7 +254,7 @@ function StudentSelectionPage() {
       }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
-      logger.error('Failed to assign tag', { error });
+      logger.error('Failed to assign tag', { error: serializeError(error) });
       setError('Armband konnte nicht zugewiesen werden. Bitte erneut versuchen.');
       setShowErrorModal(true);
     } finally {

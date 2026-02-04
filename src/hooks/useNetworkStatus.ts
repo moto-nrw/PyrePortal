@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import { api } from '../services/api';
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('useNetworkStatus');
 
@@ -80,7 +80,7 @@ export const useNetworkStatus = () => {
       const status = await checkNetworkStatus();
       setNetworkStatus(status);
     } catch (error) {
-      logger.error('Failed to check network status', { error });
+      logger.error('Failed to check network status', { error: serializeError(error) });
 
       // Fallback to offline (health check itself failed unexpectedly)
       setNetworkStatus({
@@ -142,7 +142,9 @@ export const useNetworkStatus = () => {
         }
       }
     } catch (error) {
-      logger.error('Unexpected error during initial network check', { error });
+      logger.error('Unexpected error during initial network check', {
+        error: serializeError(error),
+      });
 
       // Fallback to offline
       setNetworkStatus({

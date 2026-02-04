@@ -3,7 +3,7 @@
  * Handles all communication with the backend API
  */
 
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 import { safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('API');
@@ -427,7 +427,9 @@ export async function initializeApi(): Promise<void> {
     });
   } catch (error) {
     // Fallback to build-time env vars if Tauri is not available (e.g., in dev without Tauri)
-    logger.warn('Failed to load runtime config, falling back to build-time env vars', { error });
+    logger.warn('Failed to load runtime config, falling back to build-time env vars', {
+      error: serializeError(error),
+    });
     API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
     DEVICE_API_KEY = import.meta.env.VITE_DEVICE_API_KEY as string;
 

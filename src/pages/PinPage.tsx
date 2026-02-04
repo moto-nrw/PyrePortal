@@ -9,7 +9,13 @@ import BackButton from '../components/ui/BackButton';
 import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
-import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+import {
+  createLogger,
+  logNavigation,
+  logUserAction,
+  logError,
+  serializeError,
+} from '../utils/logger';
 
 /**
  * Custom numpad button component - Phoenix Clean Style
@@ -228,7 +234,7 @@ function PinPage() {
       setErrorMessage(errorMsg);
       setIsErrorModalOpen(true);
       setPin(''); // Clear PIN
-      logger.error('Global PIN verification error', { error });
+      logger.error('Global PIN verification error', { error: serializeError(error) });
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleSubmit');
     } finally {
       setIsLoading(false);

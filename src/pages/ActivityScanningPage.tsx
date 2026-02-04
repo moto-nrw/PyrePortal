@@ -15,7 +15,7 @@ import {
   type DailyFeedbackRating,
 } from '../services/api';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
 
@@ -343,7 +343,7 @@ const ActivityScanningPage: React.FC = () => {
         setStudentCount(0);
       }
     } catch (error) {
-      logger.error('Failed to fetch session info', { error });
+      logger.error('Failed to fetch session info', { error: serializeError(error) });
     }
   };
 
@@ -385,7 +385,7 @@ const ActivityScanningPage: React.FC = () => {
           // Don't fail - just won't show Schulhof option
         }
       } catch (error) {
-        logger.error('Failed to fetch Schulhof room', { error });
+        logger.error('Failed to fetch Schulhof room', { error: serializeError(error) });
         // Non-critical error - continue without Schulhof functionality
       }
     };
@@ -651,7 +651,7 @@ const ActivityScanningPage: React.FC = () => {
         showScanModal();
         // Modal will auto-close via useModalTimeout hook
       } catch (error) {
-        logger.error('Failed to check into Schulhof', { error });
+        logger.error('Failed to check into Schulhof', { error: serializeError(error) });
 
         // Map error to user-friendly German message with network detection
         const errorMessage =

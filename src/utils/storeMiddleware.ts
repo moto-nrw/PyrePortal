@@ -445,11 +445,13 @@ export const loggerMiddleware =
         if (stateChanges) {
           const level = logLevel ?? LogLevel.DEBUG;
           const logPayload = {
+            actionId,
+            actionName,
             changes,
             timestamp: timestamp.toISOString(),
             ...(callerInfo ? { source: callerInfo } : {}),
           };
-          const logMessage = `[${actionId}] State updated: ${actionName}`;
+          const logMessage = 'State updated';
 
           // Use the appropriate public logging method based on level
           switch (level) {
@@ -483,8 +485,9 @@ export const loggerMiddleware =
             const prevName = nameChanges.prev;
             const nextName = nameChanges.next;
 
-            const warningMessage = `[${actionId}] Activity name changed via ${actionName}`;
-            storeLogger.warn(warningMessage, {
+            storeLogger.warn('Activity name changed', {
+              actionId,
+              actionName,
               prev: prevName,
               next: nextName,
               source: callerInfo,

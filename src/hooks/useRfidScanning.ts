@@ -4,7 +4,7 @@ import { api, mapApiErrorToGerman, ApiError } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 
 // Tauri event listening
@@ -322,7 +322,7 @@ export const useRfidScanning = () => {
       isInitializedRef.current = true;
       logger.info('RFID service initialized');
     } catch (error) {
-      logger.error('Failed to initialize RFID service', { error });
+      logger.error('Failed to initialize RFID service', { error: serializeError(error) });
       showSystemError(
         'RFID-Initialisierung fehlgeschlagen',
         'Das RFID-Lesegerät konnte nicht initialisiert werden. Bitte Gerät neu starten.'
@@ -441,7 +441,7 @@ export const useRfidScanning = () => {
 
         removeOptimisticScan(scanId);
       } catch (error) {
-        logger.error('Failed to process RFID scan', { error });
+        logger.error('Failed to process RFID scan', { error: serializeError(error) });
         updateOptimisticScan(scanId, 'failed');
         setScanResult(createScanErrorResult(error));
         removeOptimisticScan(scanId);
@@ -498,7 +498,7 @@ export const useRfidScanning = () => {
       eventListener = unlisten;
       logger.info('RFID event listener setup complete');
     } catch (error) {
-      logger.error('Failed to setup RFID event listener', { error });
+      logger.error('Failed to setup RFID event listener', { error: serializeError(error) });
       showSystemError(
         'RFID-Verbindung fehlgeschlagen',
         'Das RFID-System konnte nicht verbunden werden. Scannen nicht möglich.'
@@ -584,7 +584,7 @@ export const useRfidScanning = () => {
       });
     } catch (error) {
       logger.error('Failed to start RFID service', {
-        error,
+        error: serializeError(error),
         timestamp: Date.now(),
         timeSinceCall: Date.now() - callTimestamp,
       });
@@ -630,7 +630,7 @@ export const useRfidScanning = () => {
       });
     } catch (error) {
       logger.error('Failed to stop RFID service', {
-        error,
+        error: serializeError(error),
         timestamp: Date.now(),
         timeSinceCall: Date.now() - callTimestamp,
       });
