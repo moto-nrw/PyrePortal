@@ -358,7 +358,7 @@ export const useRfidScanning = () => {
 
       // Handle duplicate prevention
       if (!canProcessTag(tagId)) {
-        logger.info('Tag blocked by duplicate prevention', { tagId });
+        logger.debug('Tag blocked by duplicate prevention', { tagId });
         const recentScan = rfid.recentTagScans.get(tagId);
         if (recentScan?.result && Date.now() - recentScan.timestamp < 2000) {
           setScanResult(recentScan.result);

@@ -76,15 +76,6 @@ function TeamManagementPage() {
       void navigate('/');
       return;
     }
-
-    logger.debug('TeamManagementPage component mounted', {
-      user: authenticatedUser.staffName,
-      hasActiveSession: !!currentSession,
-    });
-
-    return () => {
-      logger.debug('TeamManagementPage component unmounted');
-    };
   }, [authenticatedUser, currentSession, navigate, logger]);
 
   // Fetch teachers and initialize supervisors
@@ -196,12 +187,10 @@ function TeamManagementPage() {
 
   const handleNextPage = () => {
     goToNextPage();
-    logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
   };
 
   const handlePrevPage = () => {
     goToPrevPage();
-    logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
   };
 
   // Handle back navigation

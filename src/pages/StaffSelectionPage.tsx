@@ -71,10 +71,6 @@ function StaffSelectionPage() {
       void navigate('/activity-selection');
       return;
     }
-    logger.debug('StaffSelectionPage component mounted', {
-      user: authenticatedUser.staffName,
-      activity: selectedActivity.name,
-    });
   }, [authenticatedUser, selectedActivity, navigate, logger]);
 
   useEffect(() => {

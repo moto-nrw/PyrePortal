@@ -53,11 +53,6 @@ function StudentSelectionPage() {
       void navigate('/tag-assignment');
       return;
     }
-
-    logger.debug('StudentSelectionPage component mounted', {
-      user: authenticatedUser.staffName,
-      scannedTag: state.scannedTag,
-    });
   }, [authenticatedUser, state, navigate, logger]);
 
   // Fetch students and teachers

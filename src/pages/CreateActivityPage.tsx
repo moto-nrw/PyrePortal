@@ -110,11 +110,6 @@ function CreateActivityPage() {
     if (mountedRef.current) return;
     mountedRef.current = true;
 
-    logger.debug('CreateActivityPage component mounted', {
-      user: authenticatedUser?.staffName,
-      isAuthenticated: !!authenticatedUser,
-    });
-
     // Check authentication
     if (!authenticatedUser) {
       logger.warn('Unauthenticated access to CreateActivityPage');
@@ -129,7 +124,6 @@ function CreateActivityPage() {
     }
 
     return () => {
-      logger.debug('CreateActivityPage component unmounted');
       mountedRef.current = false;
     };
   }, [authenticatedUser, navigate, logger, fetchActivitiesData]);
@@ -193,12 +187,10 @@ function CreateActivityPage() {
 
   const handleNextPage = () => {
     goToNextPage();
-    logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
   };
 
   const handlePrevPage = () => {
     goToPrevPage();
-    logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
   };
 
   if (!authenticatedUser) {

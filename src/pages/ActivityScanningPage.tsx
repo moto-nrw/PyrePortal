@@ -217,7 +217,7 @@ const ActivityScanningPage: React.FC = () => {
   // Debug logging for modal state
   useEffect(() => {
     if (showModal && currentScan) {
-      logger.info('Modal should be showing', {
+      logger.debug('Modal should be showing', {
         showModal,
         studentName: currentScan.student_name,
         action: currentScan.action,
@@ -229,7 +229,6 @@ const ActivityScanningPage: React.FC = () => {
         actionCheck: currentScan.action === 'checked_in',
         studentName: currentScan.student_name,
         message: currentScan.message,
-        fullScan: currentScan,
       });
     }
   }, [showModal, currentScan]);
@@ -314,17 +313,7 @@ const ActivityScanningPage: React.FC = () => {
 
   // Start scanning when component mounts
   useEffect(() => {
-    const mountTimestamp = Date.now();
-    logger.debug('Activity Scanning Page mounted', {
-      timestamp: mountTimestamp,
-    });
-
-    // Start scanning and clear initializing state
     const initializeScanning = async () => {
-      logger.debug('Calling startScanning() from page mount', {
-        timestamp: Date.now(),
-        timeSinceMount: Date.now() - mountTimestamp,
-      });
       await startScanning();
     };
 
@@ -332,12 +321,7 @@ const ActivityScanningPage: React.FC = () => {
 
     // Cleanup: stop scanning when component unmounts
     return () => {
-      const unmountTimestamp = Date.now();
-      logger.debug('Activity Scanning Page unmounting', {
-        timestamp: unmountTimestamp,
-        timeSinceMount: unmountTimestamp - mountTimestamp,
-      });
-      void stopScanning(); // Handle async function
+      void stopScanning();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run on mount/unmount

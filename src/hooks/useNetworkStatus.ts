@@ -42,11 +42,6 @@ export const useNetworkStatus = () => {
       const quality: NetworkStatusData['quality'] =
         responseTime > POOR_THRESHOLD_MS ? 'poor' : 'online';
 
-      logger.debug('Network check successful', {
-        responseTime,
-        quality,
-      });
-
       return {
         isOnline: true,
         responseTime,
@@ -84,12 +79,6 @@ export const useNetworkStatus = () => {
     try {
       const status = await checkNetworkStatus();
       setNetworkStatus(status);
-
-      logger.debug('Network status updated', {
-        isOnline: status.isOnline,
-        quality: status.quality,
-        responseTime: status.responseTime,
-      });
     } catch (error) {
       logger.error('Failed to check network status', { error });
 

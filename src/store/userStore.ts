@@ -1214,6 +1214,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       set({ activities: updatedActivities, isLoading: false });
       return true;
     } catch (error) {
+      storeLogger.error('Check-in failed', {
+        activityId,
+        studentId: student.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
       set({
         error: mapActivityError('checkin_failed', { studentName: student.name }, error),
         isLoading: false,
@@ -1282,6 +1287,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       set({ activities: updatedActivities, isLoading: false });
       return true;
     } catch (error) {
+      storeLogger.error('Check-out failed', {
+        activityId,
+        studentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       set({
         error: mapActivityError('checkout_failed', { studentName }, error),
         isLoading: false,

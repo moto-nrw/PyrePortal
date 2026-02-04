@@ -540,7 +540,7 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new ApiError(message, response.status, code, details);
   }
 
-  logger.info('API request completed', {
+  logger.debug('API request completed', {
     endpoint,
     status: response.status,
     responseTime,
@@ -715,7 +715,6 @@ export const api = {
       logger.debug('Starting global PIN validation', {
         pin: pin.length + ' digits',
         hasApiKey: !!DEVICE_API_KEY,
-        apiKeyLength: DEVICE_API_KEY?.length,
       });
 
       await apiCall('/api/iot/ping', {
@@ -1205,8 +1204,6 @@ export const api = {
           'X-Staff-PIN': pin,
         },
       });
-
-      logger.debug('getCurrentSessionInfo response', { response });
 
       // Check if we have an active session
       if ('is_active' in response.data && response.data.is_active === false) {

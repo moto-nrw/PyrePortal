@@ -75,15 +75,6 @@ function PinPage() {
   // Create logger instance for this component
   const logger = createLogger('PinPage');
 
-  // Log component mount/unmount
-  useEffect(() => {
-    logger.debug('PinPage component mounted for global PIN entry');
-
-    return () => {
-      logger.debug('PinPage component unmounted');
-    };
-  }, [logger]);
-
   // Maximum PIN length and stable dot identifiers for React keys
   const maxPinLength = 4;
   const pinDotIds = ['dot-1', 'dot-2', 'dot-3', 'dot-4'] as const;
