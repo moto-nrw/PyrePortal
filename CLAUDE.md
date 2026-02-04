@@ -177,7 +177,7 @@ logger.info(`RFID scan completed for tag ${tagId}`);
 
 **No prefixes**: Use the appropriate log level instead of message prefixes like `[RACE-DEBUG]`.
 
-**Runtime debug override**: In production, set `localStorage.setItem('pyrePortalDebugLogging', 'true')` to enable DEBUG-level logging.
+**Runtime debug override**: In production, set `localStorage.setItem('pyrePortalDebugLogging', 'true')` to enable DEBUG-level logging. Requires page reload to take effect.
 
 ## API Integration (Project Phoenix Backend)
 
