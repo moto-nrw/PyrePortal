@@ -457,7 +457,8 @@ const ActivityScanningPage: React.FC = () => {
     }
 
     // Apply authoritative count after side effects
-    if (hasAuthoritativeCount) {
+    // Skip for Schulhof scans: active_students refers to the Schulhof room, not our room
+    if (hasAuthoritativeCount && !extendedScan.isSchulhof) {
       setStudentCount(currentScan.active_students!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
