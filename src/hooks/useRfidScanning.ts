@@ -4,7 +4,7 @@ import { api, mapApiErrorToGerman, ApiError } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 
 // Tauri event listening
@@ -116,7 +116,7 @@ const handleSupervisorAuthentication = async (
     void syncSupervisorsWithBackend(currentSession, pin, staffId);
   }
 
-  logger.info('Betreuer erfolgreich authentifiziert', {
+  logger.info('Supervisor authenticated successfully', {
     supervisorName: staffName,
     message: result.message,
     staffId,
@@ -153,12 +153,12 @@ const syncSupervisorsWithBackend = async (
   try {
     const updatedSupervisorIds = useUserStore.getState().selectedSupervisors.map(s => s.id);
     await api.updateSessionSupervisors(pin, currentSession.active_group_id, updatedSupervisorIds);
-    logger.info('Betreuer per RFID synchronisiert (Netzwerkpfad)', {
+    logger.info('Supervisor synced via RFID (network path)', {
       staffId,
       sessionId: currentSession.active_group_id,
     });
   } catch (error) {
-    logger.warn('Sync der Betreuer fehlgeschlagen (Netzwerkpfad)', {
+    logger.warn('Supervisor sync failed (network path)', {
       error: error instanceof Error ? error.message : String(error),
       staffId,
     });
@@ -322,7 +322,7 @@ export const useRfidScanning = () => {
       isInitializedRef.current = true;
       logger.info('RFID service initialized');
     } catch (error) {
-      logger.error('Failed to initialize RFID service', { error });
+      logger.error('Failed to initialize RFID service', { error: serializeError(error) });
       showSystemError(
         'RFID-Initialisierung fehlgeschlagen',
         'Das RFID-Lesegerät konnte nicht initialisiert werden. Bitte Gerät neu starten.'
@@ -349,16 +349,16 @@ export const useRfidScanning = () => {
 
       // Fast path for already-authenticated supervisors
       if (isActiveSupervisor(tagId)) {
-        logger.info('Aktiver Betreuer-Tag erkannt, leite sofort um', { tagId });
+        logger.info('Active supervisor tag detected, redirecting immediately', { tagId });
         showSupervisorRedirect();
         return;
       }
 
-      logger.info(`Processing RFID scan for tag: ${tagId}`);
+      logger.info('Processing RFID scan', { tagId });
 
       // Handle duplicate prevention
       if (!canProcessTag(tagId)) {
-        logger.info(`Tag ${tagId} blocked by duplicate prevention`);
+        logger.debug('Tag blocked by duplicate prevention', { tagId });
         const recentScan = rfid.recentTagScans.get(tagId);
         if (recentScan?.result && Date.now() - recentScan.timestamp < 2000) {
           setScanResult(recentScan.result);
@@ -387,7 +387,9 @@ export const useRfidScanning = () => {
           freshUser.pin
         );
 
-        logger.info(`RFID scan completed via server: ${result.action} for ${result.student_name}`, {
+        logger.info('RFID scan completed via server', {
+          action: result.action,
+          studentName: result.student_name,
           responseTime: Date.now() - startTime,
         });
 
@@ -439,7 +441,7 @@ export const useRfidScanning = () => {
 
         removeOptimisticScan(scanId);
       } catch (error) {
-        logger.error('Failed to process RFID scan', { error });
+        logger.error('Failed to process RFID scan', { error: serializeError(error) });
         updateOptimisticScan(scanId, 'failed');
         setScanResult(createScanErrorResult(error));
         removeOptimisticScan(scanId);
@@ -482,11 +484,11 @@ export const useRfidScanning = () => {
         'rfid-scan',
         event => {
           const { tag_id, timestamp, platform } = event.payload;
-          logger.info(`RFID scan event received: ${tag_id} from ${platform} at ${timestamp}`);
+          logger.info('RFID scan event received', { tagId: tag_id, platform, timestamp });
 
           // Check if tag is blocked before processing
           if (isTagBlocked(tag_id)) {
-            logger.debug(`Tag ${tag_id} is blocked, skipping`);
+            logger.debug('Tag blocked, skipping', { tagId: tag_id });
           } else {
             void processScan(tag_id);
           }
@@ -496,7 +498,7 @@ export const useRfidScanning = () => {
       eventListener = unlisten;
       logger.info('RFID event listener setup complete');
     } catch (error) {
-      logger.error('Failed to setup RFID event listener', { error });
+      logger.error('Failed to setup RFID event listener', { error: serializeError(error) });
       showSystemError(
         'RFID-Verbindung fehlgeschlagen',
         'Das RFID-System konnte nicht verbunden werden. Scannen nicht möglich.'
@@ -506,7 +508,7 @@ export const useRfidScanning = () => {
 
   const startScanning = useCallback(async () => {
     const callTimestamp = Date.now();
-    logger.info('[RACE-DEBUG] startScanning() called', {
+    logger.debug('startScanning() called', {
       timestamp: callTimestamp,
       isServiceStartedRef: isServiceStartedRef.current,
       rfidEnabled: isRfidEnabled(),
@@ -554,7 +556,7 @@ export const useRfidScanning = () => {
 
             // Check if tag is blocked before processing
             if (isTagBlocked(mockTagId)) {
-              logger.debug(`Mock tag ${mockTagId} is blocked, skipping`);
+              logger.debug('Mock tag blocked, skipping', { tagId: mockTagId });
             } else {
               void processScan(mockTagId);
             }
@@ -570,19 +572,19 @@ export const useRfidScanning = () => {
 
     // Real RFID scanning
     try {
-      logger.info('[RACE-DEBUG] Calling start_rfid_service backend command', {
+      logger.debug('Calling start_rfid_service backend command', {
         timestamp: callTimestamp,
       });
       await safeInvoke('start_rfid_service');
       isServiceStartedRef.current = true;
       startRfidScanning(); // Update store state
-      logger.info('[RACE-DEBUG] RFID background service started successfully', {
+      logger.debug('RFID background service started successfully', {
         timestamp: Date.now(),
         timeSinceCall: Date.now() - callTimestamp,
       });
     } catch (error) {
-      logger.error('[RACE-DEBUG] Failed to start RFID service', {
-        error,
+      logger.error('Failed to start RFID service', {
+        error: serializeError(error),
         timestamp: Date.now(),
         timeSinceCall: Date.now() - callTimestamp,
       });
@@ -595,7 +597,7 @@ export const useRfidScanning = () => {
 
   const stopScanning = useCallback(async () => {
     const callTimestamp = Date.now();
-    logger.info('[RACE-DEBUG] stopScanning() called', {
+    logger.debug('stopScanning() called', {
       timestamp: callTimestamp,
       isServiceStartedRef: isServiceStartedRef.current,
       rfidEnabled: isRfidEnabled(),
@@ -610,7 +612,7 @@ export const useRfidScanning = () => {
 
     try {
       if (isRfidEnabled()) {
-        logger.info('[RACE-DEBUG] Calling stop_rfid_service backend command', {
+        logger.debug('Calling stop_rfid_service backend command', {
           timestamp: callTimestamp,
         });
         await safeInvoke('stop_rfid_service');
@@ -622,13 +624,13 @@ export const useRfidScanning = () => {
       }
       isServiceStartedRef.current = false;
       stopRfidScanning(); // Update store state
-      logger.info('[RACE-DEBUG] RFID service stopped successfully', {
+      logger.debug('RFID service stopped successfully', {
         timestamp: Date.now(),
         timeSinceCall: Date.now() - callTimestamp,
       });
     } catch (error) {
-      logger.error('[RACE-DEBUG] Failed to stop RFID service', {
-        error,
+      logger.error('Failed to stop RFID service', {
+        error: serializeError(error),
         timestamp: Date.now(),
         timeSinceCall: Date.now() - callTimestamp,
       });

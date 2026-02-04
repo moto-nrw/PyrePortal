@@ -907,7 +907,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       updatedTags.add(tagId);
       return { activeSupervisorTags: updatedTags };
     });
-    storeLogger.debug('RFID-Tag für Betreuer gespeichert', { tagId });
+    storeLogger.debug('RFID tag saved for supervisor', { tagId });
   },
 
   isActiveSupervisor: (tagId: string) => {
@@ -916,7 +916,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   clearActiveSupervisorTags: () => {
     set({ activeSupervisorTags: new Set<string>() });
-    storeLogger.debug('Aktive Betreuer-Tags geleert');
+    storeLogger.debug('Active supervisor tags cleared');
   },
 
   // Activity-related actions
@@ -1214,6 +1214,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       set({ activities: updatedActivities, isLoading: false });
       return true;
     } catch (error) {
+      storeLogger.error('Check-in failed', {
+        activityId,
+        studentId: student.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
       set({
         error: mapActivityError('checkin_failed', { studentName: student.name }, error),
         isLoading: false,
@@ -1282,6 +1287,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       set({ activities: updatedActivities, isLoading: false });
       return true;
     } catch (error) {
+      storeLogger.error('Check-out failed', {
+        activityId,
+        studentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       set({
         error: mapActivityError('checkout_failed', { studentName }, error),
         isLoading: false,

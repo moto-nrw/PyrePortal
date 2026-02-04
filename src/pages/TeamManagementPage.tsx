@@ -13,7 +13,7 @@ import { usePagination } from '../hooks/usePagination';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import { createLogger, logNavigation, logUserAction } from '../utils/logger';
+import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 
 function TeamManagementPage() {
   const {
@@ -76,15 +76,6 @@ function TeamManagementPage() {
       void navigate('/');
       return;
     }
-
-    logger.debug('TeamManagementPage component mounted', {
-      user: authenticatedUser.staffName,
-      hasActiveSession: !!currentSession,
-    });
-
-    return () => {
-      logger.debug('TeamManagementPage component unmounted');
-    };
   }, [authenticatedUser, currentSession, navigate, logger]);
 
   // Fetch teachers and initialize supervisors
@@ -109,7 +100,7 @@ function TeamManagementPage() {
           }
         }
       } catch (error) {
-        logger.error('Failed to initialize team management page', { error });
+        logger.error('Failed to initialize team management page', { error: serializeError(error) });
       }
     };
 
@@ -186,7 +177,7 @@ function TeamManagementPage() {
       // Show success modal - navigation happens when modal closes
       setShowSuccessModal(true);
     } catch (error) {
-      logger.error('Failed to update supervisors', { error });
+      logger.error('Failed to update supervisors', { error: serializeError(error) });
       setErrorMessage('Fehler beim Aktualisieren der Betreuer. Bitte versuchen Sie es erneut.');
       setShowErrorModal(true);
     } finally {
@@ -196,12 +187,10 @@ function TeamManagementPage() {
 
   const handleNextPage = () => {
     goToNextPage();
-    logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
   };
 
   const handlePrevPage = () => {
     goToPrevPage();
-    logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
   };
 
   // Handle back navigation

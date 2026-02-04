@@ -18,8 +18,7 @@ import TeamManagementPage from './pages/TeamManagementPage';
 import { setNetworkStatusCallback } from './services/api';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
-import { createLogger, logger } from './utils/logger';
-import { getRuntimeConfig } from './utils/loggerConfig';
+import { createLogger, getRuntimeConfig, logger } from './utils/logger';
 
 function App() {
   const {

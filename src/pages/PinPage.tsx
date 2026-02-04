@@ -9,7 +9,13 @@ import BackButton from '../components/ui/BackButton';
 import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import theme from '../styles/theme';
-import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+import {
+  createLogger,
+  logNavigation,
+  logUserAction,
+  logError,
+  serializeError,
+} from '../utils/logger';
 
 /**
  * Custom numpad button component - Phoenix Clean Style
@@ -74,15 +80,6 @@ function PinPage() {
 
   // Create logger instance for this component
   const logger = createLogger('PinPage');
-
-  // Log component mount/unmount
-  useEffect(() => {
-    logger.debug('PinPage component mounted for global PIN entry');
-
-    return () => {
-      logger.debug('PinPage component unmounted');
-    };
-  }, [logger]);
 
   // Maximum PIN length and stable dot identifiers for React keys
   const maxPinLength = 4;
@@ -237,7 +234,7 @@ function PinPage() {
       setErrorMessage(errorMsg);
       setIsErrorModalOpen(true);
       setPin(''); // Clear PIN
-      logger.error('Global PIN verification error', { error });
+      logger.error('Global PIN verification error', { error: serializeError(error) });
       logError(error instanceof Error ? error : new Error(String(error)), 'PinPage.handleSubmit');
     } finally {
       setIsLoading(false);

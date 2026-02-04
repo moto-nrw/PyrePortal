@@ -3,7 +3,7 @@
  * Handles saving and loading of last session configuration
  */
 
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 import { safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('SessionStorage');
@@ -39,7 +39,7 @@ export async function saveSessionSettings(settings: SessionSettings): Promise<vo
 
     logger.info('Session settings saved successfully');
   } catch (error) {
-    logger.error('Failed to save session settings', { error });
+    logger.error('Failed to save session settings', { error: serializeError(error) });
     throw error;
   }
 }
@@ -65,7 +65,7 @@ export async function loadSessionSettings(): Promise<SessionSettings | null> {
 
     return settings;
   } catch (error) {
-    logger.error('Failed to load session settings', { error });
+    logger.error('Failed to load session settings', { error: serializeError(error) });
     // Return null instead of throwing to allow graceful degradation
     return null;
   }
@@ -82,7 +82,7 @@ export async function clearLastSession(): Promise<void> {
 
     logger.info('Last session data cleared');
   } catch (error) {
-    logger.error('Failed to clear last session', { error });
+    logger.error('Failed to clear last session', { error: serializeError(error) });
     throw error;
   }
 }

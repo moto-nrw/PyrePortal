@@ -1,9 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
-import { createLogger } from '../utils/logger';
-
-const logger = createLogger('useModalTimeout');
-
 interface UseModalTimeoutOptions {
   /** Timeout duration in milliseconds */
   duration: number;
@@ -72,22 +68,19 @@ export function useModalTimeout({
   const startTimeout = useCallback(() => {
     clearCurrentTimeout();
 
-    logger.debug('Starting modal timeout', { duration, resetKey });
     setIsRunning(true);
     setAnimationKey(prev => prev + 1);
 
     timeoutRef.current = setTimeout(() => {
-      logger.debug('Modal timeout expired', { duration, resetKey });
       setIsRunning(false);
       timeoutRef.current = null;
       onTimeoutRef.current();
     }, duration);
-  }, [clearCurrentTimeout, duration, resetKey]);
+  }, [clearCurrentTimeout, duration]);
 
   // Manual reset function
   const reset = useCallback(() => {
     if (isActive) {
-      logger.debug('Manual timeout reset requested');
       startTimeout();
     }
   }, [isActive, startTimeout]);
@@ -107,7 +100,6 @@ export function useModalTimeout({
   // Reset effect: Restart timeout when resetKey changes (while active)
   useEffect(() => {
     if (isActive && resetKey !== undefined && resetKey !== null) {
-      logger.debug('Reset key changed, restarting timeout', { resetKey });
       startTimeout();
     }
     // Only react to resetKey changes, not startTimeout

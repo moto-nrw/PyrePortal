@@ -62,20 +62,5 @@ export const isRfidEnabled = (): boolean => {
   const rfidEnvEnabled = import.meta.env.VITE_ENABLE_RFID === 'true';
   const tauriAvailable = isTauriContext();
 
-  // Debug logging to help troubleshoot (using console to avoid circular dependency)
-  if (import.meta.env.DEV) {
-    // eslint-disable-next-line no-console
-    console.debug('RFID Status Check:', {
-      VITE_ENABLE_RFID: import.meta.env.VITE_ENABLE_RFID as string,
-      rfidEnvEnabled,
-      tauriAvailable,
-      window__TAURI__: typeof window !== 'undefined' && '__TAURI__' in window,
-      window__TAURI_INTERNALS__: typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window,
-      window__TAURI_INVOKE__: typeof window !== 'undefined' && '__TAURI_INVOKE__' in window,
-      isProd: import.meta.env.PROD,
-      userAgent: typeof navigator === 'undefined' ? 'undefined' : navigator.userAgent,
-    });
-  }
-
   return rfidEnvEnabled && tauriAvailable;
 };

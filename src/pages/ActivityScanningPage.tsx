@@ -15,7 +15,7 @@ import {
   type DailyFeedbackRating,
 } from '../services/api';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
 
@@ -205,7 +205,7 @@ const ActivityScanningPage: React.FC = () => {
   // Debug logging for selectedActivity
   useEffect(() => {
     if (selectedActivity) {
-      logger.debug('Selected activity data:', {
+      logger.debug('Selected activity data', {
         id: selectedActivity.id,
         name: selectedActivity.name,
         max_participants: selectedActivity.max_participants,
@@ -217,7 +217,7 @@ const ActivityScanningPage: React.FC = () => {
   // Debug logging for modal state
   useEffect(() => {
     if (showModal && currentScan) {
-      logger.info('Modal should be showing', {
+      logger.debug('Modal should be showing', {
         showModal,
         studentName: currentScan.student_name,
         action: currentScan.action,
@@ -229,7 +229,6 @@ const ActivityScanningPage: React.FC = () => {
         actionCheck: currentScan.action === 'checked_in',
         studentName: currentScan.student_name,
         message: currentScan.message,
-        fullScan: currentScan,
       });
     }
   }, [showModal, currentScan]);
@@ -314,18 +313,7 @@ const ActivityScanningPage: React.FC = () => {
 
   // Start scanning when component mounts
   useEffect(() => {
-    const mountTimestamp = Date.now();
-    logger.info('[RACE-DEBUG] Activity Scanning Page MOUNTED', {
-      timestamp: mountTimestamp,
-      page: 'ActivityScanningPage',
-    });
-
-    // Start scanning and clear initializing state
     const initializeScanning = async () => {
-      logger.info('[RACE-DEBUG] Calling startScanning() from page mount', {
-        timestamp: Date.now(),
-        timeSinceMount: Date.now() - mountTimestamp,
-      });
       await startScanning();
     };
 
@@ -333,16 +321,7 @@ const ActivityScanningPage: React.FC = () => {
 
     // Cleanup: stop scanning when component unmounts
     return () => {
-      const unmountTimestamp = Date.now();
-      logger.info('[RACE-DEBUG] Activity Scanning Page UNMOUNTING', {
-        timestamp: unmountTimestamp,
-        page: 'ActivityScanningPage',
-        timeSinceMount: unmountTimestamp - mountTimestamp,
-      });
-      logger.info('[RACE-DEBUG] Calling stopScanning() from page unmount', {
-        timestamp: unmountTimestamp,
-      });
-      void stopScanning(); // Handle async function
+      void stopScanning();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run on mount/unmount
@@ -353,18 +332,18 @@ const ActivityScanningPage: React.FC = () => {
 
     try {
       const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
-      logger.debug('Session info received:', sessionInfo ?? {});
+      logger.debug('Session info received', sessionInfo ?? {});
 
       if (sessionInfo) {
         const count = sessionInfo.active_students ?? 0;
-        logger.info(`Setting student count to: ${count}`);
+        logger.info('Setting student count', { count });
         setStudentCount(count);
       } else {
         logger.warn('No session info received');
         setStudentCount(0);
       }
     } catch (error) {
-      logger.error('Failed to fetch session info', { error });
+      logger.error('Failed to fetch session info', { error: serializeError(error) });
     }
   };
 
@@ -406,7 +385,7 @@ const ActivityScanningPage: React.FC = () => {
           // Don't fail - just won't show Schulhof option
         }
       } catch (error) {
-        logger.error('Failed to fetch Schulhof room', { error });
+        logger.error('Failed to fetch Schulhof room', { error: serializeError(error) });
         // Non-critical error - continue without Schulhof functionality
       }
     };
@@ -672,7 +651,7 @@ const ActivityScanningPage: React.FC = () => {
         showScanModal();
         // Modal will auto-close via useModalTimeout hook
       } catch (error) {
-        logger.error('Failed to check into Schulhof', { error });
+        logger.error('Failed to check into Schulhof', { error: serializeError(error) });
 
         // Map error to user-friendly German message with network detection
         const errorMessage =

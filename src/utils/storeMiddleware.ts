@@ -410,12 +410,6 @@ export const loggerMiddleware =
           return;
         }
 
-        // Capture caller information if enabled
-        let callerInfo = '';
-        if (actionSource) {
-          callerInfo = getCallerInfo();
-        }
-
         // Get current state before update
         const prevState = get();
 
@@ -436,6 +430,12 @@ export const loggerMiddleware =
           return;
         }
 
+        // Capture caller information if enabled (after filtering to avoid unnecessary stack trace parsing)
+        let callerInfo = '';
+        if (actionSource) {
+          callerInfo = getCallerInfo();
+        }
+
         // Apply custom state filter if provided
         if (stateFilter && !stateFilter(prevState, nextState, changes)) {
           return;
@@ -445,11 +445,13 @@ export const loggerMiddleware =
         if (stateChanges) {
           const level = logLevel ?? LogLevel.DEBUG;
           const logPayload = {
+            actionId,
+            actionName,
             changes,
             timestamp: timestamp.toISOString(),
             ...(callerInfo ? { source: callerInfo } : {}),
           };
-          const logMessage = `[${actionId}] State updated: ${actionName}`;
+          const logMessage = 'State updated';
 
           // Use the appropriate public logging method based on level
           switch (level) {
@@ -483,8 +485,9 @@ export const loggerMiddleware =
             const prevName = nameChanges.prev;
             const nextName = nameChanges.next;
 
-            const warningMessage = `[${actionId}] Activity name changed via ${actionName}`;
-            storeLogger.warn(warningMessage, {
+            storeLogger.warn('Activity name changed', {
+              actionId,
+              actionName,
               prev: prevName,
               next: nextName,
               source: callerInfo,

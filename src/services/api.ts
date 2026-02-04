@@ -3,7 +3,7 @@
  * Handles all communication with the backend API
  */
 
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 import { safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('API');
@@ -427,7 +427,9 @@ export async function initializeApi(): Promise<void> {
     });
   } catch (error) {
     // Fallback to build-time env vars if Tauri is not available (e.g., in dev without Tauri)
-    logger.warn('Failed to load runtime config, falling back to build-time env vars', { error });
+    logger.warn('Failed to load runtime config, falling back to build-time env vars', {
+      error: serializeError(error),
+    });
     API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
     DEVICE_API_KEY = import.meta.env.VITE_DEVICE_API_KEY as string;
 
@@ -500,9 +502,6 @@ async function parseErrorResponse(
   }
 }
 
-/** Endpoints that should always be logged for debugging */
-const ALWAYS_LOG_ENDPOINTS = new Set(['/api/iot/ping', '/api/iot/checkin']);
-
 /**
  * Generic API call function with error handling and response timing
  */
@@ -511,16 +510,6 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
 
   const url = `${API_BASE_URL}${endpoint}`;
   const startTime = Date.now();
-
-  // Debug logging for authentication issues
-  if (endpoint === '/api/iot/ping') {
-    logger.debug('Making ping request', {
-      url,
-      method: options.method,
-      hasAuth: !!(options.headers as Record<string, string>)?.Authorization,
-      hasPin: !!(options.headers as Record<string, string>)?.['X-Staff-PIN'],
-    });
-  }
 
   let response: Response;
   try {
@@ -553,15 +542,12 @@ async function apiCall<T>(endpoint: string, options: RequestInit = {}): Promise<
     throw new ApiError(message, response.status, code, details);
   }
 
-  // Log successful request timing for critical endpoints or slow responses
-  if (ALWAYS_LOG_ENDPOINTS.has(endpoint) || responseTime > 1000) {
-    logger.info('API request completed', {
-      endpoint,
-      status: response.status,
-      responseTime,
-      quality: responseTime < POOR_THRESHOLD_MS ? 'online' : 'poor',
-    });
-  }
+  logger.debug('API request completed', {
+    endpoint,
+    status: response.status,
+    responseTime,
+    quality: responseTime < POOR_THRESHOLD_MS ? 'online' : 'poor',
+  });
 
   reportNetworkStatus(responseTime, true);
 
@@ -731,7 +717,6 @@ export const api = {
       logger.debug('Starting global PIN validation', {
         pin: pin.length + ' digits',
         hasApiKey: !!DEVICE_API_KEY,
-        apiKeyLength: DEVICE_API_KEY?.length,
       });
 
       await apiCall('/api/iot/ping', {
@@ -910,7 +895,7 @@ export const api = {
    * Endpoint: POST /api/iot/session/start
    */
   async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
-    logger.info('Starting session with request:', { ...request });
+    logger.info('Starting session', { ...request });
 
     const response = await apiCall<{
       status: string;
@@ -1221,8 +1206,6 @@ export const api = {
           'X-Staff-PIN': pin,
         },
       });
-
-      logger.debug('getCurrentSessionInfo response', { response });
 
       // Check if we have an active session
       if ('is_active' in response.data && response.data.is_active === false) {

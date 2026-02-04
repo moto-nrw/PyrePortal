@@ -723,16 +723,6 @@ function RoomSelectionPage() {
       void navigate('/staff-selection');
       return;
     }
-
-    logger.debug('RoomSelectionPage component mounted', {
-      user: authenticatedUser.staffName,
-      activity: selectedActivity.name,
-      supervisors: selectedSupervisors.length,
-    });
-
-    return () => {
-      logger.debug('RoomSelectionPage component unmounted');
-    };
   }, [authenticatedUser, selectedActivity, selectedSupervisors, navigate, logger]);
 
   // Fetch rooms when component mounts
@@ -949,12 +939,10 @@ function RoomSelectionPage() {
 
   const handleNextPage = () => {
     goToNextPage();
-    logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
   };
 
   const handlePrevPage = () => {
     goToPrevPage();
-    logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
   };
 
   if (

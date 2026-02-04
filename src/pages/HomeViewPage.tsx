@@ -15,7 +15,9 @@ import {
 import type { SessionSettings } from '../services/sessionStorage';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import { logNavigation, logUserAction } from '../utils/logger';
+import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
+
+const logger = createLogger('HomeViewPage');
 
 // ============================================================================
 // Pure helper functions (moved outside component to reduce cognitive complexity)
@@ -149,7 +151,7 @@ function HomeViewPage() {
       await fetchCurrentSession();
       logUserAction('Session ended successfully');
     } catch (error) {
-      logUserAction('Failed to end session', { error });
+      logger.error('Failed to end session', { error: serializeError(error) });
     }
   };
 

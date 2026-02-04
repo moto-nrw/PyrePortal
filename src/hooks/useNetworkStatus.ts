@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import { api } from '../services/api';
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('useNetworkStatus');
 
@@ -42,11 +42,6 @@ export const useNetworkStatus = () => {
       const quality: NetworkStatusData['quality'] =
         responseTime > POOR_THRESHOLD_MS ? 'poor' : 'online';
 
-      logger.debug('Network check successful', {
-        responseTime,
-        quality,
-      });
-
       return {
         isOnline: true,
         responseTime,
@@ -84,14 +79,8 @@ export const useNetworkStatus = () => {
     try {
       const status = await checkNetworkStatus();
       setNetworkStatus(status);
-
-      logger.debug('Network status updated', {
-        isOnline: status.isOnline,
-        quality: status.quality,
-        responseTime: status.responseTime,
-      });
     } catch (error) {
-      logger.error('Failed to check network status', { error });
+      logger.error('Failed to check network status', { error: serializeError(error) });
 
       // Fallback to offline (health check itself failed unexpectedly)
       setNetworkStatus({
@@ -153,7 +142,9 @@ export const useNetworkStatus = () => {
         }
       }
     } catch (error) {
-      logger.error('Unexpected error during initial network check', { error });
+      logger.error('Unexpected error during initial network check', {
+        error: serializeError(error),
+      });
 
       // Fallback to offline
       setNetworkStatus({

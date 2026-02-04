@@ -11,7 +11,13 @@ import {
 import { usePagination } from '../hooks/usePagination';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+import {
+  createLogger,
+  logNavigation,
+  logUserAction,
+  logError,
+  serializeError,
+} from '../utils/logger';
 
 function CreateActivityPage() {
   const {
@@ -94,7 +100,7 @@ function CreateActivityPage() {
         return;
       }
 
-      logger.error('Failed to fetch activities', { error });
+      logger.error('Failed to fetch activities', { error: serializeError(error) });
       logError(
         error instanceof Error ? error : new Error(String(error)),
         'CreateActivityPage.fetchActivitiesData'
@@ -110,11 +116,6 @@ function CreateActivityPage() {
     if (mountedRef.current) return;
     mountedRef.current = true;
 
-    logger.debug('CreateActivityPage component mounted', {
-      user: authenticatedUser?.staffName,
-      isAuthenticated: !!authenticatedUser,
-    });
-
     // Check authentication
     if (!authenticatedUser) {
       logger.warn('Unauthenticated access to CreateActivityPage');
@@ -129,7 +130,6 @@ function CreateActivityPage() {
     }
 
     return () => {
-      logger.debug('CreateActivityPage component unmounted');
       mountedRef.current = false;
     };
   }, [authenticatedUser, navigate, logger, fetchActivitiesData]);
@@ -193,12 +193,10 @@ function CreateActivityPage() {
 
   const handleNextPage = () => {
     goToNextPage();
-    logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
   };
 
   const handlePrevPage = () => {
     goToPrevPage();
-    logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
   };
 
   if (!authenticatedUser) {
