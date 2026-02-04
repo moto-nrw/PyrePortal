@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 /// Log entry structure for serialization/deserialization
 #[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LogEntry {
     pub timestamp: String,
     pub level: String,
@@ -22,7 +23,6 @@ pub struct LogEntry {
 /// Function to write a log entry to the log file
 #[tauri::command]
 pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(), String> {
-    eprintln!("[RUST] write_log called, entry length: {}", entry.len());
     let log_entry = match serde_json::from_str::<LogEntry>(&entry) {
         Ok(entry) => entry,
         Err(e) => return Err(format!("Failed to parse log entry: {e}")),
