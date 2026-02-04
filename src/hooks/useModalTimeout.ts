@@ -76,7 +76,7 @@ export function useModalTimeout({
       timeoutRef.current = null;
       onTimeoutRef.current();
     }, duration);
-  }, [clearCurrentTimeout, duration, resetKey]);
+  }, [clearCurrentTimeout, duration]);
 
   // Manual reset function
   const reset = useCallback(() => {
