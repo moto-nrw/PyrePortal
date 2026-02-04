@@ -51,7 +51,7 @@ const defaultConfig: LoggerConfig = {
 const devConfig: LoggerConfig = {
   ...defaultConfig,
   level: LogLevel.DEBUG,
-  persist: false,
+  persist: true,
   persistLevel: LogLevel.DEBUG,
   maxInMemoryLogs: 5000,
 };
