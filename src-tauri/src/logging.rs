@@ -27,6 +27,17 @@ pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(
         Err(e) => return Err(format!("Failed to parse log entry: {e}")),
     };
 
+    // Print frontend log to terminal (visible in `npm run tauri dev` and production binary)
+    let data_suffix = log_entry
+        .data
+        .as_ref()
+        .map(|d| format!(" {d}"))
+        .unwrap_or_default();
+    eprintln!(
+        "[{}] [{}] [{}] {}{}",
+        log_entry.timestamp, log_entry.level, log_entry.source, log_entry.message, data_suffix
+    );
+
     let log_dir = get_log_directory(&app).map_err(|e| e.to_string())?;
     let log_file = get_log_file_path(&log_dir);
 

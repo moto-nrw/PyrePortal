@@ -40,8 +40,8 @@ export interface LoggerConfig {
 // Default configuration
 const DEFAULT_CONFIG: LoggerConfig = {
   level: import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.WARN,
-  persist: import.meta.env.PROD,
-  persistLevel: LogLevel.WARN,
+  persist: true,
+  persistLevel: import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.WARN,
   maxInMemoryLogs: 1000,
   consoleOutput: true,
   contextInfo: {},
