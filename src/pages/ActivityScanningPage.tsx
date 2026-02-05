@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ModalBase } from '../components/ui';
+import { ErrorModal, ModalBase, SuccessModal } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { useRfidScanning } from '../hooks/useRfidScanning';
@@ -16,6 +16,7 @@ import {
 } from '../services/api';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
+import { isRfidEnabled, safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('ActivityScanningPage');
 
@@ -30,6 +31,28 @@ const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
  * 2 seconds is enough to read a short goodbye message.
  */
 const FAREWELL_TIMEOUT_MS = 2000;
+const SCANNER_RECOVERY_TIMEOUT_MS = 8000;
+
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then(result => {
+        clearTimeout(timeoutHandle);
+        resolve(result);
+      })
+      .catch(error => {
+        clearTimeout(timeoutHandle);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
+  });
 
 // Feedback button color schemes: green (positive), yellow (neutral), red (negative)
 const FEEDBACK_BUTTON_COLORS = {
@@ -290,6 +313,9 @@ const ActivityScanningPage: React.FC = () => {
 
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
+  const [isRecoveringScanner, setIsRecoveringScanner] = useState(false);
+  const [showScannerSuccessModal, setShowScannerSuccessModal] = useState(false);
+  const [showScannerErrorModal, setShowScannerErrorModal] = useState(false);
 
   // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
   // This prevents previous student's state from affecting the next scan's modal
@@ -516,6 +542,41 @@ const ActivityScanningPage: React.FC = () => {
     void stopScanning(); // Handle async function
     // Navigate to PIN page for teacher access
     void navigate('/pin');
+  };
+
+  const handleRecoverScanner = async () => {
+    if (isRecoveringScanner) return;
+
+    setIsRecoveringScanner(true);
+    try {
+      await stopScanning();
+
+      if (isRfidEnabled()) {
+        await withTimeout(
+          safeInvoke('recover_rfid_scanner'),
+          SCANNER_RECOVERY_TIMEOUT_MS,
+          'Scanner-Recovery Zeitüberschreitung'
+        );
+
+        const status = await safeInvoke<{ is_available: boolean; last_error?: string }>(
+          'get_rfid_scanner_status'
+        );
+        if (!status?.is_available) {
+          throw new Error(status?.last_error ?? 'Scanner antwortet nach Recovery nicht');
+        }
+      }
+
+      await startScanning();
+      logger.info('RFID scanner recovered from activity page');
+      setShowScannerSuccessModal(true);
+    } catch (error) {
+      logger.error('RFID scanner recovery failed on activity page', {
+        error: serializeError(error),
+      });
+      setShowScannerErrorModal(true);
+    } finally {
+      setIsRecoveringScanner(false);
+    }
   };
 
   // Handle "nach Hause" button - student confirmed going home
@@ -1277,6 +1338,44 @@ const ActivityScanningPage: React.FC = () => {
           {renderModalContent()}
         </ModalBase>
       )}
+
+      {/* Scanner restart - Bottom Center */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 10,
+        }}
+      >
+        <BackButton
+          onClick={() => {
+            void handleRecoverScanner();
+          }}
+          disabled={isRecoveringScanner}
+          text={isRecoveringScanner ? 'Starte neu...' : 'Scanner neu starten'}
+          icon="restart"
+          color="blue"
+          ariaLabel="Scanner neu starten"
+        />
+      </div>
+
+      {/* Scanner recovery success modal */}
+      <SuccessModal
+        isOpen={showScannerSuccessModal}
+        onClose={() => setShowScannerSuccessModal(false)}
+        message="Scanner wurde erfolgreich neu gestartet."
+        autoCloseDelay={2200}
+      />
+
+      {/* Scanner recovery error modal */}
+      <ErrorModal
+        isOpen={showScannerErrorModal}
+        onClose={() => setShowScannerErrorModal(false)}
+        message="Scanner konnte nicht neu gestartet werden. Bitte Gerät vom Strom trennen und neu starten – die Session bleibt erhalten."
+        autoCloseDelay={6000}
+      />
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={rfid.processingQueue.size > 0} />
