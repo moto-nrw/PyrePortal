@@ -1133,6 +1133,38 @@ export const api = {
   },
 
   /**
+   * Remove RFID tag from student
+   * Endpoint: DELETE /api/students/{studentId}/rfid
+   */
+  async unassignStudentTag(pin: string, studentId: number): Promise<TagAssignmentResult> {
+    const response = await apiCall<{
+      status: string;
+      data?: {
+        success: boolean;
+        student_id: number;
+        student_name: string;
+        rfid_tag: string;
+        message: string;
+      };
+      message?: string;
+    }>(`/api/students/${studentId}/rfid`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+    });
+
+    return {
+      success: response.data?.success ?? response.status === 'success',
+      student_id: response.data?.student_id,
+      student_name: response.data?.student_name,
+      rfid_tag: response.data?.rfid_tag,
+      message: response.data?.message ?? response.message,
+    };
+  },
+
+  /**
    * Process RFID check-in/check-out
    * Endpoint: POST /api/iot/checkin
    */

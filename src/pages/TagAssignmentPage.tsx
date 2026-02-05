@@ -63,6 +63,8 @@ function TagAssignmentPage() {
   const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
+  const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
+  const [isUnassigning, setIsUnassigning] = useState(false);
 
   // Refs for scan cancellation
   const mockScanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -73,6 +75,7 @@ function TagAssignmentPage() {
     setTagAssignment(null);
     setError(null);
     setSuccess(null);
+    setShowUnassignConfirm(false);
   }, []);
 
   // Cancel ongoing scan operation
@@ -326,6 +329,41 @@ function TagAssignmentPage() {
     logUserAction('Starting new tag scan');
     clearStates();
     void handleStartScanning();
+  };
+
+  // Handle unassigning a tag from a student
+  const handleUnassignTag = async () => {
+    const assignedPerson = getAssignedPerson(tagAssignment);
+    if (!authenticatedUser?.pin || !assignedPerson || !scannedTag) return;
+
+    setIsUnassigning(true);
+    try {
+      const result = await api.unassignStudentTag(authenticatedUser.pin, assignedPerson.id);
+
+      if (!result.success) {
+        setShowUnassignConfirm(false);
+        setError(result.message ?? 'Zuweisung konnte nicht aufgehoben werden.');
+        setShowErrorModal(true);
+        return;
+      }
+
+      // Clear stale RFID caches for this tag
+      useUserStore.getState().clearTagScan(scannedTag);
+
+      setShowUnassignConfirm(false);
+      setTagAssignment(null);
+      setScannedTag(null);
+      setSuccess(result.message ?? `Armband wurde von ${assignedPerson.name} entfernt`);
+    } catch (err) {
+      logger.error('Failed to unassign RFID tag', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      setShowUnassignConfirm(false);
+      setError('Zuweisung konnte nicht aufgehoben werden. Bitte erneut versuchen.');
+      setShowErrorModal(true);
+    } finally {
+      setIsUnassigning(false);
+    }
   };
 
   // Redirect to login if no authenticated user
@@ -718,72 +756,102 @@ function TagAssignmentPage() {
                 <div
                   style={{
                     display: 'flex',
+                    flexDirection: 'column',
                     gap: '16px',
-                    justifyContent: 'center',
+                    alignItems: 'center',
                     marginTop: '32px',
                   }}
                 >
-                  <button
-                    onClick={handleNavigateToStudentSelection}
-                    disabled={isLoading}
+                  <div
                     style={{
-                      flex: 1,
-                      height: '68px',
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      color: '#FFFFFF',
-                      background: isLoading
-                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                        : designSystem.gradients.blueRight,
-                      border: 'none',
-                      borderRadius: designSystem.borderRadius.full,
-                      cursor: isLoading ? 'not-allowed' : 'pointer',
-                      outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                      boxShadow: isLoading ? 'none' : designSystem.shadows.blue,
-                      opacity: isLoading ? 0.6 : 1,
+                      display: 'flex',
+                      gap: '16px',
+                      justifyContent: 'center',
+                      width: '100%',
                     }}
-                    onTouchStart={e => {
-                      if (!isLoading) {
+                  >
+                    <button
+                      onClick={handleNavigateToStudentSelection}
+                      style={{
+                        flex: 1,
+                        height: '68px',
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        color: '#FFFFFF',
+                        background: designSystem.gradients.blueRight,
+                        border: 'none',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
+                        boxShadow: designSystem.shadows.blue,
+                      }}
+                      onTouchStart={e => {
                         e.currentTarget.style.transform = designSystem.scales.active;
                         e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                      }
-                    }}
-                    onTouchEnd={e => {
-                      if (!isLoading) {
+                      }}
+                      onTouchEnd={e => {
                         e.currentTarget.style.transform = 'scale(1)';
                         e.currentTarget.style.boxShadow = designSystem.shadows.blue;
-                      }
-                    }}
-                  >
-                    {tagAssignment.assigned ? 'Neue Person zuweisen' : 'Person auswählen'}
-                  </button>
-                  <button
-                    onClick={handleScanAnother}
-                    style={{
-                      flex: 1,
-                      height: '68px',
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      backgroundColor: '#FFFFFF',
-                      color: '#374151',
-                      border: '2px solid #E5E7EB',
-                      borderRadius: designSystem.borderRadius.full,
-                      cursor: 'pointer',
-                      outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                    }}
-                    onTouchStart={e => {
-                      e.currentTarget.style.backgroundColor = '#F9FAFB';
-                      e.currentTarget.style.borderColor = '#D1D5DB';
-                    }}
-                    onTouchEnd={e => {
-                      e.currentTarget.style.backgroundColor = '#FFFFFF';
-                      e.currentTarget.style.borderColor = '#E5E7EB';
-                    }}
-                  >
-                    Neuer Scan
-                  </button>
+                      }}
+                    >
+                      {tagAssignment.assigned ? 'Neue Person zuweisen' : 'Person auswählen'}
+                    </button>
+                    <button
+                      onClick={handleScanAnother}
+                      style={{
+                        flex: 1,
+                        height: '68px',
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        border: '2px solid #E5E7EB',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                      onTouchStart={e => {
+                        e.currentTarget.style.backgroundColor = '#F9FAFB';
+                        e.currentTarget.style.borderColor = '#D1D5DB';
+                      }}
+                      onTouchEnd={e => {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        e.currentTarget.style.borderColor = '#E5E7EB';
+                      }}
+                    >
+                      Neuer Scan
+                    </button>
+                  </div>
+
+                  {/* Unassign button - only for student assignments */}
+                  {tagAssignment.assigned && tagAssignment.person_type === 'student' && (
+                    <button
+                      onClick={() => setShowUnassignConfirm(true)}
+                      style={{
+                        height: '56px',
+                        padding: '0 40px',
+                        fontSize: '20px',
+                        fontWeight: 600,
+                        backgroundColor: 'transparent',
+                        color: '#EF4444',
+                        border: '2px solid #FCA5A5',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                      onTouchStart={e => {
+                        e.currentTarget.style.backgroundColor = '#FEF2F2';
+                      }}
+                      onTouchEnd={e => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      Zuweisung aufheben
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -886,6 +954,111 @@ function TagAssignmentPage() {
           </div>
         </div>
       </BackgroundWrapper>
+
+      {/* Unassign Confirmation Modal */}
+      <ModalBase
+        isOpen={showUnassignConfirm}
+        onClose={() => {
+          if (!isUnassigning) setShowUnassignConfirm(false);
+        }}
+        size="sm"
+        backgroundColor="#FFFFFF"
+      >
+        <div style={{ textAlign: 'center' }}>
+          {/* X close icon */}
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#EF4444"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ marginBottom: '16px' }}
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+
+          <h2
+            style={{
+              fontSize: '28px',
+              fontWeight: 700,
+              color: '#111827',
+              marginBottom: '12px',
+            }}
+          >
+            Zuweisung aufheben?
+          </h2>
+          <p
+            style={{
+              fontSize: '18px',
+              color: '#6B7280',
+              lineHeight: 1.5,
+              marginBottom: '8px',
+            }}
+          >
+            Das Armband wird von{' '}
+            <strong style={{ color: '#111827' }}>{getAssignedPerson(tagAssignment)?.name}</strong>{' '}
+            entfernt.
+          </p>
+          <p
+            style={{
+              fontSize: '16px',
+              color: '#9CA3AF',
+              lineHeight: 1.5,
+              marginBottom: '32px',
+            }}
+          >
+            Keine Sorge — das Armband kann jederzeit neu zugewiesen werden.
+          </p>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={handleUnassignTag}
+              disabled={isUnassigning}
+              style={{
+                height: '52px',
+                padding: '0 32px',
+                fontSize: '18px',
+                fontWeight: 700,
+                backgroundColor: isUnassigning ? '#FCA5A5' : '#EF4444',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: designSystem.borderRadius.full,
+                cursor: isUnassigning ? 'not-allowed' : 'pointer',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                opacity: isUnassigning ? 0.7 : 1,
+              }}
+            >
+              {isUnassigning ? 'Wird entfernt...' : 'Ja, aufheben'}
+            </button>
+            <button
+              onClick={() => setShowUnassignConfirm(false)}
+              disabled={isUnassigning}
+              style={{
+                height: '52px',
+                padding: '0 32px',
+                fontSize: '18px',
+                fontWeight: 700,
+                backgroundColor: '#FFFFFF',
+                color: '#374151',
+                border: '2px solid #E5E7EB',
+                borderRadius: designSystem.borderRadius.full,
+                cursor: isUnassigning ? 'not-allowed' : 'pointer',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                opacity: isUnassigning ? 0.5 : 1,
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      </ModalBase>
 
       {/* Error Modal */}
       <ErrorModal
