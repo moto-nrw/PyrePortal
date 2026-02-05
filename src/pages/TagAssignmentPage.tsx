@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal, ModalBase, SuccessModal } from '../components/ui';
+import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { api, type TagAssignmentCheck } from '../services/api';
@@ -13,7 +13,7 @@ import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
-import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
+import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
 
@@ -32,15 +32,7 @@ interface RfidScanResult {
   error?: string;
 }
 
-interface RfidScannerStatus {
-  is_available: boolean;
-  platform: string;
-  last_error?: string;
-}
-
 const SCAN_INVOKE_TIMEOUT_MS = 12_000;
-const SCANNER_STATUS_TIMEOUT_MS = 4_000;
-const SCANNER_RECOVERY_TIMEOUT_MS = 8_000;
 
 const withTimeout = <T,>(
   promise: Promise<T>,
@@ -88,11 +80,6 @@ function TagAssignmentPage() {
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
   const [success, setSuccess] = useState<string | null>(null);
-  const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
-  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
-  const [isRecoveringScanner, setIsRecoveringScanner] = useState(false);
-  const [showStatusModal, setShowStatusModal] = useState(false);
-  const [statusModalMessage, setStatusModalMessage] = useState<string | null>(null);
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
   const [isUnassigning, setIsUnassigning] = useState(false);
 
@@ -177,88 +164,6 @@ function TagAssignmentPage() {
     window.history.replaceState({}, document.title);
   }, [location.state]);
 
-  const checkScannerStatus = useCallback(async (showSuccessModal = false) => {
-    logger.debug('Checking RFID scanner status');
-    setIsRefreshingStatus(true);
-
-    if (!isTauriContext()) {
-      logger.debug('Not in Tauri context, using development status');
-      setScannerStatus({
-        is_available: false,
-        platform: 'Development (Web)',
-        last_error: 'Tauri context not available in development mode',
-      });
-      setIsRefreshingStatus(false);
-      return;
-    }
-
-    try {
-      logger.debug('Calling get_rfid_scanner_status');
-      const status = await withTimeout(
-        safeInvoke<RfidScannerStatus>('get_rfid_scanner_status'),
-        SCANNER_STATUS_TIMEOUT_MS,
-        'Scanner-Status Zeitüberschreitung'
-      );
-      logger.debug('Scanner status received', { status });
-      setScannerStatus(status);
-      logUserAction('RFID scanner status checked', {
-        platform: status.platform,
-        available: status.is_available,
-      });
-
-      if (showSuccessModal && status.is_available) {
-        setStatusModalMessage('Scanner funktioniert. Sie können jetzt Armbänder scannen.');
-        setShowStatusModal(true);
-      }
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      logger.error('Scanner status error', { error: error.message });
-      logError(error, 'Failed to check RFID scanner status');
-      setScannerStatus({
-        is_available: false,
-        platform: 'Unknown',
-        last_error: error.message,
-      });
-
-      if (showSuccessModal) {
-        setShowStatusModal(false);
-      }
-    } finally {
-      setIsRefreshingStatus(false);
-    }
-  }, []);
-
-  const handleRecoverScanner = useCallback(async () => {
-    if (!isTauriContext()) {
-      return;
-    }
-
-    setIsRecoveringScanner(true);
-    try {
-      await withTimeout(
-        safeInvoke('recover_rfid_scanner'),
-        SCANNER_RECOVERY_TIMEOUT_MS,
-        'Scanner-Recovery Zeitüberschreitung'
-      );
-      await checkScannerStatus(true);
-      logUserAction('RFID scanner recovered');
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      logger.error('Scanner recovery failed', { error: error.message });
-      setError(
-        'Scanner konnte nicht neu gestartet werden. Bitte Gerät vom Strom trennen und neu starten – die Session bleibt erhalten.'
-      );
-      setShowErrorModal(true);
-    } finally {
-      setIsRecoveringScanner(false);
-    }
-  }, [checkScannerStatus]);
-
-  // Check RFID scanner status on component mount
-  useEffect(() => {
-    void checkScannerStatus(false);
-  }, [checkScannerStatus]);
-
   // Start RFID scanning process
   const handleStartScanning = async () => {
     logUserAction('RFID scanning started');
@@ -317,10 +222,7 @@ function TagAssignmentPage() {
       }
 
       if (result.success && result.tag_id) {
-        logUserAction('RFID tag scanned successfully', {
-          tagId: result.tag_id,
-          platform: scannerStatus?.platform,
-        });
+        logUserAction('RFID tag scanned successfully', { tagId: result.tag_id });
         void handleTagScanned(result.tag_id);
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';
@@ -338,7 +240,6 @@ function TagAssignmentPage() {
 
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
-      await checkScannerStatus(false);
       const timeoutError = error.message.toLowerCase().includes('zeitüberschreitung');
       setError(
         timeoutError
@@ -461,9 +362,7 @@ function TagAssignmentPage() {
     return null; // Will redirect via useEffect
   }
 
-  const scannerUnavailableInTauri = !scannerStatus?.is_available && isTauriContext();
-  const isScanStartDisabled =
-    isLoading || isRefreshingStatus || isRecoveringScanner || scannerUnavailableInTauri;
+  const isScanStartDisabled = isLoading;
 
   return (
     <>
@@ -672,66 +571,6 @@ function TagAssignmentPage() {
                 >
                   Scan starten
                 </button>
-
-                {isTauriContext() && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      gap: '12px',
-                      marginTop: '16px',
-                    }}
-                  >
-                    <BackButton
-                      onClick={() => {
-                        void checkScannerStatus(true);
-                      }}
-                      disabled={isRefreshingStatus || isRecoveringScanner}
-                      text={isRefreshingStatus ? 'Prüfe Scanner...' : 'Scanner prüfen'}
-                      color="gray"
-                      customIcon={
-                        <svg
-                          width="28"
-                          height="28"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="#374151"
-                          strokeWidth="2.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <circle cx="11" cy="11" r="8" />
-                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                        </svg>
-                      }
-                      ariaLabel="Scanner-Status prüfen"
-                    />
-                    <BackButton
-                      onClick={() => {
-                        void handleRecoverScanner();
-                      }}
-                      disabled={isRecoveringScanner}
-                      text={isRecoveringScanner ? 'Starte neu...' : 'Scanner neu starten'}
-                      icon="restart"
-                      color="blue"
-                      ariaLabel="Scanner neu starten"
-                    />
-                  </div>
-                )}
-
-                {scannerUnavailableInTauri && (
-                  <p
-                    style={{
-                      marginTop: '14px',
-                      fontSize: '15px',
-                      color: '#B91C1C',
-                      fontWeight: 600,
-                    }}
-                  >
-                    Scanner nicht verfügbar
-                    {scannerStatus?.last_error ? `: ${scannerStatus.last_error}` : '.'}
-                  </p>
-                )}
               </div>
             )}
 
@@ -1205,14 +1044,6 @@ function TagAssignmentPage() {
         onClose={() => setShowErrorModal(false)}
         message={error ?? ''}
         autoCloseDelay={3000}
-      />
-
-      {/* Positive scanner status modal (manual status checks only) */}
-      <SuccessModal
-        isOpen={showStatusModal}
-        onClose={() => setShowStatusModal(false)}
-        message={statusModalMessage ?? 'Scanner funktioniert einwandfrei.'}
-        autoCloseDelay={2200}
       />
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
