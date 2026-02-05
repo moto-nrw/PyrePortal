@@ -1023,17 +1023,34 @@ const ActivityScanningPage: React.FC = () => {
             position: 'relative',
           }}
         >
-          {/* Anmelden Button - Top Right of ContentBox */}
+          {/* Scanner restart - Top Left */}
+          <div
+            style={{
+              position: 'absolute',
+              top: '20px',
+              left: '20px',
+              zIndex: 10,
+            }}
+          >
+            <BackButton
+              onClick={() => {
+                void handleRecoverScanner();
+              }}
+              disabled={isRecoveringScanner}
+              text="Scanner neu starten"
+              icon="restart"
+              color="blue"
+              ariaLabel="Scanner neu starten"
+            />
+          </div>
+
+          {/* Anmelden Button - Top Right */}
           <div
             style={{
               position: 'absolute',
               top: '20px',
               right: '20px',
               zIndex: 10,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '10px',
-              alignItems: 'flex-end',
             }}
           >
             <BackButton
@@ -1053,16 +1070,6 @@ const ActivityScanningPage: React.FC = () => {
                 </svg>
               }
               ariaLabel="Anmelden - zur PIN-Eingabe"
-            />
-            <BackButton
-              onClick={() => {
-                void handleRecoverScanner();
-              }}
-              disabled={isRecoveringScanner}
-              text={isRecoveringScanner ? 'Scanner wird neu gestartet...' : 'Scanner neu starten'}
-              icon="restart"
-              color="blue"
-              ariaLabel="Scanner neu starten"
             />
           </div>
 
