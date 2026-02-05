@@ -140,9 +140,6 @@ function HomeViewPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
-  // Check if supervisors are selected
-  const hasSupervisors = selectedSupervisors.length > 0;
-
   // Helper to end the current session
   const endCurrentSession = async () => {
     logUserAction('Ending current session');
@@ -172,14 +169,6 @@ function HomeViewPage() {
   };
 
   const handleTagAssignment = () => {
-    if (!hasSupervisors) {
-      logUserAction('NFC-Scan attempted without supervisors');
-      setErrorMessage(
-        "Bitte wählen Sie zuerst mindestens einen Betreuer über 'Team anpassen' aus, bevor Sie die NFC-Scan Funktion nutzen können."
-      );
-      setShowErrorModal(true);
-      return;
-    }
     logNavigation('Home View', '/tag-assignment');
     void navigate('/tag-assignment');
   };
@@ -324,53 +313,42 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '12px',
               padding: '0 32px',
-              backgroundColor: hasSupervisors
-                ? designSystem.glass.background
-                : 'rgba(255, 255, 255, 0.6)',
-              border: hasSupervisors
-                ? '1px solid rgba(80, 128, 216, 0.2)'
-                : '1px solid rgba(156, 163, 175, 0.2)',
+              backgroundColor: designSystem.glass.background,
+              border: '1px solid rgba(80, 128, 216, 0.2)',
               borderRadius: '34px',
-              cursor: hasSupervisors ? 'pointer' : 'not-allowed',
+              cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: hasSupervisors
-                ? designSystem.shadows.button
-                : '0 2px 6px rgba(0, 0, 0, 0.1)',
+              boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
-              opacity: hasSupervisors ? 1 : 0.6,
             }}
             onTouchStart={e => {
-              if (hasSupervisors) {
-                e.currentTarget.style.transform = designSystem.scales.activeSmall;
-                e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
-                e.currentTarget.style.boxShadow = designSystem.shadows.button;
-              }
+              e.currentTarget.style.transform = designSystem.scales.activeSmall;
+              e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
+              e.currentTarget.style.boxShadow = designSystem.shadows.button;
             }}
             onTouchEnd={e => {
-              if (hasSupervisors) {
-                setTimeout(() => {
-                  if (e.currentTarget) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                  }
-                }, 150);
-              }
+              setTimeout(() => {
+                if (e.currentTarget) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
+                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
+                }
+              }, 150);
             }}
           >
             <FontAwesomeIcon
               icon={faWifi}
               size="xl"
-              style={{ color: hasSupervisors ? '#5080D8' : '#9CA3AF', transform: 'rotate(90deg)' }}
+              style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
             />
             <span
               style={{
                 fontSize: '20px',
                 fontWeight: 600,
-                color: hasSupervisors ? '#5080D8' : '#9CA3AF',
+                color: '#5080D8',
               }}
             >
               NFC-Scan
