@@ -91,6 +91,8 @@ function TagAssignmentPage() {
   const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
   const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
   const [isRecoveringScanner, setIsRecoveringScanner] = useState(false);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusModalMessage, setStatusModalMessage] = useState<string | null>(null);
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
   const [isUnassigning, setIsUnassigning] = useState(false);
 
@@ -175,7 +177,7 @@ function TagAssignmentPage() {
     window.history.replaceState({}, document.title);
   }, [location.state]);
 
-  const checkScannerStatus = useCallback(async () => {
+  const checkScannerStatus = useCallback(async (showSuccessModal = false) => {
     logger.debug('Checking RFID scanner status');
     setIsRefreshingStatus(true);
 
@@ -203,6 +205,11 @@ function TagAssignmentPage() {
         platform: status.platform,
         available: status.is_available,
       });
+
+      if (showSuccessModal && status.is_available) {
+        setStatusModalMessage('Scanner funktioniert. Sie können jetzt Armbänder scannen.');
+        setShowStatusModal(true);
+      }
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       logger.error('Scanner status error', { error: error.message });
@@ -212,6 +219,10 @@ function TagAssignmentPage() {
         platform: 'Unknown',
         last_error: error.message,
       });
+
+      if (showSuccessModal) {
+        setShowStatusModal(false);
+      }
     } finally {
       setIsRefreshingStatus(false);
     }
@@ -229,7 +240,7 @@ function TagAssignmentPage() {
         SCANNER_RECOVERY_TIMEOUT_MS,
         'Scanner-Recovery Zeitüberschreitung'
       );
-      await checkScannerStatus();
+      await checkScannerStatus(true);
       logUserAction('RFID scanner recovered');
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
@@ -243,7 +254,7 @@ function TagAssignmentPage() {
 
   // Check RFID scanner status on component mount
   useEffect(() => {
-    void checkScannerStatus();
+    void checkScannerStatus(false);
   }, [checkScannerStatus]);
 
   // Start RFID scanning process
@@ -325,7 +336,7 @@ function TagAssignmentPage() {
 
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
-      await checkScannerStatus();
+      await checkScannerStatus(false);
       const timeoutError = error.message.toLowerCase().includes('zeitüberschreitung');
       setError(
         timeoutError
@@ -671,7 +682,7 @@ function TagAssignmentPage() {
                   >
                     <button
                       onClick={() => {
-                        void checkScannerStatus();
+                        void checkScannerStatus(true);
                       }}
                       disabled={isRefreshingStatus || isRecoveringScanner}
                       style={{
@@ -1200,6 +1211,52 @@ function TagAssignmentPage() {
         message={error ?? ''}
         autoCloseDelay={3000}
       />
+
+      {/* Positive scanner status modal (manual status checks only) */}
+      <ModalBase
+        isOpen={showStatusModal}
+        onClose={() => setShowStatusModal(false)}
+        size="sm"
+        backgroundColor="#FFFFFF"
+        timeout={2200}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <svg
+            width="56"
+            height="56"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#16A34A"
+            strokeWidth="2.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ marginBottom: '14px' }}
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M8 12.5l2.5 2.5L16 9.5" />
+          </svg>
+          <h3
+            style={{
+              margin: '0 0 10px 0',
+              fontSize: '28px',
+              color: '#111827',
+              fontWeight: 700,
+            }}
+          >
+            Scanner bereit
+          </h3>
+          <p
+            style={{
+              margin: 0,
+              fontSize: '18px',
+              color: '#4B5563',
+              lineHeight: 1.4,
+            }}
+          >
+            {statusModalMessage ?? 'Scanner funktioniert einwandfrei.'}
+          </p>
+        </div>
+      </ModalBase>
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />
