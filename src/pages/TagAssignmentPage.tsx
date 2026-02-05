@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal, ModalBase } from '../components/ui';
+import { ErrorModal, ModalBase, SuccessModal } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { api, type TagAssignmentCheck } from '../services/api';
@@ -245,7 +245,9 @@ function TagAssignmentPage() {
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       logger.error('Scanner recovery failed', { error: error.message });
-      setError('Scanner konnte nicht neu gestartet werden. Bitte App neu starten.');
+      setError(
+        'Scanner konnte nicht neu gestartet werden. Bitte Gerät vom Strom trennen und neu starten – die Session bleibt erhalten.'
+      );
       setShowErrorModal(true);
     } finally {
       setIsRecoveringScanner(false);
@@ -680,47 +682,40 @@ function TagAssignmentPage() {
                       marginTop: '16px',
                     }}
                   >
-                    <button
+                    <BackButton
                       onClick={() => {
                         void checkScannerStatus(true);
                       }}
                       disabled={isRefreshingStatus || isRecoveringScanner}
-                      style={{
-                        height: '44px',
-                        padding: '0 20px',
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        backgroundColor: '#FFFFFF',
-                        color: '#374151',
-                        border: '2px solid #D1D5DB',
-                        borderRadius: designSystem.borderRadius.full,
-                        cursor:
-                          isRefreshingStatus || isRecoveringScanner ? 'not-allowed' : 'pointer',
-                        opacity: isRefreshingStatus || isRecoveringScanner ? 0.6 : 1,
-                      }}
-                    >
-                      {isRefreshingStatus ? 'Prüfe Scanner...' : 'Scanner prüfen'}
-                    </button>
-                    <button
+                      text={isRefreshingStatus ? 'Prüfe Scanner...' : 'Scanner prüfen'}
+                      color="gray"
+                      customIcon={
+                        <svg
+                          width="28"
+                          height="28"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="#374151"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <circle cx="11" cy="11" r="8" />
+                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                      }
+                      ariaLabel="Scanner-Status prüfen"
+                    />
+                    <BackButton
                       onClick={() => {
                         void handleRecoverScanner();
                       }}
                       disabled={isRecoveringScanner}
-                      style={{
-                        height: '44px',
-                        padding: '0 20px',
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        backgroundColor: '#FFFFFF',
-                        color: '#1D4ED8',
-                        border: '2px solid #93C5FD',
-                        borderRadius: designSystem.borderRadius.full,
-                        cursor: isRecoveringScanner ? 'not-allowed' : 'pointer',
-                        opacity: isRecoveringScanner ? 0.6 : 1,
-                      }}
-                    >
-                      {isRecoveringScanner ? 'Starte neu...' : 'Scanner neu starten'}
-                    </button>
+                      text={isRecoveringScanner ? 'Starte neu...' : 'Scanner neu starten'}
+                      icon="restart"
+                      color="blue"
+                      ariaLabel="Scanner neu starten"
+                    />
                   </div>
                 )}
 
@@ -1213,50 +1208,12 @@ function TagAssignmentPage() {
       />
 
       {/* Positive scanner status modal (manual status checks only) */}
-      <ModalBase
+      <SuccessModal
         isOpen={showStatusModal}
         onClose={() => setShowStatusModal(false)}
-        size="sm"
-        backgroundColor="#FFFFFF"
-        timeout={2200}
-      >
-        <div style={{ textAlign: 'center' }}>
-          <svg
-            width="56"
-            height="56"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#16A34A"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            style={{ marginBottom: '14px' }}
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M8 12.5l2.5 2.5L16 9.5" />
-          </svg>
-          <h3
-            style={{
-              margin: '0 0 10px 0',
-              fontSize: '28px',
-              color: '#111827',
-              fontWeight: 700,
-            }}
-          >
-            Scanner bereit
-          </h3>
-          <p
-            style={{
-              margin: 0,
-              fontSize: '18px',
-              color: '#4B5563',
-              lineHeight: 1.4,
-            }}
-          >
-            {statusModalMessage ?? 'Scanner funktioniert einwandfrei.'}
-          </p>
-        </div>
-      </ModalBase>
+        message={statusModalMessage ?? 'Scanner funktioniert einwandfrei.'}
+        autoCloseDelay={2200}
+      />
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ModalBase } from '../components/ui';
+import { ErrorModal, ModalBase, SuccessModal } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { useRfidScanning } from '../hooks/useRfidScanning';
@@ -314,6 +314,8 @@ const ActivityScanningPage: React.FC = () => {
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
   const [isRecoveringScanner, setIsRecoveringScanner] = useState(false);
+  const [showScannerSuccessModal, setShowScannerSuccessModal] = useState(false);
+  const [showScannerErrorModal, setShowScannerErrorModal] = useState(false);
 
   // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
   // This prevents previous student's state from affecting the next scan's modal
@@ -561,18 +563,12 @@ const ActivityScanningPage: React.FC = () => {
 
       await startScanning();
       logger.info('RFID scanner recovered from activity page');
+      setShowScannerSuccessModal(true);
     } catch (error) {
       logger.error('RFID scanner recovery failed on activity page', {
         error: serializeError(error),
       });
-      setScanResult({
-        student_id: null,
-        student_name: 'Scanner-Fehler',
-        action: 'error',
-        message: 'Scanner konnte nicht neu gestartet werden. Bitte erneut versuchen.',
-        showAsError: true,
-      });
-      showScanModal();
+      setShowScannerErrorModal(true);
     } finally {
       setIsRecoveringScanner(false);
     }
@@ -1058,26 +1054,16 @@ const ActivityScanningPage: React.FC = () => {
               }
               ariaLabel="Anmelden - zur PIN-Eingabe"
             />
-            <button
+            <BackButton
               onClick={() => {
                 void handleRecoverScanner();
               }}
               disabled={isRecoveringScanner}
-              style={{
-                height: '44px',
-                padding: '0 20px',
-                fontSize: '15px',
-                fontWeight: 700,
-                borderRadius: '22px',
-                border: '2px solid #93C5FD',
-                backgroundColor: '#FFFFFF',
-                color: '#1D4ED8',
-                cursor: isRecoveringScanner ? 'not-allowed' : 'pointer',
-                opacity: isRecoveringScanner ? 0.7 : 1,
-              }}
-            >
-              {isRecoveringScanner ? 'Scanner wird neu gestartet...' : 'Scanner neu starten'}
-            </button>
+              text={isRecoveringScanner ? 'Scanner wird neu gestartet...' : 'Scanner neu starten'}
+              icon="restart"
+              color="blue"
+              ariaLabel="Scanner neu starten"
+            />
           </div>
 
           <div
@@ -1361,6 +1347,22 @@ const ActivityScanningPage: React.FC = () => {
           {renderModalContent()}
         </ModalBase>
       )}
+
+      {/* Scanner recovery success modal */}
+      <SuccessModal
+        isOpen={showScannerSuccessModal}
+        onClose={() => setShowScannerSuccessModal(false)}
+        message="Scanner wurde erfolgreich neu gestartet."
+        autoCloseDelay={2200}
+      />
+
+      {/* Scanner recovery error modal */}
+      <ErrorModal
+        isOpen={showScannerErrorModal}
+        onClose={() => setShowScannerErrorModal(false)}
+        message="Scanner konnte nicht neu gestartet werden. Bitte Gerät vom Strom trennen und neu starten – die Session bleibt erhalten."
+        autoCloseDelay={6000}
+      />
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={rfid.processingQueue.size > 0} />
