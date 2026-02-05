@@ -31,7 +31,7 @@ interface LocationState {
 }
 
 function StudentSelectionPage() {
-  const { authenticatedUser, selectedSupervisors } = useUserStore();
+  const { authenticatedUser, selectedSupervisors, clearTagScan } = useUserStore();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
@@ -233,6 +233,8 @@ function StudentSelectionPage() {
             );
 
       if (result.success) {
+        clearTagScan(state.scannedTag);
+
         logUserAction('tag_assignment_complete', {
           type: selectedEntity.type,
           tagId: state.scannedTag,
