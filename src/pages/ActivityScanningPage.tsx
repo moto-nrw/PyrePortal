@@ -559,6 +559,14 @@ const ActivityScanningPage: React.FC = () => {
           SCANNER_RECOVERY_TIMEOUT_MS,
           'Scanner-Recovery Zeitüberschreitung'
         );
+
+        // Verify hardware is actually responsive after recovery
+        const status = await safeInvoke<{ is_available: boolean; last_error?: string }>(
+          'get_rfid_scanner_status'
+        );
+        if (!status?.is_available) {
+          throw new Error(status?.last_error ?? 'Scanner antwortet nach Recovery nicht');
+        }
       }
 
       await startScanning();
