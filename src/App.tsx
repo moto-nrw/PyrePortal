@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import ProtectedRoute from './components/ProtectedRoute';
@@ -29,7 +29,7 @@ function App() {
     networkStatus: storeNetworkStatus,
   } = useUserStore();
   const { networkStatus: hookNetworkStatus } = useNetworkStatus();
-  const appLogger = createLogger('App');
+  const appLogger = useMemo(() => createLogger('App'), []);
 
   // Initialize logger with runtime config
   useEffect(() => {

@@ -37,6 +37,8 @@ pub struct RfidServiceState {
     pub last_scan: Option<RfidScanEvent>,
     pub error_count: u32,
     pub last_error: Option<String>,
+    #[serde(skip)]
+    pub should_run: bool,
 }
 
 pub struct RfidBackgroundService {
@@ -48,10 +50,9 @@ pub struct RfidBackgroundService {
 // Safe global service instance using OnceLock
 static RFID_SERVICE: OnceLock<Arc<Mutex<RfidBackgroundService>>> = OnceLock::new();
 
-// Mutex to prevent concurrent one-shot scans (e.g., when user cancels and restarts quickly)
-// Without this, concurrent SPI access corrupts MFRC522 state causing hangs
-// Uses tokio::sync::Mutex because guard must be held across .await points
-static ONESHOT_SCAN_MUTEX: OnceLock<TokioMutex<()>> = OnceLock::new();
+// Global SPI guard used by BOTH continuous background scanning and one-shot scans.
+// This avoids concurrent access/reset races on /dev/spidev0.0 and MFRC522 state corruption.
+static SPI_ACCESS_MUTEX: OnceLock<TokioMutex<()>> = OnceLock::new();
 
 impl RfidBackgroundService {
     pub fn new() -> Self {
@@ -60,6 +61,7 @@ impl RfidBackgroundService {
             last_scan: None,
             error_count: 0,
             last_error: None,
+            should_run: false,
         };
 
         Self {
@@ -107,7 +109,7 @@ impl RfidBackgroundService {
 
     /// Check if scanning should continue based on state
     fn should_continue_scanning(state: &Arc<Mutex<RfidServiceState>>) -> bool {
-        state.lock().map(|guard| guard.is_running).unwrap_or(false)
+        state.lock().map(|guard| guard.should_run).unwrap_or(false)
     }
 
     /// Handle a successful RFID scan - update state and emit event
@@ -162,26 +164,85 @@ impl RfidBackgroundService {
         if let Ok(mut guard) = state.lock() {
             guard.last_error = Some(format!("Scanner initialization failed: {}", error));
             guard.is_running = false;
+            guard.should_run = false;
         }
     }
 
-    /// Handle Start command - begin scanning if not already running
-    fn handle_start_command(
+    const STOP_JOIN_TIMEOUT: Duration = Duration::from_secs(3);
+
+    fn set_running_state(state: &Arc<Mutex<RfidServiceState>>, is_running: bool) {
+        if let Ok(mut guard) = state.lock() {
+            guard.is_running = is_running;
+            if is_running {
+                guard.last_error = None;
+            }
+        }
+    }
+
+    fn set_should_run(state: &Arc<Mutex<RfidServiceState>>, should_run: bool) {
+        if let Ok(mut guard) = state.lock() {
+            guard.should_run = should_run;
+        }
+    }
+
+    async fn reap_finished_scan_task(
         state: &Arc<Mutex<RfidServiceState>>,
-        app_handle: Option<AppHandle>,
-        is_scanning: &mut bool,
         scan_task_handle: &mut Option<tokio::task::JoinHandle<()>>,
     ) {
-        if *is_scanning {
+        let is_finished = scan_task_handle
+            .as_ref()
+            .map(tokio::task::JoinHandle::is_finished)
+            .unwrap_or(false);
+
+        if !is_finished {
+            return;
+        }
+
+        if let Some(handle) = scan_task_handle.take() {
+            if let Err(join_error) = handle.await {
+                println!("RFID scan task ended with error: {join_error}");
+            } else {
+                println!("RFID scan task completed");
+            }
+        }
+
+        Self::set_should_run(state, false);
+        Self::set_running_state(state, false);
+    }
+
+    /// Handle Start command - begin scanning if not already running
+    async fn handle_start_command(
+        state: &Arc<Mutex<RfidServiceState>>,
+        app_handle: Option<AppHandle>,
+        scan_task_handle: &mut Option<tokio::task::JoinHandle<()>>,
+    ) {
+        Self::reap_finished_scan_task(state, scan_task_handle).await;
+
+        let already_running = scan_task_handle
+            .as_ref()
+            .map(tokio::task::JoinHandle::is_finished)
+            .map(|finished| !finished)
+            .unwrap_or(false);
+        let state_running = state.lock().map(|guard| guard.is_running).unwrap_or(false);
+
+        if already_running || state_running {
+            let stop_in_progress = state
+                .lock()
+                .map(|guard| guard.is_running && !guard.should_run)
+                .unwrap_or(false);
+
+            if stop_in_progress {
+                println!("RFID background scanning still stopping, start deferred");
+            } else {
+                println!("RFID background scanning already running, start ignored");
+                Self::set_running_state(state, true);
+            }
             return;
         }
 
         println!("Starting RFID background scanning...");
-        *is_scanning = true;
-
-        if let Ok(mut guard) = state.lock() {
-            guard.is_running = true;
-        }
+        Self::set_should_run(state, true);
+        Self::set_running_state(state, true);
 
         let scan_state = Arc::clone(state);
         *scan_task_handle = Some(tokio::spawn(async move {
@@ -189,25 +250,67 @@ impl RfidBackgroundService {
         }));
     }
 
-    /// Handle Stop command - stop scanning if currently running
-    fn handle_stop_command(
+    /// Handle Stop command - request stop and wait briefly for task termination.
+    async fn handle_stop_command(
         state: &Arc<Mutex<RfidServiceState>>,
-        is_scanning: &mut bool,
         scan_task_handle: &mut Option<tokio::task::JoinHandle<()>>,
     ) {
-        if !*is_scanning {
-            return;
-        }
-
         println!("Stopping RFID background scanning...");
-        *is_scanning = false;
+        // Signal the worker to exit gracefully at the next loop iteration.
+        Self::set_should_run(state, false);
 
-        if let Ok(mut guard) = state.lock() {
-            guard.is_running = false;
-        }
+        if let Some(handle) = scan_task_handle.as_mut() {
+            match tokio::time::timeout(Self::STOP_JOIN_TIMEOUT, &mut *handle).await {
+                Ok(join_result) => {
+                    if let Err(join_error) = join_result {
+                        println!("RFID scan task join error on stop: {join_error}");
+                    }
+                    *scan_task_handle = None;
+                    Self::set_running_state(state, false);
+                }
+                Err(_) => {
+                    println!("RFID scan task did not stop within timeout, aborting task (may still drain in background)");
+                    handle.abort();
+                    let mut finished_after_abort = false;
+                    for _ in 0..10 {
+                        if handle.is_finished() {
+                            finished_after_abort = true;
+                            break;
+                        }
+                        tokio::time::sleep(Duration::from_millis(50)).await;
+                    }
 
-        if let Some(handle) = scan_task_handle.take() {
-            handle.abort();
+                    if finished_after_abort {
+                        if let Some(finished_handle) = scan_task_handle.take() {
+                            if let Err(join_error) = finished_handle.await {
+                                println!("RFID scan task join error after abort: {join_error}");
+                            }
+                        }
+                        Self::set_running_state(state, false);
+                        return;
+                    }
+
+                    // If abort did not settle quickly, detach join handling in background
+                    // and keep state as running until that detached task resolves.
+                    if let Some(detached_handle) = scan_task_handle.take() {
+                        let state_for_join = Arc::clone(state);
+                        tokio::spawn(async move {
+                            if let Err(join_error) = detached_handle.await {
+                                println!("RFID scan task join error after detached abort: {join_error}");
+                            }
+                            Self::set_should_run(&state_for_join, false);
+                            Self::set_running_state(&state_for_join, false);
+                        });
+                    }
+                }
+            }
+        } else {
+            let still_running = state.lock().map(|guard| guard.is_running).unwrap_or(false);
+            if still_running {
+                println!("RFID stop requested but scanner thread is still draining");
+            } else {
+                Self::set_running_state(state, false);
+            }
         }
     }
 
@@ -218,24 +321,23 @@ impl RfidBackgroundService {
         app_handle: Option<AppHandle>,
         command_rx: &mut mpsc::UnboundedReceiver<ServiceCommand>,
     ) {
-        let mut is_scanning = false;
         let mut scan_task_handle: Option<tokio::task::JoinHandle<()>> = None;
 
         while let Some(command) = command_rx.recv().await {
+            Self::reap_finished_scan_task(&state, &mut scan_task_handle).await;
+
             match command {
                 ServiceCommand::Start => {
-                    Self::handle_start_command(
-                        &state,
-                        app_handle.clone(),
-                        &mut is_scanning,
-                        &mut scan_task_handle,
-                    );
+                    Self::handle_start_command(&state, app_handle.clone(), &mut scan_task_handle)
+                        .await;
                 }
                 ServiceCommand::Stop => {
-                    Self::handle_stop_command(&state, &mut is_scanning, &mut scan_task_handle);
+                    Self::handle_stop_command(&state, &mut scan_task_handle).await;
                 }
             }
         }
+
+        Self::handle_stop_command(&state, &mut scan_task_handle).await;
     }
 
     async fn continuous_scan_loop(
@@ -245,46 +347,18 @@ impl RfidBackgroundService {
         // Platform-specific scanning implementation
         #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
         {
-            const MAX_INIT_RETRIES: u32 = 3;
-            let mut init_attempts: u32 = 0;
+            let scan_state = Arc::clone(&state);
+            let scan_app_handle = app_handle.clone();
+            let join_result = tokio::task::spawn_blocking(move || {
+                Self::run_hardware_scan_worker(scan_state, scan_app_handle);
+            })
+            .await;
 
-            loop {
-                if !Self::should_continue_scanning(&state) {
-                    break;
-                }
-
-                match raspberry_pi::initialize_persistent_scanner() {
-                    Ok(mut scanner) => {
-                        println!("RFID scanner initialized for persistent scanning");
-                        init_attempts = 0;
-
-                        let needs_reinit =
-                            Self::run_hardware_scan_loop(&state, &app_handle, &mut scanner).await;
-
-                        if !needs_reinit || !Self::should_continue_scanning(&state) {
-                            break;
-                        }
-
-                        // Scanner gets dropped here (PersistentRfidScanner::drop calls hlta())
-                        println!("RFID: Reinitializing scanner after consecutive errors...");
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-                    Err(e) => {
-                        init_attempts += 1;
-                        if init_attempts >= MAX_INIT_RETRIES {
-                            Self::handle_scanner_init_failure(
-                                &state,
-                                &format!("{} (after {} attempts)", e, init_attempts),
-                            );
-                            break;
-                        }
-                        println!(
-                            "RFID: Init attempt {}/{} failed: {}, retrying...",
-                            init_attempts, MAX_INIT_RETRIES, e
-                        );
-                        // Exponential backoff: 1s, 2s, 3s
-                        tokio::time::sleep(Duration::from_secs(u64::from(init_attempts))).await;
-                    }
+            if let Err(join_error) = join_result {
+                let message = format!("RFID hardware worker task crashed: {join_error}");
+                println!("{message}");
+                if let Ok(mut guard) = state.lock() {
+                    guard.last_error = Some(message);
                 }
             }
         }
@@ -294,13 +368,69 @@ impl RfidBackgroundService {
         {
             Self::run_mock_scan_loop(&state, app_handle.as_ref()).await;
         }
+
+        // Ensure state reflects actual task lifecycle (prevents zombie "running" states).
+        Self::set_should_run(&state, false);
+        Self::set_running_state(&state, false);
+    }
+
+    /// Run blocking RFID scan worker on a dedicated blocking thread.
+    /// This keeps SPI operations completely off Tokio worker threads.
+    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
+    fn run_hardware_scan_worker(state: Arc<Mutex<RfidServiceState>>, app_handle: Option<AppHandle>) {
+        // Serialize all SPI access across background and one-shot modes.
+        let spi_mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
+        let _spi_guard = spi_mutex.blocking_lock();
+
+        const MAX_INIT_RETRIES: u32 = 3;
+        let mut init_attempts: u32 = 0;
+
+        loop {
+            if !Self::should_continue_scanning(&state) {
+                break;
+            }
+
+            match raspberry_pi::initialize_persistent_scanner() {
+                Ok(mut scanner) => {
+                    println!("RFID scanner initialized for persistent scanning");
+                    init_attempts = 0;
+
+                    let needs_reinit =
+                        Self::run_hardware_scan_loop_sync(&state, &app_handle, &mut scanner);
+
+                    if !needs_reinit || !Self::should_continue_scanning(&state) {
+                        break;
+                    }
+
+                    // Scanner gets dropped here (PersistentRfidScanner::drop calls hlta())
+                    println!("RFID: Reinitializing scanner after consecutive errors...");
+                    std::thread::sleep(Duration::from_secs(1));
+                }
+                Err(e) => {
+                    init_attempts += 1;
+                    if init_attempts >= MAX_INIT_RETRIES {
+                        Self::handle_scanner_init_failure(
+                            &state,
+                            &format!("{} (after {} attempts)", e, init_attempts),
+                        );
+                        break;
+                    }
+                    println!(
+                        "RFID: Init attempt {}/{} failed: {}, retrying...",
+                        init_attempts, MAX_INIT_RETRIES, e
+                    );
+                    // Exponential backoff: 1s, 2s, 3s
+                    std::thread::sleep(Duration::from_secs(u64::from(init_attempts)));
+                }
+            }
+        }
     }
 
     /// Run the hardware scan loop for Raspberry Pi platform.
     /// Returns `true` if the scanner should be re-initialized (consecutive hardware errors),
     /// `false` if scanning was stopped normally.
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    async fn run_hardware_scan_loop(
+    fn run_hardware_scan_loop_sync(
         state: &Arc<Mutex<RfidServiceState>>,
         app_handle: &Option<AppHandle>,
         scanner: &mut raspberry_pi::PersistentRfidScanner,
@@ -319,7 +449,7 @@ impl RfidBackgroundService {
                     consecutive_errors = 0;
                     Self::handle_successful_scan(state, app_handle.as_ref(), &tag_id);
                     // Wait after successful scan to prevent duplicate reads
-                    tokio::time::sleep(Duration::from_millis(200)).await;
+                    std::thread::sleep(Duration::from_millis(200));
                 }
                 Err(error) => {
                     Self::handle_scan_error(state, &error);
@@ -384,15 +514,6 @@ impl RfidBackgroundService {
         #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
         {
             format!("Development Platform ({})", std::env::consts::ARCH)
-        }
-    }
-
-    pub fn send_command(&self, command: ServiceCommand) -> Result<(), String> {
-        if let Some(ref tx) = self.command_tx {
-            tx.send(command)
-                .map_err(|e| format!("Failed to send command: {e}"))
-        } else {
-            Err("Service not initialized".to_string())
         }
     }
 
@@ -539,6 +660,11 @@ mod raspberry_pi {
         Ok(())
     }
 
+    pub fn recover_rfid_hardware() -> Result<(), String> {
+        println!("RFID: performing hardware recovery reset");
+        reset_mfrc522_hardware()
+    }
+
     // ========== Helper functions for reduced cognitive complexity ==========
 
     /// Format UID bytes as colon-separated hex string
@@ -615,6 +741,10 @@ mod raspberry_pi {
         scan_rfid_hardware_with_timeout(Duration::from_secs(10)).await
     }
 
+    pub async fn scan_rfid_hardware_with_custom_timeout(timeout: Duration) -> Result<String, String> {
+        scan_rfid_hardware_with_timeout(timeout).await
+    }
+
     /// Initialize MFRC522 scanner with SPI and GPIO setup for one-shot scanning
     fn initialize_mfrc522_oneshot() -> Result<Mfrc522Scanner, String> {
         ensure_hardware_ready()?;
@@ -689,8 +819,12 @@ mod raspberry_pi {
     }
 
     async fn scan_rfid_hardware_with_timeout(timeout: Duration) -> Result<String, String> {
-        let mut mfrc522 = initialize_mfrc522_oneshot()?;
-        run_scan_loop_with_timeout(&mut mfrc522, timeout)
+        tokio::task::spawn_blocking(move || {
+            let mut mfrc522 = initialize_mfrc522_oneshot()?;
+            run_scan_loop_with_timeout(&mut mfrc522, timeout)
+        })
+        .await
+        .map_err(|e| format!("RFID one-shot scan task failed: {e}"))?
     }
 
     pub fn check_rfid_hardware() -> RfidScannerStatus {
@@ -793,31 +927,75 @@ mod mock_platform {
     }
 }
 
-// New Tauri commands that control the background service
-#[tauri::command]
-pub async fn start_rfid_service() -> Result<String, String> {
+async fn send_service_command(command: ServiceCommand) -> Result<(), String> {
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        let service = service_arc
-            .lock()
-            .map_err(|e| format!("Failed to lock service: {e}"))?;
-        service.send_command(ServiceCommand::Start)?;
-        Ok("RFID service started".to_string())
+        let command_tx = {
+            let service = service_arc
+                .lock()
+                .map_err(|e| format!("Failed to lock service: {e}"))?;
+            service
+                .command_tx
+                .as_ref()
+                .cloned()
+                .ok_or_else(|| "Service command channel not initialized".to_string())?
+        };
+
+        command_tx
+            .send(command)
+            .map_err(|e| format!("Failed to send command: {e}"))
     } else {
         Err("RFID service not initialized".to_string())
     }
 }
 
+async fn wait_for_service_running(expected_running: bool, timeout: Duration) -> Result<(), String> {
+    let deadline = std::time::Instant::now() + timeout;
+
+    loop {
+        let state = get_rfid_service_status().await?;
+        let reached_target = if expected_running {
+            state.is_running && state.should_run
+        } else {
+            !state.is_running
+        };
+
+        if reached_target {
+            return Ok(());
+        }
+
+        if std::time::Instant::now() >= deadline {
+            let expected = if expected_running { "running" } else { "stopped" };
+            return Err(format!(
+                "Timed out waiting for RFID service to become {expected}. Current state: is_running={}, should_run={}, last_error={:?}",
+                state.is_running, state.should_run, state.last_error
+            ));
+        }
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+async fn stop_service_for_exclusive_hardware_access() {
+    if send_service_command(ServiceCommand::Stop).await.is_ok() {
+        if let Err(wait_error) = wait_for_service_running(false, Duration::from_secs(3)).await {
+            println!("RFID: stop wait warning before exclusive scan: {wait_error}");
+        }
+    }
+}
+
+// New Tauri commands that control the background service
+#[tauri::command]
+pub async fn start_rfid_service() -> Result<String, String> {
+    send_service_command(ServiceCommand::Start).await?;
+    wait_for_service_running(true, Duration::from_secs(2)).await?;
+    Ok("RFID service started".to_string())
+}
+
 #[tauri::command]
 pub async fn stop_rfid_service() -> Result<String, String> {
-    if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        let service = service_arc
-            .lock()
-            .map_err(|e| format!("Failed to lock service: {e}"))?;
-        service.send_command(ServiceCommand::Stop)?;
-        Ok("RFID service stopped".to_string())
-    } else {
-        Err("RFID service not initialized".to_string())
-    }
+    send_service_command(ServiceCommand::Stop).await?;
+    wait_for_service_running(false, Duration::from_secs(4)).await?;
+    Ok("RFID service stopped".to_string())
 }
 
 #[tauri::command]
@@ -830,6 +1008,48 @@ pub async fn get_rfid_service_status() -> Result<RfidServiceState, String> {
     } else {
         Err("RFID service not initialized".to_string())
     }
+}
+
+#[tauri::command]
+pub async fn recover_rfid_scanner() -> Result<String, String> {
+    // Best-effort stop request first.
+    if let Err(stop_error) = send_service_command(ServiceCommand::Stop).await {
+        println!("RFID recover: stop command warning: {stop_error}");
+    }
+
+    // Force GPIO reset immediately. This must not depend on SPI mutex acquisition.
+    // In the hung case, reset should help unblock in-flight SPI calls.
+    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
+    {
+        raspberry_pi::recover_rfid_hardware()?;
+    }
+
+    // Wait for scanner worker to observe stop signal after reset.
+    if let Err(wait_error) = wait_for_service_running(false, Duration::from_secs(4)).await {
+        println!("RFID recover: stop wait warning after reset: {wait_error}");
+    }
+
+    // Confirm we can take exclusive hardware access now.
+    let spi_mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
+    let _guard = tokio::time::timeout(Duration::from_secs(3), spi_mutex.lock())
+        .await
+        .map_err(|_| {
+            "Scanner reset was triggered, but hardware is still busy. Please retry recovery.".to_string()
+        })?;
+
+    // Reset service-visible error state so UI can recover without app restart.
+    if let Some(service_arc) = RfidBackgroundService::get_instance() {
+        if let Ok(service) = service_arc.lock() {
+            if let Ok(mut state_guard) = service.state.lock() {
+                state_guard.error_count = 0;
+                state_guard.last_error = None;
+                state_guard.is_running = false;
+                state_guard.should_run = false;
+            }
+        }
+    }
+
+    Ok("RFID scanner recovered".to_string())
 }
 
 #[tauri::command]
@@ -863,10 +1083,13 @@ pub async fn initialize_rfid_service(app_handle: tauri::AppHandle) -> Result<Str
 // Legacy commands (kept for compatibility)
 #[tauri::command]
 pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
-    // Acquire mutex to prevent concurrent scans - if user cancels and restarts quickly,
-    // the second scan waits for the first to complete rather than corrupting SPI state
-    let mutex = ONESHOT_SCAN_MUTEX.get_or_init(|| TokioMutex::new(()));
-    let _guard = mutex.lock().await;
+    // Ensure background scanner is stopped before one-shot access.
+    stop_service_for_exclusive_hardware_access().await;
+
+    let mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
+    let _guard = tokio::time::timeout(Duration::from_secs(3), mutex.lock())
+        .await
+        .map_err(|_| "Timed out waiting for exclusive scanner access".to_string())?;
 
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
@@ -903,16 +1126,18 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
 
 #[tauri::command]
 pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResult, String> {
-    // Acquire same mutex as scan_rfid_single to prevent concurrent SPI access
-    let mutex = ONESHOT_SCAN_MUTEX.get_or_init(|| TokioMutex::new(()));
-    let _guard = mutex.lock().await;
+    // Ensure background scanner is stopped before one-shot access.
+    stop_service_for_exclusive_hardware_access().await;
+
+    let mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
+    let _guard = tokio::time::timeout(Duration::from_secs(3), mutex.lock())
+        .await
+        .map_err(|_| "Timed out waiting for exclusive scanner access".to_string())?;
 
     // For future implementation - continuous scanning with custom timeout
     #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
     {
-        // Use the timeout parameter for future implementation
-        let _timeout = timeout_seconds; // Acknowledge parameter usage
-        raspberry_pi::scan_rfid_hardware()
+        raspberry_pi::scan_rfid_hardware_with_custom_timeout(Duration::from_secs(timeout_seconds))
             .await
             .map(|tag_id| RfidScanResult {
                 success: true,

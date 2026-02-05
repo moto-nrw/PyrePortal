@@ -38,6 +38,32 @@ interface RfidScannerStatus {
   last_error?: string;
 }
 
+const SCAN_INVOKE_TIMEOUT_MS = 12_000;
+const SCANNER_STATUS_TIMEOUT_MS = 4_000;
+const SCANNER_RECOVERY_TIMEOUT_MS = 8_000;
+
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then(result => {
+        clearTimeout(timeoutHandle);
+        resolve(result);
+      })
+      .catch(error => {
+        clearTimeout(timeoutHandle);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
+  });
+};
+
 /**
  * Tag Assignment Page - Handle RFID tag assignment to students
  *
@@ -63,6 +89,8 @@ function TagAssignmentPage() {
   const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
   const [success, setSuccess] = useState<string | null>(null);
   const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
+  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+  const [isRecoveringScanner, setIsRecoveringScanner] = useState(false);
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
   const [isUnassigning, setIsUnassigning] = useState(false);
 
@@ -147,44 +175,76 @@ function TagAssignmentPage() {
     window.history.replaceState({}, document.title);
   }, [location.state]);
 
+  const checkScannerStatus = useCallback(async () => {
+    logger.debug('Checking RFID scanner status');
+    setIsRefreshingStatus(true);
+
+    if (!isTauriContext()) {
+      logger.debug('Not in Tauri context, using development status');
+      setScannerStatus({
+        is_available: false,
+        platform: 'Development (Web)',
+        last_error: 'Tauri context not available in development mode',
+      });
+      setIsRefreshingStatus(false);
+      return;
+    }
+
+    try {
+      logger.debug('Calling get_rfid_scanner_status');
+      const status = await withTimeout(
+        safeInvoke<RfidScannerStatus>('get_rfid_scanner_status'),
+        SCANNER_STATUS_TIMEOUT_MS,
+        'Scanner-Status Zeitüberschreitung'
+      );
+      logger.debug('Scanner status received', { status });
+      setScannerStatus(status);
+      logUserAction('RFID scanner status checked', {
+        platform: status.platform,
+        available: status.is_available,
+      });
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error('Scanner status error', { error: error.message });
+      logError(error, 'Failed to check RFID scanner status');
+      setScannerStatus({
+        is_available: false,
+        platform: 'Unknown',
+        last_error: error.message,
+      });
+    } finally {
+      setIsRefreshingStatus(false);
+    }
+  }, []);
+
+  const handleRecoverScanner = useCallback(async () => {
+    if (!isTauriContext()) {
+      return;
+    }
+
+    setIsRecoveringScanner(true);
+    try {
+      await withTimeout(
+        safeInvoke('recover_rfid_scanner'),
+        SCANNER_RECOVERY_TIMEOUT_MS,
+        'Scanner-Recovery Zeitüberschreitung'
+      );
+      await checkScannerStatus();
+      logUserAction('RFID scanner recovered');
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error('Scanner recovery failed', { error: error.message });
+      setError('Scanner konnte nicht neu gestartet werden. Bitte App neu starten.');
+      setShowErrorModal(true);
+    } finally {
+      setIsRecoveringScanner(false);
+    }
+  }, [checkScannerStatus]);
+
   // Check RFID scanner status on component mount
   useEffect(() => {
-    const checkScannerStatus = async () => {
-      logger.debug('Checking RFID scanner status');
-
-      if (!isTauriContext()) {
-        logger.debug('Not in Tauri context, using development status');
-        setScannerStatus({
-          is_available: false,
-          platform: 'Development (Web)',
-          last_error: 'Tauri context not available in development mode',
-        });
-        return;
-      }
-
-      try {
-        logger.debug('Calling get_rfid_scanner_status');
-        const status = await safeInvoke<RfidScannerStatus>('get_rfid_scanner_status');
-        logger.debug('Scanner status received', { status });
-        setScannerStatus(status);
-        logUserAction('RFID scanner status checked', {
-          platform: status.platform,
-          available: status.is_available,
-        });
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        logger.error('Scanner status error', { error: error.message });
-        logError(error, 'Failed to check RFID scanner status');
-        setScannerStatus({
-          is_available: false,
-          platform: 'Unknown',
-          last_error: error.message,
-        });
-      }
-    };
-
     void checkScannerStatus();
-  }, []);
+  }, [checkScannerStatus]);
 
   // Start RFID scanning process
   const handleStartScanning = async () => {
@@ -230,8 +290,12 @@ function TagAssignmentPage() {
         return;
       }
 
-      // Use real RFID scanner through Tauri
-      const result = await safeInvoke<RfidScanResult>('scan_rfid_single');
+      // Use real RFID scanner through Tauri with frontend timeout safety net.
+      const result = await withTimeout(
+        safeInvoke<RfidScanResult>('scan_rfid_single'),
+        SCAN_INVOKE_TIMEOUT_MS,
+        'RFID-Scan Zeitüberschreitung'
+      );
 
       // Check if scan was cancelled while waiting for result
       if (scanCancelledRef.current) {
@@ -261,7 +325,13 @@ function TagAssignmentPage() {
 
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
-      setError('Verbindung zum Scanner unterbrochen. Bitte App neu starten.');
+      await checkScannerStatus();
+      const timeoutError = error.message.toLowerCase().includes('zeitüberschreitung');
+      setError(
+        timeoutError
+          ? 'Scanner reagiert nicht mehr. Bitte Scanner neu starten und erneut versuchen.'
+          : 'Verbindung zum Scanner unterbrochen. Bitte Scanner neu starten.'
+      );
       setShowErrorModal(true);
       setShowScanner(false);
     } finally {
@@ -377,6 +447,10 @@ function TagAssignmentPage() {
   if (!authenticatedUser) {
     return null; // Will redirect via useEffect
   }
+
+  const scannerUnavailableInTauri = !scannerStatus?.is_available && isTauriContext();
+  const isScanStartDisabled =
+    isLoading || isRefreshingStatus || isRecoveringScanner || scannerUnavailableInTauri;
 
   return (
     <>
@@ -552,40 +626,32 @@ function TagAssignmentPage() {
 
                 <button
                   onClick={handleStartScanning}
-                  disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
+                  disabled={isScanStartDisabled}
                   style={{
                     height: '68px',
                     padding: '0 64px',
                     fontSize: '24px',
                     fontWeight: 700,
                     color: '#FFFFFF',
-                    background:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                        : designSystem.gradients.blueRight,
+                    background: isScanStartDisabled
+                      ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                      : designSystem.gradients.blueRight,
                     border: 'none',
                     borderRadius: designSystem.borderRadius.full,
-                    cursor:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'not-allowed'
-                        : 'pointer',
+                    cursor: isScanStartDisabled ? 'not-allowed' : 'pointer',
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
-                    boxShadow:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'none'
-                        : designSystem.shadows.blue,
-                    opacity:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.6 : 1,
+                    boxShadow: isScanStartDisabled ? 'none' : designSystem.shadows.blue,
+                    opacity: isScanStartDisabled ? 0.6 : 1,
                   }}
                   onTouchStart={e => {
-                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                    if (!isScanStartDisabled) {
                       e.currentTarget.style.transform = designSystem.scales.active;
                       e.currentTarget.style.boxShadow = designSystem.shadows.button;
                     }
                   }}
                   onTouchEnd={e => {
-                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                    if (!isScanStartDisabled) {
                       e.currentTarget.style.transform = 'scale(1)';
                       e.currentTarget.style.boxShadow = designSystem.shadows.blue;
                     }
@@ -593,6 +659,73 @@ function TagAssignmentPage() {
                 >
                   Scan starten
                 </button>
+
+                {isTauriContext() && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'center',
+                      gap: '12px',
+                      marginTop: '16px',
+                    }}
+                  >
+                    <button
+                      onClick={() => {
+                        void checkScannerStatus();
+                      }}
+                      disabled={isRefreshingStatus || isRecoveringScanner}
+                      style={{
+                        height: '44px',
+                        padding: '0 20px',
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        border: '2px solid #D1D5DB',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor:
+                          isRefreshingStatus || isRecoveringScanner ? 'not-allowed' : 'pointer',
+                        opacity: isRefreshingStatus || isRecoveringScanner ? 0.6 : 1,
+                      }}
+                    >
+                      {isRefreshingStatus ? 'Prüfe Scanner...' : 'Scanner prüfen'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        void handleRecoverScanner();
+                      }}
+                      disabled={isRecoveringScanner}
+                      style={{
+                        height: '44px',
+                        padding: '0 20px',
+                        fontSize: '16px',
+                        fontWeight: 600,
+                        backgroundColor: '#FFFFFF',
+                        color: '#1D4ED8',
+                        border: '2px solid #93C5FD',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: isRecoveringScanner ? 'not-allowed' : 'pointer',
+                        opacity: isRecoveringScanner ? 0.6 : 1,
+                      }}
+                    >
+                      {isRecoveringScanner ? 'Starte neu...' : 'Scanner neu starten'}
+                    </button>
+                  </div>
+                )}
+
+                {scannerUnavailableInTauri && (
+                  <p
+                    style={{
+                      marginTop: '14px',
+                      fontSize: '15px',
+                      color: '#B91C1C',
+                      fontWeight: 600,
+                    }}
+                  >
+                    Scanner nicht verfügbar
+                    {scannerStatus?.last_error ? `: ${scannerStatus.last_error}` : '.'}
+                  </p>
+                )}
               </div>
             )}
 

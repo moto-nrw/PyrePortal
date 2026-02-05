@@ -16,6 +16,7 @@ import {
 } from '../services/api';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
+import { isRfidEnabled, safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('ActivityScanningPage');
 
@@ -30,6 +31,28 @@ const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
  * 2 seconds is enough to read a short goodbye message.
  */
 const FAREWELL_TIMEOUT_MS = 2000;
+const SCANNER_RECOVERY_TIMEOUT_MS = 8000;
+
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then(result => {
+        clearTimeout(timeoutHandle);
+        resolve(result);
+      })
+      .catch(error => {
+        clearTimeout(timeoutHandle);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
+  });
 
 // Feedback button color schemes: green (positive), yellow (neutral), red (negative)
 const FEEDBACK_BUTTON_COLORS = {
@@ -290,6 +313,7 @@ const ActivityScanningPage: React.FC = () => {
 
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
+  const [isRecoveringScanner, setIsRecoveringScanner] = useState(false);
 
   // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
   // This prevents previous student's state from affecting the next scan's modal
@@ -516,6 +540,42 @@ const ActivityScanningPage: React.FC = () => {
     void stopScanning(); // Handle async function
     // Navigate to PIN page for teacher access
     void navigate('/pin');
+  };
+
+  const handleRecoverScanner = async () => {
+    if (isRecoveringScanner) {
+      return;
+    }
+
+    setIsRecoveringScanner(true);
+    try {
+      await stopScanning();
+
+      if (isRfidEnabled()) {
+        await withTimeout(
+          safeInvoke('recover_rfid_scanner'),
+          SCANNER_RECOVERY_TIMEOUT_MS,
+          'Scanner-Recovery Zeitüberschreitung'
+        );
+      }
+
+      await startScanning();
+      logger.info('RFID scanner recovered from activity page');
+    } catch (error) {
+      logger.error('RFID scanner recovery failed on activity page', {
+        error: serializeError(error),
+      });
+      setScanResult({
+        student_id: null,
+        student_name: 'Scanner-Fehler',
+        action: 'error',
+        message: 'Scanner konnte nicht neu gestartet werden. Bitte erneut versuchen.',
+        showAsError: true,
+      });
+      showScanModal();
+    } finally {
+      setIsRecoveringScanner(false);
+    }
   };
 
   // Handle "nach Hause" button - student confirmed going home
@@ -974,6 +1034,10 @@ const ActivityScanningPage: React.FC = () => {
               top: '20px',
               right: '20px',
               zIndex: 10,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              alignItems: 'flex-end',
             }}
           >
             <BackButton
@@ -994,6 +1058,26 @@ const ActivityScanningPage: React.FC = () => {
               }
               ariaLabel="Anmelden - zur PIN-Eingabe"
             />
+            <button
+              onClick={() => {
+                void handleRecoverScanner();
+              }}
+              disabled={isRecoveringScanner}
+              style={{
+                height: '44px',
+                padding: '0 20px',
+                fontSize: '15px',
+                fontWeight: 700,
+                borderRadius: '22px',
+                border: '2px solid #93C5FD',
+                backgroundColor: '#FFFFFF',
+                color: '#1D4ED8',
+                cursor: isRecoveringScanner ? 'not-allowed' : 'pointer',
+                opacity: isRecoveringScanner ? 0.7 : 1,
+              }}
+            >
+              {isRecoveringScanner ? 'Scanner wird neu gestartet...' : 'Scanner neu starten'}
+            </button>
           </div>
 
           <div
