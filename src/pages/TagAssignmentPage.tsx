@@ -765,35 +765,27 @@ function TagAssignmentPage() {
                   >
                     <button
                       onClick={handleNavigateToStudentSelection}
-                      disabled={isLoading}
                       style={{
                         flex: 1,
                         height: '68px',
                         fontSize: '24px',
                         fontWeight: 700,
                         color: '#FFFFFF',
-                        background: isLoading
-                          ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                          : designSystem.gradients.blueRight,
+                        background: designSystem.gradients.blueRight,
                         border: 'none',
                         borderRadius: designSystem.borderRadius.full,
-                        cursor: isLoading ? 'not-allowed' : 'pointer',
+                        cursor: 'pointer',
                         outline: 'none',
                         WebkitTapHighlightColor: 'transparent',
-                        boxShadow: isLoading ? 'none' : designSystem.shadows.blue,
-                        opacity: isLoading ? 0.6 : 1,
+                        boxShadow: designSystem.shadows.blue,
                       }}
                       onTouchStart={e => {
-                        if (!isLoading) {
-                          e.currentTarget.style.transform = designSystem.scales.active;
-                          e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                        }
+                        e.currentTarget.style.transform = designSystem.scales.active;
+                        e.currentTarget.style.boxShadow = designSystem.shadows.button;
                       }}
                       onTouchEnd={e => {
-                        if (!isLoading) {
-                          e.currentTarget.style.transform = 'scale(1)';
-                          e.currentTarget.style.boxShadow = designSystem.shadows.blue;
-                        }
+                        e.currentTarget.style.transform = 'scale(1)';
+                        e.currentTarget.style.boxShadow = designSystem.shadows.blue;
                       }}
                     >
                       {tagAssignment.assigned ? 'Neue Person zuweisen' : 'Person auswählen'}
