@@ -353,7 +353,7 @@ function TagAssignmentPage() {
       setShowUnassignConfirm(false);
       setTagAssignment(null);
       setScannedTag(null);
-      setSuccess(result.message ?? `Armband wurde von ${assignedPerson.name} entfernt`);
+      setSuccess(`Armband wurde von ${assignedPerson.name} entfernt`);
     } catch (err) {
       logger.error('Failed to unassign RFID tag', {
         error: err instanceof Error ? err.message : String(err),
@@ -516,7 +516,7 @@ function TagAssignmentPage() {
             }}
           >
             {/* Initial State - Start Scanning */}
-            {!scannedTag && !isLoading && (
+            {!scannedTag && !isLoading && !success && (
               <div style={{ textAlign: 'center' }}>
                 <div
                   style={{
@@ -1012,7 +1012,7 @@ function TagAssignmentPage() {
               marginBottom: '32px',
             }}
           >
-            Keine Sorge — das Armband kann jederzeit neu zugewiesen werden.
+            Keine Sorge, das Armband kann jederzeit neu zugewiesen werden.
           </p>
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
