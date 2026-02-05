@@ -67,11 +67,8 @@ function StudentSelectionPage() {
           authenticatedUserId: authenticatedUser.staffId,
         });
 
-        // If no supervisors selected, use authenticated user's ID
-        const teacherIds =
-          selectedSupervisors.length > 0
-            ? selectedSupervisors.map(supervisor => supervisor.id)
-            : [authenticatedUser.staffId];
+        // Fetch all students (no teacher filter) so any staff can assign bracelets
+        const teacherIds: number[] = [];
 
         // Fetch both students and teachers in parallel
         const [studentList, teacherList] = await Promise.all([
