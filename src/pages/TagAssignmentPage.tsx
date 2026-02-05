@@ -340,6 +340,13 @@ function TagAssignmentPage() {
     try {
       const result = await api.unassignStudentTag(authenticatedUser.pin, assignedPerson.id);
 
+      if (!result.success) {
+        setShowUnassignConfirm(false);
+        setError(result.message ?? 'Zuweisung konnte nicht aufgehoben werden.');
+        setShowErrorModal(true);
+        return;
+      }
+
       // Clear stale RFID caches for this tag
       useUserStore.getState().clearTagScan(scannedTag);
 
