@@ -871,7 +871,7 @@ mod raspberry_pi {
         reset_mfrc522_hardware()?;
 
         let spi_interface = SpiInterface::new(spi);
-        let mfrc522 = Mfrc522::new(spi_interface)
+        let mut mfrc522 = Mfrc522::new(spi_interface)
             .init()
             .map_err(|e| format!("MFRC522 init failed: {e:?}"))?;
 
