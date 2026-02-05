@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 
 import {
   ErrorModal,
+  ModalBase,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
@@ -14,7 +15,7 @@ import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logUserAction, serializeError } from '../utils/logger';
 
-const ENTITIES_PER_PAGE = 10; // 5x2 grid to use full width
+const ENTITIES_PER_PAGE = 5; // 5x1 grid — filters are primary navigation
 
 // Union type for assignable entities (students and teachers)
 type AssignableEntity = { type: 'student'; data: Student } | { type: 'teacher'; data: Teacher };
@@ -42,7 +43,11 @@ function StudentSelectionPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<string | null>(null); // null = all, 'betreuer' = staff only, or class name
+  const [gradeFilter, setGradeFilter] = useState<string | null>(null);
+  const [sectionFilter, setSectionFilter] = useState<string | null>(null);
+  const [groupFilter, setGroupFilter] = useState<string | null>(null);
+  const [showStaffOnly, setShowStaffOnly] = useState(false);
+  const [showGroupPicker, setShowGroupPicker] = useState(false);
 
   const logger = useMemo(() => createLogger('StudentSelectionPage'), []);
 
@@ -106,23 +111,64 @@ function StudentSelectionPage() {
     }
   }, [authenticatedUser, selectedSupervisors, logger]);
 
-  // Distinct classes from students for quick class filter
-  const availableClasses = useMemo(() => {
-    const classSet = new Set<string>();
+  // Derive available grades from student school_class (e.g. "3C" → grade "3")
+  const availableGrades = useMemo(() => {
+    const grades = new Set<string>();
     entities.forEach(e => {
-      if (e.type === 'student' && e.data.school_class) classSet.add(e.data.school_class);
+      if (e.type === 'student' && e.data.school_class) {
+        const grade = /^(\d+)/.exec(e.data.school_class)?.[1];
+        if (grade) grades.add(grade);
+      }
     });
-    return Array.from(classSet).sort((a, b) => a.localeCompare(b, 'de'));
+    return Array.from(grades).sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
   }, [entities]);
 
-  // Apply filter by type or class
+  // Derive available sections within the selected grade (e.g. "3C" → section "C")
+  const availableSections = useMemo(() => {
+    if (!gradeFilter) return [];
+    const sections = new Set<string>();
+    entities.forEach(e => {
+      if (e.type === 'student' && e.data.school_class) {
+        const match = /^(\d+)(.*)/.exec(e.data.school_class);
+        if (match?.[1] === gradeFilter && match[2]) {
+          sections.add(match[2]);
+        }
+      }
+    });
+    return Array.from(sections).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [entities, gradeFilter]);
+
+  // Derive all available OGS groups
+  const availableGroups = useMemo(() => {
+    const groups = new Set<string>();
+    entities.forEach(e => {
+      if (e.type === 'student' && e.data.group_name) groups.add(e.data.group_name);
+    });
+    return Array.from(groups).sort((a, b) => a.localeCompare(b, 'de'));
+  }, [entities]);
+
+  // Combined filter logic: grade, section, group, staff-only
   const filteredEntities = useMemo(() => {
     const filtered = entities.filter(e => {
-      if (!selectedFilter) return true;
-      if (selectedFilter === 'betreuer') return e.type === 'teacher';
-      // Class filter - only students
-      if (e.type !== 'student') return false;
-      return (e.data.school_class ?? '') === selectedFilter;
+      if (showStaffOnly) return e.type === 'teacher';
+
+      if (gradeFilter || sectionFilter || groupFilter) {
+        if (e.type === 'teacher') return false;
+        const student = e.data;
+
+        if (gradeFilter) {
+          const grade = /^(\d+)/.exec(student.school_class ?? '')?.[1];
+          if (grade !== gradeFilter) return false;
+        }
+        if (sectionFilter) {
+          const section = /^\d+(.*)/.exec(student.school_class ?? '')?.[1];
+          if (section !== sectionFilter) return false;
+        }
+        if (groupFilter) {
+          if (student.group_name !== groupFilter) return false;
+        }
+      }
+      return true;
     });
 
     return filtered.sort((a, b) => {
@@ -132,7 +178,7 @@ function StudentSelectionPage() {
         b.type === 'student' ? `${b.data.last_name} ${b.data.first_name}` : b.data.display_name;
       return an.localeCompare(bn, 'de');
     });
-  }, [entities, selectedFilter]);
+  }, [entities, gradeFilter, sectionFilter, groupFilter, showStaffOnly]);
 
   // Pagination hook
   const {
@@ -147,11 +193,11 @@ function StudentSelectionPage() {
     resetPage,
   } = usePagination(filteredEntities, { itemsPerPage: ENTITIES_PER_PAGE });
 
-  // Reset pagination and selection when filter changes
+  // Reset pagination and selection when any filter changes
   useEffect(() => {
     resetPage();
     setSelectedEntityId(null);
-  }, [selectedFilter, resetPage]);
+  }, [gradeFilter, sectionFilter, groupFilter, showStaffOnly, resetPage]);
 
   const handleEntitySelect = (entity: AssignableEntity) => {
     const entityId =
@@ -300,6 +346,62 @@ function StudentSelectionPage() {
     return null;
   }
 
+  const noFiltersActive = !gradeFilter && !sectionFilter && !groupFilter && !showStaffOnly;
+
+  const chipStyle = (active: boolean): React.CSSProperties => ({
+    height: '52px',
+    padding: '0 20px',
+    borderRadius: designSystem.borderRadius.full,
+    border: active ? 'none' : '1px solid #E5E7EB',
+    background: active ? designSystem.gradients.blueRight : '#FFFFFF',
+    color: active ? '#FFFFFF' : '#374151',
+    fontSize: '17px',
+    fontWeight: 600,
+    boxShadow: active ? designSystem.shadows.blue : 'none',
+    cursor: 'pointer',
+    outline: 'none',
+    WebkitTapHighlightColor: 'transparent',
+  });
+
+  const handleResetAll = () => {
+    setGradeFilter(null);
+    setSectionFilter(null);
+    setGroupFilter(null);
+    setShowStaffOnly(false);
+  };
+
+  const handleStaffToggle = () => {
+    if (showStaffOnly) {
+      setShowStaffOnly(false);
+    } else {
+      setShowStaffOnly(true);
+      setGradeFilter(null);
+      setSectionFilter(null);
+      setGroupFilter(null);
+    }
+  };
+
+  const handleGradeSelect = (grade: string) => {
+    if (gradeFilter === grade) {
+      setGradeFilter(null);
+      setSectionFilter(null);
+    } else {
+      setGradeFilter(grade);
+      setSectionFilter(null);
+      setShowStaffOnly(false);
+    }
+  };
+
+  const handleSectionSelect = (section: string) => {
+    setSectionFilter(sectionFilter === section ? null : section);
+  };
+
+  const handleGroupSelect = (group: string) => {
+    setGroupFilter(group);
+    setShowStaffOnly(false);
+    setShowGroupPicker(false);
+  };
+
   const filterContent = (
     <div
       style={{
@@ -310,70 +412,91 @@ function StudentSelectionPage() {
         marginTop: '8px',
       }}
     >
-      <div style={{ color: '#6B7280', fontSize: '14px', fontWeight: 600 }}>Filter:</div>
+      {/* Row 1: Type + Class hierarchy */}
       <div
         style={{
           display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
           flexWrap: 'wrap',
           justifyContent: 'center',
-          gap: '8px',
-          maxWidth: '100%',
         }}
       >
-        <button
-          onClick={() => setSelectedFilter(null)}
-          style={{
-            height: '40px',
-            padding: '0 14px',
-            borderRadius: designSystem.borderRadius.full,
-            border: selectedFilter === null ? 'none' : '1px solid #E5E7EB',
-            background: selectedFilter === null ? designSystem.gradients.blueRight : '#FFFFFF',
-            color: selectedFilter === null ? '#FFFFFF' : '#374151',
-            fontSize: '14px',
-            fontWeight: 600,
-            boxShadow: selectedFilter === null ? designSystem.shadows.blue : 'none',
-          }}
-        >
+        <button onClick={handleResetAll} style={chipStyle(noFiltersActive)}>
           Alle
         </button>
-        <button
-          onClick={() => setSelectedFilter('betreuer')}
-          style={{
-            height: '40px',
-            padding: '0 14px',
-            borderRadius: designSystem.borderRadius.full,
-            border: selectedFilter === 'betreuer' ? 'none' : '1px solid #E5E7EB',
-            background:
-              selectedFilter === 'betreuer' ? designSystem.gradients.blueRight : '#FFFFFF',
-            color: selectedFilter === 'betreuer' ? '#FFFFFF' : '#374151',
-            fontSize: '14px',
-            fontWeight: 600,
-            boxShadow: selectedFilter === 'betreuer' ? designSystem.shadows.blue : 'none',
-          }}
-        >
+        <button onClick={handleStaffToggle} style={chipStyle(showStaffOnly)}>
           Betreuer
         </button>
-        {availableClasses.map(cls => {
-          const active = selectedFilter === cls;
-          return (
-            <button
-              key={cls}
-              onClick={() => setSelectedFilter(cls)}
-              style={{
-                height: '40px',
-                padding: '0 14px',
-                borderRadius: designSystem.borderRadius.full,
-                border: active ? 'none' : '1px solid #E5E7EB',
-                background: active ? designSystem.gradients.blueRight : '#FFFFFF',
-                color: active ? '#FFFFFF' : '#374151',
-                fontSize: '14px',
-                fontWeight: 600,
-              }}
-            >
-              {cls}
-            </button>
-          );
-        })}
+
+        {/* Visual separator */}
+        <div
+          style={{
+            width: '1px',
+            height: '32px',
+            backgroundColor: '#D1D5DB',
+            margin: '0 4px',
+          }}
+        />
+
+        {/* Grade chips */}
+        <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>Klasse:</span>
+        {availableGrades.map(grade => (
+          <button
+            key={grade}
+            onClick={() => handleGradeSelect(grade)}
+            style={chipStyle(gradeFilter === grade)}
+          >
+            {grade}
+          </button>
+        ))}
+
+        {/* Section chips (only when grade selected) */}
+        {gradeFilter && availableSections.length > 0 && (
+          <>
+            {availableSections.map(section => (
+              <button
+                key={section}
+                onClick={() => handleSectionSelect(section)}
+                style={chipStyle(sectionFilter === section)}
+              >
+                {section}
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Row 2: OGS Group selector */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>OGS-Gruppe:</span>
+        {groupFilter ? (
+          <button
+            onClick={() => setGroupFilter(null)}
+            style={{
+              ...chipStyle(true),
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            {groupFilter}
+            <span style={{ fontSize: '16px', lineHeight: 1 }}>&times;</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => setShowGroupPicker(true)}
+            style={{
+              ...chipStyle(false),
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}
+          >
+            Alle Gruppen
+            <span style={{ fontSize: '12px', lineHeight: 1 }}>&#9662;</span>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -487,6 +610,75 @@ function StudentSelectionPage() {
         message={error ?? ''}
         autoCloseDelay={3000}
       />
+
+      {/* OGS Group Picker Modal */}
+      <ModalBase isOpen={showGroupPicker} onClose={() => setShowGroupPicker(false)} size="md">
+        <h2
+          style={{
+            fontSize: '22px',
+            fontWeight: 700,
+            color: '#1F2937',
+            marginBottom: '20px',
+          }}
+        >
+          OGS-Gruppe wählen
+        </h2>
+
+        <button
+          onClick={() => {
+            setGroupFilter(null);
+            setShowGroupPicker(false);
+          }}
+          style={{
+            width: '100%',
+            height: '48px',
+            marginBottom: '16px',
+            borderRadius: designSystem.borderRadius.md,
+            border: '1px solid #E5E7EB',
+            background: !groupFilter ? designSystem.gradients.blueRight : '#FFFFFF',
+            color: !groupFilter ? '#FFFFFF' : '#374151',
+            fontSize: '15px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            outline: 'none',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+        >
+          Alle Gruppen
+        </button>
+
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            gap: '10px',
+            maxHeight: '400px',
+            overflowY: 'auto',
+          }}
+        >
+          {availableGroups.map(group => (
+            <button
+              key={group}
+              onClick={() => handleGroupSelect(group)}
+              style={{
+                height: '48px',
+                borderRadius: designSystem.borderRadius.md,
+                border: groupFilter === group ? 'none' : '1px solid #E5E7EB',
+                background: groupFilter === group ? designSystem.gradients.blueRight : '#FFFFFF',
+                color: groupFilter === group ? '#FFFFFF' : '#374151',
+                fontSize: '14px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                boxShadow: groupFilter === group ? designSystem.shadows.blue : 'none',
+              }}
+            >
+              {group}
+            </button>
+          ))}
+        </div>
+      </ModalBase>
     </>
   );
 }
