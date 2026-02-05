@@ -885,38 +885,13 @@ function HomeViewPage() {
         size="sm"
         backgroundColor="#FFFFFF"
       >
-        {/* Warning Icon */}
-        <div
-          style={{
-            width: '64px',
-            height: '64px',
-            background: 'linear-gradient(to right, #F59E0B, #D97706)',
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px auto',
-            boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
-          }}
-        >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M12 9v4m0 4h.01"
-              stroke="white"
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-
         {/* Title */}
         <h2
           style={{
-            fontSize: '24px',
+            fontSize: '28px',
             fontWeight: 700,
             color: '#1F2937',
-            marginBottom: '12px',
+            marginBottom: '16px',
           }}
         >
           Aktivität beenden?
@@ -925,9 +900,9 @@ function HomeViewPage() {
         {/* Warning Text */}
         <p
           style={{
-            fontSize: '16px',
+            fontSize: '20px',
             color: '#6B7280',
-            marginBottom: '24px',
+            marginBottom: '28px',
             lineHeight: 1.5,
           }}
         >
