@@ -37,7 +37,7 @@ function App() {
     logger.updateConfig(config);
 
     appLogger.info('Application initialized', {
-      version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
+      version: __APP_VERSION__,
       environment: import.meta.env.MODE,
     });
   }, [appLogger]);
