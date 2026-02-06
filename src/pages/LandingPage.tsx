@@ -145,10 +145,10 @@ function LandingPage() {
       <span
         style={{
           position: 'fixed',
-          bottom: 8,
-          left: 12,
-          fontSize: 11,
-          color: 'rgba(0, 0, 0, 0.25)',
+          bottom: 16,
+          left: 20,
+          fontSize: 16,
+          color: 'rgba(0, 0, 0, 0.4)',
           userSelect: 'none',
           pointerEvents: 'none',
         }}
