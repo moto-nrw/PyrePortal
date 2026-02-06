@@ -7,6 +7,7 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
+import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
@@ -967,7 +968,7 @@ const ActivityScanningPage: React.FC = () => {
             position: 'relative',
           }}
         >
-          {/* Anmelden Button - Top Right of ContentBox */}
+          {/* Anmelden Button - Top Right */}
           <div
             style={{
               position: 'absolute',
@@ -1277,6 +1278,11 @@ const ActivityScanningPage: React.FC = () => {
           {renderModalContent()}
         </ModalBase>
       )}
+
+      <ScannerRestartButton
+        onBeforeRecover={() => stopScanning()}
+        onAfterRecover={() => startScanning()}
+      />
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={rfid.processingQueue.size > 0} />

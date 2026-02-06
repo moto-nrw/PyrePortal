@@ -604,6 +604,7 @@ export interface ActivityResponse {
   has_spots?: boolean;
   supervisor_name?: string;
   is_active?: boolean;
+  is_occupied?: boolean;
 }
 
 /**

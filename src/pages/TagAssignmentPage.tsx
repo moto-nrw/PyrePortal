@@ -13,7 +13,7 @@ import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
-import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
+import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
 
@@ -32,11 +32,29 @@ interface RfidScanResult {
   error?: string;
 }
 
-interface RfidScannerStatus {
-  is_available: boolean;
-  platform: string;
-  last_error?: string;
-}
+const SCAN_INVOKE_TIMEOUT_MS = 20_000;
+
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then(result => {
+        clearTimeout(timeoutHandle);
+        resolve(result);
+      })
+      .catch(error => {
+        clearTimeout(timeoutHandle);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
+  });
+};
 
 /**
  * Tag Assignment Page - Handle RFID tag assignment to students
@@ -62,7 +80,6 @@ function TagAssignmentPage() {
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
   const [success, setSuccess] = useState<string | null>(null);
-  const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
   const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
   const [isUnassigning, setIsUnassigning] = useState(false);
 
@@ -147,45 +164,6 @@ function TagAssignmentPage() {
     window.history.replaceState({}, document.title);
   }, [location.state]);
 
-  // Check RFID scanner status on component mount
-  useEffect(() => {
-    const checkScannerStatus = async () => {
-      logger.debug('Checking RFID scanner status');
-
-      if (!isTauriContext()) {
-        logger.debug('Not in Tauri context, using development status');
-        setScannerStatus({
-          is_available: false,
-          platform: 'Development (Web)',
-          last_error: 'Tauri context not available in development mode',
-        });
-        return;
-      }
-
-      try {
-        logger.debug('Calling get_rfid_scanner_status');
-        const status = await safeInvoke<RfidScannerStatus>('get_rfid_scanner_status');
-        logger.debug('Scanner status received', { status });
-        setScannerStatus(status);
-        logUserAction('RFID scanner status checked', {
-          platform: status.platform,
-          available: status.is_available,
-        });
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        logger.error('Scanner status error', { error: error.message });
-        logError(error, 'Failed to check RFID scanner status');
-        setScannerStatus({
-          is_available: false,
-          platform: 'Unknown',
-          last_error: error.message,
-        });
-      }
-    };
-
-    void checkScannerStatus();
-  }, []);
-
   // Start RFID scanning process
   const handleStartScanning = async () => {
     logUserAction('RFID scanning started');
@@ -230,8 +208,12 @@ function TagAssignmentPage() {
         return;
       }
 
-      // Use real RFID scanner through Tauri
-      const result = await safeInvoke<RfidScanResult>('scan_rfid_single');
+      // Use real RFID scanner through Tauri with frontend timeout safety net.
+      const result = await withTimeout(
+        safeInvoke<RfidScanResult>('scan_rfid_single'),
+        SCAN_INVOKE_TIMEOUT_MS,
+        'RFID-Scan Zeitüberschreitung'
+      );
 
       // Check if scan was cancelled while waiting for result
       if (scanCancelledRef.current) {
@@ -240,10 +222,7 @@ function TagAssignmentPage() {
       }
 
       if (result.success && result.tag_id) {
-        logUserAction('RFID tag scanned successfully', {
-          tagId: result.tag_id,
-          platform: scannerStatus?.platform,
-        });
+        logUserAction('RFID tag scanned successfully', { tagId: result.tag_id });
         void handleTagScanned(result.tag_id);
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';
@@ -261,7 +240,12 @@ function TagAssignmentPage() {
 
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
-      setError('Verbindung zum Scanner unterbrochen. Bitte App neu starten.');
+      const timeoutError = error.message.toLowerCase().includes('zeitüberschreitung');
+      setError(
+        timeoutError
+          ? 'Scanner reagiert nicht mehr. Bitte Scanner neu starten und erneut versuchen.'
+          : 'Verbindung zum Scanner unterbrochen. Bitte Scanner neu starten.'
+      );
       setShowErrorModal(true);
       setShowScanner(false);
     } finally {
@@ -378,6 +362,8 @@ function TagAssignmentPage() {
     return null; // Will redirect via useEffect
   }
 
+  const isScanStartDisabled = isLoading;
+
   return (
     <>
       <BackgroundWrapper>
@@ -418,13 +404,15 @@ function TagAssignmentPage() {
           </h1>
 
           {/* Scanner Modal Overlay
-              IMPORTANT: timeout must match Rust scan_rfid_hardware_single() timeout in src-tauri/src/rfid.rs (currently 10s) */}
+              Budget: backend stop (3s) + SPI mutex (3s) + hardware scan (10s) = 16s worst-case.
+              Modal timeout (18s) exceeds that to avoid false "unresponsive" closures.
+              See scan_rfid_single() in src-tauri/src/rfid.rs for backend path. */}
           <ModalBase
             isOpen={showScanner}
             onClose={cancelScan}
             size="md"
             backgroundColor="#5080D8"
-            timeout={10000}
+            timeout={18000}
           >
             {/* Background pattern */}
             <div
@@ -552,40 +540,32 @@ function TagAssignmentPage() {
 
                 <button
                   onClick={handleStartScanning}
-                  disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
+                  disabled={isScanStartDisabled}
                   style={{
                     height: '68px',
                     padding: '0 64px',
                     fontSize: '24px',
                     fontWeight: 700,
                     color: '#FFFFFF',
-                    background:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                        : designSystem.gradients.blueRight,
+                    background: isScanStartDisabled
+                      ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                      : designSystem.gradients.blueRight,
                     border: 'none',
                     borderRadius: designSystem.borderRadius.full,
-                    cursor:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'not-allowed'
-                        : 'pointer',
+                    cursor: isScanStartDisabled ? 'not-allowed' : 'pointer',
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
-                    boxShadow:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'none'
-                        : designSystem.shadows.blue,
-                    opacity:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.6 : 1,
+                    boxShadow: isScanStartDisabled ? 'none' : designSystem.shadows.blue,
+                    opacity: isScanStartDisabled ? 0.6 : 1,
                   }}
                   onTouchStart={e => {
-                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                    if (!isScanStartDisabled) {
                       e.currentTarget.style.transform = designSystem.scales.active;
                       e.currentTarget.style.boxShadow = designSystem.shadows.button;
                     }
                   }}
                   onTouchEnd={e => {
-                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                    if (!isScanStartDisabled) {
                       e.currentTarget.style.transform = 'scale(1)';
                       e.currentTarget.style.boxShadow = designSystem.shadows.blue;
                     }

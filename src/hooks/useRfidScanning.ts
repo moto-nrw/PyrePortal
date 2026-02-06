@@ -369,13 +369,16 @@ export const useRfidScanning = () => {
         return;
       }
 
-      // Initialize scan tracking
-      addToProcessingQueue(tagId);
-      recordTagScan(tagId, { timestamp: Date.now() });
+      let isInProcessingQueue = false;
       const scanId = generateScanId();
       const startTime = Date.now();
 
       try {
+        // Initialize scan tracking inside try so finally can reliably clean up.
+        addToProcessingQueue(tagId);
+        isInProcessingQueue = true;
+        recordTagScan(tagId, { timestamp: Date.now() });
+
         // Track optimistic scan state (no modal yet - wait for API response)
         addOptimisticScan(createOptimisticScan(scanId, tagId));
         logger.info('Starting network scan (cache disabled)');
@@ -447,7 +450,9 @@ export const useRfidScanning = () => {
         removeOptimisticScan(scanId);
         showScanModal();
       } finally {
-        removeFromProcessingQueue(tagId);
+        if (isInProcessingQueue) {
+          removeFromProcessingQueue(tagId);
+        }
       }
     },
     [
@@ -506,6 +511,33 @@ export const useRfidScanning = () => {
     }
   }, [isTagBlocked, processScan, showSystemError]);
 
+  const waitForBackendServiceState = useCallback(
+    async (expectedRunning: boolean, timeoutMs: number): Promise<boolean> => {
+      if (!isRfidEnabled()) {
+        return expectedRunning;
+      }
+
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        try {
+          const serviceStatus = await safeInvoke<{ is_running: boolean }>(
+            'get_rfid_service_status'
+          );
+          if (serviceStatus?.is_running === expectedRunning) {
+            return true;
+          }
+        } catch (error) {
+          logger.debug('Service state poll failed', { error: serializeError(error) });
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+
+      return false;
+    },
+    []
+  );
+
   const startScanning = useCallback(async () => {
     const callTimestamp = Date.now();
     logger.debug('startScanning() called', {
@@ -515,10 +547,21 @@ export const useRfidScanning = () => {
     });
 
     if (isServiceStartedRef.current) {
-      logger.debug('Service already started, ensuring store state is synchronized');
-      // Always update store state to reflect actual service state
-      startRfidScanning();
-      return;
+      if (!isRfidEnabled()) {
+        logger.debug('Service already started in mock mode, ensuring store state is synchronized');
+        startRfidScanning();
+        return;
+      }
+
+      const backendStillRunning = await waitForBackendServiceState(true, 600);
+      if (backendStillRunning) {
+        logger.debug('Service already started, ensuring store state is synchronized');
+        startRfidScanning();
+        return;
+      }
+
+      logger.warn('Service start ref was stale, resetting and attempting restart');
+      isServiceStartedRef.current = false;
     }
 
     // Check if RFID is enabled
@@ -576,6 +619,10 @@ export const useRfidScanning = () => {
         timestamp: callTimestamp,
       });
       await safeInvoke('start_rfid_service');
+      const backendStarted = await waitForBackendServiceState(true, 2000);
+      if (!backendStarted) {
+        throw new Error('RFID service did not report running state after start command');
+      }
       isServiceStartedRef.current = true;
       startRfidScanning(); // Update store state
       logger.debug('RFID background service started successfully', {
@@ -588,12 +635,13 @@ export const useRfidScanning = () => {
         timestamp: Date.now(),
         timeSinceCall: Date.now() - callTimestamp,
       });
+      isServiceStartedRef.current = false;
       showSystemError(
         'RFID-Service Start fehlgeschlagen',
         'Das RFID-Lesegerät konnte nicht gestartet werden. Bitte Gerät prüfen.'
       );
     }
-  }, [startRfidScanning, isTagBlocked, processScan, showSystemError]);
+  }, [startRfidScanning, isTagBlocked, processScan, showSystemError, waitForBackendServiceState]);
 
   const stopScanning = useCallback(async () => {
     const callTimestamp = Date.now();
@@ -616,6 +664,10 @@ export const useRfidScanning = () => {
           timestamp: callTimestamp,
         });
         await safeInvoke('stop_rfid_service');
+        const backendStopped = await waitForBackendServiceState(false, 2500);
+        if (!backendStopped) {
+          logger.warn('RFID backend did not confirm stop within timeout');
+        }
       } else if (mockScanInterval) {
         // Stop mock scanning
         clearInterval(mockScanInterval);
@@ -638,7 +690,7 @@ export const useRfidScanning = () => {
       isServiceStartedRef.current = false;
       stopRfidScanning();
     }
-  }, [stopRfidScanning]);
+  }, [stopRfidScanning, waitForBackendServiceState]);
 
   // Check actual service state from backend
   const syncServiceState = useCallback(async () => {
@@ -650,11 +702,14 @@ export const useRfidScanning = () => {
         logger.info('RFID service is already running, synchronizing state');
         isServiceStartedRef.current = true;
         startRfidScanning(); // Update store state
+      } else {
+        isServiceStartedRef.current = false;
+        stopRfidScanning();
       }
     } catch (error) {
       logger.debug('Could not get RFID service status', { error });
     }
-  }, [startRfidScanning]);
+  }, [startRfidScanning, stopRfidScanning]);
 
   // Initialize service and setup event listener on mount
   useEffect(() => {

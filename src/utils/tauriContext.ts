@@ -6,7 +6,7 @@
  */
 
 // Check if we're running in a Tauri context
-export const isTauriContext = (): boolean => {
+const isTauriContext = (): boolean => {
   // Primary check: Tauri runtime indicators
   if (typeof window !== 'undefined') {
     // Check for Tauri runtime

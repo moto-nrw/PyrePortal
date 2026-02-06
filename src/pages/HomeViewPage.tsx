@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
 import { ErrorModal, ModalBase } from '../components/ui';
+import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import {
   api,
   mapServerErrorToGerman,
@@ -139,6 +140,7 @@ function HomeViewPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showEndSessionModal, setShowEndSessionModal] = useState(false);
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -162,10 +164,15 @@ function HomeViewPage() {
 
   const handleLogout = async () => {
     if (currentSession) {
-      await endCurrentSession();
+      setShowEndSessionModal(true);
     } else {
       await performLogout();
     }
+  };
+
+  const handleConfirmEndSession = async () => {
+    setShowEndSessionModal(false);
+    await endCurrentSession();
   };
 
   const handleTagAssignment = () => {
@@ -698,6 +705,8 @@ function HomeViewPage() {
 
         {/* Last Session Toggle - only show when no current session */}
         {!currentSession && <LastSessionToggle />}
+
+        <ScannerRestartButton />
       </div>
 
       {/* Add animation keyframes */}
@@ -868,6 +877,81 @@ function HomeViewPage() {
             }}
           >
             {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
+          </button>
+        </div>
+      </ModalBase>
+
+      {/* End Session Confirmation Modal */}
+      <ModalBase
+        isOpen={showEndSessionModal}
+        onClose={() => setShowEndSessionModal(false)}
+        size="sm"
+        backgroundColor="#FFFFFF"
+      >
+        {/* Title */}
+        <h2
+          style={{
+            fontSize: '28px',
+            fontWeight: 700,
+            color: '#1F2937',
+            marginBottom: '16px',
+          }}
+        >
+          Aktivität beenden?
+        </h2>
+
+        {/* Warning Text */}
+        <p
+          style={{
+            fontSize: '20px',
+            color: '#6B7280',
+            marginBottom: '28px',
+            lineHeight: 1.5,
+          }}
+        >
+          Alle Kinder, die in dieser Aktivität sind, werden auf den Status{' '}
+          <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
+        </p>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={() => setShowEndSessionModal(false)}
+            style={{
+              flex: 1,
+              height: '68px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#6B7280',
+              backgroundColor: 'transparent',
+              border: '2px solid #E5E7EB',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+            }}
+          >
+            Abbrechen
+          </button>
+
+          <button
+            onClick={handleConfirmEndSession}
+            style={{
+              flex: 1,
+              height: '68px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#FFFFFF',
+              background: 'linear-gradient(to right, #EF4444, #DC2626)',
+              border: 'none',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.4)',
+            }}
+          >
+            Ja, beenden
           </button>
         </div>
       </ModalBase>
