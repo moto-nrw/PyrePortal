@@ -217,9 +217,7 @@ impl RfidBackgroundService {
     ) {
         Self::reap_finished_scan_task(state, scan_task_handle).await;
 
-        let already_running = scan_task_handle
-            .as_ref()
-            .is_some_and(|h| !h.is_finished());
+        let already_running = scan_task_handle.as_ref().is_some_and(|h| !h.is_finished());
         let state_running = state.lock().map(|guard| guard.is_running).unwrap_or(false);
 
         if already_running || state_running {
