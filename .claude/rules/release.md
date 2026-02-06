@@ -1,5 +1,7 @@
 # Release Checklist
 
+**IMPORTANT**: When the user asks to release, create a release, bump a version, or prepare a build — you MUST run `./scripts/check-version.sh` FIRST and verify it passes before proceeding with any release step.
+
 ## Pre-Release: Version Sync (MANDATORY)
 
 Before every release, the version in these 3 files **MUST** match the new release tag:
@@ -16,7 +18,11 @@ Before every release, the version in these 3 files **MUST** match the new releas
 ./scripts/check-version.sh
 ```
 
-This script checks that all 3 files match and the version is greater than the latest GitHub release tag. It must pass before building.
+This script checks that all 3 files match and the version is greater than the latest GitHub release tag. **It MUST pass before building.** If it fails, fix the versions first.
+
+### Automated Guard
+
+The `pre-push` hook (`.husky/pre-push`) blocks any push where the 3 version files are out of sync. This catches mistakes automatically but does NOT check against GitHub tags — that requires the manual `check-version.sh` script above.
 
 ### Bumping
 
