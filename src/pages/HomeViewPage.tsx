@@ -5,8 +5,8 @@ import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
-import { ErrorModal, ModalBase, SuccessModal } from '../components/ui';
-import BackButton from '../components/ui/BackButton';
+import { ErrorModal, ModalBase } from '../components/ui';
+import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import {
   api,
   mapServerErrorToGerman,
@@ -17,32 +17,8 @@ import type { SessionSettings } from '../services/sessionStorage';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
-import { isRfidEnabled, safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('HomeViewPage');
-
-const SCANNER_RECOVERY_TIMEOUT_MS = 8000;
-
-const withTimeout = <T,>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  timeoutMessage: string
-): Promise<T> =>
-  new Promise<T>((resolve, reject) => {
-    const timeoutHandle = setTimeout(() => {
-      reject(new Error(timeoutMessage));
-    }, timeoutMs);
-
-    promise
-      .then(result => {
-        clearTimeout(timeoutHandle);
-        resolve(result);
-      })
-      .catch(error => {
-        clearTimeout(timeoutHandle);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      });
-  });
 
 // ============================================================================
 // Pure helper functions (moved outside component to reduce cognitive complexity)
@@ -165,39 +141,6 @@ function HomeViewPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
-  const [isRecoveringScanner, setIsRecoveringScanner] = useState(false);
-  const [showScannerSuccessModal, setShowScannerSuccessModal] = useState(false);
-  const [showScannerErrorModal, setShowScannerErrorModal] = useState(false);
-
-  const handleRecoverScanner = async () => {
-    if (isRecoveringScanner) return;
-
-    setIsRecoveringScanner(true);
-    try {
-      if (isRfidEnabled()) {
-        await withTimeout(
-          safeInvoke('recover_rfid_scanner'),
-          SCANNER_RECOVERY_TIMEOUT_MS,
-          'Scanner-Recovery Zeitüberschreitung'
-        );
-
-        const status = await safeInvoke<{ is_available: boolean; last_error?: string }>(
-          'get_rfid_scanner_status'
-        );
-        if (!status?.is_available) {
-          throw new Error(status?.last_error ?? 'Scanner antwortet nach Recovery nicht');
-        }
-      }
-
-      logger.info('RFID scanner recovered from home page');
-      setShowScannerSuccessModal(true);
-    } catch (error) {
-      logger.error('RFID scanner recovery failed', { error: serializeError(error) });
-      setShowScannerErrorModal(true);
-    } finally {
-      setIsRecoveringScanner(false);
-    }
-  };
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -763,27 +706,7 @@ function HomeViewPage() {
         {/* Last Session Toggle - only show when no current session */}
         {!currentSession && <LastSessionToggle />}
 
-        {/* Scanner restart - Bottom Center */}
-        <div
-          style={{
-            position: 'fixed',
-            bottom: '24px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            zIndex: 50,
-          }}
-        >
-          <BackButton
-            onClick={() => {
-              void handleRecoverScanner();
-            }}
-            disabled={isRecoveringScanner}
-            text={isRecoveringScanner ? 'Starte neu...' : 'Scanner neu starten'}
-            icon="restart"
-            color="blue"
-            ariaLabel="Scanner neu starten"
-          />
-        </div>
+        <ScannerRestartButton />
       </div>
 
       {/* Add animation keyframes */}
@@ -1032,22 +955,6 @@ function HomeViewPage() {
           </button>
         </div>
       </ModalBase>
-
-      {/* Scanner recovery success modal */}
-      <SuccessModal
-        isOpen={showScannerSuccessModal}
-        onClose={() => setShowScannerSuccessModal(false)}
-        message="Scanner wurde erfolgreich neu gestartet."
-        autoCloseDelay={2200}
-      />
-
-      {/* Scanner recovery error modal */}
-      <ErrorModal
-        isOpen={showScannerErrorModal}
-        onClose={() => setShowScannerErrorModal(false)}
-        message="Scanner konnte nicht neu gestartet werden. Bitte Gerät vom Strom trennen und neu starten – die Session bleibt erhalten."
-        autoCloseDelay={6000}
-      />
     </BackgroundWrapper>
   );
 }
