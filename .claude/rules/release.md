@@ -10,19 +10,13 @@ Before every release, the version in these 3 files **MUST** match the new releas
 | `src-tauri/Cargo.toml`      | `version`   |
 | `src-tauri/tauri.conf.json` | `"version"` |
 
-### Validation (always run before a release)
+### Validation (ALWAYS run before a release)
 
 ```bash
-# Latest GitHub release tag
-gh release list --limit 1
-
-# Current version in branch
-node -p "require('./package.json').version"
-grep '^version' src-tauri/Cargo.toml
-grep '"version"' src-tauri/tauri.conf.json
+./scripts/check-version.sh
 ```
 
-All three files must show the **same version**, and it must be **greater than** the latest GitHub tag.
+This script checks that all 3 files match and the version is greater than the latest GitHub release tag. It must pass before building.
 
 ### Bumping
 
