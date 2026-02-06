@@ -163,6 +163,20 @@ function App() {
           </Routes>
         </BrowserRouter>
       </main>
+      <span
+        style={{
+          position: 'fixed',
+          bottom: 16,
+          left: 20,
+          fontSize: 16,
+          color: 'rgba(0, 0, 0, 0.4)',
+          userSelect: 'none',
+          pointerEvents: 'none',
+          zIndex: 999,
+        }}
+      >
+        v{__APP_VERSION__}
+      </span>
     </ErrorBoundary>
   );
 }

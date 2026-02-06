@@ -141,20 +141,6 @@ function LandingPage() {
           </div>
         </div>
       </div>
-      {/* Version indicator */}
-      <span
-        style={{
-          position: 'fixed',
-          bottom: 16,
-          left: 20,
-          fontSize: 16,
-          color: 'rgba(0, 0, 0, 0.4)',
-          userSelect: 'none',
-          pointerEvents: 'none',
-        }}
-      >
-        v{__APP_VERSION__}
-      </span>
     </BackgroundWrapper>
   );
 }
