@@ -264,16 +264,14 @@ impl RfidBackgroundService {
                 *scan_task_handle = None;
                 Self::set_running_state(state, false);
             } else {
-                println!("RFID scan task did not stop within timeout, aborting outer async wrapper");
+                println!(
+                    "RFID scan task did not stop within timeout, aborting outer async wrapper"
+                );
                 handle.abort();
 
                 // Clean up the outer async handle (settles quickly after abort).
                 if let Some(aborted_handle) = scan_task_handle.take() {
-                    let _ = tokio::time::timeout(
-                        Duration::from_millis(500),
-                        aborted_handle,
-                    )
-                    .await;
+                    let _ = tokio::time::timeout(Duration::from_millis(500), aborted_handle).await;
                 }
 
                 // Aborting the outer task does NOT cancel the inner spawn_blocking
@@ -281,11 +279,8 @@ impl RfidBackgroundService {
                 // Probe the mutex to determine whether the worker has actually exited
                 // before reporting a stopped state.
                 let spi_mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
-                if let Ok(_guard) = tokio::time::timeout(
-                    Duration::from_millis(500),
-                    spi_mutex.lock(),
-                )
-                .await
+                if let Ok(_guard) =
+                    tokio::time::timeout(Duration::from_millis(500), spi_mutex.lock()).await
                 {
                     // SPI mutex is free — blocking worker has exited.
                     println!("RFID: SPI mutex free after abort, worker has exited");
@@ -293,7 +288,9 @@ impl RfidBackgroundService {
                 } else {
                     // Blocking worker still holds SPI — keep is_running=true
                     // and wait for the worker to drain in a background task.
-                    println!("RFID: blocking worker still holds SPI after abort, draining in background");
+                    println!(
+                        "RFID: blocking worker still holds SPI after abort, draining in background"
+                    );
                     let state_for_drain = Arc::clone(state);
                     tokio::spawn(async move {
                         let spi = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
