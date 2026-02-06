@@ -297,12 +297,25 @@ impl RfidBackgroundService {
                     let state_for_drain = Arc::clone(state);
                     tokio::spawn(async move {
                         let spi = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
-                        if tokio::time::timeout(Duration::from_secs(10), spi.lock())
+                        let drained = tokio::time::timeout(Duration::from_secs(10), spi.lock())
                             .await
-                            .is_ok()
-                        {
+                            .is_ok();
+
+                        // Check whether a new scan session was started while we
+                        // were waiting.  If should_run flipped back to true, the
+                        // service was restarted and this drain must not touch state.
+                        let restarted = state_for_drain
+                            .lock()
+                            .map(|g| g.should_run)
+                            .unwrap_or(false);
+
+                        if restarted {
+                            println!("RFID: drain complete but service was restarted during wait, preserving state");
+                            return;
+                        }
+
+                        if drained {
                             println!("RFID blocking worker drained after abort");
-                            Self::set_should_run(&state_for_drain, false);
                             Self::set_running_state(&state_for_drain, false);
                         } else {
                             // Worker is still holding SPI after 10s — do NOT report
