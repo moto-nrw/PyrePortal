@@ -297,14 +297,26 @@ impl RfidBackgroundService {
                     let state_for_drain = Arc::clone(state);
                     tokio::spawn(async move {
                         let spi = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
-                        match tokio::time::timeout(Duration::from_secs(10), spi.lock()).await {
-                            Ok(_) => println!("RFID blocking worker drained after abort"),
-                            Err(_) => println!(
-                                "RFID blocking worker did not drain within 10s after abort"
-                            ),
+                        if tokio::time::timeout(Duration::from_secs(10), spi.lock())
+                            .await
+                            .is_ok()
+                        {
+                            println!("RFID blocking worker drained after abort");
+                            Self::set_should_run(&state_for_drain, false);
+                            Self::set_running_state(&state_for_drain, false);
+                        } else {
+                            // Worker is still holding SPI after 10s — do NOT report
+                            // stopped, as that would allow a new start to "succeed"
+                            // while the old worker still owns the hardware lock.
+                            println!(
+                                "RFID blocking worker did not drain within 10s after abort, keeping running state"
+                            );
+                            if let Ok(mut guard) = state_for_drain.lock() {
+                                guard.last_error = Some(
+                                    "Scanner worker did not release hardware after abort; restart device".to_string()
+                                );
+                            }
                         }
-                        Self::set_should_run(&state_for_drain, false);
-                        Self::set_running_state(&state_for_drain, false);
                     });
                 }
             }
@@ -739,7 +751,7 @@ mod raspberry_pi {
     }
 
     /// Single RFID scan with timeout for tag assignment flow.
-    /// Frontend budget: modal 15s, invoke 18s (covers stop + mutex + this 10s scan).
+    /// Frontend budget: modal 18s, invoke 20s (covers stop + mutex + this 10s scan).
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
         scan_rfid_hardware_with_timeout(Duration::from_secs(10)).await
     }
