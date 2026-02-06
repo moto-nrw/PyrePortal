@@ -49,5 +49,6 @@ jobs:
           VERSION="${{ needs.version-check.outputs.version }}"
           gh release create "v${VERSION}" \
             "pyreportal-arm64-v${VERSION}" \
+            --target "${{ github.sha }}" \
             --title "v${VERSION}" \
             --generate-notes
