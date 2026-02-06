@@ -136,8 +136,8 @@ function CreateActivityPage() {
 
   // Handle activity selection (no immediate navigation; mirror Team auswählen flow)
   const handleActivitySelect = (activity: ActivityResponse) => {
-    // Don't allow selecting active activities
-    if (activity.is_active) return;
+    // Don't allow selecting occupied activities (active session running)
+    if (activity.is_occupied) return;
 
     try {
       logger.info('Activity selected', {
@@ -265,7 +265,7 @@ function CreateActivityPage() {
                 icon="calendar"
                 colorType="activity"
                 isSelected={selectedActivity?.id === activity.id}
-                isDisabled={activity.is_active}
+                isDisabled={!!activity.is_occupied}
                 onClick={() => handleActivitySelect(activity)}
               />
             )}
