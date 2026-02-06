@@ -223,6 +223,14 @@ headers: {
 - 423: Account locked (too many attempts)
 - 404: Not found
 
+## Releasing
+
+See `.claude/rules/release.md` for the full release checklist. Key rules:
+
+- **Version sync**: `package.json`, `Cargo.toml`, and `tauri.conf.json` must be bumped before building on the Pi
+- **Validation**: Always check branch version against `gh release list --limit 1` before releasing
+- **Security**: This repo is public. Never commit secrets, API keys, `.env` files, PINs, or credentials
+
 ## Adding New Features
 
 ### Adding API Endpoint
