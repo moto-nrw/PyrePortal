@@ -40,8 +40,9 @@ else
     echo "  Latest GH release: ${LATEST_TAG}"
 
     if [ "$NPM_VERSION" = "$LATEST_VERSION" ]; then
-        echo -e "  ${YELLOW}WARNING: Branch version (${NPM_VERSION}) equals latest release (${LATEST_TAG})${NC}"
-        echo -e "  ${YELLOW}Did you forget to bump the version?${NC}"
+        echo -e "  ${RED}ERROR: Branch version (${NPM_VERSION}) equals latest release (${LATEST_TAG})${NC}"
+        echo -e "  ${RED}Version must be greater than latest release. Bump before releasing.${NC}"
+        ERRORS=$((ERRORS + 1))
     else
         # Simple string comparison — works for semver with same segment count
         if [ "$(printf '%s\n' "$LATEST_VERSION" "$NPM_VERSION" | sort -V | tail -1)" = "$NPM_VERSION" ]; then

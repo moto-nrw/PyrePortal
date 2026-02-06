@@ -77,6 +77,17 @@ export function ScannerRestartButton({
 
       if (onAfterRecover) {
         await onAfterRecover();
+
+        // Verify the scanning service actually started — startScanning()
+        // catches errors internally, so check service state explicitly.
+        if (isRfidEnabled()) {
+          const serviceStatus = await safeInvoke<{ is_running: boolean }>(
+            'get_rfid_service_status'
+          );
+          if (!serviceStatus?.is_running) {
+            throw new Error('Scanner-Service läuft nach Recovery nicht');
+          }
+        }
       }
 
       logger.info('RFID scanner recovered');

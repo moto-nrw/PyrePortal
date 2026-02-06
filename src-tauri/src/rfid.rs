@@ -264,39 +264,47 @@ impl RfidBackgroundService {
                 *scan_task_handle = None;
                 Self::set_running_state(state, false);
             } else {
-                println!("RFID scan task did not stop within timeout, aborting task (may still drain in background)");
+                println!("RFID scan task did not stop within timeout, aborting outer async wrapper");
                 handle.abort();
-                let mut finished_after_abort = false;
-                for _ in 0..10 {
-                    if handle.is_finished() {
-                        finished_after_abort = true;
-                        break;
-                    }
-                    tokio::time::sleep(Duration::from_millis(50)).await;
+
+                // Clean up the outer async handle (settles quickly after abort).
+                if let Some(aborted_handle) = scan_task_handle.take() {
+                    let _ = tokio::time::timeout(
+                        Duration::from_millis(500),
+                        aborted_handle,
+                    )
+                    .await;
                 }
 
-                if finished_after_abort {
-                    if let Some(finished_handle) = scan_task_handle.take() {
-                        if let Err(join_error) = finished_handle.await {
-                            println!("RFID scan task join error after abort: {join_error}");
-                        }
-                    }
+                // Aborting the outer task does NOT cancel the inner spawn_blocking
+                // worker, which may still be running and holding SPI_ACCESS_MUTEX.
+                // Probe the mutex to determine whether the worker has actually exited
+                // before reporting a stopped state.
+                let spi_mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
+                if let Ok(_guard) = tokio::time::timeout(
+                    Duration::from_millis(500),
+                    spi_mutex.lock(),
+                )
+                .await
+                {
+                    // SPI mutex is free — blocking worker has exited.
+                    println!("RFID: SPI mutex free after abort, worker has exited");
                     Self::set_running_state(state, false);
-                    return;
-                }
-
-                // If abort did not settle quickly, detach join handling in background
-                // and keep state as running until that detached task resolves.
-                if let Some(detached_handle) = scan_task_handle.take() {
-                    let state_for_join = Arc::clone(state);
+                } else {
+                    // Blocking worker still holds SPI — keep is_running=true
+                    // and wait for the worker to drain in a background task.
+                    println!("RFID: blocking worker still holds SPI after abort, draining in background");
+                    let state_for_drain = Arc::clone(state);
                     tokio::spawn(async move {
-                        if let Err(join_error) = detached_handle.await {
-                            println!(
-                                "RFID scan task join error after detached abort: {join_error}"
-                            );
+                        let spi = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
+                        match tokio::time::timeout(Duration::from_secs(10), spi.lock()).await {
+                            Ok(_) => println!("RFID blocking worker drained after abort"),
+                            Err(_) => println!(
+                                "RFID blocking worker did not drain within 10s after abort"
+                            ),
                         }
-                        Self::set_should_run(&state_for_join, false);
-                        Self::set_running_state(&state_for_join, false);
+                        Self::set_should_run(&state_for_drain, false);
+                        Self::set_running_state(&state_for_drain, false);
                     });
                 }
             }
@@ -731,7 +739,7 @@ mod raspberry_pi {
     }
 
     /// Single RFID scan with timeout for tag assignment flow.
-    /// IMPORTANT: Keep in sync with TagAssignmentPage.tsx scanner modal timeout (currently 10s).
+    /// Frontend budget: modal 15s, invoke 18s (covers stop + mutex + this 10s scan).
     pub async fn scan_rfid_hardware_single() -> Result<String, String> {
         scan_rfid_hardware_with_timeout(Duration::from_secs(10)).await
     }

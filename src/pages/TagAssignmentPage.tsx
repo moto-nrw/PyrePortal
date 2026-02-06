@@ -32,7 +32,7 @@ interface RfidScanResult {
   error?: string;
 }
 
-const SCAN_INVOKE_TIMEOUT_MS = 12_000;
+const SCAN_INVOKE_TIMEOUT_MS = 18_000;
 
 const withTimeout = <T,>(
   promise: Promise<T>,
@@ -404,13 +404,15 @@ function TagAssignmentPage() {
           </h1>
 
           {/* Scanner Modal Overlay
-              IMPORTANT: timeout must match Rust scan_rfid_hardware_single() timeout in src-tauri/src/rfid.rs (currently 10s) */}
+              Budget: backend stop (3s) + SPI mutex (3s) + hardware scan (10s) = 16s worst-case.
+              Modal timeout must exceed that to avoid false "unresponsive" closures.
+              See scan_rfid_single() in src-tauri/src/rfid.rs for backend path. */}
           <ModalBase
             isOpen={showScanner}
             onClose={cancelScan}
             size="md"
             backgroundColor="#5080D8"
-            timeout={10000}
+            timeout={15000}
           >
             {/* Background pattern */}
             <div
