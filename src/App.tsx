@@ -167,7 +167,7 @@ function App() {
         style={{
           position: 'fixed',
           bottom: 16,
-          left: 20,
+          right: 20,
           fontSize: 16,
           color: 'rgba(0, 0, 0, 0.4)',
           userSelect: 'none',
