@@ -19,6 +19,6 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yml
 
-  version-check:
+  version_check:
     if: github.event_name == 'pull_request' && github.base_ref == 'main'
     uses: ./.github/workflows/version-check.yml

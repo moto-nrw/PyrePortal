@@ -7,9 +7,6 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 defaults:
   run:
     shell: bash
@@ -18,16 +15,18 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yml
 
-  version-check:
+  version_check:
     uses: ./.github/workflows/version-check.yml
 
   build:
-    needs: [lint, version-check]
+    needs: [lint, version_check]
     uses: ./.github/workflows/build.yml
 
   release:
-    needs: [version-check, build]
+    needs: [version_check, build]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
 
@@ -38,7 +37,7 @@ jobs:
 
       - name: Rename binary for release
         run: |
-          VERSION="${{ needs.version-check.outputs.version }}"
+          VERSION="${{ needs.version_check.outputs.version }}"
           chmod +x pyreportal
           mv pyreportal "pyreportal-arm64-v${VERSION}"
 
@@ -46,7 +45,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          VERSION="${{ needs.version-check.outputs.version }}"
+          VERSION="${{ needs.version_check.outputs.version }}"
           gh release create "v${VERSION}" \
             "pyreportal-arm64-v${VERSION}" \
             --target "${{ github.sha }}" \

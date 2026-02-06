@@ -3,14 +3,14 @@ on:
     outputs:
       version:
         description: "The validated version string"
-        value: ${{ jobs.version-check.outputs.version }}
+        value: ${{ jobs.version_check.outputs.version }}
 
 defaults:
   run:
     shell: bash
 
 jobs:
-  version-check:
+  version_check:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.validate.outputs.version }}
@@ -47,7 +47,12 @@ jobs:
           echo "All 3 files match: $NPM_VERSION"
 
           # Check against latest GitHub release
-          LATEST_TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null || echo "")
+          if ! RELEASE_OUTPUT=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>&1); then
+            echo "::error::Failed to query GitHub releases: $RELEASE_OUTPUT"
+            exit 1
+          fi
+
+          LATEST_TAG="$RELEASE_OUTPUT"
 
           if [ -z "$LATEST_TAG" ]; then
             echo "No existing releases found — skipping comparison"
