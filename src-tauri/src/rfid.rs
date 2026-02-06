@@ -191,8 +191,7 @@ impl RfidBackgroundService {
     ) {
         let is_finished = scan_task_handle
             .as_ref()
-            .map(tokio::task::JoinHandle::is_finished)
-            .unwrap_or(false);
+            .is_some_and(tokio::task::JoinHandle::is_finished);
 
         if !is_finished {
             return;
@@ -220,9 +219,7 @@ impl RfidBackgroundService {
 
         let already_running = scan_task_handle
             .as_ref()
-            .map(tokio::task::JoinHandle::is_finished)
-            .map(|finished| !finished)
-            .unwrap_or(false);
+            .is_some_and(|h| !h.is_finished());
         let state_running = state.lock().map(|guard| guard.is_running).unwrap_or(false);
 
         if already_running || state_running {
@@ -260,50 +257,49 @@ impl RfidBackgroundService {
         Self::set_should_run(state, false);
 
         if let Some(handle) = scan_task_handle.as_mut() {
-            match tokio::time::timeout(Self::STOP_JOIN_TIMEOUT, &mut *handle).await {
-                Ok(join_result) => {
-                    if let Err(join_error) = join_result {
-                        println!("RFID scan task join error on stop: {join_error}");
-                    }
-                    *scan_task_handle = None;
-                    Self::set_running_state(state, false);
+            if let Ok(join_result) =
+                tokio::time::timeout(Self::STOP_JOIN_TIMEOUT, &mut *handle).await
+            {
+                if let Err(join_error) = join_result {
+                    println!("RFID scan task join error on stop: {join_error}");
                 }
-                Err(_) => {
-                    println!("RFID scan task did not stop within timeout, aborting task (may still drain in background)");
-                    handle.abort();
-                    let mut finished_after_abort = false;
-                    for _ in 0..10 {
-                        if handle.is_finished() {
-                            finished_after_abort = true;
-                            break;
-                        }
-                        tokio::time::sleep(Duration::from_millis(50)).await;
+                *scan_task_handle = None;
+                Self::set_running_state(state, false);
+            } else {
+                println!("RFID scan task did not stop within timeout, aborting task (may still drain in background)");
+                handle.abort();
+                let mut finished_after_abort = false;
+                for _ in 0..10 {
+                    if handle.is_finished() {
+                        finished_after_abort = true;
+                        break;
                     }
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                }
 
-                    if finished_after_abort {
-                        if let Some(finished_handle) = scan_task_handle.take() {
-                            if let Err(join_error) = finished_handle.await {
-                                println!("RFID scan task join error after abort: {join_error}");
-                            }
+                if finished_after_abort {
+                    if let Some(finished_handle) = scan_task_handle.take() {
+                        if let Err(join_error) = finished_handle.await {
+                            println!("RFID scan task join error after abort: {join_error}");
                         }
-                        Self::set_running_state(state, false);
-                        return;
                     }
+                    Self::set_running_state(state, false);
+                    return;
+                }
 
-                    // If abort did not settle quickly, detach join handling in background
-                    // and keep state as running until that detached task resolves.
-                    if let Some(detached_handle) = scan_task_handle.take() {
-                        let state_for_join = Arc::clone(state);
-                        tokio::spawn(async move {
-                            if let Err(join_error) = detached_handle.await {
-                                println!(
-                                    "RFID scan task join error after detached abort: {join_error}"
-                                );
-                            }
-                            Self::set_should_run(&state_for_join, false);
-                            Self::set_running_state(&state_for_join, false);
-                        });
-                    }
+                // If abort did not settle quickly, detach join handling in background
+                // and keep state as running until that detached task resolves.
+                if let Some(detached_handle) = scan_task_handle.take() {
+                    let state_for_join = Arc::clone(state);
+                    tokio::spawn(async move {
+                        if let Err(join_error) = detached_handle.await {
+                            println!(
+                                "RFID scan task join error after detached abort: {join_error}"
+                            );
+                        }
+                        Self::set_should_run(&state_for_join, false);
+                        Self::set_running_state(&state_for_join, false);
+                    });
                 }
             }
         } else {
@@ -962,7 +958,7 @@ mod mock_platform {
     }
 }
 
-async fn send_service_command(command: ServiceCommand) -> Result<(), String> {
+fn send_service_command(command: ServiceCommand) -> Result<(), String> {
     if let Some(service_arc) = RfidBackgroundService::get_instance() {
         let command_tx = {
             let service = service_arc
@@ -970,8 +966,7 @@ async fn send_service_command(command: ServiceCommand) -> Result<(), String> {
                 .map_err(|e| format!("Failed to lock service: {e}"))?;
             service
                 .command_tx
-                .as_ref()
-                .cloned()
+                .clone()
                 .ok_or_else(|| "Service command channel not initialized".to_string())?
         };
 
@@ -1015,7 +1010,7 @@ async fn wait_for_service_running(expected_running: bool, timeout: Duration) -> 
 }
 
 async fn stop_service_for_exclusive_hardware_access() {
-    if send_service_command(ServiceCommand::Stop).await.is_ok() {
+    if send_service_command(ServiceCommand::Stop).is_ok() {
         if let Err(wait_error) = wait_for_service_running(false, Duration::from_secs(3)).await {
             println!("RFID: stop wait warning before exclusive scan: {wait_error}");
         }
@@ -1025,14 +1020,14 @@ async fn stop_service_for_exclusive_hardware_access() {
 // New Tauri commands that control the background service
 #[tauri::command]
 pub async fn start_rfid_service() -> Result<String, String> {
-    send_service_command(ServiceCommand::Start).await?;
+    send_service_command(ServiceCommand::Start)?;
     wait_for_service_running(true, Duration::from_secs(2)).await?;
     Ok("RFID service started".to_string())
 }
 
 #[tauri::command]
 pub async fn stop_rfid_service() -> Result<String, String> {
-    send_service_command(ServiceCommand::Stop).await?;
+    send_service_command(ServiceCommand::Stop)?;
     wait_for_service_running(false, Duration::from_secs(4)).await?;
     Ok("RFID service stopped".to_string())
 }
@@ -1052,7 +1047,7 @@ pub async fn get_rfid_service_status() -> Result<RfidServiceState, String> {
 #[tauri::command]
 pub async fn recover_rfid_scanner() -> Result<String, String> {
     // Best-effort stop request first.
-    if let Err(stop_error) = send_service_command(ServiceCommand::Stop).await {
+    if let Err(stop_error) = send_service_command(ServiceCommand::Stop) {
         println!("RFID recover: stop command warning: {stop_error}");
     }
 
