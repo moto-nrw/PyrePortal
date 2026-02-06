@@ -18,6 +18,8 @@ jobs:
 
       - name: Build frontend
         run: npm run build
+        env:
+          VITE_ENABLE_RFID: 'true'
 
       - name: Build Tauri app with RFID support
         run: npm run tauri build -- --features rfid --no-bundle

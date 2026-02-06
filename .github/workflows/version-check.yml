@@ -54,7 +54,7 @@ jobs:
 
           LATEST_TAG="$RELEASE_OUTPUT"
 
-          if [ -z "$LATEST_TAG" ]; then
+          if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
             echo "No existing releases found — skipping comparison"
           else
             LATEST_VERSION="${LATEST_TAG#v}"
