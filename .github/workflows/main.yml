@@ -18,3 +18,12 @@ defaults:
 jobs:
   lint:
     uses: ./.github/workflows/lint.yml
+
+  version_check:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    uses: ./.github/workflows/version-check.yml
+
+  build:
+    if: github.event_name == 'pull_request' && github.base_ref == 'main'
+    needs: [lint, version_check]
+    uses: ./.github/workflows/build.yml
