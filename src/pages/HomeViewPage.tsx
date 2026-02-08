@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
 import { ErrorModal, ModalBase } from '../components/ui';
+import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import {
   api,
   mapServerErrorToGerman,
@@ -15,7 +16,9 @@ import {
 import type { SessionSettings } from '../services/sessionStorage';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import { logNavigation, logUserAction } from '../utils/logger';
+import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
+
+const logger = createLogger('HomeViewPage');
 
 // ============================================================================
 // Pure helper functions (moved outside component to reduce cognitive complexity)
@@ -137,9 +140,7 @@ function HomeViewPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-
-  // Check if supervisors are selected
-  const hasSupervisors = selectedSupervisors.length > 0;
+  const [showEndSessionModal, setShowEndSessionModal] = useState(false);
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -149,7 +150,7 @@ function HomeViewPage() {
       await fetchCurrentSession();
       logUserAction('Session ended successfully');
     } catch (error) {
-      logUserAction('Failed to end session', { error });
+      logger.error('Failed to end session', { error: serializeError(error) });
     }
   };
 
@@ -163,21 +164,18 @@ function HomeViewPage() {
 
   const handleLogout = async () => {
     if (currentSession) {
-      await endCurrentSession();
+      setShowEndSessionModal(true);
     } else {
       await performLogout();
     }
   };
 
+  const handleConfirmEndSession = async () => {
+    setShowEndSessionModal(false);
+    await endCurrentSession();
+  };
+
   const handleTagAssignment = () => {
-    if (!hasSupervisors) {
-      logUserAction('NFC-Scan attempted without supervisors');
-      setErrorMessage(
-        "Bitte wählen Sie zuerst mindestens einen Betreuer über 'Team anpassen' aus, bevor Sie die NFC-Scan Funktion nutzen können."
-      );
-      setShowErrorModal(true);
-      return;
-    }
     logNavigation('Home View', '/tag-assignment');
     void navigate('/tag-assignment');
   };
@@ -322,53 +320,42 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '12px',
               padding: '0 32px',
-              backgroundColor: hasSupervisors
-                ? designSystem.glass.background
-                : 'rgba(255, 255, 255, 0.6)',
-              border: hasSupervisors
-                ? '1px solid rgba(80, 128, 216, 0.2)'
-                : '1px solid rgba(156, 163, 175, 0.2)',
+              backgroundColor: designSystem.glass.background,
+              border: '1px solid rgba(80, 128, 216, 0.2)',
               borderRadius: '34px',
-              cursor: hasSupervisors ? 'pointer' : 'not-allowed',
+              cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
               WebkitTapHighlightColor: 'transparent',
-              boxShadow: hasSupervisors
-                ? designSystem.shadows.button
-                : '0 2px 6px rgba(0, 0, 0, 0.1)',
+              boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
-              opacity: hasSupervisors ? 1 : 0.6,
             }}
             onTouchStart={e => {
-              if (hasSupervisors) {
-                e.currentTarget.style.transform = designSystem.scales.activeSmall;
-                e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
-                e.currentTarget.style.boxShadow = designSystem.shadows.button;
-              }
+              e.currentTarget.style.transform = designSystem.scales.activeSmall;
+              e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
+              e.currentTarget.style.boxShadow = designSystem.shadows.button;
             }}
             onTouchEnd={e => {
-              if (hasSupervisors) {
-                setTimeout(() => {
-                  if (e.currentTarget) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                    e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                  }
-                }, 150);
-              }
+              setTimeout(() => {
+                if (e.currentTarget) {
+                  e.currentTarget.style.transform = 'scale(1)';
+                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
+                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
+                }
+              }, 150);
             }}
           >
             <FontAwesomeIcon
               icon={faWifi}
               size="xl"
-              style={{ color: hasSupervisors ? '#5080D8' : '#9CA3AF', transform: 'rotate(90deg)' }}
+              style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
             />
             <span
               style={{
                 fontSize: '20px',
                 fontWeight: 600,
-                color: hasSupervisors ? '#5080D8' : '#9CA3AF',
+                color: '#5080D8',
               }}
             >
               NFC-Scan
@@ -718,6 +705,8 @@ function HomeViewPage() {
 
         {/* Last Session Toggle - only show when no current session */}
         {!currentSession && <LastSessionToggle />}
+
+        <ScannerRestartButton />
       </div>
 
       {/* Add animation keyframes */}
@@ -888,6 +877,81 @@ function HomeViewPage() {
             }}
           >
             {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
+          </button>
+        </div>
+      </ModalBase>
+
+      {/* End Session Confirmation Modal */}
+      <ModalBase
+        isOpen={showEndSessionModal}
+        onClose={() => setShowEndSessionModal(false)}
+        size="sm"
+        backgroundColor="#FFFFFF"
+      >
+        {/* Title */}
+        <h2
+          style={{
+            fontSize: '28px',
+            fontWeight: 700,
+            color: '#1F2937',
+            marginBottom: '16px',
+          }}
+        >
+          Aktivität beenden?
+        </h2>
+
+        {/* Warning Text */}
+        <p
+          style={{
+            fontSize: '20px',
+            color: '#6B7280',
+            marginBottom: '28px',
+            lineHeight: 1.5,
+          }}
+        >
+          Alle Kinder, die in dieser Aktivität sind, werden auf den Status{' '}
+          <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
+        </p>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={() => setShowEndSessionModal(false)}
+            style={{
+              flex: 1,
+              height: '68px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#6B7280',
+              backgroundColor: 'transparent',
+              border: '2px solid #E5E7EB',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+            }}
+          >
+            Abbrechen
+          </button>
+
+          <button
+            onClick={handleConfirmEndSession}
+            style={{
+              flex: 1,
+              height: '68px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#FFFFFF',
+              background: 'linear-gradient(to right, #EF4444, #DC2626)',
+              border: 'none',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.4)',
+            }}
+          >
+            Ja, beenden
           </button>
         </div>
       </ModalBase>

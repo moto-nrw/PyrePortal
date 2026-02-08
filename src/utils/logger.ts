@@ -37,15 +37,81 @@ export interface LoggerConfig {
   contextInfo?: Record<string, unknown>;
 }
 
-// Default configuration
-const DEFAULT_CONFIG: LoggerConfig = {
+// Default production configuration
+const defaultConfig: LoggerConfig = {
   level: import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.WARN,
-  persist: import.meta.env.PROD,
-  persistLevel: LogLevel.WARN,
+  persist: true,
+  persistLevel: import.meta.env.DEV ? LogLevel.DEBUG : LogLevel.INFO,
   maxInMemoryLogs: 1000,
   consoleOutput: true,
   contextInfo: {},
 };
+
+// Development configuration override
+const devConfig: LoggerConfig = {
+  ...defaultConfig,
+  level: LogLevel.DEBUG,
+  persist: true,
+  persistLevel: LogLevel.DEBUG,
+  maxInMemoryLogs: 5000,
+};
+
+// Test configuration override
+const testConfig: LoggerConfig = {
+  ...defaultConfig,
+  level: LogLevel.NONE,
+  persist: false,
+  consoleOutput: false,
+};
+
+// Get the appropriate configuration based on environment (avoids nested ternary - SonarCloud S3358)
+const getEnvironmentConfig = (): LoggerConfig => {
+  if (import.meta.env.TEST) {
+    return testConfig;
+  }
+  if (import.meta.env.DEV) {
+    return devConfig;
+  }
+  return defaultConfig;
+};
+
+// Check if debug logging was manually enabled via localStorage
+const isDebugLoggingEnabled = (): boolean => {
+  return localStorage.getItem('pyrePortalDebugLogging') === 'true';
+};
+
+// Get runtime configuration with any user preferences
+export const getRuntimeConfig = (): LoggerConfig => {
+  const config = { ...getEnvironmentConfig() };
+
+  // Override with user preferences if debug mode was manually enabled
+  if (isDebugLoggingEnabled()) {
+    config.level = LogLevel.DEBUG;
+    config.persistLevel = LogLevel.DEBUG;
+  }
+
+  return config;
+};
+
+// Default configuration used by Logger constructor
+const DEFAULT_CONFIG: LoggerConfig = getRuntimeConfig();
+
+// Shared session ID across all logger instances
+const SESSION_ID = `${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
+
+/**
+ * Serialize an error into a plain object safe for JSON.stringify
+ */
+export function serializeError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      name: error.name,
+      ...(error.stack ? { stack: error.stack } : {}),
+    };
+  }
+  return { message: String(error) };
+}
 
 /**
  * Logger class for PyrePortal application
@@ -54,8 +120,7 @@ export class Logger {
   private config: LoggerConfig;
   private readonly source: string;
   private readonly sessionId: string;
-  private inMemoryLogs: LogEntry[] = [];
-  private static instance: Logger;
+  private static inMemoryLogs: LogEntry[] = [];
 
   /**
    * Create a new logger instance
@@ -66,21 +131,7 @@ export class Logger {
   constructor(source: string, config: LoggerConfig = {}) {
     this.source = source;
     this.config = { ...DEFAULT_CONFIG, ...config };
-    this.sessionId = this.generateSessionId();
-  }
-
-  /**
-   * Get a singleton instance of the logger
-   *
-   * @param source The source/component name
-   * @param config Configuration options
-   * @returns A logger instance
-   */
-  public static getInstance(source: string, config: LoggerConfig = {}): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger('App', config);
-    }
-    return new Logger(source, Logger.instance.config);
+    this.sessionId = SESSION_ID;
   }
 
   /**
@@ -140,18 +191,18 @@ export class Logger {
    */
   public getInMemoryLogs(level?: LogLevel): LogEntry[] {
     if (level !== undefined) {
-      return this.inMemoryLogs.filter(
+      return Logger.inMemoryLogs.filter(
         entry => LogLevel[entry.level as keyof typeof LogLevel] >= level
       );
     }
-    return [...this.inMemoryLogs];
+    return [...Logger.inMemoryLogs];
   }
 
   /**
    * Clear in-memory logs
    */
   public clearInMemoryLogs(): void {
-    this.inMemoryLogs = [];
+    Logger.inMemoryLogs = [];
   }
 
   /**
@@ -172,8 +223,11 @@ export class Logger {
    * @param data Additional data to include
    */
   private log(level: LogLevel, message: string, data?: Record<string, unknown>): void {
-    // Skip if logging is disabled or below configured level
-    if (level < this.config.level!) {
+    const consoleLevel = this.config.level!;
+    const persistLvl = this.config.persistLevel!;
+
+    // Skip if below both thresholds
+    if (level < consoleLevel && level < persistLvl) {
       return;
     }
 
@@ -194,13 +248,13 @@ export class Logger {
     // Store in memory (with circular buffer behavior)
     this.storeInMemory(logEntry);
 
-    // Output to console if enabled
-    if (this.config.consoleOutput) {
+    // Output to console if enabled and meets console level
+    if (this.config.consoleOutput && level >= consoleLevel) {
       this.writeToConsole(level, logEntry);
     }
 
-    // Persist if enabled and meets minimum level
-    if (this.config.persist && level >= this.config.persistLevel!) {
+    // Persist if enabled and meets persist level
+    if (this.config.persist && level >= persistLvl) {
       void this.persistLog(logEntry);
     }
   }
@@ -211,11 +265,11 @@ export class Logger {
    * @param logEntry The log entry to store
    */
   private storeInMemory(logEntry: LogEntry): void {
-    this.inMemoryLogs.push(logEntry);
+    Logger.inMemoryLogs.push(logEntry);
 
     // Maintain maximum log count using circular buffer logic
-    if (this.inMemoryLogs.length > this.config.maxInMemoryLogs!) {
-      this.inMemoryLogs.shift(); // Remove oldest entry
+    if (Logger.inMemoryLogs.length > this.config.maxInMemoryLogs!) {
+      Logger.inMemoryLogs.shift(); // Remove oldest entry
     }
   }
 
@@ -274,15 +328,6 @@ export class Logger {
       }
     }
   }
-
-  /**
-   * Generate a unique session ID
-   *
-   * @returns Session ID string
-   */
-  private generateSessionId(): string {
-    return `${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
-  }
 }
 
 /**
@@ -293,7 +338,7 @@ export class Logger {
  * @returns A configured logger instance
  */
 export function createLogger(source: string, config?: LoggerConfig): Logger {
-  return Logger.getInstance(source, config);
+  return new Logger(source, config);
 }
 
 // Export a default app-level logger
@@ -301,16 +346,17 @@ export const logger = createLogger('App');
 
 // Create higher-order logging functions for common scenarios
 export const logUserAction = (action: string, details?: Record<string, unknown>): void => {
-  logger.info(`User Action: ${action}`, details);
+  logger.info('User action', { action, ...details });
 };
 
 export const logNavigation = (from: string, to: string, params?: Record<string, unknown>): void => {
-  logger.info(`Navigation: ${from} → ${to}`, params);
+  logger.info('Navigation', { from, to, ...params });
 };
 
 export const logError = (error: Error, context?: string): void => {
-  const contextSuffix = context ? ` in ${context}` : '';
-  logger.error(`Error${contextSuffix}: ${error.message}`, {
+  logger.error('Unhandled error', {
+    message: error.message,
+    context,
     stack: error.stack,
     name: error.name,
   } as Record<string, unknown>);

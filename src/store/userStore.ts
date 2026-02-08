@@ -429,6 +429,7 @@ interface UserState {
   authenticatedUser: AuthenticatedUser | null;
   rooms: Room[];
   selectedRoom: Room | null;
+  _roomSelectedAt: number | null; // Timestamp of last manual room selection (race condition guard)
   selectedActivity: ActivityResponse | null;
   currentSession: CurrentSession | null;
   activities: Activity[];
@@ -555,8 +556,8 @@ const SESSION_INITIAL_STATE = {
 };
 
 // RFID state that should be cleared on session change
-// Note: tagToStudentMap is intentionally NOT cleared - it maps RFID tags to student IDs
-// which remains useful across sessions
+// Note: tagToStudentMap is NOT cleared on session change (useful across sessions),
+// but IS cleared per-tag via clearTagScan() on tag reassignment
 const RFID_SESSION_INITIAL_STATE = {
   recentTagScans: new Map<string, RecentTagScan>(),
   studentHistory: new Map<string, StudentActionHistory>(),
@@ -588,6 +589,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   authenticatedUser: null,
   rooms: [] as Room[],
   selectedRoom: null,
+  _roomSelectedAt: null,
   selectedActivity: null,
   currentSession: null,
   activities: [] as Activity[],
@@ -720,7 +722,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
     if (roomToSelect) {
       storeLogger.info('Room selected', { roomId, roomName: roomToSelect.name });
-      set({ selectedRoom: roomToSelect });
+      set({ selectedRoom: roomToSelect, _roomSelectedAt: Date.now() });
     } else {
       storeLogger.warn('Room not found', { roomId });
     }
@@ -763,10 +765,39 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       );
       const sessionRoom = createSessionRoom(session);
 
+      // Guard: Don't overwrite selectedRoom if user just manually selected a room
+      // This prevents stale server data from reverting a recent room switch.
+      // A null sessionRoom during the recent-selection window is treated as stale/partial
+      // data — the manual selection is preserved rather than wiped.
+      const currentSelectedRoom = get().selectedRoom;
+      const roomSelectedAt = get()._roomSelectedAt;
+      const isRecentManualSelection = roomSelectedAt != null && Date.now() - roomSelectedAt < 5000;
+      const shouldPreserveRoom =
+        isRecentManualSelection &&
+        currentSelectedRoom != null &&
+        (sessionRoom == null || currentSelectedRoom.id !== sessionRoom.id);
+
+      if (shouldPreserveRoom) {
+        storeLogger.debug('Preserving manually selected room during fetchCurrentSession', {
+          manualRoomId: currentSelectedRoom.id,
+          manualRoomName: currentSelectedRoom.name,
+          serverRoomId: sessionRoom?.id ?? null,
+          serverRoomName: sessionRoom?.name ?? null,
+          roomSelectedAgoMs: Date.now() - roomSelectedAt,
+        });
+      }
+
       set({
         currentSession: session,
         selectedActivity: sessionActivity,
-        selectedRoom: sessionRoom,
+        ...(shouldPreserveRoom ? {} : { selectedRoom: sessionRoom }),
+        // Sync supervisors from backend → local cache
+        ...(session.supervisors && {
+          selectedSupervisors: session.supervisors.map(sup => ({
+            id: sup.staff_id,
+            name: sup.display_name,
+          })),
+        }),
       });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -876,7 +907,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       updatedTags.add(tagId);
       return { activeSupervisorTags: updatedTags };
     });
-    storeLogger.debug('RFID-Tag für Betreuer gespeichert', { tagId });
+    storeLogger.debug('RFID tag saved for supervisor', { tagId });
   },
 
   isActiveSupervisor: (tagId: string) => {
@@ -885,7 +916,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   clearActiveSupervisorTags: () => {
     set({ activeSupervisorTags: new Set<string>() });
-    storeLogger.debug('Aktive Betreuer-Tags geleert');
+    storeLogger.debug('Active supervisor tags cleared');
   },
 
   // Activity-related actions
@@ -1183,6 +1214,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       set({ activities: updatedActivities, isLoading: false });
       return true;
     } catch (error) {
+      storeLogger.error('Check-in failed', {
+        activityId,
+        studentId: student.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
       set({
         error: mapActivityError('checkin_failed', { studentName: student.name }, error),
         isLoading: false,
@@ -1251,6 +1287,11 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       set({ activities: updatedActivities, isLoading: false });
       return true;
     } catch (error) {
+      storeLogger.error('Check-out failed', {
+        activityId,
+        studentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       set({
         error: mapActivityError('checkout_failed', { studentName }, error),
         isLoading: false,
@@ -1457,8 +1498,23 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     set(state => {
       const newScans = new Map(state.rfid.recentTagScans);
       newScans.delete(tagId);
+
+      const newTagMap = new Map(state.rfid.tagToStudentMap);
+      const oldStudentId = newTagMap.get(tagId);
+      newTagMap.delete(tagId);
+
+      const newHistory = new Map(state.rfid.studentHistory);
+      if (oldStudentId) {
+        newHistory.delete(oldStudentId);
+      }
+
       return {
-        rfid: { ...state.rfid, recentTagScans: newScans },
+        rfid: {
+          ...state.rfid,
+          recentTagScans: newScans,
+          tagToStudentMap: newTagMap,
+          studentHistory: newHistory,
+        },
       };
     });
   },

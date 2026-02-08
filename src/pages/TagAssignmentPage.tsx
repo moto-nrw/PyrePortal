@@ -6,13 +6,14 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
+import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
-import { safeInvoke, isTauriContext, isRfidEnabled } from '../utils/tauriContext';
+import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
 
@@ -31,11 +32,29 @@ interface RfidScanResult {
   error?: string;
 }
 
-interface RfidScannerStatus {
-  is_available: boolean;
-  platform: string;
-  last_error?: string;
-}
+const SCAN_INVOKE_TIMEOUT_MS = 20_000;
+
+const withTimeout = <T,>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string
+): Promise<T> => {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutHandle = setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then(result => {
+        clearTimeout(timeoutHandle);
+        resolve(result);
+      })
+      .catch(error => {
+        clearTimeout(timeoutHandle);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      });
+  });
+};
 
 /**
  * Tag Assignment Page - Handle RFID tag assignment to students
@@ -61,7 +80,8 @@ function TagAssignmentPage() {
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
   const [success, setSuccess] = useState<string | null>(null);
-  const [scannerStatus, setScannerStatus] = useState<RfidScannerStatus | null>(null);
+  const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
+  const [isUnassigning, setIsUnassigning] = useState(false);
 
   // Refs for scan cancellation
   const mockScanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -72,6 +92,7 @@ function TagAssignmentPage() {
     setTagAssignment(null);
     setError(null);
     setSuccess(null);
+    setShowUnassignConfirm(false);
   }, []);
 
   // Cancel ongoing scan operation
@@ -143,45 +164,6 @@ function TagAssignmentPage() {
     window.history.replaceState({}, document.title);
   }, [location.state]);
 
-  // Check RFID scanner status on component mount
-  useEffect(() => {
-    const checkScannerStatus = async () => {
-      logger.debug('Checking RFID scanner status');
-
-      if (!isTauriContext()) {
-        logger.debug('Not in Tauri context, using development status');
-        setScannerStatus({
-          is_available: false,
-          platform: 'Development (Web)',
-          last_error: 'Tauri context not available in development mode',
-        });
-        return;
-      }
-
-      try {
-        logger.debug('Calling get_rfid_scanner_status');
-        const status = await safeInvoke<RfidScannerStatus>('get_rfid_scanner_status');
-        logger.debug('Scanner status received', { status });
-        setScannerStatus(status);
-        logUserAction('RFID scanner status checked', {
-          platform: status.platform,
-          available: status.is_available,
-        });
-      } catch (err) {
-        const error = err instanceof Error ? err : new Error(String(err));
-        logger.error('Scanner status error', { error: error.message });
-        logError(error, 'Failed to check RFID scanner status');
-        setScannerStatus({
-          is_available: false,
-          platform: 'Unknown',
-          last_error: error.message,
-        });
-      }
-    };
-
-    void checkScannerStatus();
-  }, []);
-
   // Start RFID scanning process
   const handleStartScanning = async () => {
     logUserAction('RFID scanning started');
@@ -226,8 +208,12 @@ function TagAssignmentPage() {
         return;
       }
 
-      // Use real RFID scanner through Tauri
-      const result = await safeInvoke<RfidScanResult>('scan_rfid_single');
+      // Use real RFID scanner through Tauri with frontend timeout safety net.
+      const result = await withTimeout(
+        safeInvoke<RfidScanResult>('scan_rfid_single'),
+        SCAN_INVOKE_TIMEOUT_MS,
+        'RFID-Scan Zeitüberschreitung'
+      );
 
       // Check if scan was cancelled while waiting for result
       if (scanCancelledRef.current) {
@@ -236,10 +222,7 @@ function TagAssignmentPage() {
       }
 
       if (result.success && result.tag_id) {
-        logUserAction('RFID tag scanned successfully', {
-          tagId: result.tag_id,
-          platform: scannerStatus?.platform,
-        });
+        logUserAction('RFID tag scanned successfully', { tagId: result.tag_id });
         void handleTagScanned(result.tag_id);
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';
@@ -257,7 +240,12 @@ function TagAssignmentPage() {
 
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
-      setError('Verbindung zum Scanner unterbrochen. Bitte App neu starten.');
+      const timeoutError = error.message.toLowerCase().includes('zeitüberschreitung');
+      setError(
+        timeoutError
+          ? 'Scanner reagiert nicht mehr. Bitte Scanner neu starten und erneut versuchen.'
+          : 'Verbindung zum Scanner unterbrochen. Bitte Scanner neu starten.'
+      );
       setShowErrorModal(true);
       setShowScanner(false);
     } finally {
@@ -327,6 +315,41 @@ function TagAssignmentPage() {
     void handleStartScanning();
   };
 
+  // Handle unassigning a tag from a student
+  const handleUnassignTag = async () => {
+    const assignedPerson = getAssignedPerson(tagAssignment);
+    if (!authenticatedUser?.pin || !assignedPerson || !scannedTag) return;
+
+    setIsUnassigning(true);
+    try {
+      const result = await api.unassignStudentTag(authenticatedUser.pin, assignedPerson.id);
+
+      if (!result.success) {
+        setShowUnassignConfirm(false);
+        setError(result.message ?? 'Zuweisung konnte nicht aufgehoben werden.');
+        setShowErrorModal(true);
+        return;
+      }
+
+      // Clear stale RFID caches for this tag
+      useUserStore.getState().clearTagScan(scannedTag);
+
+      setShowUnassignConfirm(false);
+      setTagAssignment(null);
+      setScannedTag(null);
+      setSuccess(`Armband wurde von ${assignedPerson.name} entfernt`);
+    } catch (err) {
+      logger.error('Failed to unassign RFID tag', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      setShowUnassignConfirm(false);
+      setError('Zuweisung konnte nicht aufgehoben werden. Bitte erneut versuchen.');
+      setShowErrorModal(true);
+    } finally {
+      setIsUnassigning(false);
+    }
+  };
+
   // Redirect to login if no authenticated user
   useEffect(() => {
     if (!authenticatedUser) {
@@ -338,6 +361,8 @@ function TagAssignmentPage() {
   if (!authenticatedUser) {
     return null; // Will redirect via useEffect
   }
+
+  const isScanStartDisabled = isLoading;
 
   return (
     <>
@@ -379,13 +404,15 @@ function TagAssignmentPage() {
           </h1>
 
           {/* Scanner Modal Overlay
-              IMPORTANT: timeout must match Rust scan_rfid_hardware_single() timeout in src-tauri/src/rfid.rs (currently 10s) */}
+              Budget: backend stop (3s) + SPI mutex (3s) + hardware scan (10s) = 16s worst-case.
+              Modal timeout (18s) exceeds that to avoid false "unresponsive" closures.
+              See scan_rfid_single() in src-tauri/src/rfid.rs for backend path. */}
           <ModalBase
             isOpen={showScanner}
             onClose={cancelScan}
             size="md"
             backgroundColor="#5080D8"
-            timeout={10000}
+            timeout={18000}
           >
             {/* Background pattern */}
             <div
@@ -477,7 +504,7 @@ function TagAssignmentPage() {
             }}
           >
             {/* Initial State - Start Scanning */}
-            {!scannedTag && !isLoading && (
+            {!scannedTag && !isLoading && !success && (
               <div style={{ textAlign: 'center' }}>
                 <div
                   style={{
@@ -513,40 +540,32 @@ function TagAssignmentPage() {
 
                 <button
                   onClick={handleStartScanning}
-                  disabled={isLoading || (!scannerStatus?.is_available && isTauriContext())}
+                  disabled={isScanStartDisabled}
                   style={{
                     height: '68px',
                     padding: '0 64px',
                     fontSize: '24px',
                     fontWeight: 700,
                     color: '#FFFFFF',
-                    background:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                        : designSystem.gradients.blueRight,
+                    background: isScanStartDisabled
+                      ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                      : designSystem.gradients.blueRight,
                     border: 'none',
                     borderRadius: designSystem.borderRadius.full,
-                    cursor:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'not-allowed'
-                        : 'pointer',
+                    cursor: isScanStartDisabled ? 'not-allowed' : 'pointer',
                     outline: 'none',
                     WebkitTapHighlightColor: 'transparent',
-                    boxShadow:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext())
-                        ? 'none'
-                        : designSystem.shadows.blue,
-                    opacity:
-                      isLoading || (!scannerStatus?.is_available && isTauriContext()) ? 0.6 : 1,
+                    boxShadow: isScanStartDisabled ? 'none' : designSystem.shadows.blue,
+                    opacity: isScanStartDisabled ? 0.6 : 1,
                   }}
                   onTouchStart={e => {
-                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                    if (!isScanStartDisabled) {
                       e.currentTarget.style.transform = designSystem.scales.active;
                       e.currentTarget.style.boxShadow = designSystem.shadows.button;
                     }
                   }}
                   onTouchEnd={e => {
-                    if (!(isLoading || (!scannerStatus?.is_available && isTauriContext()))) {
+                    if (!isScanStartDisabled) {
                       e.currentTarget.style.transform = 'scale(1)';
                       e.currentTarget.style.boxShadow = designSystem.shadows.blue;
                     }
@@ -717,72 +736,102 @@ function TagAssignmentPage() {
                 <div
                   style={{
                     display: 'flex',
+                    flexDirection: 'column',
                     gap: '16px',
-                    justifyContent: 'center',
+                    alignItems: 'center',
                     marginTop: '32px',
                   }}
                 >
-                  <button
-                    onClick={handleNavigateToStudentSelection}
-                    disabled={isLoading}
+                  <div
                     style={{
-                      flex: 1,
-                      height: '68px',
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      color: '#FFFFFF',
-                      background: isLoading
-                        ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                        : designSystem.gradients.blueRight,
-                      border: 'none',
-                      borderRadius: designSystem.borderRadius.full,
-                      cursor: isLoading ? 'not-allowed' : 'pointer',
-                      outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                      boxShadow: isLoading ? 'none' : designSystem.shadows.blue,
-                      opacity: isLoading ? 0.6 : 1,
+                      display: 'flex',
+                      gap: '16px',
+                      justifyContent: 'center',
+                      width: '100%',
                     }}
-                    onTouchStart={e => {
-                      if (!isLoading) {
+                  >
+                    <button
+                      onClick={handleNavigateToStudentSelection}
+                      style={{
+                        flex: 1,
+                        height: '68px',
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        color: '#FFFFFF',
+                        background: designSystem.gradients.blueRight,
+                        border: 'none',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
+                        boxShadow: designSystem.shadows.blue,
+                      }}
+                      onTouchStart={e => {
                         e.currentTarget.style.transform = designSystem.scales.active;
                         e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                      }
-                    }}
-                    onTouchEnd={e => {
-                      if (!isLoading) {
+                      }}
+                      onTouchEnd={e => {
                         e.currentTarget.style.transform = 'scale(1)';
                         e.currentTarget.style.boxShadow = designSystem.shadows.blue;
-                      }
-                    }}
-                  >
-                    {tagAssignment.assigned ? 'Neue Person zuweisen' : 'Person auswählen'}
-                  </button>
-                  <button
-                    onClick={handleScanAnother}
-                    style={{
-                      flex: 1,
-                      height: '68px',
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      backgroundColor: '#FFFFFF',
-                      color: '#374151',
-                      border: '2px solid #E5E7EB',
-                      borderRadius: designSystem.borderRadius.full,
-                      cursor: 'pointer',
-                      outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
-                    }}
-                    onTouchStart={e => {
-                      e.currentTarget.style.backgroundColor = '#F9FAFB';
-                      e.currentTarget.style.borderColor = '#D1D5DB';
-                    }}
-                    onTouchEnd={e => {
-                      e.currentTarget.style.backgroundColor = '#FFFFFF';
-                      e.currentTarget.style.borderColor = '#E5E7EB';
-                    }}
-                  >
-                    Neuer Scan
-                  </button>
+                      }}
+                    >
+                      {tagAssignment.assigned ? 'Neue Person zuweisen' : 'Person auswählen'}
+                    </button>
+                    <button
+                      onClick={handleScanAnother}
+                      style={{
+                        flex: 1,
+                        height: '68px',
+                        fontSize: '24px',
+                        fontWeight: 700,
+                        backgroundColor: '#FFFFFF',
+                        color: '#374151',
+                        border: '2px solid #E5E7EB',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                      onTouchStart={e => {
+                        e.currentTarget.style.backgroundColor = '#F9FAFB';
+                        e.currentTarget.style.borderColor = '#D1D5DB';
+                      }}
+                      onTouchEnd={e => {
+                        e.currentTarget.style.backgroundColor = '#FFFFFF';
+                        e.currentTarget.style.borderColor = '#E5E7EB';
+                      }}
+                    >
+                      Neuer Scan
+                    </button>
+                  </div>
+
+                  {/* Unassign button - only for student assignments */}
+                  {tagAssignment.assigned && tagAssignment.person_type === 'student' && (
+                    <button
+                      onClick={() => setShowUnassignConfirm(true)}
+                      style={{
+                        height: '56px',
+                        padding: '0 40px',
+                        fontSize: '20px',
+                        fontWeight: 600,
+                        backgroundColor: 'transparent',
+                        color: '#EF4444',
+                        border: '2px solid #FCA5A5',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: 'pointer',
+                        outline: 'none',
+                        WebkitTapHighlightColor: 'transparent',
+                      }}
+                      onTouchStart={e => {
+                        e.currentTarget.style.backgroundColor = '#FEF2F2';
+                      }}
+                      onTouchEnd={e => {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                      }}
+                    >
+                      Zuweisung aufheben
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -886,6 +935,111 @@ function TagAssignmentPage() {
         </div>
       </BackgroundWrapper>
 
+      {/* Unassign Confirmation Modal */}
+      <ModalBase
+        isOpen={showUnassignConfirm}
+        onClose={() => {
+          if (!isUnassigning) setShowUnassignConfirm(false);
+        }}
+        size="sm"
+        backgroundColor="#FFFFFF"
+      >
+        <div style={{ textAlign: 'center' }}>
+          {/* X close icon */}
+          <svg
+            width="48"
+            height="48"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#EF4444"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ marginBottom: '16px' }}
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="15" y1="9" x2="9" y2="15" />
+            <line x1="9" y1="9" x2="15" y2="15" />
+          </svg>
+
+          <h2
+            style={{
+              fontSize: '28px',
+              fontWeight: 700,
+              color: '#111827',
+              marginBottom: '12px',
+            }}
+          >
+            Zuweisung aufheben?
+          </h2>
+          <p
+            style={{
+              fontSize: '18px',
+              color: '#6B7280',
+              lineHeight: 1.5,
+              marginBottom: '8px',
+            }}
+          >
+            Das Armband wird von{' '}
+            <strong style={{ color: '#111827' }}>{getAssignedPerson(tagAssignment)?.name}</strong>{' '}
+            entfernt.
+          </p>
+          <p
+            style={{
+              fontSize: '16px',
+              color: '#9CA3AF',
+              lineHeight: 1.5,
+              marginBottom: '32px',
+            }}
+          >
+            Keine Sorge, das Armband kann jederzeit neu zugewiesen werden.
+          </p>
+
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+            <button
+              onClick={handleUnassignTag}
+              disabled={isUnassigning}
+              style={{
+                height: '52px',
+                padding: '0 32px',
+                fontSize: '18px',
+                fontWeight: 700,
+                backgroundColor: isUnassigning ? '#FCA5A5' : '#EF4444',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: designSystem.borderRadius.full,
+                cursor: isUnassigning ? 'not-allowed' : 'pointer',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                opacity: isUnassigning ? 0.7 : 1,
+              }}
+            >
+              {isUnassigning ? 'Wird entfernt...' : 'Ja, aufheben'}
+            </button>
+            <button
+              onClick={() => setShowUnassignConfirm(false)}
+              disabled={isUnassigning}
+              style={{
+                height: '52px',
+                padding: '0 32px',
+                fontSize: '18px',
+                fontWeight: 700,
+                backgroundColor: '#FFFFFF',
+                color: '#374151',
+                border: '2px solid #E5E7EB',
+                borderRadius: designSystem.borderRadius.full,
+                cursor: isUnassigning ? 'not-allowed' : 'pointer',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent',
+                opacity: isUnassigning ? 0.5 : 1,
+              }}
+            >
+              Abbrechen
+            </button>
+          </div>
+        </div>
+      </ModalBase>
+
       {/* Error Modal */}
       <ErrorModal
         isOpen={showErrorModal}
@@ -893,6 +1047,9 @@ function TagAssignmentPage() {
         message={error ?? ''}
         autoCloseDelay={3000}
       />
+
+      {/* Bottom-left spinner: visible between RFID tag detection and API response */}
+      <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />
     </>
   );
 }

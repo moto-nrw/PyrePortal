@@ -34,7 +34,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
     logError(error, 'ErrorBoundary');
 
     // Log additional component stack info
-    logger.error('Component stack trace:', {
+    logger.error('Component stack trace', {
       componentStack: errorInfo.componentStack,
     });
   }

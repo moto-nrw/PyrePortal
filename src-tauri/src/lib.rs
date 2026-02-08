@@ -66,6 +66,7 @@ pub fn run() {
             rfid::initialize_rfid_service,
             rfid::start_rfid_service,
             rfid::stop_rfid_service,
+            rfid::recover_rfid_scanner,
             rfid::get_rfid_service_status,
             rfid::get_rfid_scanner_status,
             rfid::scan_rfid_single,

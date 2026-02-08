@@ -11,7 +11,13 @@ import {
 import { usePagination } from '../hooks/usePagination';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+import {
+  createLogger,
+  logNavigation,
+  logUserAction,
+  logError,
+  serializeError,
+} from '../utils/logger';
 
 function CreateActivityPage() {
   const {
@@ -94,7 +100,7 @@ function CreateActivityPage() {
         return;
       }
 
-      logger.error('Failed to fetch activities', { error });
+      logger.error('Failed to fetch activities', { error: serializeError(error) });
       logError(
         error instanceof Error ? error : new Error(String(error)),
         'CreateActivityPage.fetchActivitiesData'
@@ -110,11 +116,6 @@ function CreateActivityPage() {
     if (mountedRef.current) return;
     mountedRef.current = true;
 
-    logger.debug('CreateActivityPage component mounted', {
-      user: authenticatedUser?.staffName,
-      isAuthenticated: !!authenticatedUser,
-    });
-
     // Check authentication
     if (!authenticatedUser) {
       logger.warn('Unauthenticated access to CreateActivityPage');
@@ -129,15 +130,15 @@ function CreateActivityPage() {
     }
 
     return () => {
-      logger.debug('CreateActivityPage component unmounted');
       mountedRef.current = false;
     };
   }, [authenticatedUser, navigate, logger, fetchActivitiesData]);
 
   // Handle activity selection (no immediate navigation; mirror Team auswählen flow)
   const handleActivitySelect = (activity: ActivityResponse) => {
-    // Don't allow selecting active activities
-    if (activity.is_active) return;
+    // Don't allow selecting occupied activities (active session running).
+    // Fallback to is_active for backward compatibility with older API payloads.
+    if (activity.is_occupied ?? activity.is_active) return;
 
     try {
       logger.info('Activity selected', {
@@ -193,12 +194,10 @@ function CreateActivityPage() {
 
   const handleNextPage = () => {
     goToNextPage();
-    logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
   };
 
   const handlePrevPage = () => {
     goToPrevPage();
-    logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
   };
 
   if (!authenticatedUser) {
@@ -267,7 +266,7 @@ function CreateActivityPage() {
                 icon="calendar"
                 colorType="activity"
                 isSelected={selectedActivity?.id === activity.id}
-                isDisabled={activity.is_active}
+                isDisabled={!!(activity.is_occupied ?? activity.is_active)}
                 onClick={() => handleActivitySelect(activity)}
               />
             )}

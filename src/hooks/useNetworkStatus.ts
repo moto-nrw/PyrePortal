@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 
 import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import { api } from '../services/api';
-import { createLogger } from '../utils/logger';
+import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('useNetworkStatus');
 
@@ -11,6 +11,10 @@ const logger = createLogger('useNetworkStatus');
 const POOR_THRESHOLD_MS = 1000;
 
 const CHECK_INTERVAL = 30000; // Check every 30 seconds
+
+// Initial startup retry configuration (handles Pi boot race condition)
+const INITIAL_CHECK_MAX_RETRIES = 3;
+const INITIAL_CHECK_RETRY_DELAY_MS = 1000;
 
 export const useNetworkStatus = () => {
   // Network status state
@@ -37,11 +41,6 @@ export const useNetworkStatus = () => {
       const responseTime = Date.now() - startTime;
       const quality: NetworkStatusData['quality'] =
         responseTime > POOR_THRESHOLD_MS ? 'poor' : 'online';
-
-      logger.debug('Network check successful', {
-        responseTime,
-        quality,
-      });
 
       return {
         isOnline: true,
@@ -80,14 +79,8 @@ export const useNetworkStatus = () => {
     try {
       const status = await checkNetworkStatus();
       setNetworkStatus(status);
-
-      logger.debug('Network status updated', {
-        isOnline: status.isOnline,
-        quality: status.quality,
-        responseTime: status.responseTime,
-      });
     } catch (error) {
-      logger.error('Failed to check network status', { error });
+      logger.error('Failed to check network status', { error: serializeError(error) });
 
       // Fallback to offline (health check itself failed unexpectedly)
       setNetworkStatus({
@@ -101,12 +94,76 @@ export const useNetworkStatus = () => {
     }
   }, [checkNetworkStatus]);
 
+  // Delay helper for retry logic
+  const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+  // Perform initial network check with retry logic (handles Pi boot race condition)
+  const performInitialNetworkCheck = useCallback(async () => {
+    // Prevent concurrent checks
+    if (isCheckingRef.current) {
+      logger.debug('Initial network check already in progress, skipping');
+      return;
+    }
+
+    isCheckingRef.current = true;
+
+    try {
+      // Intentionally keep default "online" state during retries rather than updating
+      // on each failure. The Pi boot race condition means WiFi is often just slow to
+      // initialize (not actually down), so we avoid showing a false "offline" status
+      // that would alarm users during normal startup. If truly offline, state updates
+      // after all retries exhaust (~3s).
+      for (let attempt = 1; attempt <= INITIAL_CHECK_MAX_RETRIES; attempt++) {
+        const status = await checkNetworkStatus();
+
+        if (status.isOnline) {
+          setNetworkStatus(status);
+          logger.info('Initial network check succeeded', {
+            attempt,
+            responseTime: status.responseTime,
+          });
+          return;
+        }
+
+        // Not online - log and retry if attempts remain
+        if (attempt < INITIAL_CHECK_MAX_RETRIES) {
+          logger.info('Initial network check failed, retrying...', {
+            attempt,
+            maxRetries: INITIAL_CHECK_MAX_RETRIES,
+            retryDelayMs: INITIAL_CHECK_RETRY_DELAY_MS,
+          });
+          await delay(INITIAL_CHECK_RETRY_DELAY_MS);
+        } else {
+          // All retries exhausted - set offline status
+          setNetworkStatus(status);
+          logger.warn('Initial network check failed after all retries', {
+            totalAttempts: INITIAL_CHECK_MAX_RETRIES,
+          });
+        }
+      }
+    } catch (error) {
+      logger.error('Unexpected error during initial network check', {
+        error: serializeError(error),
+      });
+
+      // Fallback to offline
+      setNetworkStatus({
+        isOnline: false,
+        responseTime: 0,
+        lastChecked: Date.now(),
+        quality: 'offline',
+      });
+    } finally {
+      isCheckingRef.current = false;
+    }
+  }, [checkNetworkStatus]);
+
   // Start monitoring network status
   const startMonitoring = useCallback(() => {
-    // Perform initial check
-    void performNetworkCheck();
+    // Perform initial check with retry logic (handles Pi boot race condition)
+    void performInitialNetworkCheck();
 
-    // Set up periodic checks
+    // Set up periodic checks (no retries - uses single check)
     if (!checkIntervalRef.current) {
       checkIntervalRef.current = setInterval(() => {
         void performNetworkCheck();
@@ -114,7 +171,7 @@ export const useNetworkStatus = () => {
 
       logger.info('Network monitoring started', { checkInterval: CHECK_INTERVAL });
     }
-  }, [performNetworkCheck]);
+  }, [performInitialNetworkCheck, performNetworkCheck]);
 
   // Stop monitoring network status
   const stopMonitoring = useCallback(() => {

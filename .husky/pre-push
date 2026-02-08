@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+
+# Verify package.json, Cargo.toml, and tauri.conf.json versions are in sync
+NPM_VERSION=$(node -p "require('./package.json').version")
+CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+TAURI_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).version")
+
+if [ "$NPM_VERSION" != "$CARGO_VERSION" ] || [ "$CARGO_VERSION" != "$TAURI_VERSION" ]; then
+  echo ""
+  echo "ERROR: Version mismatch detected!"
+  echo ""
+  echo "  package.json:      $NPM_VERSION"
+  echo "  Cargo.toml:        $CARGO_VERSION"
+  echo "  tauri.conf.json:   $TAURI_VERSION"
+  echo ""
+  echo "All three must be identical. Push aborted."
+  exit 1
+fi
+
+echo "pre-push: version sync OK (v$NPM_VERSION)"

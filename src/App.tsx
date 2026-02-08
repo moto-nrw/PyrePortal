@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import ProtectedRoute from './components/ProtectedRoute';
@@ -18,8 +18,7 @@ import TeamManagementPage from './pages/TeamManagementPage';
 import { setNetworkStatusCallback } from './services/api';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
-import { createLogger, logger } from './utils/logger';
-import { getRuntimeConfig } from './utils/loggerConfig';
+import { createLogger, getRuntimeConfig, logger } from './utils/logger';
 
 function App() {
   const {
@@ -30,7 +29,7 @@ function App() {
     networkStatus: storeNetworkStatus,
   } = useUserStore();
   const { networkStatus: hookNetworkStatus } = useNetworkStatus();
-  const appLogger = createLogger('App');
+  const appLogger = useMemo(() => createLogger('App'), []);
 
   // Initialize logger with runtime config
   useEffect(() => {
@@ -38,7 +37,7 @@ function App() {
     logger.updateConfig(config);
 
     appLogger.info('Application initialized', {
-      version: (import.meta.env.VITE_APP_VERSION as string) ?? 'dev',
+      version: __APP_VERSION__,
       environment: import.meta.env.MODE,
     });
   }, [appLogger]);
@@ -164,6 +163,20 @@ function App() {
           </Routes>
         </BrowserRouter>
       </main>
+      <span
+        style={{
+          position: 'fixed',
+          bottom: 16,
+          right: 20,
+          fontSize: 16,
+          color: 'rgba(0, 0, 0, 0.4)',
+          userSelect: 'none',
+          pointerEvents: 'none',
+          zIndex: 999,
+        }}
+      >
+        v{__APP_VERSION__}
+      </span>
     </ErrorBoundary>
   );
 }

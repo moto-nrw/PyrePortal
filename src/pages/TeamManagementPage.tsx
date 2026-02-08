@@ -13,7 +13,7 @@ import { usePagination } from '../hooks/usePagination';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import { createLogger, logNavigation, logUserAction } from '../utils/logger';
+import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 
 function TeamManagementPage() {
   const {
@@ -31,30 +31,31 @@ function TeamManagementPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  // Track selection order so selected supervisors can be shown first (chronologically)
-  const [selectionOrder, setSelectionOrder] = useState<Map<number, number>>(new Map());
-  const orderCounter = useRef(0);
+  // Freeze sort order after first user interaction to prevent items from moving
+  const frozenSortOrder = useRef<Map<number, number> | null>(null);
   const navigate = useNavigate();
 
   // Create stable logger instance for this component
   const logger = useMemo(() => createLogger('TeamManagementPage'), []);
 
-  // Sort users: selected first (by chronological selection), then others alphabetically
+  // Sort: pre-selected at top on page load, then freeze after first interaction
   const sortedUsers = useMemo(() => {
+    if (frozenSortOrder.current) {
+      return [...users].sort((a, b) => {
+        const aOrder = frozenSortOrder.current!.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = frozenSortOrder.current!.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        return aOrder - bOrder;
+      });
+    }
     const selectedIds = new Set(selectedSupervisors.map(s => s.id));
     return [...users].sort((a, b) => {
       const aSel = selectedIds.has(a.id);
       const bSel = selectedIds.has(b.id);
       if (aSel && !bSel) return -1;
       if (!aSel && bSel) return 1;
-      if (aSel && bSel) {
-        const ao = selectionOrder.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-        const bo = selectionOrder.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-        return ao - bo;
-      }
       return a.name.localeCompare(b.name, 'de');
     });
-  }, [users, selectedSupervisors, selectionOrder]);
+  }, [users, selectedSupervisors]);
 
   // Pagination hook with sorted users
   const {
@@ -66,7 +67,6 @@ function TeamManagementPage() {
     canGoPrev,
     goToNextPage,
     goToPrevPage,
-    resetPage,
   } = usePagination(sortedUsers, { itemsPerPage: 10 });
 
   // Redirect if not authenticated
@@ -76,15 +76,6 @@ function TeamManagementPage() {
       void navigate('/');
       return;
     }
-
-    logger.debug('TeamManagementPage component mounted', {
-      user: authenticatedUser.staffName,
-      hasActiveSession: !!currentSession,
-    });
-
-    return () => {
-      logger.debug('TeamManagementPage component unmounted');
-    };
   }, [authenticatedUser, currentSession, navigate, logger]);
 
   // Fetch teachers and initialize supervisors
@@ -94,9 +85,8 @@ function TeamManagementPage() {
         // Always refresh to pick up newly added supervisors
         await fetchTeachers(true);
 
-        // If we have an active session and no supervisors selected yet,
-        // initialize with current session supervisors
-        if (currentSession && selectedSupervisors.length === 0) {
+        // Always refresh supervisors from backend when there's an active session
+        if (currentSession) {
           // Fetch current session details to get supervisors
           const sessionDetails = await api.getCurrentSession(authenticatedUser!.pin);
           if (sessionDetails && 'supervisors' in sessionDetails) {
@@ -110,55 +100,28 @@ function TeamManagementPage() {
           }
         }
       } catch (error) {
-        logger.error('Failed to initialize team management page', { error });
+        logger.error('Failed to initialize team management page', { error: serializeError(error) });
       }
     };
 
     if (authenticatedUser) {
       void initializePage();
     }
-  }, [
-    authenticatedUser,
-    currentSession,
-    fetchTeachers,
-    selectedSupervisors.length,
-    setSelectedSupervisors,
-    logger,
-  ]);
-
-  // Initialize selection order from existing selected supervisors (e.g., from session)
-  useEffect(() => {
-    if (selectionOrder.size === 0 && selectedSupervisors.length > 0) {
-      const map = new Map<number, number>();
-      selectedSupervisors.forEach((s, idx) => map.set(s.id, idx + 1));
-      setSelectionOrder(map);
-      orderCounter.current = selectedSupervisors.length;
-    }
-  }, [selectedSupervisors, selectionOrder.size]);
+  }, [authenticatedUser, currentSession, fetchTeachers, setSelectedSupervisors, logger]);
 
   const handleUserToggle = (user: { id: number; name: string }) => {
+    // Freeze sort order on first interaction so items don't move
+    if (!frozenSortOrder.current) {
+      const orderMap = new Map<number, number>();
+      sortedUsers.forEach((u, idx) => orderMap.set(u.id, idx));
+      frozenSortOrder.current = orderMap;
+    }
+
     logger.info('Toggling supervisor selection', {
       username: user.name,
       userId: user.id,
       wasSelected: selectedSupervisors.some(s => s.id === user.id),
     });
-
-    const wasSelected = selectedSupervisors.some(s => s.id === user.id);
-    if (wasSelected) {
-      // Remove from selection order map
-      if (selectionOrder.has(user.id)) {
-        const next = new Map(selectionOrder);
-        next.delete(user.id);
-        setSelectionOrder(next);
-      }
-    } else {
-      // Add with next chronological order
-      const next = new Map(selectionOrder);
-      next.set(user.id, ++orderCounter.current);
-      setSelectionOrder(next);
-      // Jump to page 1 to reveal selected at the front
-      resetPage();
-    }
 
     toggleSupervisor(user);
 
@@ -193,18 +156,28 @@ function TeamManagementPage() {
     try {
       // If we have an active session, update supervisors via API
       if (currentSession) {
-        await api.updateSessionSupervisors(
+        const result = await api.updateSessionSupervisors(
           authenticatedUser!.pin,
           currentSession.active_group_id,
           selectedSupervisors.map(s => s.id)
         );
         logger.info('Successfully updated session supervisors');
+
+        // Sync server-confirmed supervisors back to local cache
+        if (result.supervisors) {
+          setSelectedSupervisors(
+            result.supervisors.map(sup => ({
+              id: sup.staff_id,
+              name: sup.display_name,
+            }))
+          );
+        }
       }
 
       // Show success modal - navigation happens when modal closes
       setShowSuccessModal(true);
     } catch (error) {
-      logger.error('Failed to update supervisors', { error });
+      logger.error('Failed to update supervisors', { error: serializeError(error) });
       setErrorMessage('Fehler beim Aktualisieren der Betreuer. Bitte versuchen Sie es erneut.');
       setShowErrorModal(true);
     } finally {
@@ -214,12 +187,10 @@ function TeamManagementPage() {
 
   const handleNextPage = () => {
     goToNextPage();
-    logger.debug('Navigated to next page', { newPage: currentPage + 1, totalPages });
   };
 
   const handlePrevPage = () => {
     goToPrevPage();
-    logger.debug('Navigated to previous page', { newPage: currentPage - 1, totalPages });
   };
 
   // Handle back navigation

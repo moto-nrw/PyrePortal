@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -27,6 +27,28 @@ function StaffSelectionPage() {
   const navigate = useNavigate();
   const logger = useMemo(() => createLogger('StaffSelectionPage'), []);
 
+  // Freeze sort order after first user interaction to prevent items from moving
+  const frozenSortOrder = useRef<Map<number, number> | null>(null);
+
+  // Sort: pre-selected at top on page load, then freeze after first interaction
+  const sortedUsers = useMemo(() => {
+    if (frozenSortOrder.current) {
+      return [...users].sort((a, b) => {
+        const aOrder = frozenSortOrder.current!.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+        const bOrder = frozenSortOrder.current!.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+        return aOrder - bOrder;
+      });
+    }
+    const selectedIds = new Set(selectedSupervisors.map(s => s.id));
+    return [...users].sort((a, b) => {
+      const aSel = selectedIds.has(a.id);
+      const bSel = selectedIds.has(b.id);
+      if (aSel && !bSel) return -1;
+      if (!aSel && bSel) return 1;
+      return a.name.localeCompare(b.name, 'de');
+    });
+  }, [users, selectedSupervisors]);
+
   const {
     currentPage,
     totalPages,
@@ -36,7 +58,7 @@ function StaffSelectionPage() {
     canGoPrev,
     goToNextPage,
     goToPrevPage,
-  } = usePagination(users, { itemsPerPage: 10 });
+  } = usePagination(sortedUsers, { itemsPerPage: 10 });
 
   useEffect(() => {
     if (!authenticatedUser) {
@@ -49,10 +71,6 @@ function StaffSelectionPage() {
       void navigate('/activity-selection');
       return;
     }
-    logger.debug('StaffSelectionPage component mounted', {
-      user: authenticatedUser.staffName,
-      activity: selectedActivity.name,
-    });
   }, [authenticatedUser, selectedActivity, navigate, logger]);
 
   useEffect(() => {
@@ -62,6 +80,13 @@ function StaffSelectionPage() {
   }, [fetchTeachers, logger]);
 
   const handleUserToggle = (user: { id: number; name: string }) => {
+    // Freeze sort order on first interaction so items don't move
+    if (!frozenSortOrder.current) {
+      const orderMap = new Map<number, number>();
+      sortedUsers.forEach((u, idx) => orderMap.set(u.id, idx));
+      frozenSortOrder.current = orderMap;
+    }
+
     logger.info('Toggling supervisor selection', {
       username: user.name,
       userId: user.id,

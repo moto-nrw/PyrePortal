@@ -154,6 +154,31 @@ const logger = createLogger('ComponentName');
 logger.info('Message', { contextData });
 ```
 
+### Logging Convention
+
+**Format**: String message + structured data object. No template literals.
+
+```typescript
+// ✅ Correct
+logger.info('RFID scan completed', { tagId, studentId, action });
+
+// ❌ Wrong
+logger.info(`RFID scan completed for tag ${tagId}`);
+```
+
+**Levels**:
+
+- `DEBUG` — lifecycle events, internals, verbose diagnostics
+- `INFO` — user actions, operations, API calls
+- `WARN` — recoverable issues (network retry, fallback used)
+- `ERROR` — critical failures requiring attention
+
+**Language**: All `logger.*` messages must be in English. UI-facing strings (`mapServerErrorToGerman`, modal text, error messages shown to users) stay in German.
+
+**No prefixes**: Use the appropriate log level instead of message prefixes like `[RACE-DEBUG]`.
+
+**Runtime debug override**: In production, set `localStorage.setItem('pyrePortalDebugLogging', 'true')` to enable DEBUG-level logging. Requires page reload to take effect.
+
 ## API Integration (Project Phoenix Backend)
 
 ### Environment Setup
@@ -197,6 +222,15 @@ headers: {
 - 401: Invalid PIN
 - 423: Account locked (too many attempts)
 - 404: Not found
+
+## Releasing
+
+See `.claude/rules/release.md` for the full release checklist. Key rules:
+
+- **Before any release**: Run `./scripts/check-version.sh` and verify it passes
+- **Version sync**: `package.json`, `Cargo.toml`, and `tauri.conf.json` must be bumped before building on the Pi
+- **Pre-push hook**: `.husky/pre-push` blocks pushes with mismatched versions automatically
+- **Security**: This repo is public. Never commit secrets, API keys, `.env` files, PINs, or credentials
 
 ## Adding New Features
 

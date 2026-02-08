@@ -1,0 +1,76 @@
+on:
+  workflow_call:
+    outputs:
+      version:
+        description: "The validated version string"
+        value: ${{ jobs.version_check.outputs.version }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  version_check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 'lts/*'
+
+      - name: Validate version consistency
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+
+          # Read versions from all 3 sources
+          NPM_VERSION=$(node -p "require('./package.json').version")
+          CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          TAURI_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).version")
+
+          echo "package.json:    $NPM_VERSION"
+          echo "Cargo.toml:      $CARGO_VERSION"
+          echo "tauri.conf.json: $TAURI_VERSION"
+
+          # Check all 3 match
+          if [ "$NPM_VERSION" != "$CARGO_VERSION" ] || [ "$CARGO_VERSION" != "$TAURI_VERSION" ]; then
+            echo "::error::Version mismatch! package.json=$NPM_VERSION Cargo.toml=$CARGO_VERSION tauri.conf.json=$TAURI_VERSION"
+            exit 1
+          fi
+
+          echo "All 3 files match: $NPM_VERSION"
+
+          # Check against latest GitHub release
+          if ! RELEASE_OUTPUT=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>&1); then
+            echo "::error::Failed to query GitHub releases: $RELEASE_OUTPUT"
+            exit 1
+          fi
+
+          LATEST_TAG="$RELEASE_OUTPUT"
+
+          if [ -z "$LATEST_TAG" ] || [ "$LATEST_TAG" = "null" ]; then
+            echo "No existing releases found — skipping comparison"
+          else
+            LATEST_VERSION="${LATEST_TAG#v}"
+            echo "Latest release: $LATEST_TAG"
+
+            if [ "$NPM_VERSION" = "$LATEST_VERSION" ]; then
+              echo "::error::Version $NPM_VERSION equals latest release $LATEST_TAG. Bump before releasing."
+              exit 1
+            fi
+
+            if [ "$(printf '%s\n' "$LATEST_VERSION" "$NPM_VERSION" | sort -V | tail -1)" != "$NPM_VERSION" ]; then
+              echo "::error::Version $NPM_VERSION is older than latest release $LATEST_TAG"
+              exit 1
+            fi
+
+            echo "$NPM_VERSION > $LATEST_VERSION"
+          fi
+
+          echo "version=$NPM_VERSION" >> "$GITHUB_OUTPUT"

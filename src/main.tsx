@@ -8,7 +8,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { initializeApi } from './services/api';
-import { createLogger } from './utils/logger';
+import { createLogger, serializeError } from './utils/logger';
 
 // Prevent FontAwesome from auto-injecting CSS (we import it manually above)
 config.autoAddCss = false;
@@ -19,7 +19,7 @@ const logger = createLogger('main');
 try {
   await initializeApi();
 } catch (error) {
-  logger.error('Failed to initialize API:', { error });
+  logger.error('Failed to initialize API', { error: serializeError(error) });
   // Still render the app even if API init fails - it will show offline status
 }
 

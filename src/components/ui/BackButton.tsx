@@ -49,6 +49,8 @@ interface BackButtonProps {
   customIcon?: ReactNode;
   /** Accessible label for screen readers - defaults to text prop value */
   ariaLabel?: string;
+  /** Disabled state - passed through to PillButton */
+  disabled?: boolean;
 }
 
 /**
@@ -62,6 +64,7 @@ const BackButton: React.FC<BackButtonProps> = ({
   icon = 'back',
   customIcon,
   ariaLabel,
+  disabled,
 }) => {
   const strokeColor = color === 'blue' ? '#5080d8' : '#374151';
 
@@ -76,6 +79,7 @@ const BackButton: React.FC<BackButtonProps> = ({
       variant="secondary"
       color={color}
       onClick={onClick}
+      disabled={disabled}
       icon={renderIcon()}
       ariaLabel={ariaLabel ?? text}
     >
