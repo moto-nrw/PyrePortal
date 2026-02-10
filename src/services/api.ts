@@ -18,7 +18,7 @@ interface ApiConfig {
  * Structured API error response with optional details
  * Used for rich error responses like capacity exceeded
  */
-export interface ApiErrorResponse {
+interface ApiErrorResponse {
   status: string;
   message: string;
   code?: string;
@@ -664,7 +664,7 @@ export interface SupervisorInfo {
 /**
  * Session start response structure
  */
-export interface SessionStartResponse {
+interface SessionStartResponse {
   active_group_id: number;
   activity_id: number;
   device_id: number;
@@ -1378,7 +1378,7 @@ export interface TagAssignmentCheck {
 /**
  * Tag assignment result from POST /api/students/{studentId}/rfid
  */
-export interface TagAssignmentResult {
+interface TagAssignmentResult {
   success: boolean;
   student_id?: number;
   student_name?: string;
@@ -1422,7 +1422,7 @@ export interface RfidScanResult {
 /**
  * Attendance status response from GET /api/iot/attendance/status/{rfid}
  */
-export interface AttendanceStatusResponse {
+interface AttendanceStatusResponse {
   status: string;
   data: {
     student: {
@@ -1449,7 +1449,7 @@ export interface AttendanceStatusResponse {
 /**
  * Attendance toggle response from POST /api/iot/attendance/toggle
  */
-export interface AttendanceToggleResponse {
+interface AttendanceToggleResponse {
   status: string;
   data: {
     action: 'checked_in' | 'checked_out' | 'cancelled';
@@ -1483,7 +1483,7 @@ export type DailyFeedbackRating = 'positive' | 'neutral' | 'negative';
 /**
  * Feedback submission request for POST /api/iot/feedback
  */
-export interface DailyFeedbackRequest {
+interface DailyFeedbackRequest {
   student_id: number;
   value: DailyFeedbackRating;
 }
@@ -1491,7 +1491,7 @@ export interface DailyFeedbackRequest {
 /**
  * Feedback submission response from POST /api/iot/feedback
  */
-export interface DailyFeedbackResponse {
+interface DailyFeedbackResponse {
   status: string;
   message: string;
   data?: {
