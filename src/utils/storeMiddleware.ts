@@ -305,7 +305,7 @@ const getCallerInfo = (): string => {
 /**
  * Configuration options for the logger middleware
  */
-export interface LoggerMiddlewareOptions {
+interface LoggerMiddlewareOptions {
   // Store name for identification in logs
   name?: string;
 

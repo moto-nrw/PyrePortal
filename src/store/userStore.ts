@@ -253,7 +253,7 @@ const resolveSessionActivity = async (
   }
 
   // If we already have a selectedActivity with the same ID, preserve its data
-  if (currentSelectedActivity && currentSelectedActivity.id === session.activity_id) {
+  if (currentSelectedActivity?.id === session.activity_id) {
     return currentSelectedActivity;
   }
 
@@ -775,7 +775,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const shouldPreserveRoom =
         isRecentManualSelection &&
         currentSelectedRoom != null &&
-        (sessionRoom == null || currentSelectedRoom.id !== sessionRoom.id);
+        currentSelectedRoom.id !== sessionRoom?.id;
 
       if (shouldPreserveRoom) {
         storeLogger.debug('Preserving manually selected room during fetchCurrentSession', {

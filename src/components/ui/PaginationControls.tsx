@@ -4,7 +4,7 @@ import { memo } from 'react';
 
 import { designSystem } from '../../styles/designSystem';
 
-export interface PaginationControlsProps {
+interface PaginationControlsProps {
   /** Current page index (0-based) */
   currentPage: number;
   /** Total number of pages */
