@@ -159,6 +159,22 @@ const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
     'schulhof activity not configured',
     'Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
   ],
+  [
+    'WC activity not configured',
+    'WC-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
+  ],
+  [
+    'WC activity auto-create requires staff context',
+    'WC-Aktivität konnte nicht erstellt werden. Bitte zuerst Betreuer-RFID scannen.',
+  ],
+  [
+    'failed to create Schulhof session',
+    'Schulhof-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.',
+  ],
+  [
+    'failed to create WC session',
+    'WC-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.',
+  ],
   ['failed to create visit record', 'Besuch konnte nicht erstellt werden. Bitte erneut versuchen.'],
   ['failed to end visit record', 'Besuch konnte nicht beendet werden. Bitte erneut versuchen.'],
   ['failed to get room information', 'Rauminformationen konnten nicht abgerufen werden.'],
