@@ -910,7 +910,6 @@ const ActivityScanningPage: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '12px',
-                    minWidth: '220px',
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.backgroundColor =
@@ -1189,6 +1188,13 @@ const ActivityScanningPage: React.FC = () => {
         <ModalBase
           isOpen={shouldShowCheckModal}
           onClose={handleModalTimeout}
+          size={
+            currentScan.action === 'checked_out' &&
+            checkoutDestinationState &&
+            !checkoutDestinationState.showingFarewell
+              ? 'xl'
+              : 'lg'
+          }
           backgroundColor={(() => {
             // "nach Hause" flow states (farewell, feedback) use blue
             if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) return '#6366f1';
