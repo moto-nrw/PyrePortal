@@ -17,6 +17,7 @@ import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
+  formatRoomName,
   mapServerErrorToGerman,
   type RfidScanResult,
   type DailyFeedbackRating,
@@ -705,7 +706,7 @@ const ActivityScanningPage: React.FC = () => {
           student_name: 'Toilette nicht verfügbar',
           student_id: checkoutDestinationState.studentId,
           action: 'error',
-          message: `${checkoutDestinationState.studentName}: WC-Raum wurde nicht konfiguriert.`,
+          message: `${checkoutDestinationState.studentName}: Toilette-Raum wurde nicht konfiguriert.`,
           showAsError: true,
         };
 
@@ -1056,7 +1057,7 @@ const ActivityScanningPage: React.FC = () => {
 
           switch (currentScan.action) {
             case 'checked_in':
-              return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
+              return `Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'} eingecheckt`;
             case 'checked_out':
               return 'Du bist jetzt ausgecheckt';
             case 'transferred':
