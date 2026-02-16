@@ -1,4 +1,10 @@
-import { faFaceSmile, faFaceMeh, faFaceFrown, faChildren } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFaceSmile,
+  faFaceMeh,
+  faFaceFrown,
+  faChildren,
+  faRestroom,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +17,7 @@ import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
+  formatRoomName,
   mapServerErrorToGerman,
   type RfidScanResult,
   type DailyFeedbackRating,
@@ -118,6 +125,7 @@ interface ExtendedScanResult extends RfidScanResult {
   showAsError?: boolean;
   isInfo?: boolean;
   isSchulhof?: boolean;
+  isToilette?: boolean;
 }
 
 /** State for checkout destination modal (unified checkout + "nach Hause" flow) */
@@ -134,8 +142,8 @@ interface CheckoutDestinationState {
  * Schulhof check-ins don't increment (student is leaving, not entering).
  */
 const handleCheckinAction = (scan: ExtendedScanResult): number => {
-  if (scan.isSchulhof) {
-    return 0; // No change for Schulhof check-in
+  if (scan.isSchulhof || scan.isToilette) {
+    return 0; // No change for Schulhof/WC check-in
   }
   return 1; // Increment count
 };
@@ -292,6 +300,9 @@ const ActivityScanningPage: React.FC = () => {
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
 
+  // WC room ID (discovered dynamically from server)
+  const [wcRoomId, setWcRoomId] = useState<number | null>(null);
+
   // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
   // This prevents previous student's state from affecting the next scan's modal
   useEffect(() => {
@@ -385,6 +396,15 @@ const ActivityScanningPage: React.FC = () => {
           logger.warn('No Schulhof room found in available rooms - Schulhof button will not work');
           // Don't fail - just won't show Schulhof option
         }
+
+        // Find WC room by name
+        const wcRoom = rooms.find(r => r.name === 'WC');
+        if (wcRoom) {
+          setWcRoomId(wcRoom.id);
+          logger.info('Found WC room', { id: wcRoom.id, name: wcRoom.name });
+        } else {
+          logger.warn('No WC room found - Toilette button will not work');
+        }
       } catch (error) {
         logger.error('Failed to fetch Schulhof room', { error: serializeError(error) });
         // Non-critical error - continue without Schulhof functionality
@@ -438,7 +458,7 @@ const ActivityScanningPage: React.FC = () => {
 
     // Apply authoritative count after side effects
     // Skip for Schulhof scans: active_students refers to the Schulhof room, not our room
-    if (hasAuthoritativeCount && !extendedScan.isSchulhof) {
+    if (hasAuthoritativeCount && !extendedScan.isSchulhof && !extendedScan.isToilette) {
       setStudentCount(currentScan.active_students!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -584,7 +604,7 @@ const ActivityScanningPage: React.FC = () => {
   };
 
   // Handle checkout destination selection (Schulhof or Raumwechsel)
-  const handleDestinationSelect = async (destination: 'schulhof' | 'raumwechsel') => {
+  const handleDestinationSelect = async (destination: 'schulhof' | 'raumwechsel' | 'toilette') => {
     if (!checkoutDestinationState || !authenticatedUser?.pin) return;
 
     if (destination === 'schulhof') {
@@ -676,7 +696,91 @@ const ActivityScanningPage: React.FC = () => {
         // Modal will auto-close via useModalTimeout hook
       }
     }
-    // else: destination === 'raumwechsel'
+
+    if (destination === 'toilette') {
+      // Check if WC room ID is available
+      if (!wcRoomId) {
+        logger.error('Cannot check into WC: room ID not available');
+
+        const errorResult: RfidScanResult = {
+          student_name: 'Toilette nicht verfügbar',
+          student_id: checkoutDestinationState.studentId,
+          action: 'error',
+          message: `${checkoutDestinationState.studentName}: Toilette-Raum wurde nicht konfiguriert.`,
+          showAsError: true,
+        };
+
+        setScanResult(errorResult);
+        setCheckoutDestinationState(null);
+        showScanModal();
+        return;
+      }
+
+      try {
+        logger.info('Checking student into WC', {
+          rfid: checkoutDestinationState.rfid,
+          studentName: checkoutDestinationState.studentName,
+          wcRoomId,
+        });
+
+        // CRITICAL: Wait for background checkout sync to complete
+        const recentScan = recentTagScans.get(checkoutDestinationState.rfid);
+        if (recentScan?.syncPromise) {
+          logger.debug('Waiting for background checkout sync to complete');
+          await recentScan.syncPromise;
+          logger.debug('Background sync completed, proceeding with WC check-in');
+        }
+
+        const result = await api.processRfidScan(
+          {
+            student_rfid: checkoutDestinationState.rfid,
+            action: 'checkin',
+            room_id: wcRoomId,
+          },
+          authenticatedUser.pin
+        );
+
+        logger.info('WC check-in successful', {
+          action: result.action,
+          room: result.room_name,
+        });
+
+        const firstName = checkoutDestinationState.studentName.split(' ')[0];
+        const wcResult = {
+          ...result,
+          message: `Bis gleich, ${firstName}!`,
+          isToilette: true,
+        } as RfidScanResult & { isToilette: boolean };
+
+        setScanResult(wcResult);
+        setCheckoutDestinationState(null);
+        showScanModal();
+      } catch (error) {
+        logger.error('Failed to check into WC', { error: serializeError(error) });
+
+        const errorMessage =
+          error instanceof Error ? error.message : 'Toilette Check-in fehlgeschlagen';
+        const userFriendlyError = isNetworkRelatedError(error)
+          ? 'Netzwerkfehler bei Toilette-Anmeldung. Bitte Verbindung prüfen und erneut scannen.'
+          : mapServerErrorToGerman(errorMessage);
+
+        const errorResult: RfidScanResult = {
+          student_name: 'Toilette Check-in fehlgeschlagen',
+          student_id: checkoutDestinationState.studentId,
+          action: 'error',
+          message: userFriendlyError,
+          showAsError: true,
+        };
+
+        setScanResult(errorResult);
+        setCheckoutDestinationState(null);
+        showScanModal();
+      }
+
+      return;
+    }
+
+    // destination === 'raumwechsel'
     // Clear destination state - student will scan at destination room
     setCheckoutDestinationState(null);
   };
@@ -789,6 +893,11 @@ const ActivityScanningPage: React.FC = () => {
                 label: 'Schulhof',
                 condition: Boolean(schulhofRoomId),
               },
+              {
+                destination: 'toilette' as const,
+                label: 'Toilette',
+                condition: Boolean(wcRoomId),
+              },
             ]
               .filter(btn => btn.condition)
               .map(({ destination, label }) => (
@@ -801,7 +910,6 @@ const ActivityScanningPage: React.FC = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     gap: '12px',
-                    minWidth: '220px',
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.backgroundColor =
@@ -829,13 +937,18 @@ const ActivityScanningPage: React.FC = () => {
                       <polyline points="16 17 21 12 16 7" />
                       <line x1="21" y1="12" x2="9" y2="12" />
                     </svg>
-                  ) : (
+                  ) : destination === 'schulhof' ? (
                     <FontAwesomeIcon
                       icon={faChildren}
                       style={{
                         fontSize: '48px',
                         color: '#FFFFFF',
                       }}
+                    />
+                  ) : (
+                    <FontAwesomeIcon
+                      icon={faRestroom}
+                      style={{ fontSize: '48px', color: '#FFFFFF' }}
                     />
                   )}
                   <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
@@ -933,14 +1046,17 @@ const ActivityScanningPage: React.FC = () => {
         }}
       >
         {(() => {
-          // Special handling for Schulhof - no additional content needed
+          // Special handling for Schulhof/Toilette - no additional content needed
           if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
+            return ''; // Empty content - title message is enough
+          }
+          if ((currentScan as { isToilette?: boolean }).isToilette) {
             return ''; // Empty content - title message is enough
           }
 
           switch (currentScan.action) {
             case 'checked_in':
-              return `Du bist jetzt in ${currentScan.room_name ?? 'diesem Raum'} eingecheckt`;
+              return `Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'} eingecheckt`;
             case 'checked_out':
               return 'Du bist jetzt ausgecheckt';
             case 'transferred':
@@ -1072,11 +1188,19 @@ const ActivityScanningPage: React.FC = () => {
         <ModalBase
           isOpen={shouldShowCheckModal}
           onClose={handleModalTimeout}
+          size={
+            currentScan.action === 'checked_out' &&
+            checkoutDestinationState &&
+            !checkoutDestinationState.showingFarewell
+              ? 'xl'
+              : 'lg'
+          }
           backgroundColor={(() => {
             // "nach Hause" flow states (farewell, feedback) use blue
             if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) return '#6366f1';
             // Check for Schulhof check-in (special yellow)
             if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
+            if ((currentScan as { isToilette?: boolean }).isToilette) return '#60A5FA'; // Blue for Toilette
             // Check for supervisor authentication
             if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
             // Check for error or info states

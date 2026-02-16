@@ -159,6 +159,24 @@ const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
     'schulhof activity not configured',
     'Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
   ],
+  [
+    'WC activity not configured',
+    'Toilette-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
+  ],
+  [
+    'WC activity auto-create requires staff context',
+    'Toilette-Aktivität konnte nicht erstellt werden. Bitte zuerst Betreuer-RFID scannen.',
+  ],
+  [
+    'failed to create Schulhof session',
+    'Schulhof-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.',
+  ],
+  [
+    'failed to create WC session',
+    'Toilette-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.',
+  ],
+  // Generic fallback — MUST stay AFTER specific 'failed to create Toilette/Schulhof session' entries (substring match)
+  ['failed to create session', 'Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.'],
   ['failed to create visit record', 'Besuch konnte nicht erstellt werden. Bitte erneut versuchen.'],
   ['failed to end visit record', 'Besuch konnte nicht beendet werden. Bitte erneut versuchen.'],
   ['failed to get room information', 'Rauminformationen konnten nicht abgerufen werden.'],
@@ -203,6 +221,15 @@ function isStringOrNumber(value: unknown): value is string | number {
 }
 
 /**
+ * Map backend room names to German display names.
+ * Backend uses "WC" internally but UI should show "Toilette".
+ */
+export function formatRoomName(name: string): string {
+  if (name === 'WC') return 'Toilette';
+  return name;
+}
+
+/**
  * Format activity capacity error message from details
  */
 function formatActivityCapacityError(details: Record<string, unknown>): string {
@@ -227,7 +254,8 @@ function formatRoomCapacityError(details: Record<string, unknown>): string {
 
   if (isStringOrNumber(roomName) && isStringOrNumber(maxCapacity)) {
     const current = isStringOrNumber(currentOccupancy) ? currentOccupancy : maxCapacity;
-    return `${roomName} ist voll (${current}/${maxCapacity} Plätze belegt).`;
+    const displayName = typeof roomName === 'string' ? formatRoomName(roomName) : roomName;
+    return `${displayName} ist voll (${current}/${maxCapacity} Plätze belegt).`;
   }
   return 'Raum ist voll. Kein Platz mehr verfügbar.';
 }

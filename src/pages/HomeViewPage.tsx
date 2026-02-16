@@ -9,6 +9,7 @@ import { ErrorModal, ModalBase } from '../components/ui';
 import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import {
   api,
+  formatRoomName,
   mapServerErrorToGerman,
   type SessionStartRequest,
   type CurrentSession,
@@ -585,7 +586,7 @@ function HomeViewPage() {
                               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                               <circle cx="12" cy="10" r="3" />
                             </svg>
-                            {sessionSettings.last_session.room_name}
+                            {formatRoomName(sessionSettings.last_session.room_name)}
                           </span>
                           <span
                             style={{
