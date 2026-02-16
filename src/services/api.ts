@@ -175,6 +175,8 @@ const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
     'failed to create WC session',
     'WC-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.',
   ],
+  // Generic fallback — MUST stay AFTER specific 'failed to create WC/Schulhof session' entries (substring match)
+  ['failed to create session', 'Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.'],
   ['failed to create visit record', 'Besuch konnte nicht erstellt werden. Bitte erneut versuchen.'],
   ['failed to end visit record', 'Besuch konnte nicht beendet werden. Bitte erneut versuchen.'],
   ['failed to get room information', 'Rauminformationen konnten nicht abgerufen werden.'],

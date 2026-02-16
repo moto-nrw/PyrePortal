@@ -1193,7 +1193,7 @@ const ActivityScanningPage: React.FC = () => {
             if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) return '#6366f1';
             // Check for Schulhof check-in (special yellow)
             if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
-            if ((currentScan as { isToilette?: boolean }).isToilette) return '#F59E0B'; // Orange for Toilette
+            if ((currentScan as { isToilette?: boolean }).isToilette) return '#60A5FA'; // Blue for Toilette
             // Check for supervisor authentication
             if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
             // Check for error or info states
