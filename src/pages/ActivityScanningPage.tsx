@@ -1379,10 +1379,6 @@ const ActivityScanningPage: React.FC = () => {
                 return `${currentScan.student_name} betreut jetzt ${roomName}`;
               }
 
-              // Show custom message if available
-              const msg = currentScan.message;
-              if (msg) return msg;
-
               // Error/Info states use student_name as the title
               if (
                 (currentScan as { showAsError?: boolean }).showAsError ||
@@ -1391,12 +1387,18 @@ const ActivityScanningPage: React.FC = () => {
                 return currentScan.student_name;
               }
 
-              // Normal greeting
+              // Check-in: use backend message if available, otherwise default greeting
               if (currentScan.action === 'checked_in') {
-                return `Hallo, ${currentScan.student_name}!`;
+                return currentScan.message ?? `Hallo, ${currentScan.student_name}!`;
               }
-              // Checkout: ask where the student is going
-              return `Wohin geht ${currentScan.student_name}?`;
+
+              // Checkout: always ask where the student is going (ignore backend message)
+              if (currentScan.action === 'checked_out') {
+                return `Wohin geht ${currentScan.student_name}?`;
+              }
+
+              // Fallback: use backend message or student name
+              return currentScan.message ?? currentScan.student_name;
             })()}
           </h2>
 
