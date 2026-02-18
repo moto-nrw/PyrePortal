@@ -6,7 +6,7 @@ import {
   faRestroom,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
@@ -349,6 +349,9 @@ const ActivityScanningPage: React.FC = () => {
   // Feedback prompt state
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
 
+  // Track which visit started the feedback prompt so we can detect new scans
+  const feedbackVisitIdRef = useRef<number | null>(null);
+
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
 
@@ -374,6 +377,23 @@ const ActivityScanningPage: React.FC = () => {
       }
     }
   }, [currentScan, checkoutDestinationState]);
+
+  // Abort feedback prompt when a new scan arrives (different visit)
+  useEffect(() => {
+    if (showFeedbackPrompt && currentScan && feedbackVisitIdRef.current !== null) {
+      const currentVisitId = currentScan.visit_id ?? null;
+      if (currentVisitId !== null && currentVisitId !== feedbackVisitIdRef.current) {
+        logger.debug('New scan arrived during feedback prompt, aborting feedback', {
+          feedbackVisitId: feedbackVisitIdRef.current,
+          newVisitId: currentVisitId,
+          newAction: currentScan.action,
+        });
+        setShowFeedbackPrompt(false);
+        setCheckoutDestinationState(null);
+        feedbackVisitIdRef.current = null;
+      }
+    }
+  }, [currentScan, showFeedbackPrompt]);
 
   // Start scanning when component mounts
   useEffect(() => {
@@ -551,6 +571,7 @@ const ActivityScanningPage: React.FC = () => {
     // Clear feedback prompt state to prevent orphaned state (Issue #129 Bug 2 fix)
     if (showFeedbackPrompt) {
       setShowFeedbackPrompt(false);
+      feedbackVisitIdRef.current = null;
     }
 
     hideScanModal();
@@ -609,6 +630,7 @@ const ActivityScanningPage: React.FC = () => {
         'zuhause'
       );
       logger.info('Daily checkout confirmed, showing feedback prompt');
+      feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
       setShowFeedbackPrompt(true);
     } catch (error) {
       logger.error('Failed to confirm daily checkout', {
@@ -617,6 +639,7 @@ const ActivityScanningPage: React.FC = () => {
       });
       // Still show feedback prompt — the visit is already ended,
       // attendance sync failure shouldn't block the student
+      feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
       setShowFeedbackPrompt(true);
     }
   };
@@ -1183,6 +1206,7 @@ const ActivityScanningPage: React.FC = () => {
           isOpen={shouldShowCheckModal}
           onClose={handleModalTimeout}
           size={
+            !showFeedbackPrompt &&
             currentScan.action === 'checked_out' &&
             checkoutDestinationState &&
             !checkoutDestinationState.showingFarewell
@@ -1206,7 +1230,11 @@ const ActivityScanningPage: React.FC = () => {
               : '#f87C10';
           })()}
           timeout={modalTimeoutDuration}
-          timeoutResetKey={`${currentScan.student_id}-${currentScan.action}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`}
+          timeoutResetKey={
+            showFeedbackPrompt
+              ? `feedback-${checkoutDestinationState?.studentId}`
+              : `${currentScan.student_id}-${currentScan.action}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
+          }
         >
           {/* Background pattern for visual interest */}
           <div
@@ -1222,12 +1250,13 @@ const ActivityScanningPage: React.FC = () => {
             }}
           />
 
-          {/* Icon container with background circle - hidden during checkout destination selection */}
-          {!(
-            currentScan.action === 'checked_out' &&
-            checkoutDestinationState &&
-            !checkoutDestinationState.showingFarewell
-          ) && (
+          {/* Icon container with background circle - hidden during checkout destination selection (but visible during feedback) */}
+          {(showFeedbackPrompt ||
+            !(
+              currentScan.action === 'checked_out' &&
+              checkoutDestinationState &&
+              !checkoutDestinationState.showingFarewell
+            )) && (
             <div
               style={{
                 width: '120px',
