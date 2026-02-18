@@ -98,67 +98,60 @@ const DESTINATION_BUTTON_STYLES = {
     outline: 'none',
     width: '280px',
   },
-  destructive: {
-    backgroundColor: 'rgba(220, 38, 38, 0.5)',
-    border: '3px solid rgba(255, 255, 255, 0.6)',
-  },
   hover: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
-    transform: 'scale(1.05)',
-  },
-  hoverDestructive: {
-    backgroundColor: 'rgba(220, 38, 38, 0.65)',
     transform: 'scale(1.05)',
   },
   normal: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     transform: 'scale(1)',
   },
-  normalDestructive: {
-    backgroundColor: 'rgba(220, 38, 38, 0.5)',
-    transform: 'scale(1)',
-  },
+};
+
+/** Color presets for destination buttons matching their modal colors */
+const DESTINATION_COLORS = {
+  default: { bg: 'rgba(255, 255, 255, 0.25)', bgHover: 'rgba(255, 255, 255, 0.35)' },
+  schulhof: { bg: 'rgba(245, 158, 11, 0.5)', bgHover: 'rgba(245, 158, 11, 0.65)' },
+  toilette: { bg: 'rgba(96, 165, 250, 0.5)', bgHover: 'rgba(96, 165, 250, 0.65)' },
+  destructive: { bg: 'rgba(220, 38, 38, 0.5)', bgHover: 'rgba(220, 38, 38, 0.65)' },
 };
 
 /** Reusable destination button for checkout modal */
 function DestinationButton({
   label,
   icon,
-  isDestructive,
+  colorScheme = 'default',
   onClick,
 }: {
   label: string;
   icon: React.ReactNode;
-  isDestructive?: boolean;
+  colorScheme?: keyof typeof DESTINATION_COLORS;
   onClick: () => void;
 }) {
-  const baseStyle = {
-    ...DESTINATION_BUTTON_STYLES.base,
-    ...(isDestructive ? DESTINATION_BUTTON_STYLES.destructive : {}),
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center',
-    gap: '12px',
-  };
-
-  const hoverStyles = isDestructive
-    ? DESTINATION_BUTTON_STYLES.hoverDestructive
-    : DESTINATION_BUTTON_STYLES.hover;
-  const normalStyles = isDestructive
-    ? DESTINATION_BUTTON_STYLES.normalDestructive
-    : DESTINATION_BUTTON_STYLES.normal;
+  const colors = DESTINATION_COLORS[colorScheme];
 
   return (
     <button
       onClick={onClick}
-      style={baseStyle}
+      style={{
+        ...DESTINATION_BUTTON_STYLES.base,
+        backgroundColor: colors.bg,
+        border:
+          colorScheme !== 'default'
+            ? '3px solid rgba(255, 255, 255, 0.6)'
+            : DESTINATION_BUTTON_STYLES.base.border,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '12px',
+      }}
       onMouseEnter={e => {
-        e.currentTarget.style.backgroundColor = hoverStyles.backgroundColor;
-        e.currentTarget.style.transform = hoverStyles.transform;
+        e.currentTarget.style.backgroundColor = colors.bgHover;
+        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.backgroundColor = normalStyles.backgroundColor;
-        e.currentTarget.style.transform = normalStyles.transform;
+        e.currentTarget.style.backgroundColor = colors.bg;
+        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
       }}
     >
       {icon}
@@ -807,7 +800,7 @@ const ActivityScanningPage: React.FC = () => {
         const firstName = checkoutDestinationState.studentName.split(' ')[0];
         const wcResult = {
           ...result,
-          message: `Bis gleich, ${firstName}!`,
+          message: `${firstName} geht auf Toilette`,
           isToilette: true,
         } as RfidScanResult & { isToilette: boolean };
 
@@ -929,7 +922,7 @@ const ActivityScanningPage: React.FC = () => {
         destination: 'raumwechsel' | 'schulhof' | 'toilette' | 'nach_hause';
         label: string;
         icon: React.ReactNode;
-        isDestructive?: boolean;
+        colorScheme?: keyof typeof DESTINATION_COLORS;
         onClick: () => void;
       }[] = [
         {
@@ -958,6 +951,7 @@ const ActivityScanningPage: React.FC = () => {
               {
                 destination: 'schulhof' as const,
                 label: 'Schulhof',
+                colorScheme: 'schulhof' as const,
                 icon: (
                   <FontAwesomeIcon icon={faTree} style={{ fontSize: '48px', color: '#FFFFFF' }} />
                 ),
@@ -970,6 +964,7 @@ const ActivityScanningPage: React.FC = () => {
               {
                 destination: 'toilette' as const,
                 label: 'Toilette',
+                colorScheme: 'toilette' as const,
                 icon: (
                   <FontAwesomeIcon
                     icon={faRestroom}
@@ -985,7 +980,7 @@ const ActivityScanningPage: React.FC = () => {
               {
                 destination: 'nach_hause' as const,
                 label: 'nach Hause',
-                isDestructive: true,
+                colorScheme: 'destructive' as const,
                 icon: (
                   <svg
                     width="48"
@@ -1020,12 +1015,12 @@ const ActivityScanningPage: React.FC = () => {
             justifyContent: 'center',
           }}
         >
-          {destinations.map(({ destination, label, icon, isDestructive, onClick }) => (
+          {destinations.map(({ destination, label, icon, colorScheme, onClick }) => (
             <DestinationButton
               key={destination}
               label={label}
               icon={icon}
-              isDestructive={isDestructive}
+              colorScheme={colorScheme}
               onClick={onClick}
             />
           ))}
