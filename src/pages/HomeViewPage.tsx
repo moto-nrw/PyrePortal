@@ -430,7 +430,7 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              {currentSession ? 'Aktivität Beenden' : 'Abmelden'}
+              {currentSession ? 'Aufsicht beenden' : 'Abmelden'}
             </span>
           </button>
         </div>
@@ -888,7 +888,7 @@ function HomeViewPage() {
             marginBottom: '16px',
           }}
         >
-          Aktivität beenden?
+          Aufsicht beenden?
         </h2>
 
         {/* Warning Text */}
