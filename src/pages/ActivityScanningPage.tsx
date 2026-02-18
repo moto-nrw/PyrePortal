@@ -2,7 +2,7 @@ import {
   faFaceSmile,
   faFaceMeh,
   faFaceFrown,
-  faChildren,
+  faTree,
   faRestroom,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -98,15 +98,74 @@ const DESTINATION_BUTTON_STYLES = {
     outline: 'none',
     width: '280px',
   },
+  destructive: {
+    backgroundColor: 'rgba(220, 38, 38, 0.5)',
+    border: '3px solid rgba(255, 255, 255, 0.6)',
+  },
   hover: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
+    transform: 'scale(1.05)',
+  },
+  hoverDestructive: {
+    backgroundColor: 'rgba(220, 38, 38, 0.65)',
     transform: 'scale(1.05)',
   },
   normal: {
     backgroundColor: 'rgba(255, 255, 255, 0.25)',
     transform: 'scale(1)',
   },
+  normalDestructive: {
+    backgroundColor: 'rgba(220, 38, 38, 0.5)',
+    transform: 'scale(1)',
+  },
 };
+
+/** Reusable destination button for checkout modal */
+function DestinationButton({
+  label,
+  icon,
+  isDestructive,
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  isDestructive?: boolean;
+  onClick: () => void;
+}) {
+  const baseStyle = {
+    ...DESTINATION_BUTTON_STYLES.base,
+    ...(isDestructive ? DESTINATION_BUTTON_STYLES.destructive : {}),
+    display: 'flex',
+    flexDirection: 'column' as const,
+    alignItems: 'center',
+    gap: '12px',
+  };
+
+  const hoverStyles = isDestructive
+    ? DESTINATION_BUTTON_STYLES.hoverDestructive
+    : DESTINATION_BUTTON_STYLES.hover;
+  const normalStyles = isDestructive
+    ? DESTINATION_BUTTON_STYLES.normalDestructive
+    : DESTINATION_BUTTON_STYLES.normal;
+
+  return (
+    <button
+      onClick={onClick}
+      style={baseStyle}
+      onMouseEnter={e => {
+        e.currentTarget.style.backgroundColor = hoverStyles.backgroundColor;
+        e.currentTarget.style.transform = hoverStyles.transform;
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.backgroundColor = normalStyles.backgroundColor;
+        e.currentTarget.style.transform = normalStyles.transform;
+      }}
+    >
+      {icon}
+      <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>{label}</span>
+    </button>
+  );
+}
 
 // Button configuration arrays
 const feedbackButtons = [
@@ -866,170 +925,110 @@ const ActivityScanningPage: React.FC = () => {
       checkoutDestinationState &&
       !checkoutDestinationState.showingFarewell
     ) {
+      const destinations: {
+        destination: 'raumwechsel' | 'schulhof' | 'toilette' | 'nach_hause';
+        label: string;
+        icon: React.ReactNode;
+        isDestructive?: boolean;
+        onClick: () => void;
+      }[] = [
+        {
+          destination: 'raumwechsel',
+          label: 'Raumwechsel',
+          icon: (
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          ),
+          onClick: () => void handleDestinationSelect('raumwechsel'),
+        },
+        ...(schulhofRoomId
+          ? [
+              {
+                destination: 'schulhof' as const,
+                label: 'Schulhof',
+                icon: (
+                  <FontAwesomeIcon icon={faTree} style={{ fontSize: '48px', color: '#FFFFFF' }} />
+                ),
+                onClick: () => void handleDestinationSelect('schulhof'),
+              },
+            ]
+          : []),
+        ...(wcRoomId
+          ? [
+              {
+                destination: 'toilette' as const,
+                label: 'Toilette',
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faRestroom}
+                    style={{ fontSize: '48px', color: '#FFFFFF' }}
+                  />
+                ),
+                onClick: () => void handleDestinationSelect('toilette'),
+              },
+            ]
+          : []),
+        ...(checkoutDestinationState.dailyCheckoutAvailable
+          ? [
+              {
+                destination: 'nach_hause' as const,
+                label: 'nach Hause',
+                isDestructive: true,
+                icon: (
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                ),
+                onClick: handleNachHause,
+              },
+            ]
+          : []),
+      ];
+
+      // Determine grid columns: 2x2 for 3-4 buttons, single row for 1-2
+      const gridColumns = destinations.length >= 3 ? 2 : destinations.length;
+
       return (
         <div
           style={{
             position: 'relative',
             zIndex: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${gridColumns}, ${DESTINATION_BUTTON_STYLES.base.width})`,
+            gap: '24px',
+            justifyContent: 'center',
           }}
         >
-          {/* Row 1: Raumwechsel + Schulhof */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '24px',
-              justifyContent: 'center',
-              position: 'relative',
-              zIndex: 2,
-            }}
-          >
-            {[
-              { destination: 'raumwechsel' as const, label: 'Raumwechsel', condition: true },
-              {
-                destination: 'schulhof' as const,
-                label: 'Schulhof',
-                condition: Boolean(schulhofRoomId),
-              },
-              {
-                destination: 'toilette' as const,
-                label: 'Toilette',
-                condition: Boolean(wcRoomId),
-              },
-            ]
-              .filter(btn => btn.condition)
-              .map(({ destination, label }) => (
-                <button
-                  key={destination}
-                  onClick={() => handleDestinationSelect(destination)}
-                  style={{
-                    ...DESTINATION_BUTTON_STYLES.base,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '12px',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor =
-                      DESTINATION_BUTTON_STYLES.hover.backgroundColor;
-                    e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor =
-                      DESTINATION_BUTTON_STYLES.normal.backgroundColor;
-                    e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
-                  }}
-                >
-                  {destination === 'raumwechsel' ? (
-                    <svg
-                      width="48"
-                      height="48"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                  ) : destination === 'schulhof' ? (
-                    <FontAwesomeIcon
-                      icon={faChildren}
-                      style={{
-                        fontSize: '48px',
-                        color: '#FFFFFF',
-                      }}
-                    />
-                  ) : (
-                    <FontAwesomeIcon
-                      icon={faRestroom}
-                      style={{ fontSize: '48px', color: '#FFFFFF' }}
-                    />
-                  )}
-                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
-                    {label}
-                  </span>
-                </button>
-              ))}
-          </div>
-
-          {/* Row 2: "nach Hause" button or hint text */}
-          {checkoutDestinationState.dailyCheckoutAvailable ? (
-            <button
-              onClick={handleNachHause}
-              style={{
-                ...DESTINATION_BUTTON_STYLES.base,
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '16px',
-                width: '100%',
-                marginTop: '16px',
-                padding: '16px 48px',
-                position: 'relative',
-                zIndex: 2,
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor =
-                  DESTINATION_BUTTON_STYLES.hover.backgroundColor;
-                e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor =
-                  DESTINATION_BUTTON_STYLES.normal.backgroundColor;
-                e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
-                nach Hause
-              </span>
-            </button>
-          ) : (
-            <p
-              style={{
-                marginTop: '16px',
-                fontSize: '22px',
-                color: 'rgba(255, 255, 255, 0.6)',
-                position: 'relative',
-                zIndex: 2,
-                fontStyle: 'italic',
-              }}
-            >
-              „nach Hause" nur vom Heimatraum möglich
-            </p>
-          )}
-
-          {!schulhofRoomId && (
-            <p
-              style={{
-                marginTop: '16px',
-                fontSize: '18px',
-                color: 'rgba(255, 255, 255, 0.7)',
-                position: 'relative',
-                zIndex: 2,
-              }}
-            >
-              (Schulhof derzeit nicht verfügbar)
-            </p>
-          )}
+          {destinations.map(({ destination, label, icon, isDestructive, onClick }) => (
+            <DestinationButton
+              key={destination}
+              label={label}
+              icon={icon}
+              isDestructive={isDestructive}
+              onClick={onClick}
+            />
+          ))}
         </div>
       );
     }
@@ -1228,60 +1227,101 @@ const ActivityScanningPage: React.FC = () => {
             }}
           />
 
-          {/* Icon container with background circle */}
-          <div
-            style={{
-              width: '120px',
-              height: '120px',
-              backgroundColor: 'rgba(255, 255, 255, 0.3)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 32px',
-              position: 'relative',
-              zIndex: 2,
-            }}
-          >
-            {(() => {
-              // "nach Hause" flow - Home icon for farewell and feedback states
-              if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
-                return (
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                );
-              }
-              // Supervisor authentication icon
-              if (currentScan.action === 'supervisor_authenticated') {
-                return (
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                );
-              }
-              // Error state - X icon
-              if ((currentScan as { showAsError?: boolean }).showAsError) {
-                return (
+          {/* Icon container with background circle - hidden during checkout destination selection */}
+          {!(
+            currentScan.action === 'checked_out' &&
+            checkoutDestinationState &&
+            !checkoutDestinationState.showingFarewell
+          ) && (
+            <div
+              style={{
+                width: '120px',
+                height: '120px',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 32px',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              {(() => {
+                // "nach Hause" flow - Home icon for farewell and feedback states
+                if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  );
+                }
+                // Supervisor authentication icon
+                if (currentScan.action === 'supervisor_authenticated') {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.5"
+                    >
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  );
+                }
+                // Error state - X icon
+                if ((currentScan as { showAsError?: boolean }).showAsError) {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  );
+                }
+                // Info state - Info icon
+                if ((currentScan as { isInfo?: boolean }).isInfo) {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.5"
+                    >
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  );
+                }
+                // Success states
+                return currentScan.action === 'checked_in' ||
+                  currentScan.action === 'transferred' ? (
                   <svg
                     width="80"
                     height="80"
@@ -1292,61 +1332,27 @@ const ActivityScanningPage: React.FC = () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                    <path d="M20 6L9 17l-5-5" />
                   </svg>
-                );
-              }
-              // Info state - Info icon
-              if ((currentScan as { isInfo?: boolean }).isInfo) {
-                return (
+                ) : (
                   <svg
                     width="80"
                     height="80"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="white"
-                    strokeWidth="2.5"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
                 );
-              }
-              // Success states
-              return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
-                <svg
-                  width="80"
-                  height="80"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-              ) : (
-                <svg
-                  width="80"
-                  height="80"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-              );
-            })()}
-          </div>
+              })()}
+            </div>
+          )}
 
           <h2
             style={{
