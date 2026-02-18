@@ -957,7 +957,7 @@ function RoomSelectionPage() {
   return (
     <>
       <SelectionPageLayout
-        title="Raum auswählen"
+        title="Wo machen wir das?"
         onBack={handleGoBack}
         isLoading={isLoading}
         error={error}

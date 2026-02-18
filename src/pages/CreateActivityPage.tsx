@@ -206,7 +206,7 @@ function CreateActivityPage() {
 
   return (
     <SelectionPageLayout
-      title="Aktivität auswählen"
+      title="Was machen wir?"
       onBack={handleBack}
       isLoading={isLoading || isFetching}
       error={error}

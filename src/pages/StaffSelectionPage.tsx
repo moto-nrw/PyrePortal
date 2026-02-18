@@ -132,7 +132,7 @@ function StaffSelectionPage() {
 
   return (
     <SelectionPageLayout
-      title="Betreuer auswählen"
+      title="Wer ist dabei?"
       onBack={handleBack}
       isLoading={isLoading}
       error={error}
