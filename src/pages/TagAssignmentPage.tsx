@@ -150,14 +150,7 @@ function TagAssignmentPage() {
 
     // Handle success state
     if (locationState.assignmentSuccess) {
-      const { studentName, previousTag } = locationState;
-
-      let successMessage = `Armband erfolgreich zugewiesen an ${studentName ?? 'Person'}`;
-      if (previousTag) {
-        successMessage += ` (Vorheriges Armband: ${previousTag})`;
-      }
-
-      setSuccess(successMessage);
+      setSuccess(`${locationState.studentName ?? 'Kind'} hat jetzt dieses Armband.`);
     }
 
     // Clear location state to prevent showing on page refresh
