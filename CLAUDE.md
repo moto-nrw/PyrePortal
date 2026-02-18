@@ -24,6 +24,17 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Ecosystem
+
+PyrePortal is part of a three-repo system. All repos live side-by-side (`../`):
+
+| Repo                                        | Role                          | Relationship                                                                                                                                 |
+| ------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **project-phoenix** (`../project-phoenix/`) | Go backend + Next.js frontend | Provides `/api/iot/*` endpoints — device API key + staff PIN auth. Source of truth for all data.                                             |
+| **moto-balenaOS** (`../moto-balenaOS/`)     | Balena OS deployment layer    | Runs this app on Raspberry Pi 5 in kiosk mode. Env vars (`API_BASE_URL`, `DEVICE_API_KEY`) come from Balena device variables at deploy time. |
+
+**If the backend changes**: Error messages in `src/services/api.ts` are hardcoded mappings from backend error strings to German UI text. Backend error text changes break the mapping silently — users see generic fallback instead of specific messages.
+
 ## Project Overview
 
 PyrePortal is a **Raspberry Pi kiosk application** for German after-school care (OGS) that uses RFID scanning for student check-in/check-out. Built with Tauri v2, React 18, and TypeScript 5.6 in strict mode.

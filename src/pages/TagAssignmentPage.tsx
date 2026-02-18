@@ -150,14 +150,7 @@ function TagAssignmentPage() {
 
     // Handle success state
     if (locationState.assignmentSuccess) {
-      const { studentName, previousTag } = locationState;
-
-      let successMessage = `Armband erfolgreich zugewiesen an ${studentName ?? 'Person'}`;
-      if (previousTag) {
-        successMessage += ` (Vorheriges Armband: ${previousTag})`;
-      }
-
-      setSuccess(successMessage);
+      setSuccess(`${locationState.studentName ?? 'Kind'} hat jetzt dieses Armband.`);
     }
 
     // Clear location state to prevent showing on page refresh
@@ -400,7 +393,7 @@ function TagAssignmentPage() {
               color: '#111827',
             }}
           >
-            Armband scannen
+            Armband identifizieren
           </h1>
 
           {/* Scanner Modal Overlay
@@ -460,7 +453,7 @@ function TagAssignmentPage() {
                 zIndex: 2,
               }}
             >
-              Armband scannen...
+              Armband wird erkannt...
             </h2>
             <p
               style={{
@@ -471,7 +464,7 @@ function TagAssignmentPage() {
                 zIndex: 2,
               }}
             >
-              Halten Sie das Armband an den Scanner
+              Halten Sie das Armband an das Lesegerät
             </p>
 
             <button
@@ -643,24 +636,6 @@ function TagAssignmentPage() {
                     </svg>
                     <span>Armband erkannt</span>
                   </div>
-                  {/* Tag ID label */}
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '8px 12px',
-                      backgroundColor: '#EFF6FF',
-                      border: '1px solid #DBEAFE',
-                      borderRadius: '9999px',
-                      marginBottom: '16px',
-                      color: '#1F2937',
-                      fontSize: '14px',
-                      fontWeight: 700,
-                    }}
-                  >
-                    {scannedTag}
-                  </div>
 
                   {/* Current Assignment Status */}
                   {(() => {
@@ -775,7 +750,7 @@ function TagAssignmentPage() {
                         e.currentTarget.style.boxShadow = designSystem.shadows.blue;
                       }}
                     >
-                      {tagAssignment.assigned ? 'Neue Person zuweisen' : 'Person auswählen'}
+                      {tagAssignment.assigned ? 'Anderem Kind zuweisen' : 'Kind auswählen'}
                     </button>
                     <button
                       onClick={handleScanAnother}
@@ -829,7 +804,7 @@ function TagAssignmentPage() {
                         e.currentTarget.style.backgroundColor = 'transparent';
                       }}
                     >
-                      Zuweisung aufheben
+                      Armband freigeben
                     </button>
                   )}
                 </div>
@@ -970,7 +945,7 @@ function TagAssignmentPage() {
               marginBottom: '12px',
             }}
           >
-            Zuweisung aufheben?
+            Armband freigeben?
           </h2>
           <p
             style={{
@@ -1014,7 +989,7 @@ function TagAssignmentPage() {
                 opacity: isUnassigning ? 0.7 : 1,
               }}
             >
-              {isUnassigning ? 'Wird entfernt...' : 'Ja, aufheben'}
+              {isUnassigning ? 'Wird entfernt...' : 'Ja, freigeben'}
             </button>
             <button
               onClick={() => setShowUnassignConfirm(false)}

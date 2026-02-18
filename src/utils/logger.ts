@@ -17,7 +17,7 @@ export enum LogLevel {
 }
 
 // Log entry structure
-export interface LogEntry {
+interface LogEntry {
   timestamp: string;
   level: string;
   source: string;
@@ -28,7 +28,7 @@ export interface LogEntry {
 }
 
 // Logger configuration options
-export interface LoggerConfig {
+interface LoggerConfig {
   level?: LogLevel;
   persist?: boolean;
   persistLevel?: LogLevel;
@@ -116,7 +116,7 @@ export function serializeError(error: unknown): Record<string, unknown> {
 /**
  * Logger class for PyrePortal application
  */
-export class Logger {
+class Logger {
   private config: LoggerConfig;
   private readonly source: string;
   private readonly sessionId: string;

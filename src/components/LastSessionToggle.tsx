@@ -1,21 +1,16 @@
-import { faArrowsRotate, faCheck, faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { faArrowsRotate, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useState } from 'react';
+import React from 'react';
 
-import { getRelativeTime } from '../services/sessionStorage';
 import { useUserStore } from '../store/userStore';
-
-import { InfoModal } from './InfoModal';
 
 export const LastSessionToggle: React.FC = () => {
   const { sessionSettings, toggleUseLastSession } = useUserStore();
-  const [showInfoModal, setShowInfoModal] = useState(false);
 
   if (!sessionSettings) return null;
 
   const isEnabled = sessionSettings.use_last_session;
   const hasLastSession = !!sessionSettings.last_session;
-  const savedTime = sessionSettings.last_session?.saved_at;
 
   const handleToggleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.checked;
@@ -118,66 +113,10 @@ export const LastSessionToggle: React.FC = () => {
             }}
           >
             <FontAwesomeIcon icon={faArrowsRotate} style={{ fontSize: '20px' }} />
-            Letzte Sitzung
+            Letzte Aufsicht wiederholen
           </span>
-
-          {savedTime && hasLastSession && (
-            <span
-              style={{
-                fontSize: '14px',
-                color: '#6B7280',
-                fontWeight: 400,
-              }}
-            >
-              ({getRelativeTime(savedTime)})
-            </span>
-          )}
         </label>
-
-        {/* Info button */}
-        <button
-          onClick={() => setShowInfoModal(true)}
-          style={{
-            width: '24px',
-            height: '24px',
-            borderRadius: '50%',
-            backgroundColor: '#F3F4F6',
-            border: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '14px',
-            color: '#6B7280',
-            cursor: 'pointer',
-            transition: 'all 200ms',
-            outline: 'none',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          onTouchStart={e => {
-            e.currentTarget.style.backgroundColor = '#E5E7EB';
-          }}
-          onTouchEnd={e => {
-            e.currentTarget.style.backgroundColor = '#F3F4F6';
-          }}
-        >
-          <FontAwesomeIcon icon={faCircleInfo} />
-        </button>
       </div>
-
-      {/* Info Modal */}
-      <InfoModal
-        isOpen={showInfoModal}
-        onClose={() => setShowInfoModal(false)}
-        title="Letzte Sitzung verwenden"
-        message={`Diese Funktion ermöglicht es Ihnen, die zuletzt gestartete Aktivität mit einem Klick zu wiederholen.
-
-Die gespeicherten Daten umfassen:
-- Aktivität
-- Raum
-- Betreuer
-
-Die Daten werden automatisch bei jedem erfolgreichen Start einer neuen Aktivität aktualisiert. Wenn eine der gespeicherten Komponenten nicht mehr verfügbar ist, wird die Speicherung gelöscht und Sie müssen die Aktivität neu erstellen.`}
-      />
     </>
   );
 };

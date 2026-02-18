@@ -5,13 +5,14 @@ import { useModalTimeout } from '../../hooks/useModalTimeout';
 import { ModalTimeoutIndicator } from './ModalTimeoutIndicator';
 
 /** Modal size preset */
-type ModalSize = 'sm' | 'md' | 'lg';
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 /** Size preset configurations matching existing modal dimensions */
 const SIZE_PRESETS = {
   sm: { maxWidth: '500px', padding: '48px', borderRadius: '20px' }, // ErrorModal, SuccessModal, InfoModal
   md: { maxWidth: '600px', padding: '56px', borderRadius: '24px' }, // Future use
   lg: { maxWidth: '700px', padding: '64px', borderRadius: '32px' }, // ActivityScanningPage (current default)
+  xl: { maxWidth: '1060px', padding: '64px', borderRadius: '32px' }, // Wide modals (e.g., 3-button checkout destination)
 } as const;
 
 /**
@@ -91,7 +92,7 @@ interface ModalBaseProps {
  *
  * Features:
  * - Uses native <dialog> element for proper accessibility
- * - Size presets: sm (500px), md (600px), lg (700px - default)
+ * - Size presets: sm (500px), md (600px), lg (700px - default), xl (1060px)
  * - Default backdrop blur (4px) with optional customization
  * - Integrated timeout system with visual indicator
  * - Auto-contrast timeout indicator (dark on light backgrounds)

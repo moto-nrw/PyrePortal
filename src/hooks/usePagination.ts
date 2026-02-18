@@ -1,13 +1,13 @@
 import { useState, useMemo, useCallback } from 'react';
 
-export interface UsePaginationOptions {
+interface UsePaginationOptions {
   /** Items per page (default: 10) */
   itemsPerPage?: number;
   /** Initial page index (default: 0) */
   initialPage?: number;
 }
 
-export interface UsePaginationResult<T> {
+interface UsePaginationResult<T> {
   /** Current page index (0-based) */
   currentPage: number;
   /** Total number of pages */

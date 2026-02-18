@@ -116,24 +116,24 @@ export function ScannerRestartButton({
             void handleRecover();
           }}
           disabled={isRecovering}
-          text={isRecovering ? 'Starte neu...' : 'Scanner neu starten'}
+          text={isRecovering ? 'Starte neu...' : 'Lesegerät neu starten'}
           icon="restart"
           color="blue"
-          ariaLabel="Scanner neu starten"
+          ariaLabel="Lesegerät neu starten"
         />
       </div>
 
       <SuccessModal
         isOpen={showSuccessModal}
         onClose={() => setShowSuccessModal(false)}
-        message="Scanner wurde erfolgreich neu gestartet."
+        message="Lesegerät wurde neu gestartet."
         autoCloseDelay={2200}
       />
 
       <ErrorModal
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
-        message="Scanner konnte nicht neu gestartet werden. Bitte Gerät vom Strom trennen und neu starten – die Session bleibt erhalten."
+        message="Lesegerät konnte nicht neu gestartet werden. Bitte Gerät vom Strom trennen und neu starten – die Aufsicht bleibt erhalten."
         autoCloseDelay={6000}
       />
     </>

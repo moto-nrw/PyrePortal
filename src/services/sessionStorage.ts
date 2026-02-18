@@ -86,34 +86,3 @@ export async function clearLastSession(): Promise<void> {
     throw error;
   }
 }
-
-/**
- * Helper function to get relative time string
- */
-export function getRelativeTime(savedAt: string): string {
-  const saved = new Date(savedAt);
-  const now = new Date();
-  const diffMs = now.getTime() - saved.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays === 0) {
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    if (diffHours === 0) {
-      const diffMinutes = Math.floor(diffMs / (1000 * 60));
-      if (diffMinutes < 5) return 'gerade eben';
-      return `vor ${diffMinutes} Minuten`;
-    }
-    if (diffHours === 1) return 'vor einer Stunde';
-    return `vor ${diffHours} Stunden`;
-  }
-
-  if (diffDays === 1) return 'gestern';
-  if (diffDays < 7) return `vor ${diffDays} Tagen`;
-  if (diffDays < 30) {
-    const weeks = Math.floor(diffDays / 7);
-    return weeks === 1 ? 'vor einer Woche' : `vor ${weeks} Wochen`;
-  }
-
-  const months = Math.floor(diffDays / 30);
-  return months === 1 ? 'vor einem Monat' : `vor ${months} Monaten`;
-}

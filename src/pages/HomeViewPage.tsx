@@ -9,6 +9,7 @@ import { ErrorModal, ModalBase } from '../components/ui';
 import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import {
   api,
+  formatRoomName,
   mapServerErrorToGerman,
   type SessionStartRequest,
   type CurrentSession,
@@ -81,9 +82,9 @@ function getActivityHeading(
     return currentSession.activity_name ?? 'Aktivität';
   }
   if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return 'Aktivität wiederholen';
+    return 'Aufsicht wiederholen';
   }
-  return 'Neue Aktivität';
+  return 'Aufsicht starten';
 }
 
 /** Get activity subtitle text based on session state */
@@ -97,7 +98,7 @@ function getActivitySubtitle(
   if (sessionSettings?.use_last_session && sessionSettings.last_session) {
     return sessionSettings.last_session.activity_name;
   }
-  return 'Starten';
+  return '';
 }
 
 /** Get supervisor count label for saved session display */
@@ -358,7 +359,7 @@ function HomeViewPage() {
                 color: '#5080D8',
               }}
             >
-              NFC-Scan
+              Armband identifizieren
             </span>
           </button>
         </div>
@@ -429,7 +430,7 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              {currentSession ? 'Aktivität Beenden' : 'Abmelden'}
+              {currentSession ? 'Aufsicht beenden' : 'Abmelden'}
             </span>
           </button>
         </div>
@@ -585,7 +586,7 @@ function HomeViewPage() {
                               <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                               <circle cx="12" cy="10" r="3" />
                             </svg>
-                            {sessionSettings.last_session.room_name}
+                            {formatRoomName(sessionSettings.last_session.room_name)}
                           </span>
                           <span
                             style={{
@@ -681,22 +682,12 @@ function HomeViewPage() {
                       fontSize: '28px',
                       fontWeight: 700,
                       color: '#1F2937',
-                      margin: '0 0 8px 0',
+                      margin: 0,
                       textAlign: 'center',
                     }}
                   >
                     Team anpassen
                   </h3>
-                  <p
-                    style={{
-                      fontSize: '18px',
-                      color: '#6B7280',
-                      margin: 0,
-                      textAlign: 'center',
-                    }}
-                  >
-                    Betreuer verwalten
-                  </p>
                 </div>
               </button>
             </div>
@@ -776,7 +767,7 @@ function HomeViewPage() {
             marginBottom: '12px',
           }}
         >
-          Aktivität wiederholen?
+          Aufsicht wiederholen?
         </h2>
 
         {/* Activity Details */}
@@ -876,7 +867,82 @@ function HomeViewPage() {
               opacity: isValidatingLastSession ? 0.6 : 1,
             }}
           >
-            {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
+            {isValidatingLastSession ? 'Starte...' : 'Aufsicht starten'}
+          </button>
+        </div>
+      </ModalBase>
+
+      {/* End Session Confirmation Modal */}
+      <ModalBase
+        isOpen={showEndSessionModal}
+        onClose={() => setShowEndSessionModal(false)}
+        size="sm"
+        backgroundColor="#FFFFFF"
+      >
+        {/* Title */}
+        <h2
+          style={{
+            fontSize: '28px',
+            fontWeight: 700,
+            color: '#1F2937',
+            marginBottom: '16px',
+          }}
+        >
+          Aufsicht beenden?
+        </h2>
+
+        {/* Warning Text */}
+        <p
+          style={{
+            fontSize: '20px',
+            color: '#6B7280',
+            marginBottom: '28px',
+            lineHeight: 1.5,
+          }}
+        >
+          Alle Kinder, die in dieser Aufsicht sind, werden auf den Status{' '}
+          <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
+        </p>
+
+        {/* Action Buttons */}
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <button
+            onClick={() => setShowEndSessionModal(false)}
+            style={{
+              flex: 1,
+              height: '68px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#6B7280',
+              backgroundColor: 'transparent',
+              border: '2px solid #E5E7EB',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+            }}
+          >
+            Abbrechen
+          </button>
+
+          <button
+            onClick={handleConfirmEndSession}
+            style={{
+              flex: 1,
+              height: '68px',
+              fontSize: '18px',
+              fontWeight: 600,
+              color: '#FFFFFF',
+              background: 'linear-gradient(to right, #EF4444, #DC2626)',
+              border: 'none',
+              borderRadius: designSystem.borderRadius.lg,
+              cursor: 'pointer',
+              transition: 'all 200ms',
+              outline: 'none',
+              boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.4)',
+            }}
+          >
+            Ja, beenden
           </button>
         </div>
       </ModalBase>
