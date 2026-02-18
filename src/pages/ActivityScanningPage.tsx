@@ -565,8 +565,9 @@ const ActivityScanningPage: React.FC = () => {
     // Clear feedback prompt state to prevent orphaned state (Issue #129 Bug 2 fix)
     if (showFeedbackPrompt) {
       setShowFeedbackPrompt(false);
-      feedbackVisitIdRef.current = null;
     }
+    // Always clear visit ID ref to prevent stale ref from wiping next checkout's destination state
+    feedbackVisitIdRef.current = null;
 
     hideScanModal();
 
@@ -1045,6 +1046,14 @@ const ActivityScanningPage: React.FC = () => {
         }}
       >
         {(() => {
+          // Error/Info states - show the detailed message from backend
+          if (
+            (currentScan as { showAsError?: boolean }).showAsError ||
+            (currentScan as { isInfo?: boolean }).isInfo
+          ) {
+            return currentScan.message ?? '';
+          }
+
           // Special handling for Schulhof/Toilette - no additional content needed
           if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
             return ''; // Empty content - title message is enough
