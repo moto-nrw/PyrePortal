@@ -1394,7 +1394,8 @@ const ActivityScanningPage: React.FC = () => {
 
               // Checkout: always ask where the student is going (ignore backend message)
               if (currentScan.action === 'checked_out') {
-                return `Wohin geht ${currentScan.student_name}?`;
+                const firstName = currentScan.student_name.split(' ')[0];
+                return `Wohin geht ${firstName}?`;
               }
 
               // Fallback: use backend message or student name
