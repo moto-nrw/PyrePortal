@@ -1398,10 +1398,20 @@ const ActivityScanningPage: React.FC = () => {
                 return currentScan.message ?? `Hallo, ${currentScan.student_name}!`;
               }
 
-              // Checkout: always ask where the student is going (ignore backend message)
-              if (currentScan.action === 'checked_out') {
+              // Checkout with destination buttons: ask where the student is going
+              if (
+                currentScan.action === 'checked_out' &&
+                checkoutDestinationState &&
+                !checkoutDestinationState.showingFarewell
+              ) {
                 const firstName = currentScan.student_name.split(' ')[0];
                 return `Wohin geht ${firstName}?`;
+              }
+
+              // Checkout after destination selected (e.g. Raumwechsel): confirmation
+              if (currentScan.action === 'checked_out') {
+                const firstName = currentScan.student_name.split(' ')[0];
+                return `${firstName} ist unterwegs`;
               }
 
               // Fallback: use backend message or student name
