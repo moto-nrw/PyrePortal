@@ -97,7 +97,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         lineHeight: 1.2,
       }}
     >
-      Aktivität starten?
+      Aufsicht starten?
     </h2>
 
     {/* Activity Details Card */}
@@ -324,7 +324,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           }
         }}
       >
-        {isLoading ? 'Starte...' : 'Aktivität starten'}
+        {isLoading ? 'Starte...' : 'Aufsicht starten'}
       </button>
     </div>
   </ModalBase>
