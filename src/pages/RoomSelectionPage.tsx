@@ -97,7 +97,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         lineHeight: 1.2,
       }}
     >
-      Aktivität starten?
+      Aufsicht starten?
     </h2>
 
     {/* Activity Details Card */}
@@ -324,7 +324,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           }
         }}
       >
-        {isLoading ? 'Starte...' : 'Aktivität starten'}
+        {isLoading ? 'Starte...' : 'Aufsicht starten'}
       </button>
     </div>
   </ModalBase>
@@ -957,7 +957,7 @@ function RoomSelectionPage() {
   return (
     <>
       <SelectionPageLayout
-        title="Raum auswählen"
+        title="Wo machen wir das?"
         onBack={handleGoBack}
         isLoading={isLoading}
         error={error}

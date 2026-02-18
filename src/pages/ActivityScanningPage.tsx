@@ -2,11 +2,11 @@ import {
   faFaceSmile,
   faFaceMeh,
   faFaceFrown,
-  faChildren,
+  faTree,
   faRestroom,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
@@ -107,6 +107,58 @@ const DESTINATION_BUTTON_STYLES = {
     transform: 'scale(1)',
   },
 };
+
+/** Color presets for destination buttons matching their modal colors */
+const DESTINATION_COLORS = {
+  default: { bg: 'rgba(255, 255, 255, 0.25)', bgHover: 'rgba(255, 255, 255, 0.35)' },
+  schulhof: { bg: 'rgba(245, 158, 11, 0.5)', bgHover: 'rgba(245, 158, 11, 0.65)' },
+  toilette: { bg: 'rgba(96, 165, 250, 0.85)', bgHover: 'rgba(96, 165, 250, 0.95)' },
+  destructive: { bg: 'rgba(220, 38, 38, 0.5)', bgHover: 'rgba(220, 38, 38, 0.65)' },
+};
+
+/** Reusable destination button for checkout modal */
+function DestinationButton({
+  label,
+  icon,
+  colorScheme = 'default',
+  onClick,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  colorScheme?: keyof typeof DESTINATION_COLORS;
+  onClick: () => void;
+}) {
+  const colors = DESTINATION_COLORS[colorScheme];
+
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        ...DESTINATION_BUTTON_STYLES.base,
+        backgroundColor: colors.bg,
+        border:
+          colorScheme !== 'default'
+            ? '3px solid rgba(255, 255, 255, 0.6)'
+            : DESTINATION_BUTTON_STYLES.base.border,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '12px',
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.backgroundColor = colors.bgHover;
+        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.backgroundColor = colors.bg;
+        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
+      }}
+    >
+      {icon}
+      <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>{label}</span>
+    </button>
+  );
+}
 
 // Button configuration arrays
 const feedbackButtons = [
@@ -297,29 +349,43 @@ const ActivityScanningPage: React.FC = () => {
   // Feedback prompt state
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
 
+  // Track which visit started the feedback prompt so we can detect new scans
+  const feedbackVisitIdRef = useRef<number | null>(null);
+
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
 
   // WC room ID (discovered dynamically from server)
   const [wcRoomId, setWcRoomId] = useState<number | null>(null);
 
-  // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
-  // This prevents previous student's state from affecting the next scan's modal
+  // Clear stale checkout/feedback/farewell state when a new scan arrives.
+  // A "new scan" is detected by: different RFID tag, different visit_id, or
+  // a check-in arriving while we're in a checkout flow (always means new scan).
   useEffect(() => {
-    if (currentScan && checkoutDestinationState) {
-      const currentRfid = currentScan.scannedTagId ?? '';
+    if (!currentScan || !checkoutDestinationState) return;
 
-      // If checkoutDestinationState exists for a DIFFERENT scan, clear it
-      if (currentRfid && checkoutDestinationState.rfid !== currentRfid) {
-        logger.debug('Clearing stale checkoutDestinationState for new scan', {
-          oldRfid: checkoutDestinationState.rfid,
-          newRfid: currentRfid,
-          oldStudentName: checkoutDestinationState.studentName,
-          newStudentName: currentScan.student_name,
-        });
-        setCheckoutDestinationState(null);
-        setShowFeedbackPrompt(false);
-      }
+    const currentRfid = currentScan.scannedTagId ?? '';
+    const isDifferentTag = currentRfid && checkoutDestinationState.rfid !== currentRfid;
+    const isDifferentVisit =
+      feedbackVisitIdRef.current !== null &&
+      currentScan.visit_id != null &&
+      currentScan.visit_id !== feedbackVisitIdRef.current;
+    const isCheckinDuringCheckoutFlow = currentScan.action === 'checked_in';
+
+    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow) {
+      logger.debug('Clearing stale checkout state for new scan', {
+        reason: isDifferentTag
+          ? 'different_tag'
+          : isDifferentVisit
+            ? 'different_visit'
+            : 'checkin_during_checkout',
+        oldRfid: checkoutDestinationState.rfid,
+        newRfid: currentRfid,
+        newAction: currentScan.action,
+      });
+      setCheckoutDestinationState(null);
+      setShowFeedbackPrompt(false);
+      feedbackVisitIdRef.current = null;
     }
   }, [currentScan, checkoutDestinationState]);
 
@@ -500,6 +566,8 @@ const ActivityScanningPage: React.FC = () => {
     if (showFeedbackPrompt) {
       setShowFeedbackPrompt(false);
     }
+    // Always clear visit ID ref to prevent stale ref from wiping next checkout's destination state
+    feedbackVisitIdRef.current = null;
 
     hideScanModal();
 
@@ -557,6 +625,7 @@ const ActivityScanningPage: React.FC = () => {
         'zuhause'
       );
       logger.info('Daily checkout confirmed, showing feedback prompt');
+      feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
       setShowFeedbackPrompt(true);
     } catch (error) {
       logger.error('Failed to confirm daily checkout', {
@@ -565,6 +634,7 @@ const ActivityScanningPage: React.FC = () => {
       });
       // Still show feedback prompt — the visit is already ended,
       // attendance sync failure shouldn't block the student
+      feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
       setShowFeedbackPrompt(true);
     }
   };
@@ -748,7 +818,7 @@ const ActivityScanningPage: React.FC = () => {
         const firstName = checkoutDestinationState.studentName.split(' ')[0];
         const wcResult = {
           ...result,
-          message: `Bis gleich, ${firstName}!`,
+          message: `${firstName} geht auf Toilette`,
           isToilette: true,
         } as RfidScanResult & { isToilette: boolean };
 
@@ -801,18 +871,6 @@ const ActivityScanningPage: React.FC = () => {
             alignItems: 'center',
           }}
         >
-          {/* Student name subtitle - matching other modal styles */}
-          <div
-            style={{
-              fontSize: '28px',
-              color: 'rgba(255, 255, 255, 0.95)',
-              fontWeight: 600,
-              marginBottom: '40px',
-            }}
-          >
-            {checkoutDestinationState?.studentName}
-          </div>
-
           {/* Feedback buttons container - centered with consistent spacing */}
           <div
             style={{
@@ -866,170 +924,112 @@ const ActivityScanningPage: React.FC = () => {
       checkoutDestinationState &&
       !checkoutDestinationState.showingFarewell
     ) {
+      const destinations: {
+        destination: 'raumwechsel' | 'schulhof' | 'toilette' | 'nach_hause';
+        label: string;
+        icon: React.ReactNode;
+        colorScheme?: keyof typeof DESTINATION_COLORS;
+        onClick: () => void;
+      }[] = [
+        {
+          destination: 'raumwechsel',
+          label: 'Raumwechsel',
+          icon: (
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+          ),
+          onClick: () => void handleDestinationSelect('raumwechsel'),
+        },
+        ...(schulhofRoomId
+          ? [
+              {
+                destination: 'schulhof' as const,
+                label: 'Schulhof',
+                colorScheme: 'schulhof' as const,
+                icon: (
+                  <FontAwesomeIcon icon={faTree} style={{ fontSize: '48px', color: '#FFFFFF' }} />
+                ),
+                onClick: () => void handleDestinationSelect('schulhof'),
+              },
+            ]
+          : []),
+        ...(wcRoomId
+          ? [
+              {
+                destination: 'toilette' as const,
+                label: 'Toilette',
+                colorScheme: 'toilette' as const,
+                icon: (
+                  <FontAwesomeIcon
+                    icon={faRestroom}
+                    style={{ fontSize: '48px', color: '#FFFFFF' }}
+                  />
+                ),
+                onClick: () => void handleDestinationSelect('toilette'),
+              },
+            ]
+          : []),
+        ...(checkoutDestinationState.dailyCheckoutAvailable
+          ? [
+              {
+                destination: 'nach_hause' as const,
+                label: 'nach Hause',
+                colorScheme: 'destructive' as const,
+                icon: (
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                ),
+                onClick: handleNachHause,
+              },
+            ]
+          : []),
+      ];
+
+      // Determine grid columns: 2x2 for 3-4 buttons, single row for 1-2
+      const gridColumns = destinations.length >= 3 ? 2 : destinations.length;
+
       return (
         <div
           style={{
             position: 'relative',
             zIndex: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
+            display: 'grid',
+            gridTemplateColumns: `repeat(${gridColumns}, ${DESTINATION_BUTTON_STYLES.base.width})`,
+            gap: '24px',
+            justifyContent: 'center',
           }}
         >
-          {/* Row 1: Raumwechsel + Schulhof */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '24px',
-              justifyContent: 'center',
-              position: 'relative',
-              zIndex: 2,
-            }}
-          >
-            {[
-              { destination: 'raumwechsel' as const, label: 'Raumwechsel', condition: true },
-              {
-                destination: 'schulhof' as const,
-                label: 'Schulhof',
-                condition: Boolean(schulhofRoomId),
-              },
-              {
-                destination: 'toilette' as const,
-                label: 'Toilette',
-                condition: Boolean(wcRoomId),
-              },
-            ]
-              .filter(btn => btn.condition)
-              .map(({ destination, label }) => (
-                <button
-                  key={destination}
-                  onClick={() => handleDestinationSelect(destination)}
-                  style={{
-                    ...DESTINATION_BUTTON_STYLES.base,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: '12px',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.backgroundColor =
-                      DESTINATION_BUTTON_STYLES.hover.backgroundColor;
-                    e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.backgroundColor =
-                      DESTINATION_BUTTON_STYLES.normal.backgroundColor;
-                    e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
-                  }}
-                >
-                  {destination === 'raumwechsel' ? (
-                    <svg
-                      width="48"
-                      height="48"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                      <polyline points="16 17 21 12 16 7" />
-                      <line x1="21" y1="12" x2="9" y2="12" />
-                    </svg>
-                  ) : destination === 'schulhof' ? (
-                    <FontAwesomeIcon
-                      icon={faChildren}
-                      style={{
-                        fontSize: '48px',
-                        color: '#FFFFFF',
-                      }}
-                    />
-                  ) : (
-                    <FontAwesomeIcon
-                      icon={faRestroom}
-                      style={{ fontSize: '48px', color: '#FFFFFF' }}
-                    />
-                  )}
-                  <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
-                    {label}
-                  </span>
-                </button>
-              ))}
-          </div>
-
-          {/* Row 2: "nach Hause" button or hint text */}
-          {checkoutDestinationState.dailyCheckoutAvailable ? (
-            <button
-              onClick={handleNachHause}
-              style={{
-                ...DESTINATION_BUTTON_STYLES.base,
-                display: 'flex',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '16px',
-                width: '100%',
-                marginTop: '16px',
-                padding: '16px 48px',
-                position: 'relative',
-                zIndex: 2,
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.backgroundColor =
-                  DESTINATION_BUTTON_STYLES.hover.backgroundColor;
-                e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.backgroundColor =
-                  DESTINATION_BUTTON_STYLES.normal.backgroundColor;
-                e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="2.2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>
-                nach Hause
-              </span>
-            </button>
-          ) : (
-            <p
-              style={{
-                marginTop: '16px',
-                fontSize: '22px',
-                color: 'rgba(255, 255, 255, 0.6)',
-                position: 'relative',
-                zIndex: 2,
-                fontStyle: 'italic',
-              }}
-            >
-              „nach Hause" nur vom Heimatraum möglich
-            </p>
-          )}
-
-          {!schulhofRoomId && (
-            <p
-              style={{
-                marginTop: '16px',
-                fontSize: '18px',
-                color: 'rgba(255, 255, 255, 0.7)',
-                position: 'relative',
-                zIndex: 2,
-              }}
-            >
-              (Schulhof derzeit nicht verfügbar)
-            </p>
-          )}
+          {destinations.map(({ destination, label, icon, colorScheme, onClick }) => (
+            <DestinationButton
+              key={destination}
+              label={label}
+              icon={icon}
+              colorScheme={colorScheme}
+              onClick={onClick}
+            />
+          ))}
         </div>
       );
     }
@@ -1046,6 +1046,14 @@ const ActivityScanningPage: React.FC = () => {
         }}
       >
         {(() => {
+          // Error/Info states - show the detailed message from backend
+          if (
+            (currentScan as { showAsError?: boolean }).showAsError ||
+            (currentScan as { isInfo?: boolean }).isInfo
+          ) {
+            return currentScan.message ?? '';
+          }
+
           // Special handling for Schulhof/Toilette - no additional content needed
           if ((currentScan as { isSchulhof?: boolean }).isSchulhof) {
             return ''; // Empty content - title message is enough
@@ -1056,9 +1064,9 @@ const ActivityScanningPage: React.FC = () => {
 
           switch (currentScan.action) {
             case 'checked_in':
-              return `Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'} eingecheckt`;
+              return `Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`;
             case 'checked_out':
-              return 'Du bist jetzt ausgecheckt';
+              return ''; // Checkout shows destination buttons, no extra text needed
             case 'transferred':
               return 'Raumwechsel erfolgreich';
             default:
@@ -1189,6 +1197,7 @@ const ActivityScanningPage: React.FC = () => {
           isOpen={shouldShowCheckModal}
           onClose={handleModalTimeout}
           size={
+            !showFeedbackPrompt &&
             currentScan.action === 'checked_out' &&
             checkoutDestinationState &&
             !checkoutDestinationState.showingFarewell
@@ -1212,7 +1221,11 @@ const ActivityScanningPage: React.FC = () => {
               : '#f87C10';
           })()}
           timeout={modalTimeoutDuration}
-          timeoutResetKey={`${currentScan.student_id}-${currentScan.action}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`}
+          timeoutResetKey={
+            showFeedbackPrompt
+              ? `feedback-${checkoutDestinationState?.studentId}`
+              : `${currentScan.student_id}-${currentScan.action}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
+          }
         >
           {/* Background pattern for visual interest */}
           <div
@@ -1228,60 +1241,102 @@ const ActivityScanningPage: React.FC = () => {
             }}
           />
 
-          {/* Icon container with background circle */}
-          <div
-            style={{
-              width: '120px',
-              height: '120px',
-              backgroundColor: 'rgba(255, 255, 255, 0.3)',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 32px',
-              position: 'relative',
-              zIndex: 2,
-            }}
-          >
-            {(() => {
-              // "nach Hause" flow - Home icon for farewell and feedback states
-              if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
-                return (
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                );
-              }
-              // Supervisor authentication icon
-              if (currentScan.action === 'supervisor_authenticated') {
-                return (
-                  <svg
-                    width="80"
-                    height="80"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2.5"
-                  >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                  </svg>
-                );
-              }
-              // Error state - X icon
-              if ((currentScan as { showAsError?: boolean }).showAsError) {
-                return (
+          {/* Icon container with background circle - hidden during checkout destination selection (but visible during feedback) */}
+          {(showFeedbackPrompt ||
+            !(
+              currentScan.action === 'checked_out' &&
+              checkoutDestinationState &&
+              !checkoutDestinationState.showingFarewell
+            )) && (
+            <div
+              style={{
+                width: '120px',
+                height: '120px',
+                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0 auto 32px',
+                position: 'relative',
+                zIndex: 2,
+              }}
+            >
+              {(() => {
+                // "nach Hause" flow - Home icon for farewell and feedback states
+                if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                    </svg>
+                  );
+                }
+                // Supervisor authentication icon
+                if (currentScan.action === 'supervisor_authenticated') {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.5"
+                    >
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  );
+                }
+                // Error state - X icon
+                if ((currentScan as { showAsError?: boolean }).showAsError) {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  );
+                }
+                // Info state - Info icon
+                if ((currentScan as { isInfo?: boolean }).isInfo) {
+                  return (
+                    <svg
+                      width="80"
+                      height="80"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="white"
+                      strokeWidth="2.5"
+                    >
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                  );
+                }
+                // Success states
+                return currentScan.action === 'checked_in' ||
+                  currentScan.action === 'transferred' ? (
                   <svg
                     width="80"
                     height="80"
@@ -1292,61 +1347,27 @@ const ActivityScanningPage: React.FC = () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                   >
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                    <path d="M20 6L9 17l-5-5" />
                   </svg>
-                );
-              }
-              // Info state - Info icon
-              if ((currentScan as { isInfo?: boolean }).isInfo) {
-                return (
+                ) : (
                   <svg
                     width="80"
                     height="80"
                     viewBox="0 0 24 24"
                     fill="none"
                     stroke="white"
-                    strokeWidth="2.5"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
                   >
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
                   </svg>
                 );
-              }
-              // Success states
-              return currentScan.action === 'checked_in' || currentScan.action === 'transferred' ? (
-                <svg
-                  width="80"
-                  height="80"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M20 6L9 17l-5-5" />
-                </svg>
-              ) : (
-                <svg
-                  width="80"
-                  height="80"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" y1="12" x2="9" y2="12" />
-                </svg>
-              );
-            })()}
-          </div>
+              })()}
+            </div>
+          )}
 
           <h2
             style={{
@@ -1362,13 +1383,14 @@ const ActivityScanningPage: React.FC = () => {
             {(() => {
               // Feedback prompt
               if (showFeedbackPrompt) {
-                return 'Wie war dein Tag?';
+                const firstName = checkoutDestinationState?.studentName?.split(' ')[0] ?? '';
+                return `Wie war dein Tag, ${firstName}?`;
               }
 
               // Farewell state after "nach Hause" feedback
               if (checkoutDestinationState?.showingFarewell) {
                 const firstName = checkoutDestinationState.studentName.split(' ')[0];
-                return `Auf Wiedersehen, ${firstName}!`;
+                return `Tschüss, ${firstName}!`;
               }
 
               // Supervisor authentication - prefer custom message (e.g., redirect hint)
@@ -1379,10 +1401,6 @@ const ActivityScanningPage: React.FC = () => {
                 return `${currentScan.student_name} betreut jetzt ${roomName}`;
               }
 
-              // Show custom message if available
-              const msg = currentScan.message;
-              if (msg) return msg;
-
               // Error/Info states use student_name as the title
               if (
                 (currentScan as { showAsError?: boolean }).showAsError ||
@@ -1391,10 +1409,29 @@ const ActivityScanningPage: React.FC = () => {
                 return currentScan.student_name;
               }
 
-              // Normal greeting
-              return currentScan.action === 'checked_in'
-                ? `Hallo, ${currentScan.student_name}!`
-                : `Tschüss, ${currentScan.student_name}!`;
+              // Check-in: use backend message if available, otherwise default greeting
+              if (currentScan.action === 'checked_in') {
+                return currentScan.message ?? `Hallo, ${currentScan.student_name}!`;
+              }
+
+              // Checkout with destination buttons: ask where the student is going
+              if (
+                currentScan.action === 'checked_out' &&
+                checkoutDestinationState &&
+                !checkoutDestinationState.showingFarewell
+              ) {
+                const firstName = currentScan.student_name.split(' ')[0];
+                return `Wohin geht ${firstName}?`;
+              }
+
+              // Checkout after destination selected (e.g. Raumwechsel): confirmation
+              if (currentScan.action === 'checked_out') {
+                const firstName = currentScan.student_name.split(' ')[0];
+                return `${firstName} ist unterwegs`;
+              }
+
+              // Fallback: use backend message or student name
+              return currentScan.message ?? currentScan.student_name;
             })()}
           </h2>
 
