@@ -6,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
 import { ErrorModal, ModalBase } from '../components/ui';
-import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import {
   api,
   formatRoomName,
@@ -696,8 +695,6 @@ function HomeViewPage() {
 
         {/* Last Session Toggle - only show when no current session */}
         {!currentSession && <LastSessionToggle />}
-
-        <ScannerRestartButton />
       </div>
 
       {/* Add animation keyframes */}
