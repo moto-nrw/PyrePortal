@@ -7,6 +7,7 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
+import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -1025,6 +1026,8 @@ function TagAssignmentPage() {
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />
+
+      <ScannerRestartButton />
     </>
   );
 }
