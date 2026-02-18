@@ -82,9 +82,9 @@ function getActivityHeading(
     return currentSession.activity_name ?? 'Aktivität';
   }
   if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return 'Aktivität wiederholen';
+    return 'Aufsicht wiederholen';
   }
-  return 'Neue Aktivität';
+  return 'Aufsicht starten';
 }
 
 /** Get activity subtitle text based on session state */
@@ -98,7 +98,7 @@ function getActivitySubtitle(
   if (sessionSettings?.use_last_session && sessionSettings.last_session) {
     return sessionSettings.last_session.activity_name;
   }
-  return 'Starten';
+  return '';
 }
 
 /** Get supervisor count label for saved session display */
@@ -359,7 +359,7 @@ function HomeViewPage() {
                 color: '#5080D8',
               }}
             >
-              NFC-Scan
+              Armband identifizieren
             </span>
           </button>
         </div>
@@ -682,22 +682,12 @@ function HomeViewPage() {
                       fontSize: '28px',
                       fontWeight: 700,
                       color: '#1F2937',
-                      margin: '0 0 8px 0',
+                      margin: 0,
                       textAlign: 'center',
                     }}
                   >
                     Team anpassen
                   </h3>
-                  <p
-                    style={{
-                      fontSize: '18px',
-                      color: '#6B7280',
-                      margin: 0,
-                      textAlign: 'center',
-                    }}
-                  >
-                    Betreuer verwalten
-                  </p>
                 </div>
               </button>
             </div>
@@ -777,7 +767,7 @@ function HomeViewPage() {
             marginBottom: '12px',
           }}
         >
-          Aktivität wiederholen?
+          Aufsicht wiederholen?
         </h2>
 
         {/* Activity Details */}
