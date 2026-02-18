@@ -1056,9 +1056,9 @@ const ActivityScanningPage: React.FC = () => {
 
           switch (currentScan.action) {
             case 'checked_in':
-              return `Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'} eingecheckt`;
+              return `Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`;
             case 'checked_out':
-              return 'Du bist jetzt ausgecheckt';
+              return ''; // Checkout shows destination buttons, no extra text needed
             case 'transferred':
               return 'Raumwechsel erfolgreich';
             default:
@@ -1368,7 +1368,7 @@ const ActivityScanningPage: React.FC = () => {
               // Farewell state after "nach Hause" feedback
               if (checkoutDestinationState?.showingFarewell) {
                 const firstName = checkoutDestinationState.studentName.split(' ')[0];
-                return `Auf Wiedersehen, ${firstName}!`;
+                return `Tschüss, ${firstName}!`;
               }
 
               // Supervisor authentication - prefer custom message (e.g., redirect hint)
@@ -1392,9 +1392,11 @@ const ActivityScanningPage: React.FC = () => {
               }
 
               // Normal greeting
-              return currentScan.action === 'checked_in'
-                ? `Hallo, ${currentScan.student_name}!`
-                : `Tschüss, ${currentScan.student_name}!`;
+              if (currentScan.action === 'checked_in') {
+                return `Hallo, ${currentScan.student_name}!`;
+              }
+              // Checkout: ask where the student is going
+              return `Wohin geht ${currentScan.student_name}?`;
             })()}
           </h2>
 
