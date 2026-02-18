@@ -867,7 +867,7 @@ function HomeViewPage() {
               opacity: isValidatingLastSession ? 0.6 : 1,
             }}
           >
-            {isValidatingLastSession ? 'Starte...' : 'Aktivität starten'}
+            {isValidatingLastSession ? 'Starte...' : 'Aufsicht starten'}
           </button>
         </div>
       </ModalBase>
