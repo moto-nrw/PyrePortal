@@ -358,42 +358,36 @@ const ActivityScanningPage: React.FC = () => {
   // WC room ID (discovered dynamically from server)
   const [wcRoomId, setWcRoomId] = useState<number | null>(null);
 
-  // Clear stale modal state when a new scan arrives (Issue #129 Bug 2 defensive fix)
-  // This prevents previous student's state from affecting the next scan's modal
+  // Clear stale checkout/feedback/farewell state when a new scan arrives.
+  // A "new scan" is detected by: different RFID tag, different visit_id, or
+  // a check-in arriving while we're in a checkout flow (always means new scan).
   useEffect(() => {
-    if (currentScan && checkoutDestinationState) {
-      const currentRfid = currentScan.scannedTagId ?? '';
+    if (!currentScan || !checkoutDestinationState) return;
 
-      // If checkoutDestinationState exists for a DIFFERENT scan, clear it
-      if (currentRfid && checkoutDestinationState.rfid !== currentRfid) {
-        logger.debug('Clearing stale checkoutDestinationState for new scan', {
-          oldRfid: checkoutDestinationState.rfid,
-          newRfid: currentRfid,
-          oldStudentName: checkoutDestinationState.studentName,
-          newStudentName: currentScan.student_name,
-        });
-        setCheckoutDestinationState(null);
-        setShowFeedbackPrompt(false);
-      }
+    const currentRfid = currentScan.scannedTagId ?? '';
+    const isDifferentTag = currentRfid && checkoutDestinationState.rfid !== currentRfid;
+    const isDifferentVisit =
+      feedbackVisitIdRef.current !== null &&
+      currentScan.visit_id != null &&
+      currentScan.visit_id !== feedbackVisitIdRef.current;
+    const isCheckinDuringCheckoutFlow = currentScan.action === 'checked_in';
+
+    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow) {
+      logger.debug('Clearing stale checkout state for new scan', {
+        reason: isDifferentTag
+          ? 'different_tag'
+          : isDifferentVisit
+            ? 'different_visit'
+            : 'checkin_during_checkout',
+        oldRfid: checkoutDestinationState.rfid,
+        newRfid: currentRfid,
+        newAction: currentScan.action,
+      });
+      setCheckoutDestinationState(null);
+      setShowFeedbackPrompt(false);
+      feedbackVisitIdRef.current = null;
     }
   }, [currentScan, checkoutDestinationState]);
-
-  // Abort feedback prompt when a new scan arrives (different visit)
-  useEffect(() => {
-    if (showFeedbackPrompt && currentScan && feedbackVisitIdRef.current !== null) {
-      const currentVisitId = currentScan.visit_id ?? null;
-      if (currentVisitId !== null && currentVisitId !== feedbackVisitIdRef.current) {
-        logger.debug('New scan arrived during feedback prompt, aborting feedback', {
-          feedbackVisitId: feedbackVisitIdRef.current,
-          newVisitId: currentVisitId,
-          newAction: currentScan.action,
-        });
-        setShowFeedbackPrompt(false);
-        setCheckoutDestinationState(null);
-        feedbackVisitIdRef.current = null;
-      }
-    }
-  }, [currentScan, showFeedbackPrompt]);
 
   // Start scanning when component mounts
   useEffect(() => {
@@ -876,18 +870,6 @@ const ActivityScanningPage: React.FC = () => {
             alignItems: 'center',
           }}
         >
-          {/* Student name subtitle - matching other modal styles */}
-          <div
-            style={{
-              fontSize: '28px',
-              color: 'rgba(255, 255, 255, 0.95)',
-              fontWeight: 600,
-              marginBottom: '40px',
-            }}
-          >
-            {checkoutDestinationState?.studentName}
-          </div>
-
           {/* Feedback buttons container - centered with consistent spacing */}
           <div
             style={{
@@ -1392,7 +1374,8 @@ const ActivityScanningPage: React.FC = () => {
             {(() => {
               // Feedback prompt
               if (showFeedbackPrompt) {
-                return 'Wie war dein Tag?';
+                const firstName = checkoutDestinationState?.studentName?.split(' ')[0] ?? '';
+                return `Wie war dein Tag, ${firstName}?`;
               }
 
               // Farewell state after "nach Hause" feedback
