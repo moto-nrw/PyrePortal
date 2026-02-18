@@ -900,7 +900,7 @@ function HomeViewPage() {
             lineHeight: 1.5,
           }}
         >
-          Alle Kinder, die in dieser Aktivität sind, werden auf den Status{' '}
+          Alle Kinder, die in dieser Aufsicht sind, werden auf den Status{' '}
           <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
         </p>
 
