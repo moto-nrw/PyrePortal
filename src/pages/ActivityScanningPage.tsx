@@ -112,7 +112,7 @@ const DESTINATION_BUTTON_STYLES = {
 const DESTINATION_COLORS = {
   default: { bg: 'rgba(255, 255, 255, 0.25)', bgHover: 'rgba(255, 255, 255, 0.35)' },
   schulhof: { bg: 'rgba(245, 158, 11, 0.5)', bgHover: 'rgba(245, 158, 11, 0.65)' },
-  toilette: { bg: 'rgba(96, 165, 250, 0.5)', bgHover: 'rgba(96, 165, 250, 0.65)' },
+  toilette: { bg: 'rgba(96, 165, 250, 0.85)', bgHover: 'rgba(96, 165, 250, 0.95)' },
   destructive: { bg: 'rgba(220, 38, 38, 0.5)', bgHover: 'rgba(220, 38, 38, 0.65)' },
 };
 
