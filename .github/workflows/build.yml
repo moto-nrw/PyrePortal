@@ -22,7 +22,7 @@ jobs:
           VITE_ENABLE_RFID: 'true'
 
       - name: Upload Linux ARM64 build
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: pyreportal-linux-arm64-${{github.sha}}
           path: src-tauri/target/release/pyreportal
