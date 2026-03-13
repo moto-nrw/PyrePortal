@@ -35,9 +35,9 @@ const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
 
 /**
  * Timeout duration (in milliseconds) for farewell messages after actions.
- * 2 seconds is enough to read a short goodbye message.
+ * 1.5 seconds is enough to read a short goodbye message while keeping queue throughput high.
  */
-const FAREWELL_TIMEOUT_MS = 2000;
+const FAREWELL_TIMEOUT_MS = 1500;
 
 // Feedback button color schemes: green (positive), yellow (neutral), red (negative)
 const FEEDBACK_BUTTON_COLORS = {
