@@ -407,7 +407,7 @@ interface RfidState {
   currentScan: RfidScanResult | null;
   blockedTags: Map<string, number>; // tagId -> blockUntilTimestamp
   scanTimeout: number; // 3 seconds default
-  modalDisplayTime: number; // 1.25 seconds default
+  modalDisplayTime: number; // 1.5 seconds default
   showModal: boolean;
 
   // New optimistic state management
@@ -606,7 +606,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     currentScan: null,
     blockedTags: new Map<string, number>(),
     scanTimeout: 3000, // 3 seconds
-    modalDisplayTime: 2000, // 2 seconds - balanced for animation viewing
+    modalDisplayTime: 1500, // 1.5 seconds - fast turnover for kiosk queues
     showModal: false,
 
     // New optimistic state
