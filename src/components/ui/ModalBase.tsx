@@ -224,6 +224,15 @@ export function ModalBase({
       {/* Container */}
       <div
         onClick={closeOnContentClick ? () => dialogRef.current?.close() : undefined}
+        onKeyDown={
+          closeOnContentClick
+            ? e => {
+                if (e.key === 'Enter' || e.key === ' ') dialogRef.current?.close();
+              }
+            : undefined
+        }
+        role={closeOnContentClick ? 'button' : undefined}
+        tabIndex={closeOnContentClick ? 0 : undefined}
         style={{
           backgroundColor,
           borderRadius: sizePreset.borderRadius,
