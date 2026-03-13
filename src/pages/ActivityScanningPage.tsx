@@ -1226,6 +1226,14 @@ const ActivityScanningPage: React.FC = () => {
               ? `feedback-${checkoutDestinationState?.studentId}`
               : `${currentScan.student_id}-${currentScan.action}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
           }
+          closeOnContentClick={
+            !showFeedbackPrompt &&
+            !(
+              currentScan.action === 'checked_out' &&
+              checkoutDestinationState &&
+              !checkoutDestinationState.showingFarewell
+            )
+          }
         >
           {/* Background pattern for visual interest */}
           <div
