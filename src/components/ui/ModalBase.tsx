@@ -85,6 +85,10 @@ interface ModalBaseProps {
 
   /** Allow closing by clicking backdrop. Default: true */
   closeOnBackdropClick?: boolean;
+
+  /** Allow closing by clicking the modal content itself. Default: false.
+   *  Useful for display-only modals without interactive buttons. */
+  closeOnContentClick?: boolean;
 }
 
 /**
@@ -123,6 +127,7 @@ export function ModalBase({
   timeoutColor,
   timeoutTrackColor,
   closeOnBackdropClick = true,
+  closeOnContentClick = false,
 }: Readonly<ModalBaseProps>) {
   // Get size preset values
   const sizePreset = SIZE_PRESETS[size];
@@ -218,6 +223,16 @@ export function ModalBase({
     <dialog ref={dialogRef} style={dialogStyle}>
       {/* Container */}
       <div
+        onClick={closeOnContentClick ? () => dialogRef.current?.close() : undefined}
+        onKeyDown={
+          closeOnContentClick
+            ? e => {
+                if (e.key === 'Enter' || e.key === ' ') dialogRef.current?.close();
+              }
+            : undefined
+        }
+        role={closeOnContentClick ? 'button' : undefined}
+        tabIndex={closeOnContentClick ? 0 : undefined}
         style={{
           backgroundColor,
           borderRadius: sizePreset.borderRadius,
@@ -228,6 +243,7 @@ export function ModalBase({
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
           position: 'relative',
           overflow: 'hidden',
+          cursor: closeOnContentClick ? 'pointer' : undefined,
         }}
       >
         {children}
