@@ -52,11 +52,8 @@ vi.mock('../utils/crypto', () => ({
 
 const mockedSafeInvoke = vi.mocked(safeInvoke);
 const mockedIsRfidEnabled = vi.mocked(isRfidEnabled);
-// eslint-disable-next-line @typescript-eslint/unbound-method
 const mockedProcessRfidScan = vi.mocked(api.processRfidScan);
-// eslint-disable-next-line @typescript-eslint/unbound-method
 const mockedUpdateSessionActivity = vi.mocked(api.updateSessionActivity);
-// eslint-disable-next-line @typescript-eslint/unbound-method
 const mockedUpdateSessionSupervisors = vi.mocked(api.updateSessionSupervisors);
 
 function resetStore() {
@@ -136,6 +133,23 @@ function setSession(overrides: Partial<CurrentSession> = {}): CurrentSession {
 
 const MOCK_TAG = '04:D6:94:82:97:6A:80';
 
+/**
+ * Triggers mock scan interval and drains all resulting async operations.
+ * processScan() has a long async chain (API call → state updates → supervisor auth →
+ * fire-and-forget activity update → cleanup), so we drain in a single act()
+ * with multiple timer ticks to ensure all microtasks resolve.
+ */
+async function triggerMockScanAndDrain() {
+  await act(async () => {
+    // Fire the mock interval callback
+    await vi.advanceTimersByTimeAsync(5100);
+    // Multiple microtask drain rounds to flush the full processScan async chain
+    for (let i = 0; i < 20; i++) {
+      await vi.advanceTimersByTimeAsync(0);
+    }
+  });
+}
+
 function makeCheckinResult(overrides: Partial<RfidScanResult> = {}): RfidScanResult {
   return {
     student_id: 42,
@@ -165,7 +179,13 @@ function makeSupervisorResult(
 // ====================================================================
 
 describe('useRfidScanning', () => {
+  let originalMockRfidTags: string | undefined;
+
   beforeEach(() => {
+    // Force mock tags to a known value so tests are independent of .env
+    originalMockRfidTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
+    (import.meta.env as Record<string, unknown>).VITE_MOCK_RFID_TAGS = MOCK_TAG;
+
     vi.useFakeTimers();
     resetStore();
     mockedIsRfidEnabled.mockReturnValue(false);
@@ -176,6 +196,12 @@ describe('useRfidScanning', () => {
   });
 
   afterEach(() => {
+    // Restore original env value
+    if (originalMockRfidTags === undefined) {
+      delete (import.meta.env as Record<string, unknown>).VITE_MOCK_RFID_TAGS;
+    } else {
+      (import.meta.env as Record<string, unknown>).VITE_MOCK_RFID_TAGS = originalMockRfidTags;
+    }
     vi.useRealTimers();
   });
 
@@ -648,13 +674,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.showModal).toBe(true);
@@ -673,13 +693,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.action).toBe('checked_out');
@@ -694,13 +708,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       expect(mockedUpdateSessionActivity).toHaveBeenCalledWith('1234');
     });
@@ -715,13 +723,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       // Should still show success modal despite activity update failure
       const state = useUserStore.getState();
@@ -738,13 +740,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.showModal).toBe(true);
@@ -760,13 +756,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.student_name).toBe('Sitzung abgelaufen');
@@ -781,13 +771,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.scannedTagId).toBeDefined();
@@ -814,13 +798,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.showModal).toBe(true);
@@ -839,13 +817,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       // With null student_id, handleSupervisorAuthentication returns false
       // and we go through student bookkeeping path
@@ -862,13 +834,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       expect(mockedUpdateSessionSupervisors).toHaveBeenCalled();
     });
@@ -883,13 +849,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       // Should still show modal despite sync failure
       const state = useUserStore.getState();
@@ -954,13 +914,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       // Should show redirect modal (no API call needed)
       const state = useUserStore.getState();
@@ -989,13 +943,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.showModal).toBe(true);
@@ -1019,13 +967,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.showModal).toBe(true);
@@ -1048,13 +990,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.student_name).toBe('Aktivität voll');
@@ -1069,13 +1005,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       expect(mapApiErrorToGerman).toHaveBeenCalled();
       const state = useUserStore.getState();
@@ -1092,13 +1022,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.showModal).toBe(true);
@@ -1115,13 +1039,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.message).toBe('Bitte erneut versuchen');
@@ -1149,13 +1067,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       // processRfidScan should NOT be called since tag is in queue
       expect(mockedProcessRfidScan).not.toHaveBeenCalled();
@@ -1209,13 +1121,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       expect(mockedProcessRfidScan).not.toHaveBeenCalled();
     });
@@ -1356,14 +1262,17 @@ describe('useRfidScanning', () => {
     });
 
     it('polls until backend confirms expected state', async () => {
+      // Use real timers for this test — fake timers and async polling loops
+      // don't interleave reliably across test suite runs
+      vi.useRealTimers();
       mockedIsRfidEnabled.mockReturnValue(true);
-      let callCount = 0;
 
+      let pollCount = 0;
       mockedSafeInvoke.mockImplementation(async (cmd: string) => {
         if (cmd === 'get_rfid_service_status') {
-          callCount++;
+          pollCount++;
           // Return running=true after 3 polls
-          return { is_running: callCount >= 3 };
+          return { is_running: pollCount >= 3 };
         }
         return undefined;
       });
@@ -1371,24 +1280,27 @@ describe('useRfidScanning', () => {
       const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
-        const promise = result.current.startScanning();
-        for (let i = 0; i < 25; i++) {
-          await vi.advanceTimersByTimeAsync(100);
-        }
-        await promise;
+        await result.current.startScanning();
       });
 
+      // Verify polling completed successfully
+      expect(pollCount).toBeGreaterThanOrEqual(3);
       expect(useUserStore.getState().rfid.isScanning).toBe(true);
+
+      // Restore fake timers for cleanup
+      vi.useFakeTimers();
     });
 
     it('handles poll errors and continues polling', async () => {
+      // Use real timers — same reason as above
+      vi.useRealTimers();
       mockedIsRfidEnabled.mockReturnValue(true);
-      let callCount = 0;
 
+      let pollCount = 0;
       mockedSafeInvoke.mockImplementation(async (cmd: string) => {
         if (cmd === 'get_rfid_service_status') {
-          callCount++;
-          if (callCount === 1) throw new Error('poll error');
+          pollCount++;
+          if (pollCount === 1) throw new Error('poll error');
           return { is_running: true };
         }
         return undefined;
@@ -1397,14 +1309,15 @@ describe('useRfidScanning', () => {
       const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
-        const promise = result.current.startScanning();
-        for (let i = 0; i < 25; i++) {
-          await vi.advanceTimersByTimeAsync(100);
-        }
-        await promise;
+        await result.current.startScanning();
       });
 
+      // Verify polling recovered from error
+      expect(pollCount).toBeGreaterThanOrEqual(2);
       expect(useUserStore.getState().rfid.isScanning).toBe(true);
+
+      // Restore fake timers for cleanup
+      vi.useFakeTimers();
     });
   });
 
@@ -1428,13 +1341,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       // The tag should be mapped to student
       const cachedId = useUserStore.getState().getCachedStudentId(MOCK_TAG);
@@ -1450,13 +1357,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       // No mapping should exist
       const cachedId = useUserStore.getState().getCachedStudentId(MOCK_TAG);
@@ -1474,13 +1375,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
       const history = state.rfid.studentHistory.get('42');
