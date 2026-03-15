@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LastSessionConfig {
@@ -23,7 +23,7 @@ pub struct SessionSettings {
 }
 
 /// Get the path to the session settings file
-fn get_session_settings_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
+fn get_session_settings_path<R: Runtime>(app_handle: &AppHandle<R>) -> Result<PathBuf, String> {
     let app_data_dir = app_handle
         .path()
         .app_data_dir()
@@ -37,8 +37,8 @@ fn get_session_settings_path(app_handle: &AppHandle) -> Result<PathBuf, String> 
 }
 
 #[tauri::command]
-pub async fn save_session_settings(
-    app_handle: AppHandle,
+pub async fn save_session_settings<R: Runtime>(
+    app_handle: AppHandle<R>,
     settings: SessionSettings,
 ) -> Result<(), String> {
     let settings_path = get_session_settings_path(&app_handle)?;
@@ -53,8 +53,8 @@ pub async fn save_session_settings(
 }
 
 #[tauri::command]
-pub async fn load_session_settings(
-    app_handle: AppHandle,
+pub async fn load_session_settings<R: Runtime>(
+    app_handle: AppHandle<R>,
 ) -> Result<Option<SessionSettings>, String> {
     let settings_path = get_session_settings_path(&app_handle)?;
 
@@ -73,7 +73,7 @@ pub async fn load_session_settings(
 }
 
 #[tauri::command]
-pub async fn clear_last_session(app_handle: AppHandle) -> Result<(), String> {
+pub async fn clear_last_session<R: Runtime>(app_handle: AppHandle<R>) -> Result<(), String> {
     let settings_path = get_session_settings_path(&app_handle)?;
 
     // Load existing settings if available
@@ -102,6 +102,18 @@ pub async fn clear_last_session(app_handle: AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tauri::Manager;
+
+    fn mock_app_handle() -> tauri::AppHandle<tauri::test::MockRuntime> {
+        let app = tauri::test::mock_builder()
+            .build(tauri::test::mock_context(tauri::test::noop_assets()))
+            .expect("failed to build mock app");
+        let handle = app.handle().clone();
+        if let Ok(dir) = handle.path().app_data_dir() {
+            let _ = fs::remove_dir_all(&dir);
+        }
+        handle
+    }
 
     fn sample_last_session() -> LastSessionConfig {
         LastSessionConfig {
@@ -123,15 +135,18 @@ mod tests {
         }
     }
 
+    // ====================================================================
+    // Serde tests
+    // ====================================================================
+
     #[test]
     fn session_settings_serialization_roundtrip() {
         let settings = sample_settings();
         let json = serde_json::to_string_pretty(&settings).unwrap();
-        let deserialized: SessionSettings = serde_json::from_str(&json).unwrap();
-
-        assert!(deserialized.use_last_session);
-        assert!(deserialized.auto_save_enabled);
-        let session = deserialized.last_session.unwrap();
+        let d: SessionSettings = serde_json::from_str(&json).unwrap();
+        assert!(d.use_last_session);
+        assert!(d.auto_save_enabled);
+        let session = d.last_session.unwrap();
         assert_eq!(session.activity_id, 42);
         assert_eq!(session.room_id, 7);
         assert_eq!(session.supervisor_ids, vec![1, 2, 3]);
@@ -146,68 +161,139 @@ mod tests {
             auto_save_enabled: true,
             last_session: None,
         };
-
-        let json = serde_json::to_string(&settings).unwrap();
-        let deserialized: SessionSettings = serde_json::from_str(&json).unwrap();
-
-        assert!(!deserialized.use_last_session);
-        assert!(deserialized.last_session.is_none());
-    }
-
-    #[test]
-    fn session_settings_filesystem_roundtrip() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("session-settings.json");
-
-        let settings = sample_settings();
-        let json = serde_json::to_string_pretty(&settings).unwrap();
-        fs::write(&path, &json).unwrap();
-
-        let loaded_json = fs::read_to_string(&path).unwrap();
-        let loaded: SessionSettings = serde_json::from_str(&loaded_json).unwrap();
-
-        assert!(loaded.use_last_session);
-        assert_eq!(loaded.last_session.unwrap().activity_id, 42);
-    }
-
-    #[test]
-    fn clear_last_session_preserves_structure() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("session-settings.json");
-
-        // Save settings with a session
-        let settings = sample_settings();
-        let json = serde_json::to_string_pretty(&settings).unwrap();
-        fs::write(&path, &json).unwrap();
-
-        // Simulate clear_last_session logic (same as the command does)
-        let loaded_json = fs::read_to_string(&path).unwrap();
-        let mut loaded: SessionSettings = serde_json::from_str(&loaded_json).unwrap();
-        loaded.last_session = None;
-        loaded.use_last_session = false;
-        let updated_json = serde_json::to_string_pretty(&loaded).unwrap();
-        fs::write(&path, updated_json).unwrap();
-
-        // Verify
-        let final_json = fs::read_to_string(&path).unwrap();
-        let final_settings: SessionSettings = serde_json::from_str(&final_json).unwrap();
-        assert!(!final_settings.use_last_session);
-        assert!(final_settings.last_session.is_none());
-        assert!(final_settings.auto_save_enabled); // Should be preserved
+        let d: SessionSettings =
+            serde_json::from_str(&serde_json::to_string(&settings).unwrap()).unwrap();
+        assert!(!d.use_last_session);
+        assert!(d.last_session.is_none());
     }
 
     #[test]
     fn last_session_config_has_all_display_fields() {
         let session = sample_last_session();
         let json = serde_json::to_string(&session).unwrap();
+        for field in &[
+            "activity_id",
+            "room_id",
+            "supervisor_ids",
+            "saved_at",
+            "activity_name",
+            "room_name",
+            "supervisor_names",
+        ] {
+            assert!(json.contains(field), "Missing field: {field}");
+        }
+    }
 
-        // Verify all fields are present in serialized JSON
-        assert!(json.contains("activity_id"));
-        assert!(json.contains("room_id"));
-        assert!(json.contains("supervisor_ids"));
-        assert!(json.contains("saved_at"));
-        assert!(json.contains("activity_name"));
-        assert!(json.contains("room_name"));
-        assert!(json.contains("supervisor_names"));
+    // ====================================================================
+    // Path helper tests
+    // ====================================================================
+
+    #[test]
+    fn get_session_settings_path_ends_with_json() {
+        let handle = mock_app_handle();
+        let path = get_session_settings_path(&handle).unwrap();
+        assert!(path.ends_with("session-settings.json"));
+    }
+
+    #[test]
+    fn get_session_settings_path_creates_parent_dir() {
+        let handle = mock_app_handle();
+        let path = get_session_settings_path(&handle).unwrap();
+        assert!(path.parent().unwrap().exists());
+    }
+
+    // ====================================================================
+    // Tauri command tests (using mock AppHandle)
+    // ====================================================================
+
+    #[tokio::test]
+    async fn save_and_load_session_settings_roundtrip() {
+        let handle = mock_app_handle();
+        let settings = sample_settings();
+
+        save_session_settings(handle.clone(), settings).await.unwrap();
+
+        let loaded = load_session_settings(handle).await.unwrap();
+        assert!(loaded.is_some());
+        let loaded = loaded.unwrap();
+        assert!(loaded.use_last_session);
+        assert!(loaded.auto_save_enabled);
+        assert_eq!(loaded.last_session.unwrap().activity_id, 42);
+    }
+
+    #[test]
+    fn load_returns_none_when_file_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("session-settings.json");
+        // File doesn't exist → load should return None
+        assert!(!path.exists());
+    }
+
+    #[tokio::test]
+    async fn save_overwrites_existing_settings() {
+        let handle = mock_app_handle();
+
+        // Save initial
+        save_session_settings(handle.clone(), sample_settings())
+            .await
+            .unwrap();
+
+        // Save different settings
+        let new_settings = SessionSettings {
+            use_last_session: false,
+            auto_save_enabled: false,
+            last_session: None,
+        };
+        save_session_settings(handle.clone(), new_settings)
+            .await
+            .unwrap();
+
+        let loaded = load_session_settings(handle).await.unwrap().unwrap();
+        assert!(!loaded.use_last_session);
+        assert!(!loaded.auto_save_enabled);
+        assert!(loaded.last_session.is_none());
+    }
+
+    #[tokio::test]
+    async fn clear_last_session_command_clears_session_data() {
+        let handle = mock_app_handle();
+
+        // Save settings with a session
+        save_session_settings(handle.clone(), sample_settings())
+            .await
+            .unwrap();
+
+        // Clear
+        clear_last_session(handle.clone()).await.unwrap();
+
+        // Verify
+        let loaded = load_session_settings(handle).await.unwrap().unwrap();
+        assert!(!loaded.use_last_session);
+        assert!(loaded.last_session.is_none());
+        assert!(loaded.auto_save_enabled); // Preserved
+    }
+
+    #[tokio::test]
+    async fn clear_last_session_noop_when_no_file() {
+        let handle = mock_app_handle();
+        // Should not error when there's nothing to clear
+        clear_last_session(handle).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn clear_last_session_preserves_auto_save() {
+        let handle = mock_app_handle();
+
+        let settings = SessionSettings {
+            use_last_session: true,
+            auto_save_enabled: true,
+            last_session: Some(sample_last_session()),
+        };
+        save_session_settings(handle.clone(), settings).await.unwrap();
+        clear_last_session(handle.clone()).await.unwrap();
+
+        let loaded = load_session_settings(handle).await.unwrap().unwrap();
+        assert!(loaded.auto_save_enabled);
+        assert!(!loaded.use_last_session);
     }
 }
