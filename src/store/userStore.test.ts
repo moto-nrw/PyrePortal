@@ -174,8 +174,20 @@ describe('Authentication', () => {
 
 describe('fetchTeachers', () => {
   const mockTeachers: Teacher[] = [
-    { staff_id: 1, display_name: 'Herr Müller' },
-    { staff_id: 2, display_name: 'Frau Schmidt' },
+    {
+      staff_id: 1,
+      person_id: 1,
+      first_name: 'Max',
+      last_name: 'Müller',
+      display_name: 'Herr Müller',
+    },
+    {
+      staff_id: 2,
+      person_id: 2,
+      first_name: 'Anna',
+      last_name: 'Schmidt',
+      display_name: 'Frau Schmidt',
+    },
   ];
 
   it('fetches teachers and maps to users', async () => {
@@ -378,8 +390,20 @@ describe('fetchCurrentSession', () => {
       room_name: 'Raum A',
       is_active: true,
       supervisors: [
-        { staff_id: 1, display_name: 'Herr Test' },
-        { staff_id: 2, display_name: 'Frau Test' },
+        {
+          staff_id: 1,
+          first_name: 'Max',
+          last_name: 'Test',
+          display_name: 'Herr Test',
+          role: 'teacher',
+        },
+        {
+          staff_id: 2,
+          first_name: 'Anna',
+          last_name: 'Test',
+          display_name: 'Frau Test',
+          role: 'teacher',
+        },
       ],
     };
     mockGetCurrentSession.mockResolvedValueOnce(session);
@@ -1698,8 +1722,8 @@ describe('validateAndRecreateSession', () => {
     mockGetRooms.mockResolvedValueOnce([mockRoom({ id: 5 })]);
     // fetchTeachers will be called internally
     mockGetTeachers.mockResolvedValueOnce([
-      { staff_id: 1, display_name: 'Herr A' },
-      { staff_id: 2, display_name: 'Frau B' },
+      { staff_id: 1, person_id: 1, first_name: 'Hans', last_name: 'A', display_name: 'Herr A' },
+      { staff_id: 2, person_id: 2, first_name: 'Frau', last_name: 'B', display_name: 'Frau B' },
     ]);
 
     const result = await useUserStore.getState().validateAndRecreateSession();
@@ -1807,19 +1831,22 @@ describe('clearSessionSettings', () => {
 describe('submitDailyFeedback', () => {
   it('submits feedback when authenticated', async () => {
     setAuthenticated();
-    mockSubmitDailyFeedback.mockResolvedValueOnce(undefined);
+    mockSubmitDailyFeedback.mockResolvedValueOnce({
+      status: 'success',
+      message: 'Feedback submitted',
+    });
 
-    const result = await useUserStore.getState().submitDailyFeedback(10, 'happy');
+    const result = await useUserStore.getState().submitDailyFeedback(10, 'positive');
 
     expect(result).toBe(true);
     expect(mockSubmitDailyFeedback).toHaveBeenCalledWith('1234', {
       student_id: 10,
-      value: 'happy',
+      value: 'positive',
     });
   });
 
   it('returns false when not authenticated', async () => {
-    const result = await useUserStore.getState().submitDailyFeedback(10, 'happy');
+    const result = await useUserStore.getState().submitDailyFeedback(10, 'positive');
 
     expect(result).toBe(false);
     expect(mockSubmitDailyFeedback).not.toHaveBeenCalled();
@@ -1829,7 +1856,7 @@ describe('submitDailyFeedback', () => {
     setAuthenticated();
     mockSubmitDailyFeedback.mockRejectedValueOnce(new Error('Server error'));
 
-    const result = await useUserStore.getState().submitDailyFeedback(10, 'happy');
+    const result = await useUserStore.getState().submitDailyFeedback(10, 'positive');
 
     expect(result).toBe(false);
   });

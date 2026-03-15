@@ -661,7 +661,7 @@ describe('ActivityScanningPage', () => {
     mockedApi.toggleAttendance.mockResolvedValueOnce({
       status: 'confirmed',
       message: 'Daily checkout confirmed',
-    });
+    } as never);
 
     mockRfidHookReturn = {
       ...mockRfidHookReturn,
@@ -728,7 +728,7 @@ describe('ActivityScanningPage', () => {
     mockedApi.toggleAttendance.mockResolvedValueOnce({
       status: 'confirmed',
       message: 'ok',
-    });
+    } as never);
 
     // Mock submitDailyFeedback on the store
     const mockSubmitFeedback = vi.fn().mockResolvedValue(true);
@@ -765,7 +765,10 @@ describe('ActivityScanningPage', () => {
 
   it('submits neutral feedback and shows farewell', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({ status: 'confirmed', message: 'ok' });
+    mockedApi.toggleAttendance.mockResolvedValueOnce({
+      status: 'confirmed',
+      message: 'ok',
+    } as never);
 
     const mockSubmitFeedback = vi.fn().mockResolvedValue(true);
     useUserStore.setState({ submitDailyFeedback: mockSubmitFeedback });
@@ -791,7 +794,10 @@ describe('ActivityScanningPage', () => {
 
   it('submits negative feedback and shows farewell', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({ status: 'confirmed', message: 'ok' });
+    mockedApi.toggleAttendance.mockResolvedValueOnce({
+      status: 'confirmed',
+      message: 'ok',
+    } as never);
 
     const mockSubmitFeedback = vi.fn().mockResolvedValue(true);
     useUserStore.setState({ submitDailyFeedback: mockSubmitFeedback });
@@ -817,7 +823,10 @@ describe('ActivityScanningPage', () => {
 
   it('shows farewell even when feedback submission fails', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({ status: 'confirmed', message: 'ok' });
+    mockedApi.toggleAttendance.mockResolvedValueOnce({
+      status: 'confirmed',
+      message: 'ok',
+    } as never);
 
     const mockSubmitFeedback = vi.fn().mockResolvedValue(false);
     useUserStore.setState({ submitDailyFeedback: mockSubmitFeedback });
@@ -843,7 +852,10 @@ describe('ActivityScanningPage', () => {
 
   it('skips feedback when student_id is null', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({ status: 'confirmed', message: 'ok' });
+    mockedApi.toggleAttendance.mockResolvedValueOnce({
+      status: 'confirmed',
+      message: 'ok',
+    } as never);
 
     mockRfidHookReturn = {
       ...mockRfidHookReturn,
@@ -984,8 +996,8 @@ describe('ActivityScanningPage', () => {
   it('fetches session info and updates student count', async () => {
     mockedApi.getCurrentSessionInfo.mockResolvedValueOnce({
       active_students: 15,
-      activity_id: 1,
-      room_id: 1,
+      activity_name: 'Test Activity',
+      room_name: 'Raum A',
     });
 
     await act(async () => {
@@ -1089,8 +1101,8 @@ describe('ActivityScanningPage', () => {
     // First set count to something > 0 via session info
     mockedApi.getCurrentSessionInfo.mockResolvedValueOnce({
       active_students: 5,
-      activity_id: 1,
-      room_id: 1,
+      activity_name: 'Test Activity',
+      room_name: 'Raum A',
     });
 
     mockRfidHookReturn = {
@@ -1411,8 +1423,8 @@ describe('ActivityScanningPage', () => {
   it('periodically fetches session info every 10 seconds', async () => {
     mockedApi.getCurrentSessionInfo.mockResolvedValue({
       active_students: 3,
-      activity_id: 1,
-      room_id: 1,
+      activity_name: 'Test Activity',
+      room_name: 'Raum A',
     });
 
     await act(async () => {
@@ -1731,8 +1743,8 @@ describe('ActivityScanningPage', () => {
   it('sets student count from session info active_students', async () => {
     mockedApi.getCurrentSessionInfo.mockResolvedValueOnce({
       active_students: 25,
-      activity_id: 1,
-      room_id: 1,
+      activity_name: 'Test Activity',
+      room_name: 'Raum A',
     });
 
     await act(async () => {

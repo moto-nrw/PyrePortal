@@ -585,7 +585,7 @@ describe('api methods', () => {
 
     // Set up global fetch mock
     mockFetch = vi.fn();
-    globalThis.fetch = mockFetch;
+    globalThis.fetch = mockFetch as typeof fetch;
   });
 
   afterEach(() => {
