@@ -102,17 +102,26 @@ pub async fn clear_last_session<R: Runtime>(app_handle: AppHandle<R>) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
     use tauri::Manager;
 
-    fn mock_app_handle() -> tauri::AppHandle<tauri::test::MockRuntime> {
+    /// Serialize tests that use the shared mock-app data directory.
+    static APP_DIR_LOCK: Mutex<()> = Mutex::new(());
+
+    fn mock_app_handle() -> (
+        tauri::AppHandle<tauri::test::MockRuntime>,
+        std::sync::MutexGuard<'static, ()>,
+    ) {
+        let guard = APP_DIR_LOCK.lock().unwrap();
         let app = tauri::test::mock_builder()
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .expect("failed to build mock app");
         let handle = app.handle().clone();
-        if let Ok(dir) = handle.path().app_data_dir() {
-            let _ = fs::remove_dir_all(&dir);
+        // Clean session file from previous test
+        if let Ok(path) = get_session_settings_path(&handle) {
+            let _ = fs::remove_file(&path);
         }
-        handle
+        (handle, guard)
     }
 
     fn sample_last_session() -> LastSessionConfig {
@@ -190,14 +199,14 @@ mod tests {
 
     #[test]
     fn get_session_settings_path_ends_with_json() {
-        let handle = mock_app_handle();
+        let (handle, _guard) = mock_app_handle();
         let path = get_session_settings_path(&handle).unwrap();
         assert!(path.ends_with("session-settings.json"));
     }
 
     #[test]
     fn get_session_settings_path_creates_parent_dir() {
-        let handle = mock_app_handle();
+        let (handle, _guard) = mock_app_handle();
         let path = get_session_settings_path(&handle).unwrap();
         assert!(path.parent().unwrap().exists());
     }
@@ -208,7 +217,7 @@ mod tests {
 
     #[tokio::test]
     async fn save_and_load_session_settings_roundtrip() {
-        let handle = mock_app_handle();
+        let (handle, _guard) = mock_app_handle();
         let settings = sample_settings();
 
         save_session_settings(handle.clone(), settings).await.unwrap();
@@ -231,7 +240,7 @@ mod tests {
 
     #[tokio::test]
     async fn save_overwrites_existing_settings() {
-        let handle = mock_app_handle();
+        let (handle, _guard) = mock_app_handle();
 
         // Save initial
         save_session_settings(handle.clone(), sample_settings())
@@ -256,7 +265,7 @@ mod tests {
 
     #[tokio::test]
     async fn clear_last_session_command_clears_session_data() {
-        let handle = mock_app_handle();
+        let (handle, _guard) = mock_app_handle();
 
         // Save settings with a session
         save_session_settings(handle.clone(), sample_settings())
@@ -275,14 +284,14 @@ mod tests {
 
     #[tokio::test]
     async fn clear_last_session_noop_when_no_file() {
-        let handle = mock_app_handle();
+        let (handle, _guard) = mock_app_handle();
         // Should not error when there's nothing to clear
         clear_last_session(handle).await.unwrap();
     }
 
     #[tokio::test]
     async fn clear_last_session_preserves_auto_save() {
-        let handle = mock_app_handle();
+        let (handle, _guard) = mock_app_handle();
 
         let settings = SessionSettings {
             use_last_session: true,

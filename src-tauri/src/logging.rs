@@ -20,13 +20,10 @@ pub struct LogEntry {
     pub user_id: Option<String>,
 }
 
-/// Function to write a log entry to the log file
-#[tauri::command]
-pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(), String> {
-    let log_entry = match serde_json::from_str::<LogEntry>(&entry) {
-        Ok(entry) => entry,
-        Err(e) => return Err(format!("Failed to parse log entry: {e}")),
-    };
+/// Parse and write a log entry to the given log directory.
+fn write_log_to_dir(log_dir: &std::path::Path, entry: &str) -> Result<(), String> {
+    let log_entry = serde_json::from_str::<LogEntry>(entry)
+        .map_err(|e| format!("Failed to parse log entry: {e}"))?;
 
     // Print frontend log to terminal (visible in `npm run tauri dev` and production binary)
     let data_suffix = log_entry
@@ -39,12 +36,11 @@ pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(
         log_entry.timestamp, log_entry.level, log_entry.source, log_entry.message, data_suffix
     );
 
-    let log_dir = get_log_directory(&app).map_err(|e| e.to_string())?;
-    let log_file = get_log_file_path(&log_dir);
+    let log_file = get_log_file_path(log_dir);
 
     // Create log directory if it doesn't exist
     if !log_dir.exists() {
-        fs::create_dir_all(&log_dir).map_err(|e| format!("Failed to create log directory: {e}"))?;
+        fs::create_dir_all(log_dir).map_err(|e| format!("Failed to create log directory: {e}"))?;
     }
 
     // Open log file for appending, create if it doesn't exist
@@ -64,6 +60,13 @@ pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(
     Ok(())
 }
 
+/// Function to write a log entry to the log file
+#[tauri::command]
+pub async fn write_log<R: Runtime>(app: AppHandle<R>, entry: String) -> Result<(), String> {
+    let log_dir = get_log_directory(&app).map_err(|e| e.to_string())?;
+    write_log_to_dir(&log_dir, &entry)
+}
+
 /// Get the path to the log directory
 fn get_log_directory<R: Runtime>(
     app: &AppHandle<R>,
@@ -79,20 +82,14 @@ fn get_log_file_path(log_dir: &std::path::Path) -> PathBuf {
     log_dir.join(filename)
 }
 
-/// Command to retrieve log file list
-#[tauri::command]
-pub async fn get_log_files<R: Runtime>(app: AppHandle<R>) -> Result<Vec<String>, String> {
-    let log_dir = match get_log_directory(&app) {
-        Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to get log directory: {e}")),
-    };
-
+/// List log files in the given directory, sorted newest first.
+fn list_log_files_in_dir(log_dir: &std::path::Path) -> Result<Vec<String>, String> {
     if !log_dir.exists() {
         return Ok(Vec::new());
     }
 
     let entries =
-        fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log directory: {e}"))?;
+        fs::read_dir(log_dir).map_err(|e| format!("Failed to read log directory: {e}"))?;
 
     let mut log_files = Vec::new();
     for entry in entries.flatten() {
@@ -106,67 +103,35 @@ pub async fn get_log_files<R: Runtime>(app: AppHandle<R>) -> Result<Vec<String>,
         }
     }
 
-    // Sort files by name (which includes date) in descending order
     log_files.sort_by(|a, b| b.cmp(a));
     Ok(log_files)
 }
 
-/// Command to read a specific log file
-#[tauri::command]
-pub async fn read_log_file<R: Runtime>(
-    app: AppHandle<R>,
-    file_name: String,
-) -> Result<String, String> {
-    let log_dir = match get_log_directory(&app) {
-        Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to get log directory: {e}")),
-    };
-
+/// Read a log file by name, with security checks.
+fn read_log_file_from_dir(log_dir: &std::path::Path, file_name: &str) -> Result<String, String> {
     let file_path = log_dir.join(file_name);
 
-    // Security check: ensure the file is actually in the log directory
-    if !file_path.starts_with(&log_dir) || file_path.extension().is_none_or(|ext| ext != "log") {
+    if !file_path.starts_with(log_dir) || file_path.extension().is_none_or(|ext| ext != "log") {
         return Err("Invalid log file path".to_string());
     }
 
     fs::read_to_string(&file_path).map_err(|e| format!("Failed to read log file: {e}"))
 }
 
-/// Command to clear a specific log file
-#[tauri::command]
-pub async fn clear_log_file<R: Runtime>(
-    app: AppHandle<R>,
-    file_name: String,
-) -> Result<(), String> {
-    let log_dir = match get_log_directory(&app) {
-        Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to get log directory: {e}")),
-    };
-
+/// Clear (truncate) a log file by name, with security checks.
+fn clear_log_file_in_dir(log_dir: &std::path::Path, file_name: &str) -> Result<(), String> {
     let file_path = log_dir.join(file_name);
 
-    // Security check: ensure the file is actually in the log directory
-    if !file_path.starts_with(&log_dir) || file_path.extension().is_none_or(|ext| ext != "log") {
+    if !file_path.starts_with(log_dir) || file_path.extension().is_none_or(|ext| ext != "log") {
         return Err("Invalid log file path".to_string());
     }
 
-    // Truncate the file by opening it with create mode
     File::create(&file_path).map_err(|e| format!("Failed to clear log file: {e}"))?;
-
     Ok(())
 }
 
-/// Command to delete old log files
-#[tauri::command]
-pub async fn cleanup_old_logs<R: Runtime>(
-    app: AppHandle<R>,
-    days_to_keep: u32,
-) -> Result<u32, String> {
-    let log_dir = match get_log_directory(&app) {
-        Ok(dir) => dir,
-        Err(e) => return Err(format!("Failed to get log directory: {e}")),
-    };
-
+/// Delete log files older than `days_to_keep` days.
+fn cleanup_old_logs_in_dir(log_dir: &std::path::Path, days_to_keep: u32) -> Result<u32, String> {
     if !log_dir.exists() {
         return Ok(0);
     }
@@ -177,7 +142,7 @@ pub async fn cleanup_old_logs<R: Runtime>(
     let cutoff_filename = format!("pyre-portal-{cutoff_str}.log");
 
     let entries =
-        fs::read_dir(&log_dir).map_err(|e| format!("Failed to read log directory: {e}"))?;
+        fs::read_dir(log_dir).map_err(|e| format!("Failed to read log directory: {e}"))?;
 
     let mut deleted_count = 0;
     for entry in entries.flatten() {
@@ -197,6 +162,43 @@ pub async fn cleanup_old_logs<R: Runtime>(
     Ok(deleted_count)
 }
 
+/// Command to retrieve log file list
+#[tauri::command]
+pub async fn get_log_files<R: Runtime>(app: AppHandle<R>) -> Result<Vec<String>, String> {
+    let log_dir = get_log_directory(&app).map_err(|e| e.to_string())?;
+    list_log_files_in_dir(&log_dir)
+}
+
+/// Command to read a specific log file
+#[tauri::command]
+pub async fn read_log_file<R: Runtime>(
+    app: AppHandle<R>,
+    file_name: String,
+) -> Result<String, String> {
+    let log_dir = get_log_directory(&app).map_err(|e| e.to_string())?;
+    read_log_file_from_dir(&log_dir, &file_name)
+}
+
+/// Command to clear a specific log file
+#[tauri::command]
+pub async fn clear_log_file<R: Runtime>(
+    app: AppHandle<R>,
+    file_name: String,
+) -> Result<(), String> {
+    let log_dir = get_log_directory(&app).map_err(|e| e.to_string())?;
+    clear_log_file_in_dir(&log_dir, &file_name)
+}
+
+/// Command to delete old log files
+#[tauri::command]
+pub async fn cleanup_old_logs<R: Runtime>(
+    app: AppHandle<R>,
+    days_to_keep: u32,
+) -> Result<u32, String> {
+    let log_dir = get_log_directory(&app).map_err(|e| e.to_string())?;
+    cleanup_old_logs_in_dir(&log_dir, days_to_keep)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -213,17 +215,21 @@ mod tests {
         }
     }
 
-    /// Simulate `write_log` logic using an explicit log directory (no `AppHandle` needed).
-    fn write_entry_to_dir(log_dir: &std::path::Path, entry: &LogEntry) {
-        fs::create_dir_all(log_dir).unwrap();
-        let log_file = get_log_file_path(log_dir);
-        let mut file = OpenOptions::new()
-            .append(true)
-            .create(true)
-            .open(log_file)
-            .unwrap();
-        let line = format!("{}\n", serde_json::to_string(entry).unwrap());
-        file.write_all(line.as_bytes()).unwrap();
+    fn sample_entry_json() -> String {
+        serde_json::to_string(&sample_entry()).unwrap()
+    }
+
+    fn sample_entry_json_with_data() -> String {
+        serde_json::to_string(&LogEntry {
+            timestamp: "2024-06-15T10:30:00Z".to_string(),
+            level: "WARN".to_string(),
+            source: "RFID".to_string(),
+            message: "Scan timeout".to_string(),
+            data: Some(serde_json::json!({"retries": 3})),
+            session_id: "abc".to_string(),
+            user_id: Some("staff-42".to_string()),
+        })
+        .unwrap()
     }
 
     // ====================================================================
@@ -329,17 +335,16 @@ mod tests {
     }
 
     // ====================================================================
-    // Filesystem logic tests (using tempdir, no AppHandle)
+    // Extracted helper function tests (using tempdir, no AppHandle)
     // ====================================================================
 
     #[test]
-    fn write_log_creates_file_and_appends() {
+    fn write_log_to_dir_creates_and_appends() {
         let tmp = tempfile::tempdir().unwrap();
         let log_dir = tmp.path().join("logs");
 
-        // Write two entries
-        write_entry_to_dir(&log_dir, &sample_entry());
-        write_entry_to_dir(&log_dir, &sample_entry());
+        write_log_to_dir(&log_dir, &sample_entry_json()).unwrap();
+        write_log_to_dir(&log_dir, &sample_entry_json()).unwrap();
 
         let log_file = get_log_file_path(&log_dir);
         assert!(log_file.exists());
@@ -350,19 +355,10 @@ mod tests {
     }
 
     #[test]
-    fn write_log_with_data_field() {
+    fn write_log_to_dir_with_data() {
         let tmp = tempfile::tempdir().unwrap();
         let log_dir = tmp.path().join("logs");
-        let entry = LogEntry {
-            timestamp: "2024-06-15T10:30:00Z".to_string(),
-            level: "WARN".to_string(),
-            source: "RFID".to_string(),
-            message: "Scan timeout".to_string(),
-            data: Some(serde_json::json!({"retries": 3})),
-            session_id: "abc".to_string(),
-            user_id: Some("staff-42".to_string()),
-        };
-        write_entry_to_dir(&log_dir, &entry);
+        write_log_to_dir(&log_dir, &sample_entry_json_with_data()).unwrap();
 
         let content = fs::read_to_string(get_log_file_path(&log_dir)).unwrap();
         assert!(content.contains("retries"));
@@ -370,21 +366,23 @@ mod tests {
     }
 
     #[test]
-    fn write_log_rejects_invalid_json() {
-        let result = serde_json::from_str::<LogEntry>("not valid json");
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn get_log_files_returns_empty_when_no_dir() {
+    fn write_log_to_dir_rejects_invalid_json() {
         let tmp = tempfile::tempdir().unwrap();
-        let log_dir = tmp.path().join("nonexistent-logs");
-        // Simulate: directory doesn't exist → return empty
-        assert!(!log_dir.exists());
+        let result = write_log_to_dir(tmp.path(), "not valid json");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to parse"));
     }
 
     #[test]
-    fn get_log_files_lists_only_log_files() {
+    fn list_log_files_empty_when_no_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let log_dir = tmp.path().join("nonexistent");
+        let files = list_log_files_in_dir(&log_dir).unwrap();
+        assert!(files.is_empty());
+    }
+
+    #[test]
+    fn list_log_files_ignores_non_log() {
         let tmp = tempfile::tempdir().unwrap();
         let log_dir = tmp.path().join("logs");
         fs::create_dir_all(&log_dir).unwrap();
@@ -392,24 +390,13 @@ mod tests {
         fs::write(log_dir.join("notes.txt"), "not a log").unwrap();
         fs::write(log_dir.join("pyre-portal-2024-01-01.log"), "log data").unwrap();
 
-        let entries = fs::read_dir(&log_dir).unwrap();
-        let mut log_files = Vec::new();
-        for entry in entries.flatten() {
-            if let Some(name) = entry.file_name().to_str() {
-                if std::path::Path::new(name)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))
-                {
-                    log_files.push(name.to_string());
-                }
-            }
-        }
-        assert_eq!(log_files.len(), 1);
-        assert!(log_files[0].contains("2024-01-01"));
+        let files = list_log_files_in_dir(&log_dir).unwrap();
+        assert_eq!(files.len(), 1);
+        assert!(files[0].contains("2024-01-01"));
     }
 
     #[test]
-    fn log_files_sorted_descending() {
+    fn list_log_files_sorted_descending() {
         let tmp = tempfile::tempdir().unwrap();
         let log_dir = tmp.path().join("logs");
         fs::create_dir_all(&log_dir).unwrap();
@@ -418,73 +405,57 @@ mod tests {
         fs::write(log_dir.join("pyre-portal-2024-06-15.log"), "newer").unwrap();
         fs::write(log_dir.join("pyre-portal-2024-03-10.log"), "mid").unwrap();
 
-        let mut files: Vec<String> = fs::read_dir(&log_dir)
-            .unwrap()
-            .flatten()
-            .filter_map(|e| {
-                let name = e.file_name().to_str()?.to_string();
-                if std::path::Path::new(&name)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))
-                {
-                    Some(name)
-                } else {
-                    None
-                }
-            })
-            .collect();
-        files.sort_by(|a, b| b.cmp(a));
-
+        let files = list_log_files_in_dir(&log_dir).unwrap();
+        assert_eq!(files.len(), 3);
         assert_eq!(files[0], "pyre-portal-2024-06-15.log");
         assert_eq!(files[1], "pyre-portal-2024-03-10.log");
         assert_eq!(files[2], "pyre-portal-2024-01-01.log");
     }
 
     #[test]
+    fn read_log_file_from_dir_returns_content() {
+        let tmp = tempfile::tempdir().unwrap();
+        let log_dir = tmp.path().join("logs");
+        write_log_to_dir(&log_dir, &sample_entry_json()).unwrap();
+
+        let files = list_log_files_in_dir(&log_dir).unwrap();
+        let content = read_log_file_from_dir(&log_dir, &files[0]).unwrap();
+        assert!(content.contains("hello"));
+    }
+
+    #[test]
     fn read_log_file_rejects_non_log_extension() {
         let tmp = tempfile::tempdir().unwrap();
-        let log_dir = tmp.path().join("logs");
-        let file_path = log_dir.join("evil.txt");
-        // Security check from read_log_file
-        assert!(
-            file_path.extension().is_none_or(|ext| ext != "log"),
-            "Should reject non-.log files"
-        );
+        let result = read_log_file_from_dir(tmp.path(), "evil.txt");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid"));
     }
 
     #[test]
-    fn path_traversal_detection_logic() {
-        // Verify the security check pattern used by read_log_file and clear_log_file:
-        // file_path.starts_with(&log_dir) && extension == "log"
-        let log_dir = PathBuf::from("/app/data/logs");
-
-        // Normal file — allowed
-        let normal = log_dir.join("pyre-portal-2024-01-01.log");
-        assert!(normal.starts_with(&log_dir));
-        assert_eq!(normal.extension().unwrap(), "log");
-
-        // Wrong extension — blocked
-        let txt = log_dir.join("evil.txt");
-        assert!(txt.extension().is_none_or(|ext| ext != "log"));
-
-        // No extension — blocked
-        let no_ext = log_dir.join("noext");
-        assert!(no_ext.extension().is_none_or(|ext| ext != "log"));
+    fn read_log_file_rejects_no_extension() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = read_log_file_from_dir(tmp.path(), "noext");
+        assert!(result.is_err());
     }
 
     #[test]
-    fn clear_log_file_truncates_content() {
+    fn clear_log_file_in_dir_truncates() {
         let tmp = tempfile::tempdir().unwrap();
         let log_dir = tmp.path().join("logs");
-        write_entry_to_dir(&log_dir, &sample_entry());
-        write_entry_to_dir(&log_dir, &sample_entry());
+        write_log_to_dir(&log_dir, &sample_entry_json()).unwrap();
 
-        let log_file = get_log_file_path(&log_dir);
-        assert!(!fs::read_to_string(&log_file).unwrap().is_empty());
+        let files = list_log_files_in_dir(&log_dir).unwrap();
+        clear_log_file_in_dir(&log_dir, &files[0]).unwrap();
 
-        // Truncate (same as clear_log_file command)
-        File::create(&log_file).unwrap();
-        assert!(fs::read_to_string(&log_file).unwrap().is_empty());
+        let content = read_log_file_from_dir(&log_dir, &files[0]).unwrap();
+        assert!(content.is_empty());
+    }
+
+    #[test]
+    fn clear_log_file_rejects_non_log() {
+        let tmp = tempfile::tempdir().unwrap();
+        let result = clear_log_file_in_dir(tmp.path(), "hack.sh");
+        assert!(result.is_err());
     }
 
     #[test]
@@ -493,38 +464,23 @@ mod tests {
         let log_dir = tmp.path().join("logs");
         fs::create_dir_all(&log_dir).unwrap();
 
-        // Old file
         fs::write(log_dir.join("pyre-portal-2020-01-01.log"), "old").unwrap();
-        // Today's file
         let today = Utc::now().format("%Y-%m-%d").to_string();
         fs::write(log_dir.join(format!("pyre-portal-{today}.log")), "new").unwrap();
 
-        // Simulate cleanup logic from the command
-        let cutoff = Utc::now() - chrono::Duration::days(7);
-        let cutoff_filename = format!("pyre-portal-{}.log", cutoff.format("%Y-%m-%d"));
+        let count = cleanup_old_logs_in_dir(&log_dir, 7).unwrap();
+        assert_eq!(count, 1);
 
-        let mut deleted = 0u32;
-        for entry in fs::read_dir(&log_dir).unwrap().flatten() {
-            let path = entry.path();
-            if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                if std::path::Path::new(name)
-                    .extension()
-                    .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))
-                    && name < &cutoff_filename[..]
-                    && fs::remove_file(&path).is_ok()
-                {
-                    deleted += 1;
-                }
-            }
-        }
-
-        assert_eq!(deleted, 1);
-        // Today's file should remain
-        let remaining: Vec<_> = fs::read_dir(&log_dir)
-            .unwrap()
-            .flatten()
-            .collect();
+        let remaining = list_log_files_in_dir(&log_dir).unwrap();
         assert_eq!(remaining.len(), 1);
+        assert!(remaining[0].contains(&today));
+    }
+
+    #[test]
+    fn cleanup_returns_zero_when_no_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let count = cleanup_old_logs_in_dir(&tmp.path().join("nope"), 7).unwrap();
+        assert_eq!(count, 0);
     }
 
     #[test]
@@ -536,21 +492,23 @@ mod tests {
         let today = Utc::now().format("%Y-%m-%d").to_string();
         fs::write(log_dir.join(format!("pyre-portal-{today}.log")), "data").unwrap();
 
-        let cutoff = Utc::now() - chrono::Duration::days(7);
-        let cutoff_filename = format!("pyre-portal-{}.log", cutoff.format("%Y-%m-%d"));
+        let count = cleanup_old_logs_in_dir(&log_dir, 7).unwrap();
+        assert_eq!(count, 0);
+    }
 
-        let old_files: Vec<_> = fs::read_dir(&log_dir)
-            .unwrap()
-            .flatten()
-            .filter(|e| {
-                e.file_name().to_str().is_some_and(|n| n < &cutoff_filename[..])
-            })
-            .collect();
-        assert!(old_files.is_empty());
+    #[test]
+    fn path_traversal_detection_logic() {
+        let log_dir = PathBuf::from("/app/data/logs");
+        let normal = log_dir.join("pyre-portal-2024-01-01.log");
+        assert!(normal.starts_with(&log_dir));
+        assert_eq!(normal.extension().unwrap(), "log");
+
+        let txt = log_dir.join("evil.txt");
+        assert!(txt.extension().is_none_or(|ext| ext != "log"));
     }
 
     // ====================================================================
-    // Tauri command tests (using real AppHandle — data in system dir)
+    // Tauri mock-app integration tests
     // ====================================================================
 
     #[test]
@@ -558,8 +516,7 @@ mod tests {
         let app = tauri::test::mock_builder()
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .unwrap();
-        let handle = app.handle();
-        let dir = get_log_directory(handle).unwrap();
+        let dir = get_log_directory(app.handle()).unwrap();
         assert!(dir.ends_with("logs"));
     }
 
@@ -569,13 +526,10 @@ mod tests {
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .unwrap();
         let handle = app.handle().clone();
-
-        let json = serde_json::to_string(&sample_entry()).unwrap();
-        write_log(handle.clone(), json).await.unwrap();
+        write_log(handle.clone(), sample_entry_json()).await.unwrap();
 
         let log_dir = get_log_directory(&handle).unwrap();
-        let log_file = get_log_file_path(&log_dir);
-        let content = fs::read_to_string(log_file).unwrap();
+        let content = fs::read_to_string(get_log_file_path(&log_dir)).unwrap();
         assert!(content.contains("hello"));
     }
 
