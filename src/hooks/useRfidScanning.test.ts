@@ -1,4 +1,4 @@
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, cleanup } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -196,6 +196,11 @@ describe('useRfidScanning', () => {
   });
 
   afterEach(() => {
+    // Unmount all rendered hooks BEFORE restoring real timers so that
+    // useEffect cleanup (which clears module-level mockScanInterval /
+    // eventListener) fires while fake timers are still active.
+    cleanup();
+
     // Restore original env value
     if (originalMockRfidTags === undefined) {
       delete (import.meta.env as Record<string, unknown>).VITE_MOCK_RFID_TAGS;
@@ -203,6 +208,7 @@ describe('useRfidScanning', () => {
       (import.meta.env as Record<string, unknown>).VITE_MOCK_RFID_TAGS = originalMockRfidTags;
     }
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   // ------------------------------------------------------------------

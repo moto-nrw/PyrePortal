@@ -100,6 +100,23 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// Env-var tests mutate process-global state and must not run in parallel.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Clear all env vars these tests touch so each case starts from a clean slate.
+    fn clear_env() {
+        for key in [
+            "API_BASE_URL",
+            "DEVICE_API_KEY",
+            "VITE_API_BASE_URL",
+            "VITE_DEVICE_API_KEY",
+            "TAURI_FULLSCREEN",
+        ] {
+            env::remove_var(key);
+        }
+    }
 
     #[test]
     fn api_config_serialization_roundtrip() {
@@ -117,7 +134,9 @@ mod tests {
 
     #[test]
     fn get_api_config_uses_env_vars() {
-        // Set the primary env vars
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
         env::set_var("API_BASE_URL", "http://test-server:9090");
         env::set_var("DEVICE_API_KEY", "test-device-key");
 
@@ -125,14 +144,14 @@ mod tests {
         assert_eq!(config.api_base_url, "http://test-server:9090");
         assert_eq!(config.device_api_key, "test-device-key");
 
-        env::remove_var("API_BASE_URL");
-        env::remove_var("DEVICE_API_KEY");
+        clear_env();
     }
 
     #[test]
     fn get_api_config_falls_back_to_vite_prefix() {
-        env::remove_var("API_BASE_URL");
-        env::remove_var("DEVICE_API_KEY");
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
         env::set_var("VITE_API_BASE_URL", "http://vite-server:3000");
         env::set_var("VITE_DEVICE_API_KEY", "vite-key");
 
@@ -140,26 +159,26 @@ mod tests {
         assert_eq!(config.api_base_url, "http://vite-server:3000");
         assert_eq!(config.device_api_key, "vite-key");
 
-        env::remove_var("VITE_API_BASE_URL");
-        env::remove_var("VITE_DEVICE_API_KEY");
+        clear_env();
     }
 
     #[test]
     fn get_api_config_defaults_base_url_when_missing() {
-        env::remove_var("API_BASE_URL");
-        env::remove_var("VITE_API_BASE_URL");
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
         env::set_var("DEVICE_API_KEY", "some-key");
 
         let config = get_api_config().unwrap();
         assert_eq!(config.api_base_url, "http://localhost:8080");
 
-        env::remove_var("DEVICE_API_KEY");
+        clear_env();
     }
 
     #[test]
     fn get_api_config_errors_when_no_api_key() {
-        env::remove_var("DEVICE_API_KEY");
-        env::remove_var("VITE_DEVICE_API_KEY");
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
 
         let result = get_api_config();
         assert!(result.is_err());
@@ -168,25 +187,34 @@ mod tests {
 
     #[test]
     fn parse_fullscreen_defaults_to_true() {
-        env::remove_var("TAURI_FULLSCREEN");
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
         assert!(parse_fullscreen_env());
     }
 
     #[test]
     fn parse_fullscreen_respects_false() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
         env::set_var("TAURI_FULLSCREEN", "false");
         assert!(!parse_fullscreen_env());
-        env::remove_var("TAURI_FULLSCREEN");
+
+        clear_env();
     }
 
     #[test]
     fn parse_fullscreen_case_insensitive() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
         env::set_var("TAURI_FULLSCREEN", "TRUE");
         assert!(parse_fullscreen_env());
 
         env::set_var("TAURI_FULLSCREEN", "False");
         assert!(!parse_fullscreen_env());
 
-        env::remove_var("TAURI_FULLSCREEN");
+        clear_env();
     }
 }
