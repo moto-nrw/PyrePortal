@@ -14,6 +14,8 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
+    pool: 'forks',
+    poolOptions: { forks: { execArgv: ['--max-old-space-size=4096'] } },
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/src-tauri/**'],
