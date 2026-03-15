@@ -116,6 +116,27 @@ export default tseslint.config(
     },
   },
 
+  // Test file overrides — relax rules that conflict with test patterns
+  {
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx', 'src/test/**'],
+    rules: {
+      // Tests commonly use any for mocking
+      '@typescript-eslint/no-explicit-any': 'off',
+      // Unbound methods are common in mock assertions
+      '@typescript-eslint/unbound-method': 'off',
+      // Console usage is fine in tests
+      'no-console': 'off',
+      // Tests don't need safe Tauri invoke patterns
+      'no-restricted-syntax': 'off',
+      // Floating promises are common with act() and fireEvent
+      '@typescript-eslint/no-floating-promises': 'off',
+      // Allow non-null assertions in tests (simpler mock access)
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // Empty functions are common in mock factories (noop callbacks)
+      '@typescript-eslint/no-empty-function': 'off',
+    },
+  },
+
   // Tauri-specific rules
   {
     files: ['**/*.{ts,tsx}'],

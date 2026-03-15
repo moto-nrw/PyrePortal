@@ -43,3 +43,8 @@ pedantic = { level = "deny", priority = -1 }
 # Allow specific pedantic lints that are too restrictive
 too_many_lines = "allow"  # Platform-conditional code often exceeds 100 lines legitimately
 
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tauri = { version = "2", features = ["test"] }
+
