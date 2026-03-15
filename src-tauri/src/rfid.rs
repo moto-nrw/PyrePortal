@@ -1259,3 +1259,222 @@ pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResu
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- Struct serialization tests ---
+
+    #[test]
+    fn rfid_scan_result_success_serialization() {
+        let result = RfidScanResult {
+            success: true,
+            tag_id: Some("04:D6:94:82:97:6A:80".to_string()),
+            error: None,
+        };
+
+        let json = serde_json::to_string(&result).unwrap();
+        let deserialized: RfidScanResult = serde_json::from_str(&json).unwrap();
+
+        assert!(deserialized.success);
+        assert_eq!(deserialized.tag_id.as_deref(), Some("04:D6:94:82:97:6A:80"));
+        assert!(deserialized.error.is_none());
+    }
+
+    #[test]
+    fn rfid_scan_result_error_serialization() {
+        let result = RfidScanResult {
+            success: false,
+            tag_id: None,
+            error: Some("Scan timeout - no card detected".to_string()),
+        };
+
+        let json = serde_json::to_string(&result).unwrap();
+        let deserialized: RfidScanResult = serde_json::from_str(&json).unwrap();
+
+        assert!(!deserialized.success);
+        assert!(deserialized.tag_id.is_none());
+        assert!(deserialized.error.unwrap().contains("timeout"));
+    }
+
+    #[test]
+    fn rfid_scanner_status_serialization() {
+        let status = RfidScannerStatus {
+            is_available: true,
+            platform: "Development Platform (x86_64)".to_string(),
+            last_error: None,
+        };
+
+        let json = serde_json::to_string(&status).unwrap();
+        let deserialized: RfidScannerStatus = serde_json::from_str(&json).unwrap();
+
+        assert!(deserialized.is_available);
+        assert!(!deserialized.platform.is_empty());
+    }
+
+    #[test]
+    fn rfid_scan_event_serialization() {
+        let event = RfidScanEvent {
+            tag_id: "04:A7:B3:C2:D1:E0:F5".to_string(),
+            timestamp: 1_718_000_000,
+            platform: "Development Platform".to_string(),
+        };
+
+        let json = serde_json::to_string(&event).unwrap();
+        let deserialized: RfidScanEvent = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.tag_id, "04:A7:B3:C2:D1:E0:F5");
+        assert_eq!(deserialized.timestamp, 1_718_000_000);
+    }
+
+    #[test]
+    fn rfid_service_state_default_values() {
+        let state = RfidServiceState {
+            is_running: false,
+            last_scan: None,
+            error_count: 0,
+            last_error: None,
+            should_run: false,
+        };
+
+        assert!(!state.is_running);
+        assert!(!state.should_run);
+        assert_eq!(state.error_count, 0);
+        assert!(state.last_scan.is_none());
+        assert!(state.last_error.is_none());
+    }
+
+    #[test]
+    fn rfid_service_state_should_run_not_serialized() {
+        let state = RfidServiceState {
+            is_running: true,
+            last_scan: None,
+            error_count: 0,
+            last_error: None,
+            should_run: true, // Marked #[serde(skip)]
+        };
+
+        let json = serde_json::to_string(&state).unwrap();
+        // should_run has #[serde(skip)], so it should not appear in JSON
+        assert!(!json.contains("should_run"));
+
+        // When deserialized, should_run defaults to false
+        let deserialized: RfidServiceState = serde_json::from_str(&json).unwrap();
+        assert!(!deserialized.should_run);
+    }
+
+    // --- Service state logic tests ---
+
+    #[test]
+    fn rfid_background_service_new_creates_stopped_state() {
+        let service = RfidBackgroundService::new();
+        let state = service.state.lock().unwrap();
+
+        assert!(!state.is_running);
+        assert!(!state.should_run);
+        assert_eq!(state.error_count, 0);
+        assert!(state.last_scan.is_none());
+        assert!(state.last_error.is_none());
+        assert!(service.command_tx.is_none());
+        assert!(service.app_handle.is_none());
+    }
+
+    #[test]
+    fn get_platform_name_returns_nonempty_string() {
+        let name = RfidBackgroundService::get_platform_name();
+        assert!(!name.is_empty());
+        // On dev machines it should contain "Development Platform"
+        #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
+        assert!(name.contains("Development Platform"));
+    }
+
+    #[test]
+    fn should_continue_scanning_checks_should_run() {
+        let state = Arc::new(Mutex::new(RfidServiceState {
+            is_running: true,
+            last_scan: None,
+            error_count: 0,
+            last_error: None,
+            should_run: true,
+        }));
+
+        assert!(RfidBackgroundService::should_continue_scanning(&state));
+
+        state.lock().unwrap().should_run = false;
+        assert!(!RfidBackgroundService::should_continue_scanning(&state));
+    }
+
+    #[test]
+    fn handle_successful_scan_updates_state() {
+        let state = Arc::new(Mutex::new(RfidServiceState {
+            is_running: true,
+            last_scan: None,
+            error_count: 5,
+            last_error: Some("previous error".to_string()),
+            should_run: true,
+        }));
+
+        // No app_handle (None) — event won't be emitted but state should update
+        RfidBackgroundService::handle_successful_scan(&state, None, "04:D6:94:82:97:6A:80");
+
+        let guard = state.lock().unwrap();
+        // handle_successful_scan clears last_error but does NOT reset error_count
+        // (error_count is only incremented by handle_scan_error, not decremented)
+        assert_eq!(guard.error_count, 5);
+        assert!(guard.last_error.is_none());
+        let scan = guard.last_scan.as_ref().unwrap();
+        assert_eq!(scan.tag_id, "04:D6:94:82:97:6A:80");
+        assert!(scan.timestamp > 0);
+    }
+
+    #[test]
+    fn handle_scan_error_increments_counter() {
+        let state = Arc::new(Mutex::new(RfidServiceState {
+            is_running: true,
+            last_scan: None,
+            error_count: 0,
+            last_error: None,
+            should_run: true,
+        }));
+
+        RfidBackgroundService::handle_scan_error(&state, "SPI communication failure");
+
+        let guard = state.lock().unwrap();
+        assert_eq!(guard.error_count, 1);
+        assert_eq!(guard.last_error.as_deref(), Some("SPI communication failure"));
+    }
+
+    // --- Mock platform tests (only on non-ARM) ---
+
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
+    mod mock_tests {
+        use super::*;
+
+        #[test]
+        fn mock_check_hardware_is_always_available() {
+            let status = mock_platform::check_rfid_hardware();
+            assert!(status.is_available);
+            assert!(status.platform.contains("MOCK"));
+            assert!(status.last_error.is_none());
+        }
+
+        #[tokio::test]
+        async fn mock_scan_returns_valid_tag_format() {
+            // Run multiple scans to get at least one success (5% error rate)
+            let mut got_success = false;
+            for _ in 0..50 {
+                if let Ok(tag) = mock_platform::scan_rfid_hardware().await {
+                    // Tags should be in format XX:XX:XX:XX:XX:XX:XX
+                    assert!(tag.contains(':'), "Tag should contain colons: {tag}");
+                    let parts: Vec<&str> = tag.split(':').collect();
+                    assert_eq!(parts.len(), 7, "Tag should have 7 hex bytes: {tag}");
+                    assert!(tag.starts_with("04:"), "Tag should start with 04: {tag}");
+                    got_success = true;
+                    break;
+                }
+            }
+            assert!(got_success, "Should get at least one successful scan in 50 attempts");
+        }
+    }
+}

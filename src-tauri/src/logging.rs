@@ -196,3 +196,116 @@ pub async fn cleanup_old_logs<R: Runtime>(
 
     Ok(deleted_count)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn log_entry_serialization_roundtrip() {
+        let entry = LogEntry {
+            timestamp: "2024-01-01T00:00:00Z".to_string(),
+            level: "INFO".to_string(),
+            source: "TestComponent".to_string(),
+            message: "Test message".to_string(),
+            data: Some(serde_json::json!({"key": "value"})),
+            session_id: "test-session".to_string(),
+            user_id: Some("user-1".to_string()),
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        let deserialized: LogEntry = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.timestamp, "2024-01-01T00:00:00Z");
+        assert_eq!(deserialized.level, "INFO");
+        assert_eq!(deserialized.source, "TestComponent");
+        assert_eq!(deserialized.message, "Test message");
+        assert_eq!(deserialized.session_id, "test-session");
+        assert_eq!(deserialized.user_id.as_deref(), Some("user-1"));
+        assert!(deserialized.data.is_some());
+    }
+
+    #[test]
+    fn log_entry_omits_none_fields() {
+        let entry = LogEntry {
+            timestamp: "2024-01-01T00:00:00Z".to_string(),
+            level: "ERROR".to_string(),
+            source: "Test".to_string(),
+            message: "Error occurred".to_string(),
+            data: None,
+            session_id: "sess".to_string(),
+            user_id: None,
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(!json.contains("data"));
+        assert!(!json.contains("userId"));
+    }
+
+    #[test]
+    fn log_entry_uses_camel_case_keys() {
+        let entry = LogEntry {
+            timestamp: "t".to_string(),
+            level: "l".to_string(),
+            source: "s".to_string(),
+            message: "m".to_string(),
+            data: None,
+            session_id: "id".to_string(),
+            user_id: Some("u".to_string()),
+        };
+
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("sessionId"));
+        assert!(json.contains("userId"));
+        // Should NOT contain snake_case
+        assert!(!json.contains("session_id"));
+        assert!(!json.contains("user_id"));
+    }
+
+    #[test]
+    fn log_file_path_contains_date() {
+        let dir = std::path::Path::new("/tmp/test-logs");
+        let path = get_log_file_path(dir);
+
+        let filename = path.file_name().unwrap().to_str().unwrap();
+        assert!(filename.starts_with("pyre-portal-"));
+        assert!(
+            std::path::Path::new(filename)
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("log"))
+        );
+
+        // Should contain today's date in YYYY-MM-DD format
+        let today = Utc::now().format("%Y-%m-%d").to_string();
+        assert!(filename.contains(&today));
+    }
+
+    #[test]
+    fn log_file_path_is_within_directory() {
+        let dir = std::path::Path::new("/var/logs/pyreportal");
+        let path = get_log_file_path(dir);
+
+        assert!(path.starts_with(dir));
+    }
+
+    #[test]
+    fn log_entry_deserializes_from_frontend_json() {
+        // Simulate JSON from the frontend logger (camelCase keys)
+        let frontend_json = r#"{
+            "timestamp": "2024-06-15T10:30:00.000Z",
+            "level": "WARN",
+            "source": "RFIDService",
+            "message": "Scan timeout",
+            "data": {"tagId": "04:D6:94:82:97:6A:80", "retries": 3},
+            "sessionId": "abc123_def456",
+            "userId": "staff-42"
+        }"#;
+
+        let entry: LogEntry = serde_json::from_str(frontend_json).unwrap();
+        assert_eq!(entry.level, "WARN");
+        assert_eq!(entry.source, "RFIDService");
+        assert_eq!(entry.session_id, "abc123_def456");
+        assert_eq!(entry.user_id.as_deref(), Some("staff-42"));
+        assert!(entry.data.is_some());
+    }
+}

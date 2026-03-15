@@ -33,8 +33,18 @@ jobs:
         run: npm run typecheck
         continue-on-error: true
 
-      - name: Run tests with coverage
+      - name: Run frontend tests with coverage
         run: npm run test:coverage
+
+      - name: Install Rust toolchain
+        run: rustup update stable
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Run Rust tests with coverage
+        working-directory: src-tauri
+        run: cargo llvm-cov --lib --lcov --output-path coverage/lcov.info
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarqube-scan-action@v7
