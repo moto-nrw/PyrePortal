@@ -1327,7 +1327,8 @@ mod tests {
             tag_id: None,
             error: Some("Scan timeout - no card detected".to_string()),
         };
-        let d: RfidScanResult = serde_json::from_str(&serde_json::to_string(&result).unwrap()).unwrap();
+        let d: RfidScanResult =
+            serde_json::from_str(&serde_json::to_string(&result).unwrap()).unwrap();
         assert!(!d.success);
         assert!(d.tag_id.is_none());
         assert!(d.error.unwrap().contains("timeout"));
@@ -1340,7 +1341,8 @@ mod tests {
             platform: "Dev".to_string(),
             last_error: None,
         };
-        let d: RfidScannerStatus = serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
+        let d: RfidScannerStatus =
+            serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
         assert!(d.is_available);
         assert!(!d.platform.is_empty());
     }
@@ -1352,7 +1354,8 @@ mod tests {
             platform: "Pi".to_string(),
             last_error: Some("SPI fail".to_string()),
         };
-        let d: RfidScannerStatus = serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
+        let d: RfidScannerStatus =
+            serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
         assert!(!d.is_available);
         assert_eq!(d.last_error.as_deref(), Some("SPI fail"));
     }
@@ -1364,7 +1367,8 @@ mod tests {
             timestamp: 1_718_000_000,
             platform: "Development Platform".to_string(),
         };
-        let d: RfidScanEvent = serde_json::from_str(&serde_json::to_string(&event).unwrap()).unwrap();
+        let d: RfidScanEvent =
+            serde_json::from_str(&serde_json::to_string(&event).unwrap()).unwrap();
         assert_eq!(d.tag_id, "04:A7:B3:C2:D1:E0:F5");
         assert_eq!(d.timestamp, 1_718_000_000);
     }
@@ -1538,7 +1542,10 @@ mod tests {
         RfidBackgroundService::handle_scan_error(&state, "SPI communication failure");
         let guard = state.lock().unwrap();
         assert_eq!(guard.error_count, 1);
-        assert_eq!(guard.last_error.as_deref(), Some("SPI communication failure"));
+        assert_eq!(
+            guard.last_error.as_deref(),
+            Some("SPI communication failure")
+        );
     }
 
     #[test]
@@ -1756,7 +1763,10 @@ mod tests {
         });
 
         let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
-        assert!(result.is_ok(), "Loop should exit immediately when should_run=false");
+        assert!(
+            result.is_ok(),
+            "Loop should exit immediately when should_run=false"
+        );
     }
 
     #[tokio::test]
@@ -2089,7 +2099,10 @@ mod tests {
 
     #[test]
     fn stop_join_timeout_is_reasonable() {
-        assert_eq!(RfidBackgroundService::STOP_JOIN_TIMEOUT, Duration::from_secs(3));
+        assert_eq!(
+            RfidBackgroundService::STOP_JOIN_TIMEOUT,
+            Duration::from_secs(3)
+        );
     }
 
     // ====================================================================

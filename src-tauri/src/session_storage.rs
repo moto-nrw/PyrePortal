@@ -220,7 +220,9 @@ mod tests {
         let (handle, _guard) = mock_app_handle();
         let settings = sample_settings();
 
-        save_session_settings(handle.clone(), settings).await.unwrap();
+        save_session_settings(handle.clone(), settings)
+            .await
+            .unwrap();
 
         let loaded = load_session_settings(handle).await.unwrap();
         assert!(loaded.is_some());
@@ -298,7 +300,9 @@ mod tests {
             auto_save_enabled: true,
             last_session: Some(sample_last_session()),
         };
-        save_session_settings(handle.clone(), settings).await.unwrap();
+        save_session_settings(handle.clone(), settings)
+            .await
+            .unwrap();
         clear_last_session(handle.clone()).await.unwrap();
 
         let loaded = load_session_settings(handle).await.unwrap().unwrap();

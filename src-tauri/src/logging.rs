@@ -526,7 +526,9 @@ mod tests {
             .build(tauri::test::mock_context(tauri::test::noop_assets()))
             .unwrap();
         let handle = app.handle().clone();
-        write_log(handle.clone(), sample_entry_json()).await.unwrap();
+        write_log(handle.clone(), sample_entry_json())
+            .await
+            .unwrap();
 
         let log_dir = get_log_directory(&handle).unwrap();
         let content = fs::read_to_string(get_log_file_path(&log_dir)).unwrap();
