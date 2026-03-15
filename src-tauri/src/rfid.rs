@@ -986,35 +986,50 @@ mod mock_platform {
     }
 }
 
-fn send_service_command(command: ServiceCommand) -> Result<(), String> {
-    if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        let command_tx = {
-            let service = service_arc
-                .lock()
-                .map_err(|e| format!("Failed to lock service: {e}"))?;
-            service
-                .command_tx
-                .clone()
-                .ok_or_else(|| "Service command channel not initialized".to_string())?
-        };
+/// Send a command to a given service instance (testable without global state).
+fn send_command_to(
+    service_arc: &Arc<Mutex<RfidBackgroundService>>,
+    command: ServiceCommand,
+) -> Result<(), String> {
+    let command_tx = {
+        let service = service_arc
+            .lock()
+            .map_err(|e| format!("Failed to lock service: {e}"))?;
+        service
+            .command_tx
+            .clone()
+            .ok_or_else(|| "Service command channel not initialized".to_string())?
+    };
 
-        command_tx
-            .send(command)
-            .map_err(|e| format!("Failed to send command: {e}"))
-    } else {
-        Err("RFID service not initialized".to_string())
-    }
+    command_tx
+        .send(command)
+        .map_err(|e| format!("Failed to send command: {e}"))
 }
 
-async fn wait_for_service_running(expected_running: bool, timeout: Duration) -> Result<(), String> {
+fn send_service_command(command: ServiceCommand) -> Result<(), String> {
+    let service_arc = RfidBackgroundService::get_instance()
+        .ok_or_else(|| "RFID service not initialized".to_string())?;
+    send_command_to(&service_arc, command)
+}
+
+/// Wait for the service state to match expected running state (testable with state Arc).
+async fn wait_for_state(
+    state: &Arc<Mutex<RfidServiceState>>,
+    expected_running: bool,
+    timeout: Duration,
+) -> Result<(), String> {
     let deadline = std::time::Instant::now() + timeout;
 
     loop {
-        let state = get_rfid_service_status().await?;
+        let current = state
+            .lock()
+            .map(|guard| guard.clone())
+            .map_err(|e| format!("Failed to lock state: {e}"))?;
+
         let reached_target = if expected_running {
-            state.is_running && state.should_run
+            current.is_running && current.should_run
         } else {
-            !state.is_running
+            !current.is_running
         };
 
         if reached_target {
@@ -1029,12 +1044,24 @@ async fn wait_for_service_running(expected_running: bool, timeout: Duration) -> 
             };
             return Err(format!(
                 "Timed out waiting for RFID service to become {expected}. Current state: is_running={}, should_run={}, last_error={:?}",
-                state.is_running, state.should_run, state.last_error
+                current.is_running, current.should_run, current.last_error
             ));
         }
 
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+}
+
+async fn wait_for_service_running(expected_running: bool, timeout: Duration) -> Result<(), String> {
+    let service_arc = RfidBackgroundService::get_instance()
+        .ok_or_else(|| "RFID service not initialized".to_string())?;
+    let state = {
+        let service = service_arc
+            .lock()
+            .map_err(|e| format!("Failed to lock service: {e}"))?;
+        Arc::clone(&service.state)
+    };
+    wait_for_state(&state, expected_running, timeout).await
 }
 
 async fn stop_service_for_exclusive_hardware_access() {
@@ -1948,8 +1975,42 @@ mod tests {
     }
 
     // ====================================================================
-    // send_service_command (without global RFID_SERVICE)
+    // send_command_to (testable without global RFID_SERVICE)
     // ====================================================================
+
+    #[test]
+    fn send_command_to_fails_without_channel() {
+        let service = RfidBackgroundService::new();
+        let service_arc = Arc::new(Mutex::new(service));
+
+        let result = send_command_to(&service_arc, ServiceCommand::Start);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not initialized"));
+    }
+
+    #[test]
+    fn send_command_to_succeeds_with_channel() {
+        let mut service = RfidBackgroundService::new();
+        let (tx, _rx) = mpsc::unbounded_channel::<ServiceCommand>();
+        service.command_tx = Some(tx);
+        let service_arc = Arc::new(Mutex::new(service));
+
+        let result = send_command_to(&service_arc, ServiceCommand::Start);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn send_command_to_fails_when_receiver_dropped() {
+        let mut service = RfidBackgroundService::new();
+        let (tx, rx) = mpsc::unbounded_channel::<ServiceCommand>();
+        service.command_tx = Some(tx);
+        drop(rx); // Drop receiver
+
+        let service_arc = Arc::new(Mutex::new(service));
+        let result = send_command_to(&service_arc, ServiceCommand::Stop);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to send"));
+    }
 
     #[test]
     fn send_service_command_fails_when_not_initialized() {
@@ -1958,6 +2019,68 @@ mod tests {
             assert!(result.is_err());
             assert!(result.unwrap_err().contains("not initialized"));
         }
+    }
+
+    // ====================================================================
+    // wait_for_state (testable without global RFID_SERVICE)
+    // ====================================================================
+
+    #[tokio::test]
+    async fn wait_for_state_returns_immediately_when_already_target() {
+        let state = test_state();
+        // Already stopped → wait_for_state(false) should return immediately
+        let result = wait_for_state(&state, false, Duration::from_millis(100)).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn wait_for_state_returns_when_running() {
+        let state = test_state();
+        {
+            let mut guard = state.lock().unwrap();
+            guard.is_running = true;
+            guard.should_run = true;
+        }
+        let result = wait_for_state(&state, true, Duration::from_millis(100)).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn wait_for_state_times_out() {
+        let state = test_state();
+        // State is stopped, wait for running → should timeout
+        let result = wait_for_state(&state, true, Duration::from_millis(100)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("Timed out"));
+        assert!(err.contains("running"));
+    }
+
+    #[tokio::test]
+    async fn wait_for_state_timeout_for_stop() {
+        let state = test_state();
+        state.lock().unwrap().is_running = true;
+        // State is running, wait for stop → should timeout
+        let result = wait_for_state(&state, false, Duration::from_millis(100)).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("stopped"));
+    }
+
+    #[tokio::test]
+    async fn wait_for_state_detects_transition() {
+        let state = test_state();
+        let state_clone = Arc::clone(&state);
+
+        // Spawn a task that sets running after a delay
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            let mut guard = state_clone.lock().unwrap();
+            guard.is_running = true;
+            guard.should_run = true;
+        });
+
+        let result = wait_for_state(&state, true, Duration::from_secs(1)).await;
+        assert!(result.is_ok());
     }
 
     // ====================================================================
