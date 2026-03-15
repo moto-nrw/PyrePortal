@@ -936,7 +936,7 @@ mod mock_platform {
         scan_rfid_mock_internal()
     }
 
-    fn scan_rfid_mock_internal() -> Result<String, String> {
+    pub(crate) fn scan_rfid_mock_internal() -> Result<String, String> {
         // Check for duplicate read (2-second cooldown like real hardware)
         let mut last_scan = LAST_SCAN.lock().unwrap();
         if let Some((last_tag, last_time)) = &*last_scan {
@@ -1838,10 +1838,12 @@ mod tests {
 
         #[tokio::test]
         async fn mock_scan_can_produce_errors() {
-            // With 5% error rate, 200 attempts should produce at least one error
+            // With 5% error rate, 500 calls to the internal fn (no sleep) should
+            // produce at least one error. Avoids the 200-500ms per-call sleep in
+            // scan_rfid_hardware() which caused CI timeouts.
             let mut got_error = false;
-            for _ in 0..200 {
-                if mock_platform::scan_rfid_hardware().await.is_err() {
+            for _ in 0..500 {
+                if mock_platform::scan_rfid_mock_internal().is_err() {
                     got_error = true;
                     break;
                 }
