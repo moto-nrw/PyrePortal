@@ -9,6 +9,17 @@ import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, serializeError } from '../utils/logger';
 import { isRfidEnabled } from '../utils/tauriContext';
 
+/**
+ * True when the current platform uses real NFC/RFID hardware (not mock).
+ * - GKT: always real (NFC via system.js)
+ * - Tauri + VITE_ENABLE_RFID=true: real (MFRC522 hardware)
+ * - Tauri + VITE_ENABLE_RFID=false: mock
+ * - Browser: mock
+ */
+const isRealScanningEnabled = (): boolean => {
+  return adapter.platform === 'gkt' || isRfidEnabled();
+};
+
 // Mock scanning interval for development
 let mockScanInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -320,7 +331,7 @@ export const useRfidScanning = () => {
 
   // Initialize RFID service on mount
   const initializeService = useCallback(async () => {
-    if (!isRfidEnabled() || isInitializedRef.current) {
+    if (!isRealScanningEnabled() || isInitializedRef.current) {
       return;
     }
 
@@ -497,7 +508,7 @@ export const useRfidScanning = () => {
 
   const waitForBackendServiceState = useCallback(
     async (expectedRunning: boolean, timeoutMs: number): Promise<boolean> => {
-      if (!isRfidEnabled()) {
+      if (!isRealScanningEnabled()) {
         return expectedRunning;
       }
 
@@ -525,11 +536,11 @@ export const useRfidScanning = () => {
     logger.debug('startScanning() called', {
       timestamp: callTimestamp,
       isServiceStartedRef: isServiceStartedRef.current,
-      rfidEnabled: isRfidEnabled(),
+      rfidEnabled: isRealScanningEnabled(),
     });
 
     if (isServiceStartedRef.current) {
-      if (!isRfidEnabled()) {
+      if (!isRealScanningEnabled()) {
         logger.debug('Service already started in mock mode, ensuring store state is synchronized');
         startRfidScanning();
         return;
@@ -547,7 +558,7 @@ export const useRfidScanning = () => {
     }
 
     // Check if RFID is enabled
-    if (!isRfidEnabled()) {
+    if (!isRealScanningEnabled()) {
       logger.info('RFID not enabled, starting mock scanning mode');
 
       // Start mock scanning interval
@@ -637,7 +648,7 @@ export const useRfidScanning = () => {
     logger.debug('stopScanning() called', {
       timestamp: callTimestamp,
       isServiceStartedRef: isServiceStartedRef.current,
-      rfidEnabled: isRfidEnabled(),
+      rfidEnabled: isRealScanningEnabled(),
     });
 
     if (!isServiceStartedRef.current) {
@@ -648,7 +659,7 @@ export const useRfidScanning = () => {
     }
 
     try {
-      if (isRfidEnabled()) {
+      if (isRealScanningEnabled()) {
         logger.debug('Calling stop_rfid_service backend command', {
           timestamp: callTimestamp,
         });
@@ -683,7 +694,7 @@ export const useRfidScanning = () => {
 
   // Check actual service state from backend
   const syncServiceState = useCallback(async () => {
-    if (!isRfidEnabled()) return;
+    if (!isRealScanningEnabled()) return;
 
     try {
       const serviceStatus = await adapter.getServiceStatus();
