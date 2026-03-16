@@ -234,9 +234,9 @@ describe('LandingPage', () => {
     });
   });
 
-  // --- Touch event tests ---
+  // --- Pointer event tests (components use onPointerDown/onPointerUp) ---
 
-  it('applies pressed styles on touchStart of login button', () => {
+  it('applies pressed styles on pointerDown of login button', () => {
     render(
       <MemoryRouter>
         <LandingPage />
@@ -244,14 +244,14 @@ describe('LandingPage', () => {
     );
 
     const button = screen.getByText('Anmelden');
-    fireEvent.touchStart(button);
+    fireEvent.pointerDown(button);
 
     expect(button.style.transform).toBe('scale(0.95)');
     expect(button.style.backgroundColor).toBe('#1F2937');
     expect(button.style.boxShadow).toBe('0 2px 8px rgba(0, 0, 0, 0.2)');
   });
 
-  it('fires touchEnd handler without error', () => {
+  it('fires pointerUp handler without error', () => {
     render(
       <MemoryRouter>
         <LandingPage />
@@ -259,17 +259,14 @@ describe('LandingPage', () => {
     );
 
     const button = screen.getByText('Anmelden');
-    fireEvent.touchStart(button);
-    // touchEnd triggers setTimeout — covers the onTouchEnd handler entry
-    fireEvent.touchEnd(button);
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
 
-    // The touchStart styles are still applied (setTimeout hasn't fired yet)
-    expect(button.style.transform).toBe('scale(0.95)');
+    // pointerUp immediately restores styles (no setTimeout)
+    expect(button.style.transform).toBe('');
   });
 
-  it('restores original styles after touchEnd timeout completes', () => {
-    vi.useFakeTimers();
-
+  it('restores original styles on pointerUp', () => {
     render(
       <MemoryRouter>
         <LandingPage />
@@ -277,27 +274,14 @@ describe('LandingPage', () => {
     );
 
     const button = screen.getByText('Anmelden');
-    fireEvent.touchStart(button);
+    fireEvent.pointerDown(button);
     expect(button.style.transform).toBe('scale(0.95)');
 
-    // Replace setTimeout to execute synchronously so e.currentTarget is still valid
-    const origSetTimeout = globalThis.setTimeout;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    globalThis.setTimeout = ((fn: () => void) => {
-      fn();
-      return 0;
-    }) as any;
+    fireEvent.pointerUp(button);
 
-    fireEvent.touchEnd(button);
-
-    globalThis.setTimeout = origSetTimeout;
-
-    // Styles should be restored since the callback ran while currentTarget was live
-    expect(button.style.transform).toBe('scale(1)');
+    expect(button.style.transform).toBe('');
     expect(button.style.backgroundColor).toBe('#111827');
     expect(button.style.boxShadow).toBe('0 4px 12px rgba(0, 0, 0, 0.15)');
-
-    vi.useRealTimers();
   });
 
   // --- Additional styling tests ---

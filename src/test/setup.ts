@@ -45,6 +45,7 @@ vi.mock('../utils/logger', () => {
     info: noop,
     warn: noop,
     error: noop,
+    wouldLog: vi.fn(() => false),
     updateConfig: noop,
     getInMemoryLogs: vi.fn(() => []),
     clearInMemoryLogs: noop,

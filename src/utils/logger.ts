@@ -135,6 +135,14 @@ class Logger {
   }
 
   /**
+   * Check if a message at the given level would actually be logged.
+   * Use this to guard expensive log payload computation.
+   */
+  public wouldLog(level: LogLevel): boolean {
+    return level >= this.config.level! || level >= this.config.persistLevel!;
+  }
+
+  /**
    * Log a debug message
    *
    * @param message The message to log
