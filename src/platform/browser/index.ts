@@ -71,8 +71,9 @@ class BrowserAdapter implements PlatformAdapter {
     localStorage.removeItem('pyreportal_session');
   }
 
-  async persistLog(_entry: string): Promise<void> {
-    throw new Error('BrowserAdapter.persistLog not implemented yet');
+  async persistLog(entry: string): Promise<void> {
+    // eslint-disable-next-line no-console
+    console.log('[Log]', entry);
   }
 
   async restartApp(): Promise<void> {

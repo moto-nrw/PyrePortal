@@ -75,8 +75,8 @@ class TauriAdapter implements PlatformAdapter {
     await safeInvoke('clear_last_session');
   }
 
-  async persistLog(_entry: string): Promise<void> {
-    throw new Error('TauriAdapter.persistLog not implemented yet');
+  async persistLog(entry: string): Promise<void> {
+    await safeInvoke('write_log', { entry });
   }
 
   async restartApp(): Promise<void> {

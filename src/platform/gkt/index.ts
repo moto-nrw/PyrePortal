@@ -9,6 +9,14 @@
 import type { SessionSettings } from '../../services/sessionStorage';
 import type { PlatformAdapter } from '../adapter';
 
+// SYSTEM is a global injected by system.js (loaded in index.html)
+declare const SYSTEM: {
+  registerNfc(
+    callback: (obj: { uid: string; eventSource: string; eventNumber: number }) => void
+  ): void;
+  log2(facility: string, msg: string): void;
+};
+
 class GKTAdapter implements PlatformAdapter {
   readonly platform = 'gkt' as const;
 
@@ -75,8 +83,13 @@ class GKTAdapter implements PlatformAdapter {
     localStorage.removeItem('pyreportal_session');
   }
 
-  async persistLog(_entry: string): Promise<void> {
-    throw new Error('GKTAdapter.persistLog not implemented yet');
+  async persistLog(entry: string): Promise<void> {
+    try {
+      SYSTEM.log2('PyrePortal', entry);
+    } catch {
+      // eslint-disable-next-line no-console
+      console.log(entry);
+    }
   }
 
   async restartApp(): Promise<void> {
