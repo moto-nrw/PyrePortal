@@ -3,6 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+import { adapter } from '@platform';
+
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
@@ -14,7 +16,7 @@ import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
-import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
+import { isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
 
@@ -27,12 +29,6 @@ const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
 };
 
 // RFID scanner types from Tauri backend
-interface RfidScanResult {
-  success: boolean;
-  tag_id?: string;
-  error?: string;
-}
-
 const SCAN_INVOKE_TIMEOUT_MS = 20_000;
 
 const withTimeout = <T,>(
@@ -202,9 +198,9 @@ function TagAssignmentPage() {
         return;
       }
 
-      // Use real RFID scanner through Tauri with frontend timeout safety net.
+      // Use real RFID scanner via platform adapter with frontend timeout safety net.
       const result = await withTimeout(
-        safeInvoke<RfidScanResult>('scan_rfid_single'),
+        adapter.scanSingleTag(SCAN_INVOKE_TIMEOUT_MS),
         SCAN_INVOKE_TIMEOUT_MS,
         'RFID-Scan Zeitüberschreitung'
       );
