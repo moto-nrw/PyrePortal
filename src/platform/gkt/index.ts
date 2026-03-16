@@ -77,13 +77,23 @@ class GKTAdapter implements PlatformAdapter {
   }
 
   async scanSingleTag(
-    _timeoutMs: number
+    timeoutMs: number
   ): Promise<{ success: boolean; tag_id?: string; error?: string }> {
-    // GKT has no blocking single-scan API
-    return {
-      success: false,
-      error: 'Single-tag scan not supported on GKT. Use continuous scanning.',
-    };
+    // GKT has no blocking single-scan API — simulate by capturing the next
+    // NFC callback and resolving the promise with it.
+    const previousCallback = this.scanCallback;
+    return new Promise(resolve => {
+      const timer = setTimeout(() => {
+        this.scanCallback = previousCallback;
+        resolve({ success: false, error: 'Scan timed out' });
+      }, timeoutMs);
+
+      this.scanCallback = (tagId: string) => {
+        clearTimeout(timer);
+        this.scanCallback = previousCallback;
+        resolve({ success: true, tag_id: tagId });
+      };
+    });
   }
 
   async recoverScanner(): Promise<void> {

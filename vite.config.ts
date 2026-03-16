@@ -16,7 +16,18 @@ const buildTarget = process.env.BUILD_TARGET || 'browser';
 
 // https://vitejs.dev/config/
 export default defineConfig(async () => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Inject system.js for GKT builds — the GKT-Kiosk WebView provides the
+    // native GKTKiosk object, but system.js (the JS wrapper) must be loaded
+    // explicitly. Must come before the app module script.
+    buildTarget === 'gkt' && {
+      name: 'inject-system-js',
+      transformIndexHtml(html: string) {
+        return html.replace('<head>', '<head>\n    <script src="/system.js"></script>');
+      },
+    },
+  ].filter(Boolean),
 
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
