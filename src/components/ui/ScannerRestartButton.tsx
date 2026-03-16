@@ -1,7 +1,9 @@
 import { useState } from 'react';
 
+import { adapter } from '@platform';
+
 import { createLogger, serializeError } from '../../utils/logger';
-import { isRfidEnabled, safeInvoke } from '../../utils/tauriContext';
+import { isRfidEnabled } from '../../utils/tauriContext';
 
 import BackButton from './BackButton';
 import { ErrorModal } from './ErrorModal';
@@ -62,14 +64,12 @@ export function ScannerRestartButton({
 
       if (isRfidEnabled()) {
         await withTimeout(
-          safeInvoke('recover_rfid_scanner'),
+          adapter.recoverScanner(),
           SCANNER_RECOVERY_TIMEOUT_MS,
           'Scanner-Recovery Zeitüberschreitung'
         );
 
-        const status = await safeInvoke<{ is_available: boolean; last_error?: string }>(
-          'get_rfid_scanner_status'
-        );
+        const status = await adapter.getScannerStatus();
         if (!status?.is_available) {
           throw new Error(status?.last_error ?? 'Scanner antwortet nach Recovery nicht');
         }
@@ -81,9 +81,7 @@ export function ScannerRestartButton({
         // Verify the scanning service actually started — startScanning()
         // catches errors internally, so check service state explicitly.
         if (isRfidEnabled()) {
-          const serviceStatus = await safeInvoke<{ is_running: boolean }>(
-            'get_rfid_service_status'
-          );
+          const serviceStatus = await adapter.getServiceStatus();
           if (!serviceStatus?.is_running) {
             throw new Error('Scanner-Service läuft nach Recovery nicht');
           }

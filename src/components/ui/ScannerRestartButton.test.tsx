@@ -2,16 +2,31 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { isRfidEnabled, safeInvoke } from '../../utils/tauriContext';
+import { isRfidEnabled } from '../../utils/tauriContext';
 
 import { ScannerRestartButton } from './ScannerRestartButton';
 
+// Mock the platform adapter
+vi.mock('@platform', () => ({
+  adapter: {
+    recoverScanner: vi.fn(),
+    getScannerStatus: vi.fn(),
+    getServiceStatus: vi.fn(),
+  },
+}));
+
+const { adapter } = await import('@platform');
+const mockRecoverScanner = vi.mocked(adapter.recoverScanner);
+const mockGetScannerStatus = vi.mocked(adapter.getScannerStatus);
+const mockGetServiceStatus = vi.mocked(adapter.getServiceStatus);
+
 const mockIsRfidEnabled = vi.mocked(isRfidEnabled);
-const mockSafeInvoke = vi.mocked(safeInvoke);
 
 beforeEach(() => {
   mockIsRfidEnabled.mockReturnValue(false);
-  mockSafeInvoke.mockResolvedValue(undefined);
+  mockRecoverScanner.mockResolvedValue(undefined);
+  mockGetScannerStatus.mockResolvedValue({ is_available: true });
+  mockGetServiceStatus.mockResolvedValue({ is_running: true });
 });
 
 describe('ScannerRestartButton', () => {
@@ -126,14 +141,10 @@ describe('ScannerRestartButton', () => {
       mockIsRfidEnabled.mockReturnValue(true);
     });
 
-    it('calls recover_rfid_scanner and get_rfid_scanner_status on success', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') return Promise.resolve(undefined);
-        if (cmd === 'get_rfid_scanner_status')
-          return Promise.resolve({ is_available: true, last_error: undefined });
-        if (cmd === 'get_rfid_service_status') return Promise.resolve({ is_running: true });
-        return Promise.resolve(undefined);
-      });
+    it('calls adapter.recoverScanner and adapter.getScannerStatus on success', async () => {
+      mockRecoverScanner.mockResolvedValue(undefined);
+      mockGetScannerStatus.mockResolvedValue({ is_available: true });
+      mockGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const onAfter = vi.fn().mockResolvedValue(undefined);
       render(<ScannerRestartButton onAfterRecover={onAfter} />);
@@ -143,17 +154,16 @@ describe('ScannerRestartButton', () => {
         expect(screen.getByText('Lesegerät wurde neu gestartet.')).toBeInTheDocument();
       });
 
-      expect(mockSafeInvoke).toHaveBeenCalledWith('recover_rfid_scanner');
-      expect(mockSafeInvoke).toHaveBeenCalledWith('get_rfid_scanner_status');
-      expect(mockSafeInvoke).toHaveBeenCalledWith('get_rfid_service_status');
+      expect(mockRecoverScanner).toHaveBeenCalled();
+      expect(mockGetScannerStatus).toHaveBeenCalled();
+      expect(mockGetServiceStatus).toHaveBeenCalled();
     });
 
     it('throws last_error when scanner is not available after recovery', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') return Promise.resolve(undefined);
-        if (cmd === 'get_rfid_scanner_status')
-          return Promise.resolve({ is_available: false, last_error: 'Hardware defekt' });
-        return Promise.resolve(undefined);
+      mockRecoverScanner.mockResolvedValue(undefined);
+      mockGetScannerStatus.mockResolvedValue({
+        is_available: false,
+        last_error: 'Hardware defekt',
       });
 
       render(<ScannerRestartButton />);
@@ -165,11 +175,8 @@ describe('ScannerRestartButton', () => {
     });
 
     it('uses fallback error when scanner not available and no last_error', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') return Promise.resolve(undefined);
-        if (cmd === 'get_rfid_scanner_status') return Promise.resolve({ is_available: false });
-        return Promise.resolve(undefined);
-      });
+      mockRecoverScanner.mockResolvedValue(undefined);
+      mockGetScannerStatus.mockResolvedValue({ is_available: false });
 
       render(<ScannerRestartButton />);
       await userEvent.click(screen.getByLabelText('Lesegerät neu starten'));
@@ -180,12 +187,9 @@ describe('ScannerRestartButton', () => {
     });
 
     it('throws when service is not running after recovery', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') return Promise.resolve(undefined);
-        if (cmd === 'get_rfid_scanner_status') return Promise.resolve({ is_available: true });
-        if (cmd === 'get_rfid_service_status') return Promise.resolve({ is_running: false });
-        return Promise.resolve(undefined);
-      });
+      mockRecoverScanner.mockResolvedValue(undefined);
+      mockGetScannerStatus.mockResolvedValue({ is_available: true });
+      mockGetServiceStatus.mockResolvedValue({ is_running: false });
 
       const onAfter = vi.fn().mockResolvedValue(undefined);
       render(<ScannerRestartButton onAfterRecover={onAfter} />);
@@ -199,13 +203,8 @@ describe('ScannerRestartButton', () => {
     it('shows error on recovery timeout after 8000ms', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
 
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') {
-          // Never resolves - will timeout
-          return new Promise(() => {});
-        }
-        return Promise.resolve(undefined);
-      });
+      // Never resolves - will timeout
+      mockRecoverScanner.mockImplementation(() => new Promise(() => {}));
 
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<ScannerRestartButton />);
@@ -221,7 +220,7 @@ describe('ScannerRestartButton', () => {
       vi.useRealTimers();
     });
 
-    it('skips Tauri calls but runs callbacks when RFID disabled', async () => {
+    it('skips adapter calls but runs callbacks when RFID disabled', async () => {
       mockIsRfidEnabled.mockReturnValue(false);
 
       const onBefore = vi.fn().mockResolvedValue(undefined);
@@ -235,15 +234,12 @@ describe('ScannerRestartButton', () => {
 
       expect(onBefore).toHaveBeenCalledOnce();
       expect(onAfter).toHaveBeenCalledOnce();
-      expect(mockSafeInvoke).not.toHaveBeenCalled();
+      expect(mockRecoverScanner).not.toHaveBeenCalled();
     });
 
     it('handles status returning null/undefined gracefully', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') return Promise.resolve(undefined);
-        if (cmd === 'get_rfid_scanner_status') return Promise.resolve(null);
-        return Promise.resolve(undefined);
-      });
+      mockRecoverScanner.mockResolvedValue(undefined);
+      mockGetScannerStatus.mockResolvedValue(null as never);
 
       render(<ScannerRestartButton />);
       await userEvent.click(screen.getByLabelText('Lesegerät neu starten'));
@@ -253,11 +249,8 @@ describe('ScannerRestartButton', () => {
       });
     });
 
-    it('handles recover_rfid_scanner rejection', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') return Promise.reject(new Error('hardware failure'));
-        return Promise.resolve(undefined);
-      });
+    it('handles recoverScanner rejection', async () => {
+      mockRecoverScanner.mockRejectedValue(new Error('hardware failure'));
 
       render(<ScannerRestartButton />);
       await userEvent.click(screen.getByLabelText('Lesegerät neu starten'));
@@ -268,13 +261,7 @@ describe('ScannerRestartButton', () => {
     });
 
     it('handles non-Error rejection from withTimeout', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') {
-          // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
-          return Promise.reject('string error');
-        }
-        return Promise.resolve(undefined);
-      });
+      mockRecoverScanner.mockRejectedValue('string error');
 
       render(<ScannerRestartButton />);
       await userEvent.click(screen.getByLabelText('Lesegerät neu starten'));
@@ -284,15 +271,12 @@ describe('ScannerRestartButton', () => {
       });
     });
 
-    it('checks get_rfid_service_status only when onAfterRecover is provided', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') return Promise.resolve(undefined);
-        if (cmd === 'get_rfid_scanner_status') return Promise.resolve({ is_available: true });
-        if (cmd === 'get_rfid_service_status') return Promise.resolve({ is_running: true });
-        return Promise.resolve(undefined);
-      });
+    it('checks getServiceStatus only when onAfterRecover is provided', async () => {
+      mockRecoverScanner.mockResolvedValue(undefined);
+      mockGetScannerStatus.mockResolvedValue({ is_available: true });
+      mockGetServiceStatus.mockResolvedValue({ is_running: true });
 
-      // Without onAfterRecover - should NOT call get_rfid_service_status
+      // Without onAfterRecover - should NOT call getServiceStatus
       render(<ScannerRestartButton />);
       await userEvent.click(screen.getByLabelText('Lesegerät neu starten'));
 
@@ -300,16 +284,13 @@ describe('ScannerRestartButton', () => {
         expect(screen.getByText('Lesegerät wurde neu gestartet.')).toBeInTheDocument();
       });
 
-      expect(mockSafeInvoke).not.toHaveBeenCalledWith('get_rfid_service_status');
+      expect(mockGetServiceStatus).not.toHaveBeenCalled();
     });
 
     it('handles serviceStatus returning null after recovery', async () => {
-      mockSafeInvoke.mockImplementation((cmd: string) => {
-        if (cmd === 'recover_rfid_scanner') return Promise.resolve(undefined);
-        if (cmd === 'get_rfid_scanner_status') return Promise.resolve({ is_available: true });
-        if (cmd === 'get_rfid_service_status') return Promise.resolve(null);
-        return Promise.resolve(undefined);
-      });
+      mockRecoverScanner.mockResolvedValue(undefined);
+      mockGetScannerStatus.mockResolvedValue({ is_available: true });
+      mockGetServiceStatus.mockResolvedValue(null as never);
 
       const onAfter = vi.fn().mockResolvedValue(undefined);
       render(<ScannerRestartButton onAfterRecover={onAfter} />);

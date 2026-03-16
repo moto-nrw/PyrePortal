@@ -25,24 +25,28 @@ class BrowserAdapter implements PlatformAdapter {
   }
 
   async getServiceStatus(): Promise<{ is_running: boolean }> {
-    throw new Error('BrowserAdapter.getServiceStatus not implemented yet');
+    return { is_running: false };
   }
 
   async scanSingleTag(
     _timeoutMs: number
   ): Promise<{ success: boolean; tag_id?: string; error?: string }> {
-    throw new Error('BrowserAdapter.scanSingleTag not implemented yet');
+    return new Promise(resolve => {
+      setTimeout(() => {
+        resolve({ success: true, tag_id: '04:D6:94:82:97:6A:80' });
+      }, 1000);
+    });
   }
 
   async recoverScanner(): Promise<void> {
-    throw new Error('BrowserAdapter.recoverScanner not implemented yet');
+    // No-op in browser
   }
 
   async getScannerStatus(): Promise<{
     is_available: boolean;
     last_error?: string;
   }> {
-    throw new Error('BrowserAdapter.getScannerStatus not implemented yet');
+    return { is_available: true };
   }
 
   async loadConfig(): Promise<void> {

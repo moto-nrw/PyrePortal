@@ -19,6 +19,7 @@ declare const SYSTEM: {
 
 class GKTAdapter implements PlatformAdapter {
   readonly platform = 'gkt' as const;
+  private scanCallback: ((tagId: string) => void) | null = null;
 
   async initializeNfc(): Promise<void> {
     throw new Error('GKTAdapter.initializeNfc not implemented yet');
@@ -33,24 +34,30 @@ class GKTAdapter implements PlatformAdapter {
   }
 
   async getServiceStatus(): Promise<{ is_running: boolean }> {
-    throw new Error('GKTAdapter.getServiceStatus not implemented yet');
+    // GKT NFC is always running once registered
+    return { is_running: this.scanCallback !== null };
   }
 
   async scanSingleTag(
     _timeoutMs: number
   ): Promise<{ success: boolean; tag_id?: string; error?: string }> {
-    throw new Error('GKTAdapter.scanSingleTag not implemented yet');
+    // GKT has no blocking single-scan API
+    return {
+      success: false,
+      error: 'Single-tag scan not supported on GKT. Use continuous scanning.',
+    };
   }
 
   async recoverScanner(): Promise<void> {
-    throw new Error('GKTAdapter.recoverScanner not implemented yet');
+    // No scanner recovery on GKT — NFC is managed by GKT-Kiosk system
   }
 
   async getScannerStatus(): Promise<{
     is_available: boolean;
     last_error?: string;
   }> {
-    throw new Error('GKTAdapter.getScannerStatus not implemented yet');
+    // NFC is always available if usbnfc APK is installed
+    return { is_available: true };
   }
 
   async loadConfig(): Promise<void> {

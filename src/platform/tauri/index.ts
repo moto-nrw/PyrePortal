@@ -27,24 +27,29 @@ class TauriAdapter implements PlatformAdapter {
   }
 
   async getServiceStatus(): Promise<{ is_running: boolean }> {
-    throw new Error('TauriAdapter.getServiceStatus not implemented yet');
+    return await safeInvoke<{ is_running: boolean }>('get_rfid_service_status');
   }
 
   async scanSingleTag(
-    _timeoutMs: number
+    timeoutMs: number
   ): Promise<{ success: boolean; tag_id?: string; error?: string }> {
-    throw new Error('TauriAdapter.scanSingleTag not implemented yet');
+    return await safeInvoke<{ success: boolean; tag_id?: string; error?: string }>(
+      'scan_rfid_single',
+      { timeout_ms: timeoutMs }
+    );
   }
 
   async recoverScanner(): Promise<void> {
-    throw new Error('TauriAdapter.recoverScanner not implemented yet');
+    await safeInvoke('recover_rfid_scanner');
   }
 
   async getScannerStatus(): Promise<{
     is_available: boolean;
     last_error?: string;
   }> {
-    throw new Error('TauriAdapter.getScannerStatus not implemented yet');
+    return await safeInvoke<{ is_available: boolean; last_error?: string }>(
+      'get_rfid_scanner_status'
+    );
   }
 
   async loadConfig(): Promise<void> {
