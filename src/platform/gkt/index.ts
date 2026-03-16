@@ -11,21 +11,52 @@ import type { PlatformAdapter } from '../adapter';
 
 // SYSTEM is a global injected by system.js (loaded in index.html)
 declare const SYSTEM: {
-  registerNfc(
-    callback: (obj: { uid: string; eventSource: string; eventNumber: number }) => void
-  ): void;
+  registerNfc(callback: (payload: unknown) => void): void;
   log2(facility: string, msg: string): void;
 };
+
+/**
+ * Normalize NFC payload from system.js into an uppercase UID string.
+ *
+ * system.js delivers scans via two paths with different payload shapes:
+ * 1. Intent-path: {uid: "f0:bc:e8:44", eventSource: "NFC", eventNumber: N}
+ * 2. Sensor-path: {eventSource: "nfc", barcode: "f0:bc:e8:44"}
+ * 3. Legacy string: "f0:bc:e8:44"
+ */
+export function normalizeNfcPayload(payload: unknown): string | null {
+  if (typeof payload === 'string') {
+    return payload.toUpperCase();
+  }
+
+  if (typeof payload === 'object' && payload !== null) {
+    const obj = payload as Record<string, unknown>;
+
+    // Intent-path: {uid: "f0:bc:e8:44", eventSource: "NFC"}
+    if (typeof obj.uid === 'string' && obj.uid) {
+      return obj.uid.toUpperCase();
+    }
+
+    // Sensor-path: {eventSource: "nfc", barcode: "f0:bc:e8:44"}
+    if (typeof obj.barcode === 'string' && obj.barcode) {
+      return obj.barcode.toUpperCase();
+    }
+  }
+
+  return null;
+}
 
 class GKTAdapter implements PlatformAdapter {
   readonly platform = 'gkt' as const;
   private scanCallback: ((tagId: string) => void) | null = null;
 
   async initializeNfc(): Promise<void> {
-    // Register NFC callback with system.js
-    SYSTEM.registerNfc(obj => {
-      if (this.scanCallback) {
-        this.scanCallback(obj.uid.toUpperCase());
+    // Register NFC callback with system.js — handles all payload shapes
+    SYSTEM.registerNfc((payload: unknown) => {
+      if (!this.scanCallback) return;
+
+      const tagId = normalizeNfcPayload(payload);
+      if (tagId) {
+        this.scanCallback(tagId);
       }
     });
   }
