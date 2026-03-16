@@ -12,6 +12,7 @@ import TagAssignmentPage from './TagAssignmentPage';
 // Mock the platform adapter
 vi.mock('@platform', () => ({
   adapter: {
+    platform: 'browser',
     scanSingleTag: vi.fn(),
   },
 }));
@@ -99,6 +100,7 @@ describe('TagAssignmentPage', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    (adapter as unknown as Record<string, unknown>).platform = 'browser';
     vi.restoreAllMocks();
   });
 
@@ -1179,6 +1181,33 @@ describe('TagAssignmentPage', () => {
       });
 
       expect(screen.getByText('Scan starten')).toBeInTheDocument();
+    });
+  });
+
+  describe('with GKT platform', () => {
+    beforeEach(() => {
+      vi.mocked(isRfidEnabled).mockReturnValue(false);
+      (adapter as unknown as Record<string, unknown>).platform = 'gkt';
+    });
+
+    it('uses adapter.scanSingleTag instead of the mock timeout flow', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockScanSingleTag.mockResolvedValue({
+        success: true,
+        tag_id: '04:AA:BB:CC:DD:EE:FF',
+      });
+      const checkSpy = vi.spyOn(api, 'checkTagAssignment').mockResolvedValue(unassignedTag);
+
+      renderPage();
+      await user.click(screen.getByText('Scan starten'));
+
+      expect(mockScanSingleTag).toHaveBeenCalledWith(20_000);
+
+      await act(async () => {
+        vi.advanceTimersByTime(2100);
+      });
+
+      expect(checkSpy).toHaveBeenCalledWith('1234', '04:AA:BB:CC:DD:EE:FF');
     });
   });
 

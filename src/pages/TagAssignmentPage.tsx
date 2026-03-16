@@ -21,6 +21,12 @@ import { isRfidEnabled } from '../utils/tauriContext';
 const logger = createLogger('TagAssignmentPage');
 
 /**
+ * True when the current platform uses real NFC/RFID hardware.
+ * GKT always uses real NFC via system.js, Tauri depends on VITE_ENABLE_RFID.
+ */
+const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt' || isRfidEnabled();
+
+/**
  * Helper to get assigned person from TagAssignmentCheck
  */
 const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
@@ -166,7 +172,7 @@ function TagAssignmentPage() {
     setIsLoading(true);
 
     try {
-      if (!isRfidEnabled()) {
+      if (!isRealScanningEnabled()) {
         // Development mock behavior - store timeout ref for cancellation
         mockScanTimeoutRef.current = setTimeout(() => {
           // Check if scan was cancelled before processing
