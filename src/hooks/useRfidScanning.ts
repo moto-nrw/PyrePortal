@@ -1,14 +1,13 @@
 import { useEffect, useRef, useCallback } from 'react';
 
+import { adapter } from '@platform';
+
 import { api, mapApiErrorToGerman, ApiError } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, serializeError } from '../utils/logger';
-import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
-
-// Tauri event listening
-let eventListener: (() => void) | null = null;
+import { isRfidEnabled } from '../utils/tauriContext';
 
 // Mock scanning interval for development
 let mockScanInterval: ReturnType<typeof setInterval> | null = null;
@@ -318,7 +317,7 @@ export const useRfidScanning = () => {
     }
 
     try {
-      await safeInvoke('initialize_rfid_service');
+      await adapter.initializeNfc();
       isInitializedRef.current = true;
       logger.info('RFID service initialized');
     } catch (error) {
@@ -475,41 +474,18 @@ export const useRfidScanning = () => {
     ]
   );
 
-  // Setup event listener for RFID scans
-  const setupEventListener = useCallback(async () => {
-    if (!isRfidEnabled() || eventListener) {
-      return;
-    }
-
-    try {
-      // Import listen function dynamically for Tauri context
-      const { listen } = await import('@tauri-apps/api/event');
-
-      const unlisten = await listen<{ tag_id: string; timestamp: number; platform: string }>(
-        'rfid-scan',
-        event => {
-          const { tag_id, timestamp, platform } = event.payload;
-          logger.info('RFID scan event received', { tagId: tag_id, platform, timestamp });
-
-          // Check if tag is blocked before processing
-          if (isTagBlocked(tag_id)) {
-            logger.debug('Tag blocked, skipping', { tagId: tag_id });
-          } else {
-            void processScan(tag_id);
-          }
-        }
-      );
-
-      eventListener = unlisten;
-      logger.info('RFID event listener setup complete');
-    } catch (error) {
-      logger.error('Failed to setup RFID event listener', { error: serializeError(error) });
-      showSystemError(
-        'RFID-Verbindung fehlgeschlagen',
-        'Das RFID-System konnte nicht verbunden werden. Scannen nicht möglich.'
-      );
-    }
-  }, [isTagBlocked, processScan, showSystemError]);
+  // Create onScan callback for the adapter (checks blocked tags + processes scan)
+  const onAdapterScan = useCallback(
+    (tagId: string) => {
+      logger.info('RFID scan event received', { tagId });
+      if (isTagBlocked(tagId)) {
+        logger.debug('Tag blocked, skipping', { tagId });
+      } else {
+        void processScan(tagId);
+      }
+    },
+    [isTagBlocked, processScan]
+  );
 
   const waitForBackendServiceState = useCallback(
     async (expectedRunning: boolean, timeoutMs: number): Promise<boolean> => {
@@ -520,9 +496,7 @@ export const useRfidScanning = () => {
       const deadline = Date.now() + timeoutMs;
       while (Date.now() < deadline) {
         try {
-          const serviceStatus = await safeInvoke<{ is_running: boolean }>(
-            'get_rfid_service_status'
-          );
+          const serviceStatus = await adapter.getServiceStatus();
           if (serviceStatus?.is_running === expectedRunning) {
             return true;
           }
@@ -618,7 +592,7 @@ export const useRfidScanning = () => {
       logger.debug('Calling start_rfid_service backend command', {
         timestamp: callTimestamp,
       });
-      await safeInvoke('start_rfid_service');
+      await adapter.startScanning(onAdapterScan);
       const backendStarted = await waitForBackendServiceState(true, 2000);
       if (!backendStarted) {
         throw new Error('RFID service did not report running state after start command');
@@ -641,7 +615,14 @@ export const useRfidScanning = () => {
         'Das RFID-Lesegerät konnte nicht gestartet werden. Bitte Gerät prüfen.'
       );
     }
-  }, [startRfidScanning, isTagBlocked, processScan, showSystemError, waitForBackendServiceState]);
+  }, [
+    startRfidScanning,
+    isTagBlocked,
+    processScan,
+    showSystemError,
+    waitForBackendServiceState,
+    onAdapterScan,
+  ]);
 
   const stopScanning = useCallback(async () => {
     const callTimestamp = Date.now();
@@ -663,7 +644,7 @@ export const useRfidScanning = () => {
         logger.debug('Calling stop_rfid_service backend command', {
           timestamp: callTimestamp,
         });
-        await safeInvoke('stop_rfid_service');
+        await adapter.stopScanning();
         const backendStopped = await waitForBackendServiceState(false, 2500);
         if (!backendStopped) {
           logger.warn('RFID backend did not confirm stop within timeout');
@@ -697,7 +678,7 @@ export const useRfidScanning = () => {
     if (!isRfidEnabled()) return;
 
     try {
-      const serviceStatus = await safeInvoke<{ is_running: boolean }>('get_rfid_service_status');
+      const serviceStatus = await adapter.getServiceStatus();
       if (serviceStatus?.is_running) {
         logger.info('RFID service is already running, synchronizing state');
         isServiceStartedRef.current = true;
@@ -714,9 +695,8 @@ export const useRfidScanning = () => {
   // Initialize service and setup event listener on mount
   useEffect(() => {
     void initializeService();
-    void setupEventListener();
     void syncServiceState();
-  }, [initializeService, setupEventListener, syncServiceState]);
+  }, [initializeService, syncServiceState]);
 
   // Auto-restart scanning after modal hides
   useEffect(() => {
@@ -740,10 +720,6 @@ export const useRfidScanning = () => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (eventListener) {
-        eventListener();
-        eventListener = null;
-      }
       if (mockScanInterval) {
         clearInterval(mockScanInterval);
         mockScanInterval = null;

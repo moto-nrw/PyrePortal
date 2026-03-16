@@ -17,11 +17,11 @@ class BrowserAdapter implements PlatformAdapter {
   }
 
   async startScanning(_onScan: (tagId: string) => void): Promise<void> {
-    throw new Error('BrowserAdapter.startScanning not implemented yet');
+    // No-op — mock scanning is handled directly in the useRfidScanning hook
   }
 
   async stopScanning(): Promise<void> {
-    throw new Error('BrowserAdapter.stopScanning not implemented yet');
+    // No-op — mock scanning is handled directly in the useRfidScanning hook
   }
 
   async getServiceStatus(): Promise<{ is_running: boolean }> {

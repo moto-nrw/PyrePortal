@@ -8,13 +8,28 @@ import {
   type CurrentSession,
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
+import { isRfidEnabled } from '../utils/tauriContext';
 
 import { useRfidScanning } from './useRfidScanning';
 
 // ====================================================================
 // Mock modules
 // ====================================================================
+
+vi.mock('@platform', () => ({
+  adapter: {
+    initializeNfc: vi.fn(),
+    startScanning: vi.fn(),
+    stopScanning: vi.fn(),
+    getServiceStatus: vi.fn(),
+  },
+}));
+
+const { adapter } = await import('@platform');
+const mockAdapterStartScanning = vi.mocked(adapter.startScanning);
+const mockAdapterStopScanning = vi.mocked(adapter.stopScanning);
+const mockAdapterGetServiceStatus = vi.mocked(adapter.getServiceStatus);
+const mockAdapterInitializeNfc = vi.mocked(adapter.initializeNfc);
 
 vi.mock('../services/api', () => ({
   api: {
@@ -50,7 +65,6 @@ vi.mock('../utils/crypto', () => ({
 // Helpers
 // ====================================================================
 
-const mockedSafeInvoke = vi.mocked(safeInvoke);
 const mockedIsRfidEnabled = vi.mocked(isRfidEnabled);
 const mockedProcessRfidScan = vi.mocked(api.processRfidScan);
 const mockedUpdateSessionActivity = vi.mocked(api.updateSessionActivity);
@@ -189,7 +203,10 @@ describe('useRfidScanning', () => {
     vi.useFakeTimers();
     resetStore();
     mockedIsRfidEnabled.mockReturnValue(false);
-    mockedSafeInvoke.mockResolvedValue(undefined);
+    mockAdapterInitializeNfc.mockResolvedValue(undefined);
+    mockAdapterStartScanning.mockResolvedValue(undefined);
+    mockAdapterStopScanning.mockResolvedValue(undefined);
+    mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
     mockedProcessRfidScan.mockResolvedValue(makeCheckinResult());
     mockedUpdateSessionActivity.mockResolvedValue(undefined);
     mockedUpdateSessionSupervisors.mockResolvedValue({ supervisors: [] });
@@ -225,32 +242,29 @@ describe('useRfidScanning', () => {
       expect(typeof result.current.stopScanning).toBe('function');
     });
 
-    it('does not call safeInvoke when RFID is disabled', () => {
+    it('does not call initializeNfc when RFID is disabled', () => {
       mockedIsRfidEnabled.mockReturnValue(false);
       renderHook(() => useRfidScanning());
-      expect(mockedSafeInvoke).not.toHaveBeenCalledWith('initialize_rfid_service');
+      expect(mockAdapterInitializeNfc).not.toHaveBeenCalled();
     });
 
-    it('calls initialize_rfid_service when RFID is enabled', async () => {
+    it('calls initializeNfc when RFID is enabled', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
-      mockedSafeInvoke.mockResolvedValue(undefined);
+      mockAdapterInitializeNfc.mockResolvedValue(undefined);
 
       await act(async () => {
         renderHook(() => useRfidScanning());
       });
 
-      expect(mockedSafeInvoke).toHaveBeenCalledWith('initialize_rfid_service');
+      expect(mockAdapterInitializeNfc).toHaveBeenCalled();
     });
 
     it('shows system error when initialization fails', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'initialize_rfid_service') throw new Error('Init failed');
-        // syncServiceState will also call get_rfid_service_status - let it fail
-        // so it doesn't overwrite the error modal via stopRfidScanning
-        if (cmd === 'get_rfid_service_status') throw new Error('not available');
-        return undefined;
-      });
+      mockAdapterInitializeNfc.mockRejectedValue(new Error('Init failed'));
+      // syncServiceState will also call getServiceStatus - let it fail
+      // so it doesn't overwrite the error modal via stopRfidScanning
+      mockAdapterGetServiceStatus.mockRejectedValue(new Error('not available'));
 
       await act(async () => {
         renderHook(() => useRfidScanning());
@@ -263,10 +277,7 @@ describe('useRfidScanning', () => {
 
     it('syncs service state when RFID is enabled and service is running', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       await act(async () => {
         renderHook(() => useRfidScanning());
@@ -278,10 +289,7 @@ describe('useRfidScanning', () => {
 
     it('syncs service state to stopped when backend reports not running', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: false };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
 
       // Pre-set scanning to true to verify it gets turned off
       useUserStore.setState({
@@ -298,10 +306,7 @@ describe('useRfidScanning', () => {
 
     it('handles syncServiceState error gracefully', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') throw new Error('status fail');
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockRejectedValue(new Error('status fail'));
 
       // Should not throw
       await act(async () => {
@@ -435,10 +440,7 @@ describe('useRfidScanning', () => {
     });
 
     it('starts real RFID service', async () => {
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -446,16 +448,13 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      expect(mockedSafeInvoke).toHaveBeenCalledWith('start_rfid_service');
+      expect(mockAdapterStartScanning).toHaveBeenCalled();
       expect(useUserStore.getState().rfid.isScanning).toBe(true);
     });
 
-    it('shows error when start_rfid_service fails', async () => {
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'start_rfid_service') throw new Error('HW fail');
-        if (cmd === 'get_rfid_service_status') return { is_running: false };
-        return undefined;
-      });
+    it('shows error when startScanning fails', async () => {
+      mockAdapterStartScanning.mockRejectedValue(new Error('HW fail'));
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -469,10 +468,7 @@ describe('useRfidScanning', () => {
     });
 
     it('throws when service does not confirm running state', async () => {
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: false };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -492,10 +488,7 @@ describe('useRfidScanning', () => {
     });
 
     it('stops real RFID service', async () => {
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -504,10 +497,7 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: false };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
 
       await act(async () => {
         const stopPromise = result.current.stopScanning();
@@ -517,15 +507,12 @@ describe('useRfidScanning', () => {
         await stopPromise;
       });
 
-      expect(mockedSafeInvoke).toHaveBeenCalledWith('stop_rfid_service');
+      expect(mockAdapterStopScanning).toHaveBeenCalled();
       expect(useUserStore.getState().rfid.isScanning).toBe(false);
     });
 
     it('handles stop error gracefully', async () => {
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -533,11 +520,8 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'stop_rfid_service') throw new Error('Stop failed');
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterStopScanning.mockRejectedValue(new Error('Stop failed'));
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       await act(async () => {
         await result.current.stopScanning();
@@ -548,10 +532,7 @@ describe('useRfidScanning', () => {
     });
 
     it('skips re-start when already started and backend confirms running', async () => {
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -559,7 +540,12 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      mockedSafeInvoke.mockClear();
+      mockAdapterStartScanning.mockClear();
+      mockAdapterStopScanning.mockClear();
+      mockAdapterGetServiceStatus.mockClear();
+      mockAdapterInitializeNfc.mockClear();
+
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       await act(async () => {
         const startPromise = result.current.startScanning();
@@ -569,15 +555,12 @@ describe('useRfidScanning', () => {
         await startPromise;
       });
 
-      // Should have checked status but NOT called start_rfid_service again
-      expect(mockedSafeInvoke).not.toHaveBeenCalledWith('start_rfid_service');
+      // Should have checked status but NOT called startScanning again
+      expect(mockAdapterStartScanning).not.toHaveBeenCalled();
     });
 
     it('restarts when ref says started but backend says not running', async () => {
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -587,10 +570,7 @@ describe('useRfidScanning', () => {
       });
 
       // Now backend says not running
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: false };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
 
       await act(async () => {
         const startPromise = result.current.startScanning();
@@ -606,29 +586,35 @@ describe('useRfidScanning', () => {
       expect(state.rfid.showModal).toBe(true);
     });
 
-    it('sets up event listener for RFID scans', async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      const mockedListen = vi.mocked(listen);
+    it('captures onScan callback via adapter.startScanning', async () => {
+      let capturedOnScan: ((tagId: string) => void) | undefined;
+      mockAdapterStartScanning.mockImplementation(async onScan => {
+        capturedOnScan = onScan;
+      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
-        renderHook(() => useRfidScanning());
+        await result.current.startScanning();
       });
 
-      expect(mockedListen).toHaveBeenCalledWith('rfid-scan', expect.any(Function));
+      expect(capturedOnScan).toBeDefined();
     });
 
-    it('shows error when event listener setup fails', async () => {
-      const { listen } = await import('@tauri-apps/api/event');
-      const mockedListen = vi.mocked(listen);
-      mockedListen.mockRejectedValueOnce(new Error('Listen failed'));
+    it('shows error when startScanning setup fails', async () => {
+      mockAdapterStartScanning.mockRejectedValue(new Error('Listen failed'));
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
+
+      const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
-        renderHook(() => useRfidScanning());
+        await result.current.startScanning();
       });
 
       const state = useUserStore.getState();
       expect(state.rfid.showModal).toBe(true);
-      expect(state.rfid.currentScan?.student_name).toBe('RFID-Verbindung fehlgeschlagen');
+      expect(state.rfid.currentScan?.student_name).toBe('RFID-Service Start fehlgeschlagen');
     });
   });
 
@@ -1170,10 +1156,7 @@ describe('useRfidScanning', () => {
 
     it('stops service on unmount when started', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result, unmount } = renderHook(() => useRfidScanning());
 
@@ -1182,11 +1165,11 @@ describe('useRfidScanning', () => {
       });
 
       // Reset so we can check if stop was called
-      mockedSafeInvoke.mockClear();
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: false };
-        return undefined;
-      });
+      mockAdapterStartScanning.mockClear();
+      mockAdapterStopScanning.mockClear();
+      mockAdapterGetServiceStatus.mockClear();
+      mockAdapterInitializeNfc.mockClear();
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
 
       unmount();
 
@@ -1197,23 +1180,7 @@ describe('useRfidScanning', () => {
         }
       });
 
-      expect(mockedSafeInvoke).toHaveBeenCalledWith('stop_rfid_service');
-    });
-
-    it('cleans up event listener on unmount', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
-      const unlistenFn = vi.fn();
-      const { listen } = await import('@tauri-apps/api/event');
-      vi.mocked(listen).mockResolvedValue(unlistenFn);
-
-      let hookResult: ReturnType<typeof renderHook>;
-      await act(async () => {
-        hookResult = renderHook(() => useRfidScanning());
-      });
-
-      hookResult!.unmount();
-
-      expect(unlistenFn).toHaveBeenCalled();
+      expect(mockAdapterStopScanning).toHaveBeenCalled();
     });
   });
 
@@ -1274,13 +1241,10 @@ describe('useRfidScanning', () => {
       mockedIsRfidEnabled.mockReturnValue(true);
 
       let pollCount = 0;
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') {
-          pollCount++;
-          // Return running=true after 3 polls
-          return { is_running: pollCount >= 3 };
-        }
-        return undefined;
+      mockAdapterGetServiceStatus.mockImplementation(async () => {
+        pollCount++;
+        // Return running=true after 3 polls
+        return { is_running: pollCount >= 3 };
       });
 
       const { result } = renderHook(() => useRfidScanning());
@@ -1303,13 +1267,10 @@ describe('useRfidScanning', () => {
       mockedIsRfidEnabled.mockReturnValue(true);
 
       let pollCount = 0;
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') {
-          pollCount++;
-          if (pollCount === 1) throw new Error('poll error');
-          return { is_running: true };
-        }
-        return undefined;
+      mockAdapterGetServiceStatus.mockImplementation(async () => {
+        pollCount++;
+        if (pollCount === 1) throw new Error('poll error');
+        return { is_running: true };
       });
 
       const { result } = renderHook(() => useRfidScanning());
@@ -1394,33 +1355,29 @@ describe('useRfidScanning', () => {
   // ------------------------------------------------------------------
 
   describe('RFID event processing', () => {
-    it('processes scans from event listener', async () => {
+    it('processes scans from adapter callback', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
       setAuthenticated();
       setRoom();
       setSession();
 
-      let eventCallback:
-        | ((event: { payload: { tag_id: string; timestamp: number; platform: string } }) => void)
-        | undefined;
-
-      const { listen } = await import('@tauri-apps/api/event');
-      vi.mocked(listen).mockImplementation(async (_event, handler) => {
-        eventCallback = handler as typeof eventCallback;
-        return () => undefined;
+      let capturedOnScan: ((tagId: string) => void) | undefined;
+      mockAdapterStartScanning.mockImplementation(async onScan => {
+        capturedOnScan = onScan;
       });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
-        renderHook(() => useRfidScanning());
+        await result.current.startScanning();
       });
 
-      expect(eventCallback).toBeDefined();
+      expect(capturedOnScan).toBeDefined();
 
-      // Trigger a scan event
+      // Trigger a scan event via the captured callback
       await act(async () => {
-        eventCallback!({
-          payload: { tag_id: '04:AA:BB:CC:DD:EE:FF', timestamp: Date.now(), platform: 'test' },
-        });
+        capturedOnScan!('04:AA:BB:CC:DD:EE:FF');
       });
 
       await act(async () => {
@@ -1433,32 +1390,28 @@ describe('useRfidScanning', () => {
       );
     });
 
-    it('skips blocked tags from event listener', async () => {
+    it('skips blocked tags from adapter callback', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
       setAuthenticated();
       setRoom();
 
-      let eventCallback:
-        | ((event: { payload: { tag_id: string; timestamp: number; platform: string } }) => void)
-        | undefined;
-
-      const { listen } = await import('@tauri-apps/api/event');
-      vi.mocked(listen).mockImplementation(async (_event, handler) => {
-        eventCallback = handler as typeof eventCallback;
-        return () => undefined;
+      let capturedOnScan: ((tagId: string) => void) | undefined;
+      mockAdapterStartScanning.mockImplementation(async onScan => {
+        capturedOnScan = onScan;
       });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
-        renderHook(() => useRfidScanning());
+        await result.current.startScanning();
       });
 
       // Block the tag
       useUserStore.getState().blockTag('04:AA:BB:CC:DD:EE:FF', 60000);
 
       await act(async () => {
-        eventCallback!({
-          payload: { tag_id: '04:AA:BB:CC:DD:EE:FF', timestamp: Date.now(), platform: 'test' },
-        });
+        capturedOnScan!('04:AA:BB:CC:DD:EE:FF');
       });
 
       await act(async () => {
@@ -1476,10 +1429,7 @@ describe('useRfidScanning', () => {
   describe('stop scanning edge cases', () => {
     it('warns when backend does not confirm stop within timeout', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -1555,15 +1505,12 @@ describe('useRfidScanning', () => {
     });
 
     // Known issue (post-mortem #7): stopScanning doesn't clean up state
-    // when stop_rfid_service throws. Currently store stays isScanning=true.
+    // when stopScanning throws. Currently store stays isScanning=true.
     // Will be fixed in adapter migration (Step 4b).
-    it.skip('stopScanning cleans up even when stop_rfid_service fails', async () => {
+    it.skip('stopScanning cleans up even when adapter.stopScanning fails', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
-      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
-        if (cmd === 'get_rfid_service_status') return { is_running: true };
-        if (cmd === 'stop_rfid_service') throw new Error('stop failed');
-        return undefined;
-      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+      mockAdapterStopScanning.mockRejectedValue(new Error('stop failed'));
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -1581,26 +1528,24 @@ describe('useRfidScanning', () => {
       expect(useUserStore.getState().rfid.isScanning).toBe(false);
     });
 
-    it('listener is set up on mount for real RFID', async () => {
+    it('onScan callback is captured on startScanning for real RFID', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
 
-      let eventCallback:
-        | ((event: { payload: { tag_id: string; timestamp: number; platform: string } }) => void)
-        | undefined;
-
-      const { listen } = await import('@tauri-apps/api/event');
-      vi.mocked(listen).mockImplementation(async (_event, handler) => {
-        eventCallback = handler as typeof eventCallback;
-        return () => undefined;
+      let capturedOnScan: ((tagId: string) => void) | undefined;
+      mockAdapterStartScanning.mockImplementation(async onScan => {
+        capturedOnScan = onScan;
       });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
-        renderHook(() => useRfidScanning());
+        await result.current.startScanning();
       });
 
-      // Listener should have been registered on mount
-      expect(eventCallback).toBeDefined();
-      expect(vi.mocked(listen)).toHaveBeenCalledWith('rfid-scan', expect.any(Function));
+      // Callback should have been passed to adapter.startScanning
+      expect(capturedOnScan).toBeDefined();
+      expect(mockAdapterStartScanning).toHaveBeenCalledWith(expect.any(Function));
     });
   });
 });

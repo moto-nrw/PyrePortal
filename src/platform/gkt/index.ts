@@ -30,12 +30,13 @@ class GKTAdapter implements PlatformAdapter {
     });
   }
 
-  async startScanning(_onScan: (tagId: string) => void): Promise<void> {
-    throw new Error('GKTAdapter.startScanning not implemented yet');
+  async startScanning(onScan: (tagId: string) => void): Promise<void> {
+    // GKT NFC is always-on after registerNfc — just set callback
+    this.scanCallback = onScan;
   }
 
   async stopScanning(): Promise<void> {
-    throw new Error('GKTAdapter.stopScanning not implemented yet');
+    this.scanCallback = null;
   }
 
   async getServiceStatus(): Promise<{ is_running: boolean }> {

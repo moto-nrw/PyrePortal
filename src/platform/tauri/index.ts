@@ -18,12 +18,43 @@ class TauriAdapter implements PlatformAdapter {
     await safeInvoke('initialize_rfid_service');
   }
 
-  async startScanning(_onScan: (tagId: string) => void): Promise<void> {
-    throw new Error('TauriAdapter.startScanning not implemented yet');
+  private unlisten: (() => void) | null = null;
+
+  async startScanning(onScan: (tagId: string) => void): Promise<void> {
+    // Clean up previous listener first (post-mortem #13: prevent duplicates)
+    if (this.unlisten) {
+      this.unlisten();
+      this.unlisten = null;
+    }
+
+    // Set up listener BEFORE starting service (post-mortem #6: don't miss first scan)
+    const { listen } = await import('@tauri-apps/api/event');
+    this.unlisten = await listen<{ tag_id: string }>('rfid-scan', event => {
+      onScan(event.payload.tag_id);
+    });
+
+    try {
+      await safeInvoke('start_rfid_service');
+    } catch (error) {
+      // Clean up listener if service start fails (post-mortem #12)
+      if (this.unlisten) {
+        this.unlisten();
+        this.unlisten = null;
+      }
+      throw error;
+    }
   }
 
   async stopScanning(): Promise<void> {
-    throw new Error('TauriAdapter.stopScanning not implemented yet');
+    try {
+      await safeInvoke('stop_rfid_service');
+    } finally {
+      // Always clean up listener even on failure (post-mortem #7)
+      if (this.unlisten) {
+        this.unlisten();
+        this.unlisten = null;
+      }
+    }
   }
 
   async getServiceStatus(): Promise<{ is_running: boolean }> {
