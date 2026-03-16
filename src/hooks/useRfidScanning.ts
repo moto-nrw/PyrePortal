@@ -12,6 +12,14 @@ import { isRfidEnabled } from '../utils/tauriContext';
 // Mock scanning interval for development
 let mockScanInterval: ReturnType<typeof setInterval> | null = null;
 
+/** Reset module-level state between tests. Not for production use. */
+export function __resetModuleStateForTesting(): void {
+  if (mockScanInterval) {
+    clearInterval(mockScanInterval);
+    mockScanInterval = null;
+  }
+}
+
 const logger = createLogger('useRfidScanning');
 
 // ============================================================================

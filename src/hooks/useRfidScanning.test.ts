@@ -10,7 +10,7 @@ import {
 import { useUserStore } from '../store/userStore';
 import { isRfidEnabled } from '../utils/tauriContext';
 
-import { useRfidScanning } from './useRfidScanning';
+import { useRfidScanning, __resetModuleStateForTesting } from './useRfidScanning';
 
 // ====================================================================
 // Mock modules
@@ -200,6 +200,12 @@ describe('useRfidScanning', () => {
     originalMockRfidTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
     (import.meta.env as Record<string, unknown>).VITE_MOCK_RFID_TAGS = MOCK_TAG;
 
+    // Reset module-level mockScanInterval to prevent cross-test contamination.
+    // cleanup() in afterEach fires the unmount effect, but if timer mode was
+    // swapped (real↔fake) the clearInterval may target the wrong timer pool,
+    // leaving mockScanInterval non-null for the next test.
+    __resetModuleStateForTesting();
+
     vi.useFakeTimers();
     resetStore();
     mockedIsRfidEnabled.mockReturnValue(false);
@@ -212,11 +218,17 @@ describe('useRfidScanning', () => {
     mockedUpdateSessionSupervisors.mockResolvedValue({ supervisors: [] });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     // Unmount all rendered hooks BEFORE restoring real timers so that
     // useEffect cleanup (which clears module-level mockScanInterval /
     // eventListener) fires while fake timers are still active.
     cleanup();
+
+    // Drain any pending microtasks spawned by fire-and-forget async cleanup
+    // (e.g., `void stopScanning()` in the unmount effect). Without this,
+    // the dangling promise can settle during the NEXT test and call
+    // stopRfidScanning(), wiping isScanning/currentScan mid-assertion.
+    await vi.advanceTimersByTimeAsync(0);
 
     // Restore original env value
     if (originalMockRfidTags === undefined) {
@@ -1504,10 +1516,7 @@ describe('useRfidScanning', () => {
       expect(mockedProcessRfidScan).toHaveBeenCalled();
     });
 
-    // Known issue (post-mortem #7): stopScanning doesn't clean up state
-    // when stopScanning throws. Currently store stays isScanning=true.
-    // Will be fixed in adapter migration (Step 4b).
-    it.skip('stopScanning cleans up even when adapter.stopScanning fails', async () => {
+    it('stopScanning cleans up even when adapter.stopScanning fails', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
       mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
       mockAdapterStopScanning.mockRejectedValue(new Error('stop failed'));
