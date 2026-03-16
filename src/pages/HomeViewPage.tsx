@@ -326,7 +326,6 @@ function HomeViewPage() {
               cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
               boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
@@ -388,7 +387,6 @@ function HomeViewPage() {
               cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
               boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
@@ -487,7 +485,6 @@ function HomeViewPage() {
                   padding: '36px',
                   transition: 'all 300ms ease-out',
                   outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
                   minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -633,7 +630,6 @@ function HomeViewPage() {
                   cursor: 'pointer',
                   transition: 'all 300ms ease-out',
                   outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
                   minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -826,6 +822,15 @@ function HomeViewPage() {
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
           <button
             onClick={() => setShowConfirmModal(false)}
+            onPointerDown={e => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onPointerUp={e => {
+              e.currentTarget.style.transform = '';
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.transform = '';
+            }}
             style={{
               flex: 1,
               height: '68px',
@@ -846,6 +851,15 @@ function HomeViewPage() {
           <button
             onClick={handleConfirmRecreation}
             disabled={isValidatingLastSession}
+            onPointerDown={e => {
+              if (!isValidatingLastSession) e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onPointerUp={e => {
+              e.currentTarget.style.transform = '';
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.transform = '';
+            }}
             style={{
               flex: 1,
               height: '68px',
@@ -905,6 +919,15 @@ function HomeViewPage() {
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
           <button
             onClick={() => setShowEndSessionModal(false)}
+            onPointerDown={e => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onPointerUp={e => {
+              e.currentTarget.style.transform = '';
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.transform = '';
+            }}
             style={{
               flex: 1,
               height: '68px',
@@ -924,6 +947,15 @@ function HomeViewPage() {
 
           <button
             onClick={handleConfirmEndSession}
+            onPointerDown={e => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onPointerUp={e => {
+              e.currentTarget.style.transform = '';
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.transform = '';
+            }}
             style={{
               flex: 1,
               height: '68px',
@@ -980,6 +1012,15 @@ function HomeViewPage() {
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
           <button
             onClick={() => setShowEndSessionModal(false)}
+            onPointerDown={e => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onPointerUp={e => {
+              e.currentTarget.style.transform = '';
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.transform = '';
+            }}
             style={{
               flex: 1,
               height: '68px',
@@ -999,6 +1040,15 @@ function HomeViewPage() {
 
           <button
             onClick={handleConfirmEndSession}
+            onPointerDown={e => {
+              e.currentTarget.style.transform = 'scale(0.95)';
+            }}
+            onPointerUp={e => {
+              e.currentTarget.style.transform = '';
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.transform = '';
+            }}
             style={{
               flex: 1,
               height: '68px',

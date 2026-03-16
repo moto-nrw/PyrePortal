@@ -472,6 +472,15 @@ function TagAssignmentPage() {
 
             <button
               onClick={cancelScan}
+              onPointerDown={e => {
+                e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onPointerUp={e => {
+                e.currentTarget.style.transform = '';
+              }}
+              onPointerLeave={e => {
+                e.currentTarget.style.transform = '';
+              }}
               style={{
                 padding: '12px 32px',
                 fontSize: '18px',
@@ -482,6 +491,7 @@ function TagAssignmentPage() {
                 borderRadius: '24px',
                 cursor: 'pointer',
                 outline: 'none',
+                transition: 'all 200ms',
                 position: 'relative',
                 zIndex: 2,
               }}
@@ -550,7 +560,6 @@ function TagAssignmentPage() {
                     borderRadius: designSystem.borderRadius.full,
                     cursor: isScanStartDisabled ? 'not-allowed' : 'pointer',
                     outline: 'none',
-                    WebkitTapHighlightColor: 'transparent',
                     boxShadow: isScanStartDisabled ? 'none' : designSystem.shadows.blue,
                     opacity: isScanStartDisabled ? 0.6 : 1,
                   }}
@@ -741,7 +750,6 @@ function TagAssignmentPage() {
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
                         boxShadow: designSystem.shadows.blue,
                       }}
                       onTouchStart={e => {
@@ -768,7 +776,6 @@ function TagAssignmentPage() {
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
                       }}
                       onTouchStart={e => {
                         e.currentTarget.style.backgroundColor = '#F9FAFB';
@@ -798,7 +805,6 @@ function TagAssignmentPage() {
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
                       }}
                       onTouchStart={e => {
                         e.currentTarget.style.backgroundColor = '#FEF2F2';
@@ -871,6 +877,15 @@ function TagAssignmentPage() {
                 >
                   <button
                     onClick={handleScanAnother}
+                    onPointerDown={e => {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                    }}
+                    onPointerUp={e => {
+                      e.currentTarget.style.transform = '';
+                    }}
+                    onPointerLeave={e => {
+                      e.currentTarget.style.transform = '';
+                    }}
                     style={{
                       height: '68px',
                       padding: '0 40px',
@@ -882,7 +897,7 @@ function TagAssignmentPage() {
                       borderRadius: '34px',
                       cursor: 'pointer',
                       outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
+                      transition: 'all 200ms',
                       boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
                     }}
                   >
@@ -890,6 +905,15 @@ function TagAssignmentPage() {
                   </button>
                   <button
                     onClick={handleBack}
+                    onPointerDown={e => {
+                      e.currentTarget.style.transform = 'scale(0.95)';
+                    }}
+                    onPointerUp={e => {
+                      e.currentTarget.style.transform = '';
+                    }}
+                    onPointerLeave={e => {
+                      e.currentTarget.style.transform = '';
+                    }}
                     style={{
                       height: '68px',
                       padding: '0 40px',
@@ -901,7 +925,7 @@ function TagAssignmentPage() {
                       borderRadius: '34px',
                       cursor: 'pointer',
                       outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
+                      transition: 'all 200ms',
                     }}
                   >
                     Zurück
@@ -977,6 +1001,15 @@ function TagAssignmentPage() {
             <button
               onClick={handleUnassignTag}
               disabled={isUnassigning}
+              onPointerDown={e => {
+                if (!isUnassigning) e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onPointerUp={e => {
+                e.currentTarget.style.transform = '';
+              }}
+              onPointerLeave={e => {
+                e.currentTarget.style.transform = '';
+              }}
               style={{
                 height: '52px',
                 padding: '0 32px',
@@ -988,7 +1021,7 @@ function TagAssignmentPage() {
                 borderRadius: designSystem.borderRadius.full,
                 cursor: isUnassigning ? 'not-allowed' : 'pointer',
                 outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 200ms',
                 opacity: isUnassigning ? 0.7 : 1,
               }}
             >
@@ -997,6 +1030,15 @@ function TagAssignmentPage() {
             <button
               onClick={() => setShowUnassignConfirm(false)}
               disabled={isUnassigning}
+              onPointerDown={e => {
+                if (!isUnassigning) e.currentTarget.style.transform = 'scale(0.95)';
+              }}
+              onPointerUp={e => {
+                e.currentTarget.style.transform = '';
+              }}
+              onPointerLeave={e => {
+                e.currentTarget.style.transform = '';
+              }}
               style={{
                 height: '52px',
                 padding: '0 32px',
@@ -1008,7 +1050,7 @@ function TagAssignmentPage() {
                 borderRadius: designSystem.borderRadius.full,
                 cursor: isUnassigning ? 'not-allowed' : 'pointer',
                 outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 200ms',
                 opacity: isUnassigning ? 0.5 : 1,
               }}
             >

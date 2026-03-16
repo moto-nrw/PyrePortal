@@ -46,23 +46,22 @@ function NumpadButton({ onClick, isAction = false, children }: NumpadButtonProps
         cursor: 'pointer',
         transition: 'all 150ms ease-out',
         outline: 'none',
-        WebkitTapHighlightColor: 'transparent',
-        touchAction: 'manipulation',
         boxShadow: '0 3px 8px rgba(0, 0, 0, 0.1)',
       }}
-      onTouchStart={e => {
+      onPointerDown={e => {
         e.currentTarget.style.transform = 'scale(0.95)';
         e.currentTarget.style.backgroundColor = isAction ? '#F3F4F6' : '#F9FAFB';
         e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
       }}
-      onTouchEnd={e => {
-        setTimeout(() => {
-          if (e.currentTarget) {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
-            e.currentTarget.style.boxShadow = '0 2px 4px rgba(0, 0, 0, 0.05)';
-          }
-        }, 100);
+      onPointerUp={e => {
+        e.currentTarget.style.transform = '';
+        e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
+        e.currentTarget.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.1)';
+      }}
+      onPointerLeave={e => {
+        e.currentTarget.style.transform = '';
+        e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
+        e.currentTarget.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.1)';
       }}
     >
       {children}

@@ -145,19 +145,15 @@ function DestinationButton({
         alignItems: 'center',
         gap: '12px',
       }}
-      onMouseEnter={e => {
+      onPointerDown={e => {
         e.currentTarget.style.backgroundColor = colors.bgHover;
         e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
       }}
-      onMouseLeave={e => {
+      onPointerUp={e => {
         e.currentTarget.style.backgroundColor = colors.bg;
         e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
       }}
-      onTouchStart={e => {
-        e.currentTarget.style.backgroundColor = colors.bgHover;
-        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
-      }}
-      onTouchEnd={e => {
+      onPointerLeave={e => {
         e.currentTarget.style.backgroundColor = colors.bg;
         e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
       }}
@@ -899,19 +895,15 @@ const ActivityScanningPage: React.FC = () => {
                     backgroundColor: colorScheme.background,
                     borderColor: colorScheme.border,
                   }}
-                  onMouseEnter={e => {
+                  onPointerDown={e => {
                     e.currentTarget.style.backgroundColor = colorScheme.hoverBackground;
                     e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
                   }}
-                  onMouseLeave={e => {
+                  onPointerUp={e => {
                     e.currentTarget.style.backgroundColor = colorScheme.background;
                     e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
                   }}
-                  onTouchStart={e => {
-                    e.currentTarget.style.backgroundColor = colorScheme.hoverBackground;
-                    e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
-                  }}
-                  onTouchEnd={e => {
+                  onPointerLeave={e => {
                     e.currentTarget.style.backgroundColor = colorScheme.background;
                     e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
                   }}

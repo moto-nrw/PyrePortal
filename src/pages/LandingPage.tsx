@@ -120,21 +120,21 @@ function LandingPage() {
                 cursor: 'pointer',
                 transition: 'all 200ms ease-out',
                 outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
               }}
-              onTouchStart={e => {
+              onPointerDown={e => {
                 e.currentTarget.style.transform = 'scale(0.95)';
                 e.currentTarget.style.backgroundColor = '#1F2937';
                 e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
               }}
-              onTouchEnd={e => {
-                setTimeout(() => {
-                  if (e.currentTarget) {
-                    e.currentTarget.style.transform = 'scale(1)';
-                    e.currentTarget.style.backgroundColor = '#111827';
-                    e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
-                  }
-                }, 100);
+              onPointerUp={e => {
+                e.currentTarget.style.transform = '';
+                e.currentTarget.style.backgroundColor = '#111827';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+              }}
+              onPointerLeave={e => {
+                e.currentTarget.style.transform = '';
+                e.currentTarget.style.backgroundColor = '#111827';
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
               }}
             >
               Anmelden

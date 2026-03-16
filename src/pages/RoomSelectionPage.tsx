@@ -259,6 +259,15 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       <button
         onClick={onCancel}
         disabled={isLoading}
+        onPointerDown={e => {
+          if (!isLoading) e.currentTarget.style.transform = 'scale(0.95)';
+        }}
+        onPointerUp={e => {
+          e.currentTarget.style.transform = '';
+        }}
+        onPointerLeave={e => {
+          e.currentTarget.style.transform = '';
+        }}
         style={{
           flex: 1,
           height: '68px',
@@ -271,20 +280,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           cursor: isLoading ? 'not-allowed' : 'pointer',
           transition: 'all 200ms',
           outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
           opacity: isLoading ? 0.6 : 1,
-        }}
-        onTouchStart={e => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
-            e.currentTarget.style.borderColor = '#D1D5DB';
-          }
-        }}
-        onTouchEnd={e => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.borderColor = '#E5E7EB';
-          }
         }}
       >
         Abbrechen
@@ -293,6 +289,15 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       <button
         onClick={onConfirm}
         disabled={isLoading}
+        onPointerDown={e => {
+          if (!isLoading) e.currentTarget.style.transform = 'scale(0.95)';
+        }}
+        onPointerUp={e => {
+          e.currentTarget.style.transform = '';
+        }}
+        onPointerLeave={e => {
+          e.currentTarget.style.transform = '';
+        }}
         style={{
           flex: 1,
           height: '68px',
@@ -307,21 +312,8 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           cursor: isLoading ? 'not-allowed' : 'pointer',
           transition: 'all 200ms',
           outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
           boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
           opacity: isLoading ? 0.6 : 1,
-        }}
-        onTouchStart={e => {
-          if (!isLoading) {
-            e.currentTarget.style.transform = 'scale(0.98)';
-            e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(131, 205, 45, 0.5)';
-          }
-        }}
-        onTouchEnd={e => {
-          if (!isLoading) {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(131, 205, 45, 0.4)';
-          }
         }}
       >
         {isLoading ? 'Starte...' : 'Aufsicht starten'}
@@ -582,6 +574,15 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
       <button
         onClick={onCancel}
         disabled={isLoading}
+        onPointerDown={e => {
+          if (!isLoading) e.currentTarget.style.transform = 'scale(0.95)';
+        }}
+        onPointerUp={e => {
+          e.currentTarget.style.transform = '';
+        }}
+        onPointerLeave={e => {
+          e.currentTarget.style.transform = '';
+        }}
         style={{
           flex: 1,
           height: '68px',
@@ -594,20 +595,7 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
           cursor: isLoading ? 'not-allowed' : 'pointer',
           transition: 'all 200ms',
           outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
           opacity: isLoading ? 0.6 : 1,
-        }}
-        onTouchStart={e => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
-            e.currentTarget.style.borderColor = '#D1D5DB';
-          }
-        }}
-        onTouchEnd={e => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.borderColor = '#E5E7EB';
-          }
         }}
       >
         Abbrechen
@@ -616,6 +604,15 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
       <button
         onClick={onForceStart}
         disabled={isLoading}
+        onPointerDown={e => {
+          if (!isLoading) e.currentTarget.style.transform = 'scale(0.95)';
+        }}
+        onPointerUp={e => {
+          e.currentTarget.style.transform = '';
+        }}
+        onPointerLeave={e => {
+          e.currentTarget.style.transform = '';
+        }}
         style={{
           flex: 1,
           height: '68px',
@@ -630,21 +627,8 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
           cursor: isLoading ? 'not-allowed' : 'pointer',
           transition: 'all 200ms',
           outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
           boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
           opacity: isLoading ? 0.6 : 1,
-        }}
-        onTouchStart={e => {
-          if (!isLoading) {
-            e.currentTarget.style.transform = 'scale(0.98)';
-            e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(220, 38, 38, 0.5)';
-          }
-        }}
-        onTouchEnd={e => {
-          if (!isLoading) {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(220, 38, 38, 0.4)';
-          }
         }}
       >
         {isLoading ? 'Starte...' : 'Trotzdem starten'}
