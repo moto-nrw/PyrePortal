@@ -491,6 +491,45 @@ describe('HomeViewPage', () => {
     });
   });
 
+  it('keeps logout label as "Abmelden" while recreation is redirecting', async () => {
+    const user = userEvent.setup();
+    const validateMock = vi.fn(() => Promise.resolve(true));
+    const fetchCurrentSession = vi
+      .fn<() => Promise<void>>()
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(async () => {
+        useUserStore.setState({ currentSession: activeSession });
+      });
+
+    useUserStore.setState({
+      sessionSettings: sessionSettingsWithLastSession,
+      validateAndRecreateSession: validateMock,
+      fetchCurrentSession,
+      saveLastSessionData: vi.fn(() => Promise.resolve()),
+      selectedActivity: testActivity,
+      selectedRoom: testRoom,
+      selectedSupervisors: [{ id: 1, name: 'Frau Müller' }] as never[],
+    });
+    renderPage();
+
+    await user.click(screen.getByText('Aufsicht wiederholen'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
+    });
+
+    const startButtons = screen.getAllByText('Aufsicht starten');
+    await user.click(startButtons[startButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(fetchCurrentSession).toHaveBeenCalledTimes(2);
+    });
+
+    expect(screen.getByText('Abmelden')).toBeInTheDocument();
+    expect(screen.queryByText('Aufsicht beenden')).not.toBeInTheDocument();
+    expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
+  });
+
   it('confirm recreation shows error when session data is incomplete (no activity)', async () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => Promise.resolve(true));

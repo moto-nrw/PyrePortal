@@ -141,6 +141,7 @@ function HomeViewPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
+  const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -163,6 +164,7 @@ function HomeViewPage() {
   };
 
   const handleLogout = async () => {
+    setTouchedButton(null);
     if (currentSession) {
       setShowEndSessionModal(true);
     } else {
@@ -176,6 +178,7 @@ function HomeViewPage() {
   };
 
   const handleTagAssignment = () => {
+    setTouchedButton(null);
     logNavigation('Home View', '/tag-assignment');
     void navigate('/tag-assignment');
   };
@@ -252,6 +255,8 @@ function HomeViewPage() {
     });
 
     try {
+      setIsNavigatingToScanning(true);
+
       const sessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id,
@@ -270,6 +275,7 @@ function HomeViewPage() {
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');
     } catch (error) {
+      setIsNavigatingToScanning(false);
       showRecreationError(formatRecreationError(error));
     } finally {
       setShowConfirmModal(false);
@@ -313,6 +319,10 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleTagAssignment}
+            onTouchStart={() => setTouchedButton('tag')}
+            onTouchEnd={() => setTouchedButton(null)}
+            onTouchCancel={() => setTouchedButton(null)}
+            onPointerLeave={() => setTouchedButton(current => (current === 'tag' ? null : current))}
             style={{
               height: '68px',
               display: 'flex',
@@ -320,7 +330,8 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '12px',
               padding: '0 32px',
-              backgroundColor: designSystem.glass.background,
+              backgroundColor:
+                touchedButton === 'tag' ? 'rgba(80, 128, 216, 0.1)' : designSystem.glass.background,
               border: '1px solid rgba(80, 128, 216, 0.2)',
               borderRadius: '34px',
               cursor: 'pointer',
@@ -329,20 +340,7 @@ function HomeViewPage() {
               boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
-            }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = designSystem.scales.activeSmall;
-              e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
-              e.currentTarget.style.boxShadow = designSystem.shadows.button;
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                }
-              }, 150);
+              transform: touchedButton === 'tag' ? designSystem.scales.activeSmall : 'scale(1)',
             }}
           >
             <FontAwesomeIcon
@@ -374,6 +372,12 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleLogout}
+            onTouchStart={() => setTouchedButton('logout')}
+            onTouchEnd={() => setTouchedButton(null)}
+            onTouchCancel={() => setTouchedButton(null)}
+            onPointerLeave={() =>
+              setTouchedButton(current => (current === 'logout' ? null : current))
+            }
             style={{
               height: '68px',
               display: 'flex',
@@ -381,7 +385,10 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '12px',
               padding: '0 32px',
-              backgroundColor: designSystem.glass.background,
+              backgroundColor:
+                touchedButton === 'logout'
+                  ? 'rgba(255, 49, 48, 0.1)'
+                  : designSystem.glass.background,
               border: '1px solid rgba(255, 49, 48, 0.2)',
               borderRadius: '34px',
               cursor: 'pointer',
@@ -390,20 +397,7 @@ function HomeViewPage() {
               boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
-            }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = designSystem.scales.activeSmall;
-              e.currentTarget.style.backgroundColor = 'rgba(255, 49, 48, 0.1)';
-              e.currentTarget.style.boxShadow = designSystem.shadows.button;
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                }
-              }, 150);
+              transform: touchedButton === 'logout' ? designSystem.scales.activeSmall : 'scale(1)',
             }}
           >
             <svg
@@ -427,7 +421,7 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              {currentSession ? 'Aufsicht beenden' : 'Abmelden'}
+              {currentSession && !isNavigatingToScanning ? 'Aufsicht beenden' : 'Abmelden'}
             </span>
           </button>
         </div>
