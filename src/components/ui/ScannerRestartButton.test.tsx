@@ -9,6 +9,7 @@ import { ScannerRestartButton } from './ScannerRestartButton';
 // Mock the platform adapter
 vi.mock('@platform', () => ({
   adapter: {
+    platform: 'tauri',
     recoverScanner: vi.fn(),
     getScannerStatus: vi.fn(),
     getServiceStatus: vi.fn(),
@@ -23,6 +24,7 @@ const mockGetServiceStatus = vi.mocked(adapter.getServiceStatus);
 const mockIsRfidEnabled = vi.mocked(isRfidEnabled);
 
 beforeEach(() => {
+  (adapter as unknown as Record<string, unknown>).platform = 'tauri';
   mockIsRfidEnabled.mockReturnValue(false);
   mockRecoverScanner.mockResolvedValue(undefined);
   mockGetScannerStatus.mockResolvedValue({ is_available: true });

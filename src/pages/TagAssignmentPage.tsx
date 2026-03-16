@@ -1029,7 +1029,7 @@ function TagAssignmentPage() {
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />
 
-      <ScannerRestartButton />
+      {__BUILD_TARGET__ !== 'gkt' && <ScannerRestartButton />}
     </>
   );
 }

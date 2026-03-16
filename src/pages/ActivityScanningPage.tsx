@@ -1448,10 +1448,12 @@ const ActivityScanningPage: React.FC = () => {
         </ModalBase>
       )}
 
-      <ScannerRestartButton
-        onBeforeRecover={() => stopScanning()}
-        onAfterRecover={() => startScanning()}
-      />
+      {__BUILD_TARGET__ !== 'gkt' && (
+        <ScannerRestartButton
+          onBeforeRecover={() => stopScanning()}
+          onAfterRecover={() => startScanning()}
+        />
+      )}
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={rfid.processingQueue.size > 0} />
