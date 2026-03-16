@@ -88,9 +88,13 @@ function LandingPage() {
               />
             </div>
 
-            {/* Welcome Heading with Phoenix MOTO Gradient */}
+            {/* Welcome Heading with Phoenix MOTO Gradient (solid fallback for GKT WebView) */}
             <h1
-              className="bg-gradient-to-r from-[#5080d8] to-[#83cd2d] bg-clip-text font-bold text-transparent"
+              className={
+                adapter.platform === 'gkt'
+                  ? 'font-bold text-[#5080d8]'
+                  : 'bg-gradient-to-r from-[#5080d8] to-[#83cd2d] bg-clip-text font-bold text-transparent'
+              }
               style={{
                 fontSize: '64px',
                 marginBottom: theme.spacing.md,
