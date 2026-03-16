@@ -7,6 +7,7 @@
  */
 
 import type { SessionSettings } from '../../services/sessionStorage';
+import { safeInvoke } from '../../utils/tauriContext';
 import type { PlatformAdapter } from '../adapter';
 
 class TauriAdapter implements PlatformAdapter {
@@ -53,16 +54,16 @@ class TauriAdapter implements PlatformAdapter {
     throw new Error('TauriAdapter.getDeviceApiKey not implemented yet');
   }
 
-  async saveSessionSettings(_settings: SessionSettings): Promise<void> {
-    throw new Error('TauriAdapter.saveSessionSettings not implemented yet');
+  async saveSessionSettings(settings: SessionSettings): Promise<void> {
+    await safeInvoke('save_session_settings', { settings });
   }
 
   async loadSessionSettings(): Promise<SessionSettings | null> {
-    throw new Error('TauriAdapter.loadSessionSettings not implemented yet');
+    return await safeInvoke<SessionSettings | null>('load_session_settings');
   }
 
   async clearLastSession(): Promise<void> {
-    throw new Error('TauriAdapter.clearLastSession not implemented yet');
+    await safeInvoke('clear_last_session');
   }
 
   async persistLog(_entry: string): Promise<void> {

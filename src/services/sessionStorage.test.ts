@@ -2,11 +2,20 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { saveSessionSettings, loadSessionSettings, clearLastSession } from './sessionStorage';
 
-// safeInvoke is globally mocked in test/setup.ts — override per test
-const mockSafeInvoke = vi.mocked((await import('../utils/tauriContext')).safeInvoke);
+// Mock the platform adapter
+vi.mock('@platform', () => ({
+  adapter: {
+    saveSessionSettings: vi.fn(),
+    loadSessionSettings: vi.fn(),
+    clearLastSession: vi.fn(),
+  },
+}));
+
+const { adapter } = await import('@platform');
+const mockAdapter = vi.mocked(adapter);
 
 beforeEach(() => {
-  mockSafeInvoke.mockReset();
+  vi.clearAllMocks();
 });
 
 const sampleSettings = {
@@ -24,50 +33,48 @@ const sampleSettings = {
 };
 
 describe('saveSessionSettings', () => {
-  it('calls safeInvoke with correct command', async () => {
-    mockSafeInvoke.mockResolvedValueOnce(undefined);
+  it('calls adapter.saveSessionSettings with correct data', async () => {
+    mockAdapter.saveSessionSettings.mockResolvedValueOnce(undefined);
     await saveSessionSettings(sampleSettings);
-    expect(mockSafeInvoke).toHaveBeenCalledWith('save_session_settings', {
-      settings: sampleSettings,
-    });
+    expect(mockAdapter.saveSessionSettings).toHaveBeenCalledWith(sampleSettings);
   });
 
-  it('throws on IPC failure', async () => {
-    mockSafeInvoke.mockRejectedValueOnce(new Error('IPC failed'));
+  it('throws on adapter failure', async () => {
+    mockAdapter.saveSessionSettings.mockRejectedValueOnce(new Error('IPC failed'));
     await expect(saveSessionSettings(sampleSettings)).rejects.toThrow('IPC failed');
   });
 });
 
 describe('loadSessionSettings', () => {
   it('returns settings on success', async () => {
-    mockSafeInvoke.mockResolvedValueOnce(sampleSettings);
+    mockAdapter.loadSessionSettings.mockResolvedValueOnce(sampleSettings);
     const result = await loadSessionSettings();
     expect(result).toEqual(sampleSettings);
-    expect(mockSafeInvoke).toHaveBeenCalledWith('load_session_settings');
+    expect(mockAdapter.loadSessionSettings).toHaveBeenCalled();
   });
 
   it('returns null when no settings exist', async () => {
-    mockSafeInvoke.mockResolvedValueOnce(null);
+    mockAdapter.loadSessionSettings.mockResolvedValueOnce(null);
     const result = await loadSessionSettings();
     expect(result).toBeNull();
   });
 
-  it('returns null on IPC failure (graceful degradation)', async () => {
-    mockSafeInvoke.mockRejectedValueOnce(new Error('Tauri not available'));
+  it('returns null on adapter failure (graceful degradation)', async () => {
+    mockAdapter.loadSessionSettings.mockRejectedValueOnce(new Error('Tauri not available'));
     const result = await loadSessionSettings();
     expect(result).toBeNull();
   });
 });
 
 describe('clearLastSession', () => {
-  it('calls safeInvoke with correct command', async () => {
-    mockSafeInvoke.mockResolvedValueOnce(undefined);
+  it('calls adapter.clearLastSession', async () => {
+    mockAdapter.clearLastSession.mockResolvedValueOnce(undefined);
     await clearLastSession();
-    expect(mockSafeInvoke).toHaveBeenCalledWith('clear_last_session');
+    expect(mockAdapter.clearLastSession).toHaveBeenCalled();
   });
 
-  it('throws on IPC failure', async () => {
-    mockSafeInvoke.mockRejectedValueOnce(new Error('fail'));
+  it('throws on adapter failure', async () => {
+    mockAdapter.clearLastSession.mockRejectedValueOnce(new Error('fail'));
     await expect(clearLastSession()).rejects.toThrow('fail');
   });
 });

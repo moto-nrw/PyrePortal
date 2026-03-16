@@ -53,16 +53,17 @@ class BrowserAdapter implements PlatformAdapter {
     throw new Error('BrowserAdapter.getDeviceApiKey not implemented yet');
   }
 
-  async saveSessionSettings(_settings: SessionSettings): Promise<void> {
-    throw new Error('BrowserAdapter.saveSessionSettings not implemented yet');
+  async saveSessionSettings(settings: SessionSettings): Promise<void> {
+    localStorage.setItem('pyreportal_session', JSON.stringify(settings));
   }
 
   async loadSessionSettings(): Promise<SessionSettings | null> {
-    throw new Error('BrowserAdapter.loadSessionSettings not implemented yet');
+    const data = localStorage.getItem('pyreportal_session');
+    return data ? (JSON.parse(data) as SessionSettings) : null;
   }
 
   async clearLastSession(): Promise<void> {
-    throw new Error('BrowserAdapter.clearLastSession not implemented yet');
+    localStorage.removeItem('pyreportal_session');
   }
 
   async persistLog(_entry: string): Promise<void> {
