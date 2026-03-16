@@ -1,5 +1,6 @@
-import { invoke } from '@tauri-apps/api/core';
 import { useNavigate } from 'react-router-dom';
+
+import { adapter } from '@platform';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import BackButton from '../components/ui/BackButton';
@@ -22,13 +23,13 @@ function LandingPage() {
     logger.info('User requested application restart from landing page');
     logUserAction('restart_app');
 
-    invoke('restart_app', {})
+    adapter
+      .restartApp()
       .then(() => {
         logger.debug('Application restart command sent successfully');
       })
-      .catch(error => {
-        // Expected: invoke may fail because the process exits
-        // This is normal behavior when Balena restarts the container
+      .catch((error: unknown) => {
+        // Expected: may fail because the process exits (Tauri) or page reloads (GKT/browser)
         logError(
           error instanceof Error ? error : new Error(String(error)),
           'LandingPage.handleRestart'

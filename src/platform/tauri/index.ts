@@ -80,7 +80,7 @@ class TauriAdapter implements PlatformAdapter {
   }
 
   async restartApp(): Promise<void> {
-    throw new Error('TauriAdapter.restartApp not implemented yet');
+    await safeInvoke('restart_app');
   }
 
   getDeviceInfo(): { platform: 'tauri'; version: string } {

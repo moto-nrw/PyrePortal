@@ -77,7 +77,7 @@ class BrowserAdapter implements PlatformAdapter {
   }
 
   async restartApp(): Promise<void> {
-    throw new Error('BrowserAdapter.restartApp not implemented yet');
+    window.location.reload();
   }
 
   getDeviceInfo(): { platform: 'browser'; version: string } {

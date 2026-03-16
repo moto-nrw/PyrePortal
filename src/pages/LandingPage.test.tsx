@@ -1,13 +1,22 @@
-import { invoke } from '@tauri-apps/api/core';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { type Mock, vi } from 'vitest';
+import { vi } from 'vitest';
 
 import { logError } from '../utils/logger';
 
 import LandingPage from './LandingPage';
+
+// Mock the platform adapter
+vi.mock('@platform', () => ({
+  adapter: {
+    restartApp: vi.fn(),
+  },
+}));
+
+const { adapter } = await import('@platform');
+const mockRestartApp = vi.mocked(adapter.restartApp);
 
 /**
  * Helper component that reports location changes via callback.
@@ -152,8 +161,8 @@ describe('LandingPage', () => {
 
   // --- handleRestart tests ---
 
-  it('calls invoke("restart_app") when restart button is clicked', async () => {
-    (invoke as Mock).mockResolvedValueOnce(undefined);
+  it('calls adapter.restartApp() when restart button is clicked', async () => {
+    mockRestartApp.mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
 
     render(
@@ -164,11 +173,11 @@ describe('LandingPage', () => {
 
     await user.click(screen.getByText('Neu starten'));
 
-    expect(invoke).toHaveBeenCalledWith('restart_app', {});
+    expect(mockRestartApp).toHaveBeenCalled();
   });
 
-  it('resolves successfully when restart invoke succeeds', async () => {
-    (invoke as Mock).mockResolvedValueOnce(undefined);
+  it('resolves successfully when restartApp succeeds', async () => {
+    mockRestartApp.mockResolvedValueOnce(undefined);
 
     const user = userEvent.setup();
 
@@ -180,15 +189,14 @@ describe('LandingPage', () => {
 
     await user.click(screen.getByText('Neu starten'));
 
-    // Wait for the resolved promise's .then() to execute (covers logger.debug branch)
     await vi.waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith('restart_app', {});
+      expect(mockRestartApp).toHaveBeenCalled();
     });
   });
 
-  it('calls logError when restart invoke rejects with an Error', async () => {
+  it('calls logError when restartApp rejects with an Error', async () => {
     const restartError = new Error('restart failed');
-    (invoke as Mock).mockRejectedValueOnce(restartError);
+    mockRestartApp.mockRejectedValueOnce(restartError);
 
     const user = userEvent.setup();
 
@@ -205,8 +213,8 @@ describe('LandingPage', () => {
     });
   });
 
-  it('calls logError with wrapped Error when restart invoke rejects with a string', async () => {
-    (invoke as Mock).mockRejectedValueOnce('string error');
+  it('calls logError with wrapped Error when restartApp rejects with a string', async () => {
+    mockRestartApp.mockRejectedValueOnce('string error');
 
     const user = userEvent.setup();
 

@@ -93,7 +93,7 @@ class GKTAdapter implements PlatformAdapter {
   }
 
   async restartApp(): Promise<void> {
-    throw new Error('GKTAdapter.restartApp not implemented yet');
+    window.location.reload();
   }
 
   getDeviceInfo(): { platform: 'gkt'; version: string } {
