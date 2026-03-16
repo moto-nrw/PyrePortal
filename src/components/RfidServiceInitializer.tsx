@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 
+import { adapter } from '@platform';
+
 import { createLogger, serializeError } from '../utils/logger';
-import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
+import { isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('RfidServiceInitializer');
 
@@ -15,7 +17,7 @@ export const RfidServiceInitializer = () => {
 
       try {
         logger.info('Initializing RFID service at app startup');
-        await safeInvoke('initialize_rfid_service');
+        await adapter.initializeNfc();
         logger.info('RFID service initialized successfully');
       } catch (error) {
         logger.error('Failed to initialize RFID service at startup', {

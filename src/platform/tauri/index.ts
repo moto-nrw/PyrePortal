@@ -15,7 +15,7 @@ class TauriAdapter implements PlatformAdapter {
   private config: { api_base_url: string; device_api_key: string } | null = null;
 
   async initializeNfc(): Promise<void> {
-    throw new Error('TauriAdapter.initializeNfc not implemented yet');
+    await safeInvoke('initialize_rfid_service');
   }
 
   async startScanning(_onScan: (tagId: string) => void): Promise<void> {

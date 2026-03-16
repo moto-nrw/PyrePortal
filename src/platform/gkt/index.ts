@@ -22,7 +22,12 @@ class GKTAdapter implements PlatformAdapter {
   private scanCallback: ((tagId: string) => void) | null = null;
 
   async initializeNfc(): Promise<void> {
-    throw new Error('GKTAdapter.initializeNfc not implemented yet');
+    // Register NFC callback with system.js
+    SYSTEM.registerNfc(obj => {
+      if (this.scanCallback) {
+        this.scanCallback(obj.uid.toUpperCase());
+      }
+    });
   }
 
   async startScanning(_onScan: (tagId: string) => void): Promise<void> {

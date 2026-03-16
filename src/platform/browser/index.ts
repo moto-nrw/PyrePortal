@@ -13,7 +13,7 @@ class BrowserAdapter implements PlatformAdapter {
   readonly platform = 'browser' as const;
 
   async initializeNfc(): Promise<void> {
-    throw new Error('BrowserAdapter.initializeNfc not implemented yet');
+    // No-op in browser — mock scanning is handled in useRfidScanning hook
   }
 
   async startScanning(_onScan: (tagId: string) => void): Promise<void> {
