@@ -1,0 +1,81 @@
+/**
+ * Tauri Platform Adapter (stub)
+ *
+ * Re-exports will delegate to safeInvoke + Tauri event API.
+ * For now, this is a skeleton that satisfies the interface.
+ * Actual implementation happens in Phase 1-4.
+ */
+
+import type { SessionSettings } from '../../services/sessionStorage';
+import type { PlatformAdapter } from '../adapter';
+
+class TauriAdapter implements PlatformAdapter {
+  readonly platform = 'tauri' as const;
+
+  async initializeNfc(): Promise<void> {
+    throw new Error('TauriAdapter.initializeNfc not implemented yet');
+  }
+
+  async startScanning(_onScan: (tagId: string) => void): Promise<void> {
+    throw new Error('TauriAdapter.startScanning not implemented yet');
+  }
+
+  async stopScanning(): Promise<void> {
+    throw new Error('TauriAdapter.stopScanning not implemented yet');
+  }
+
+  async getServiceStatus(): Promise<{ is_running: boolean }> {
+    throw new Error('TauriAdapter.getServiceStatus not implemented yet');
+  }
+
+  async scanSingleTag(
+    _timeoutMs: number
+  ): Promise<{ success: boolean; tag_id?: string; error?: string }> {
+    throw new Error('TauriAdapter.scanSingleTag not implemented yet');
+  }
+
+  async recoverScanner(): Promise<void> {
+    throw new Error('TauriAdapter.recoverScanner not implemented yet');
+  }
+
+  async getScannerStatus(): Promise<{
+    is_available: boolean;
+    last_error?: string;
+  }> {
+    throw new Error('TauriAdapter.getScannerStatus not implemented yet');
+  }
+
+  getApiBaseUrl(): string {
+    throw new Error('TauriAdapter.getApiBaseUrl not implemented yet');
+  }
+
+  getDeviceApiKey(): string {
+    throw new Error('TauriAdapter.getDeviceApiKey not implemented yet');
+  }
+
+  async saveSessionSettings(_settings: SessionSettings): Promise<void> {
+    throw new Error('TauriAdapter.saveSessionSettings not implemented yet');
+  }
+
+  async loadSessionSettings(): Promise<SessionSettings | null> {
+    throw new Error('TauriAdapter.loadSessionSettings not implemented yet');
+  }
+
+  async clearLastSession(): Promise<void> {
+    throw new Error('TauriAdapter.clearLastSession not implemented yet');
+  }
+
+  async persistLog(_entry: string): Promise<void> {
+    throw new Error('TauriAdapter.persistLog not implemented yet');
+  }
+
+  async restartApp(): Promise<void> {
+    throw new Error('TauriAdapter.restartApp not implemented yet');
+  }
+
+  getDeviceInfo(): { platform: 'tauri'; version: string } {
+    return { platform: this.platform, version: __APP_VERSION__ };
+  }
+}
+
+export const adapter: PlatformAdapter = new TauriAdapter();
