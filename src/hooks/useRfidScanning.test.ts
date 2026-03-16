@@ -1557,4 +1557,99 @@ describe('useRfidScanning', () => {
       expect(mockAdapterStartScanning).toHaveBeenCalledWith(expect.any(Function));
     });
   });
+
+  // ------------------------------------------------------------------
+  // GKT platform: real NFC even though isRfidEnabled() returns false
+  // ------------------------------------------------------------------
+
+  describe('GKT platform scanning (adapter.platform === "gkt")', () => {
+    beforeEach(() => {
+      // GKT build: isRfidEnabled() is false (no VITE_ENABLE_RFID, no Tauri),
+      // but adapter.platform is 'gkt' → must use real NFC, not mock.
+      mockedIsRfidEnabled.mockReturnValue(false);
+      (adapter as unknown as Record<string, unknown>).platform = 'gkt';
+    });
+
+    afterEach(() => {
+      // Restore undefined so other tests aren't affected
+      (adapter as unknown as Record<string, unknown>).platform = undefined;
+    });
+
+    it('calls initializeNfc on mount', async () => {
+      await act(async () => {
+        renderHook(() => useRfidScanning());
+      });
+
+      expect(mockAdapterInitializeNfc).toHaveBeenCalled();
+    });
+
+    it('uses adapter.startScanning instead of mock interval', async () => {
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      expect(mockAdapterStartScanning).toHaveBeenCalledWith(expect.any(Function));
+      expect(useUserStore.getState().rfid.isScanning).toBe(true);
+    });
+
+    it('does not generate mock scans', async () => {
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      // Advance timer well past mock interval — no mock scans should fire
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(15000);
+      });
+
+      // processRfidScan should NOT have been called by a mock interval
+      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
+    });
+
+    it('uses adapter.stopScanning instead of clearing mock interval', async () => {
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
+
+      await act(async () => {
+        const stopPromise = result.current.stopScanning();
+        for (let i = 0; i < 30; i++) {
+          await vi.advanceTimersByTimeAsync(100);
+        }
+        await stopPromise;
+      });
+
+      expect(mockAdapterStopScanning).toHaveBeenCalled();
+      expect(useUserStore.getState().rfid.isScanning).toBe(false);
+    });
+
+    it('syncs service state on mount', async () => {
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      await act(async () => {
+        renderHook(() => useRfidScanning());
+      });
+
+      expect(mockAdapterGetServiceStatus).toHaveBeenCalled();
+      expect(useUserStore.getState().rfid.isScanning).toBe(true);
+    });
+  });
 });
