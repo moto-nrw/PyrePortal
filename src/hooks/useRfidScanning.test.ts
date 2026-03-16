@@ -1501,4 +1501,106 @@ describe('useRfidScanning', () => {
       expect(useUserStore.getState().rfid.isScanning).toBe(false);
     });
   });
+
+  // ------------------------------------------------------------------
+  // Scan lifecycle edge cases (from post-mortem)
+  // Tests run against the current implementation to verify or document
+  // pre-existing behavior before the adapter migration.
+  // ------------------------------------------------------------------
+
+  describe('scan lifecycle edge cases', () => {
+    it('double startScanning call does not duplicate mock intervals', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+        await result.current.startScanning(); // second call
+      });
+
+      // Advance time to trigger scans
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+        for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(0);
+      });
+
+      // Should only produce one scan, not two (no duplicated intervals)
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
+    });
+
+    it('mock scanning works when RFID is disabled', async () => {
+      mockedIsRfidEnabled.mockReturnValue(false);
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      expect(useUserStore.getState().rfid.isScanning).toBe(true);
+
+      // Trigger a mock scan
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5100);
+        for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(mockedProcessRfidScan).toHaveBeenCalled();
+    });
+
+    // Known issue (post-mortem #7): stopScanning doesn't clean up state
+    // when stop_rfid_service throws. Currently store stays isScanning=true.
+    // Will be fixed in adapter migration (Step 4b).
+    it.skip('stopScanning cleans up even when stop_rfid_service fails', async () => {
+      mockedIsRfidEnabled.mockReturnValue(true);
+      mockedSafeInvoke.mockImplementation(async (cmd: string) => {
+        if (cmd === 'get_rfid_service_status') return { is_running: true };
+        if (cmd === 'stop_rfid_service') throw new Error('stop failed');
+        return undefined;
+      });
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      // Stop should not throw even when the backend call fails
+      await act(async () => {
+        const stopPromise = result.current.stopScanning();
+        for (let i = 0; i < 30; i++) await vi.advanceTimersByTimeAsync(100);
+        await stopPromise;
+      });
+
+      expect(useUserStore.getState().rfid.isScanning).toBe(false);
+    });
+
+    it('listener is set up on mount for real RFID', async () => {
+      mockedIsRfidEnabled.mockReturnValue(true);
+
+      let eventCallback:
+        | ((event: { payload: { tag_id: string; timestamp: number; platform: string } }) => void)
+        | undefined;
+
+      const { listen } = await import('@tauri-apps/api/event');
+      vi.mocked(listen).mockImplementation(async (_event, handler) => {
+        eventCallback = handler as typeof eventCallback;
+        return () => undefined;
+      });
+
+      await act(async () => {
+        renderHook(() => useRfidScanning());
+      });
+
+      // Listener should have been registered on mount
+      expect(eventCallback).toBeDefined();
+      expect(vi.mocked(listen)).toHaveBeenCalledWith('rfid-scan', expect.any(Function));
+    });
+  });
 });
