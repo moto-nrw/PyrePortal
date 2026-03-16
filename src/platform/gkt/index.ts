@@ -48,6 +48,7 @@ export function normalizeNfcPayload(payload: unknown): string | null {
 class GKTAdapter implements PlatformAdapter {
   readonly platform = 'gkt' as const;
   private scanCallback: ((tagId: string) => void) | null = null;
+  private cachedApiKey: string | null = null;
 
   async initializeNfc(): Promise<void> {
     // Register NFC callback with system.js — handles all payload shapes
@@ -109,8 +110,12 @@ class GKTAdapter implements PlatformAdapter {
     const params = new URLSearchParams(window.location.search);
     const key = params.get('key');
     if (!key) {
+      if (this.cachedApiKey) {
+        return this.cachedApiKey;
+      }
       throw new Error('DEVICE_API_KEY not found in URL. Expected ?key=...');
     }
+    this.cachedApiKey = key;
     return key;
   }
 
@@ -137,7 +142,11 @@ class GKTAdapter implements PlatformAdapter {
   }
 
   async restartApp(): Promise<void> {
-    window.location.reload();
+    if (this.cachedApiKey) {
+      window.location.href = `${window.location.origin}/?key=${encodeURIComponent(this.cachedApiKey)}`;
+    } else {
+      window.location.reload();
+    }
   }
 
   getDeviceInfo(): { platform: 'gkt'; version: string } {
