@@ -12,6 +12,7 @@ import type { PlatformAdapter } from '../adapter';
 
 class TauriAdapter implements PlatformAdapter {
   readonly platform = 'tauri' as const;
+  private config: { api_base_url: string; device_api_key: string } | null = null;
 
   async initializeNfc(): Promise<void> {
     throw new Error('TauriAdapter.initializeNfc not implemented yet');
@@ -46,12 +47,20 @@ class TauriAdapter implements PlatformAdapter {
     throw new Error('TauriAdapter.getScannerStatus not implemented yet');
   }
 
+  async loadConfig(): Promise<void> {
+    this.config = await safeInvoke<{ api_base_url: string; device_api_key: string }>(
+      'get_api_config'
+    );
+  }
+
   getApiBaseUrl(): string {
-    throw new Error('TauriAdapter.getApiBaseUrl not implemented yet');
+    if (!this.config) throw new Error('TauriAdapter: call loadConfig() before getApiBaseUrl()');
+    return this.config.api_base_url;
   }
 
   getDeviceApiKey(): string {
-    throw new Error('TauriAdapter.getDeviceApiKey not implemented yet');
+    if (!this.config) throw new Error('TauriAdapter: call loadConfig() before getDeviceApiKey()');
+    return this.config.device_api_key;
   }
 
   async saveSessionSettings(settings: SessionSettings): Promise<void> {

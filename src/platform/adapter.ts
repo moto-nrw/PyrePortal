@@ -31,6 +31,8 @@ export interface PlatformAdapter {
   }>;
 
   // --- Configuration ---
+  /** Async config init (Tauri: loads from Rust backend, others: no-op) */
+  loadConfig(): Promise<void>;
   getApiBaseUrl(): string;
   getDeviceApiKey(): string;
 

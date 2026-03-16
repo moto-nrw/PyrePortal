@@ -45,12 +45,21 @@ class GKTAdapter implements PlatformAdapter {
     throw new Error('GKTAdapter.getScannerStatus not implemented yet');
   }
 
+  async loadConfig(): Promise<void> {
+    // No-op: GKT reads config synchronously from env vars / URL params
+  }
+
   getApiBaseUrl(): string {
-    throw new Error('GKTAdapter.getApiBaseUrl not implemented yet');
+    return (import.meta.env.VITE_API_BASE_URL as string) ?? 'https://api.moto-app.de';
   }
 
   getDeviceApiKey(): string {
-    throw new Error('GKTAdapter.getDeviceApiKey not implemented yet');
+    const params = new URLSearchParams(window.location.search);
+    const key = params.get('key');
+    if (!key) {
+      throw new Error('DEVICE_API_KEY not found in URL. Expected ?key=...');
+    }
+    return key;
   }
 
   async saveSessionSettings(settings: SessionSettings): Promise<void> {

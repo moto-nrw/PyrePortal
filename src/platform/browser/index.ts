@@ -45,12 +45,17 @@ class BrowserAdapter implements PlatformAdapter {
     throw new Error('BrowserAdapter.getScannerStatus not implemented yet');
   }
 
+  async loadConfig(): Promise<void> {
+    // No-op: browser reads config synchronously from env vars
+  }
+
   getApiBaseUrl(): string {
-    throw new Error('BrowserAdapter.getApiBaseUrl not implemented yet');
+    return (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
   }
 
   getDeviceApiKey(): string {
-    throw new Error('BrowserAdapter.getDeviceApiKey not implemented yet');
+    const urlKey = new URLSearchParams(window.location.search).get('key');
+    return urlKey ?? (import.meta.env.VITE_DEVICE_API_KEY as string) ?? 'dev-key';
   }
 
   async saveSessionSettings(settings: SessionSettings): Promise<void> {

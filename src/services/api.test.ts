@@ -493,81 +493,48 @@ describe('initializeApi', () => {
   // We need to re-import the module to reset isInitialized state.
   // Since the module-level `isInitialized` persists, we use vi.resetModules().
 
-  it('loads config from Tauri backend via safeInvoke', async () => {
-    // Use a fresh module to ensure isInitialized = false
+  it('initializes config via platform adapter', async () => {
     vi.resetModules();
-    const { initializeApi: freshInit } = await import('./api');
-    const { safeInvoke: freshSafeInvoke } = await import('../utils/tauriContext');
-    const mockedInvoke = vi.mocked(freshSafeInvoke);
-
-    mockedInvoke.mockResolvedValueOnce({
-      api_base_url: 'http://test.local',
-      device_api_key: 'key-abc',
-    });
-
-    await freshInit();
-    expect(mockedInvoke).toHaveBeenCalledWith('get_api_config');
-  });
-
-  it('skips re-initialization if already initialized', async () => {
-    vi.resetModules();
-    const { initializeApi: freshInit } = await import('./api');
-    const { safeInvoke: freshSafeInvoke } = await import('../utils/tauriContext');
-    const mockedInvoke = vi.mocked(freshSafeInvoke);
-
-    mockedInvoke.mockResolvedValueOnce({
-      api_base_url: 'http://test.local',
-      device_api_key: 'key-abc',
-    });
-
-    await freshInit();
-    await freshInit(); // second call should be a no-op
-    expect(mockedInvoke).toHaveBeenCalledTimes(1);
-  });
-
-  it('falls back to VITE env vars when Tauri is not available', async () => {
-    vi.resetModules();
-
-    // Set VITE env vars for fallback
-    const originalEnv = { ...import.meta.env };
-    import.meta.env.VITE_API_BASE_URL = 'http://vite-fallback.local';
-    import.meta.env.VITE_DEVICE_API_KEY = 'vite-key-123';
+    import.meta.env.VITE_API_BASE_URL = 'http://test.local';
+    import.meta.env.VITE_DEVICE_API_KEY = 'key-abc';
 
     const { initializeApi: freshInit } = await import('./api');
-    const { safeInvoke: freshSafeInvoke } = await import('../utils/tauriContext');
-    const mockedInvoke = vi.mocked(freshSafeInvoke);
-
-    mockedInvoke.mockRejectedValueOnce(new Error('Tauri not available'));
-
     await freshInit();
-    // Should not throw since VITE_DEVICE_API_KEY is set
+    // No throw = success — adapter.loadConfig + getters worked
 
-    // Cleanup
-    Object.assign(import.meta.env, originalEnv);
     delete import.meta.env.VITE_API_BASE_URL;
     delete import.meta.env.VITE_DEVICE_API_KEY;
   });
 
-  it('throws when Tauri fails and no VITE_DEVICE_API_KEY', async () => {
+  it('skips re-initialization if already initialized', async () => {
     vi.resetModules();
-
-    // Ensure VITE_DEVICE_API_KEY is not set
-    const savedKey = import.meta.env.VITE_DEVICE_API_KEY as string | undefined;
-    delete import.meta.env.VITE_DEVICE_API_KEY;
-    (import.meta.env as Record<string, string | undefined>).VITE_API_BASE_URL = undefined;
+    import.meta.env.VITE_API_BASE_URL = 'http://test.local';
+    import.meta.env.VITE_DEVICE_API_KEY = 'key-abc';
 
     const { initializeApi: freshInit } = await import('./api');
-    const { safeInvoke: freshSafeInvoke } = await import('../utils/tauriContext');
-    const mockedInvoke = vi.mocked(freshSafeInvoke);
+    const platformModule = await import('@platform');
+    const spy = vi.spyOn(platformModule.adapter, 'loadConfig');
 
-    mockedInvoke.mockRejectedValueOnce(new Error('Tauri not available'));
+    await freshInit();
+    await freshInit(); // second call should be a no-op
+    expect(spy).toHaveBeenCalledTimes(1);
 
-    await expect(freshInit()).rejects.toThrow('API key not found');
+    spy.mockRestore();
+    delete import.meta.env.VITE_API_BASE_URL;
+    delete import.meta.env.VITE_DEVICE_API_KEY;
+  });
 
-    // Cleanup
-    if (savedKey !== undefined) {
-      (import.meta.env as Record<string, string>).VITE_DEVICE_API_KEY = savedKey;
-    }
+  it('reads config from env vars (browser adapter)', async () => {
+    vi.resetModules();
+    import.meta.env.VITE_API_BASE_URL = 'http://vite-fallback.local';
+    import.meta.env.VITE_DEVICE_API_KEY = 'vite-key-123';
+
+    const { initializeApi: freshInit } = await import('./api');
+    await freshInit();
+    // Browser adapter reads VITE env vars — should not throw
+
+    delete import.meta.env.VITE_API_BASE_URL;
+    delete import.meta.env.VITE_DEVICE_API_KEY;
   });
 });
 
@@ -593,20 +560,16 @@ describe('api methods', () => {
   });
 
   /**
-   * Helper: get fresh api + initializeApi from a clean module,
-   * with safeInvoke already configured to return valid config.
+   * Helper: get fresh api from a clean module,
+   * with env vars configured for the browser adapter.
    */
   async function getFreshApi() {
+    import.meta.env.VITE_API_BASE_URL = 'http://test-api.local';
+    import.meta.env.VITE_DEVICE_API_KEY = 'test-key-123';
+
     const apiModule = await import('./api');
-    const tauriModule = await import('../utils/tauriContext');
-    const mockedInvoke = vi.mocked(tauriModule.safeInvoke);
 
-    mockedInvoke.mockResolvedValueOnce({
-      api_base_url: 'http://test-api.local',
-      device_api_key: 'test-key-123',
-    });
-
-    return { ...apiModule, mockedInvoke };
+    return { ...apiModule };
   }
 
   // ------------------------------------------------------------------
@@ -2219,14 +2182,12 @@ describe('api methods', () => {
 
   describe('ensureInitialized', () => {
     it('auto-initializes on first api call', async () => {
-      const { api: freshApi, mockedInvoke } = await getFreshApi();
+      const { api: freshApi } = await getFreshApi();
 
       mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', data: [], message: 'ok' }));
 
+      // Should not throw — adapter auto-initializes via ensureInitialized
       await freshApi.getTeachers();
-
-      // safeInvoke should have been called for get_api_config
-      expect(mockedInvoke).toHaveBeenCalledWith('get_api_config');
     });
   });
 });

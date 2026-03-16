@@ -3,16 +3,11 @@
  * Handles all communication with the backend API
  */
 
-import { createLogger, serializeError } from '../utils/logger';
-import { safeInvoke } from '../utils/tauriContext';
+import { adapter } from '@platform';
+
+import { createLogger } from '../utils/logger';
 
 const logger = createLogger('API');
-
-// API configuration interface
-interface ApiConfig {
-  api_base_url: string;
-  device_api_key: string;
-}
 
 /**
  * Structured API error response with optional details
@@ -435,40 +430,23 @@ function reportNetworkStatus(responseTime: number, success: boolean): void {
 }
 
 /**
- * Initialize API configuration from Tauri backend
+ * Initialize API configuration via platform adapter
  */
 export async function initializeApi(): Promise<void> {
   if (isInitialized) {
     return;
   }
 
-  try {
-    // Try to get config from Tauri backend
-    const config = await safeInvoke<ApiConfig>('get_api_config');
-    API_BASE_URL = config.api_base_url;
-    DEVICE_API_KEY = config.device_api_key;
-    isInitialized = true;
+  await adapter.loadConfig();
+  API_BASE_URL = adapter.getApiBaseUrl();
+  DEVICE_API_KEY = adapter.getDeviceApiKey();
+  isInitialized = true;
 
-    logger.info('API initialized with runtime configuration', {
-      baseUrl: API_BASE_URL,
-      hasApiKey: !!DEVICE_API_KEY,
-    });
-  } catch (error) {
-    // Fallback to build-time env vars if Tauri is not available (e.g., in dev without Tauri)
-    logger.warn('Failed to load runtime config, falling back to build-time env vars', {
-      error: serializeError(error),
-    });
-    API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) ?? 'http://localhost:8080';
-    DEVICE_API_KEY = import.meta.env.VITE_DEVICE_API_KEY as string;
-
-    if (!DEVICE_API_KEY) {
-      throw new Error(
-        'API key not found. Please set DEVICE_API_KEY or VITE_DEVICE_API_KEY environment variable'
-      );
-    }
-
-    isInitialized = true;
-  }
+  logger.info('API initialized with platform configuration', {
+    platform: adapter.platform,
+    baseUrl: API_BASE_URL,
+    hasApiKey: !!DEVICE_API_KEY,
+  });
 }
 
 /**
