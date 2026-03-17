@@ -5,8 +5,8 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('IdleTimer');
 
-/** Idle timeout in milliseconds. 30 s for testing — bump to 180_000 (3 min) for production. */
-const IDLE_TIMEOUT_MS = 30_000;
+/** Idle timeout in milliseconds (3 minutes). */
+const IDLE_TIMEOUT_MS = 180_000;
 
 /**
  * Tracks user activity (pointer, keyboard, RFID scans) and returns
