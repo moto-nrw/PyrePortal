@@ -7,7 +7,7 @@
  */
 
 import type { SessionSettings } from '../../services/sessionStorage';
-import type { PlatformAdapter } from '../adapter';
+import type { NfcScanEvent, PlatformAdapter } from '../adapter';
 
 // SYSTEM is a global injected by system.js (loaded in index.html)
 declare const SYSTEM: {
@@ -16,29 +16,30 @@ declare const SYSTEM: {
 };
 
 /**
- * Normalize NFC payload from system.js into an uppercase UID string.
+ * Normalize NFC payload from system.js into a platform-agnostic scan event.
  *
  * system.js delivers scans via two paths with different payload shapes:
  * 1. Intent-path: {uid: "f0:bc:e8:44", eventSource: "NFC", eventNumber: N}
  * 2. Sensor-path: {eventSource: "nfc", barcode: "f0:bc:e8:44"}
  * 3. Legacy string: "f0:bc:e8:44"
  */
-export function normalizeNfcPayload(payload: unknown): string | null {
+export function normalizeNfcPayload(payload: unknown, fallbackScanId: number): NfcScanEvent | null {
   if (typeof payload === 'string') {
-    return payload.toUpperCase();
+    return { tagId: payload.toUpperCase(), scanId: fallbackScanId };
   }
 
   if (typeof payload === 'object' && payload !== null) {
     const obj = payload as Record<string, unknown>;
+    const eventNumber = typeof obj.eventNumber === 'number' ? obj.eventNumber : fallbackScanId;
 
     // Intent-path: {uid: "f0:bc:e8:44", eventSource: "NFC"}
     if (typeof obj.uid === 'string' && obj.uid) {
-      return obj.uid.toUpperCase();
+      return { tagId: obj.uid.toUpperCase(), scanId: eventNumber };
     }
 
     // Sensor-path: {eventSource: "nfc", barcode: "f0:bc:e8:44"}
     if (typeof obj.barcode === 'string' && obj.barcode) {
-      return obj.barcode.toUpperCase();
+      return { tagId: obj.barcode.toUpperCase(), scanId: eventNumber };
     }
   }
 
@@ -47,22 +48,23 @@ export function normalizeNfcPayload(payload: unknown): string | null {
 
 class GKTAdapter implements PlatformAdapter {
   readonly platform = 'gkt' as const;
-  private scanCallback: ((tagId: string) => void) | null = null;
+  private scanCallback: ((event: NfcScanEvent) => void) | null = null;
   private cachedApiKey: string | null = null;
+  private fallbackScanCounter = 0;
 
   async initializeNfc(): Promise<void> {
     // Register NFC callback with system.js — handles all payload shapes
     SYSTEM.registerNfc((payload: unknown) => {
       if (!this.scanCallback) return;
 
-      const tagId = normalizeNfcPayload(payload);
-      if (tagId) {
-        this.scanCallback(tagId);
+      const scanEvent = normalizeNfcPayload(payload, ++this.fallbackScanCounter);
+      if (scanEvent) {
+        this.scanCallback(scanEvent);
       }
     });
   }
 
-  async startScanning(onScan: (tagId: string) => void): Promise<void> {
+  async startScanning(onScan: (event: NfcScanEvent) => void): Promise<void> {
     // GKT NFC is always-on after registerNfc — just set callback
     this.scanCallback = onScan;
   }
@@ -88,10 +90,10 @@ class GKTAdapter implements PlatformAdapter {
         resolve({ success: false, error: 'Scan timed out' });
       }, timeoutMs);
 
-      this.scanCallback = (tagId: string) => {
+      this.scanCallback = (event: NfcScanEvent) => {
         clearTimeout(timer);
         this.scanCallback = previousCallback;
-        resolve({ success: true, tag_id: tagId });
+        resolve({ success: true, tag_id: event.tagId });
       };
     });
   }

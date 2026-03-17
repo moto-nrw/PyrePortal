@@ -7,7 +7,7 @@
  */
 
 import type { SessionSettings } from '../../services/sessionStorage';
-import type { PlatformAdapter } from '../adapter';
+import type { NfcScanEvent, PlatformAdapter } from '../adapter';
 
 class BrowserAdapter implements PlatformAdapter {
   readonly platform = 'browser' as const;
@@ -16,7 +16,7 @@ class BrowserAdapter implements PlatformAdapter {
     // No-op in browser — mock scanning is handled in useRfidScanning hook
   }
 
-  async startScanning(_onScan: (tagId: string) => void): Promise<void> {
+  async startScanning(_onScan: (event: NfcScanEvent) => void): Promise<void> {
     // No-op — mock scanning is handled directly in the useRfidScanning hook
   }
 

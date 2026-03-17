@@ -2,9 +2,10 @@ import { useEffect, useRef, useCallback } from 'react';
 
 import { adapter } from '@platform';
 
+import type { NfcScanEvent } from '../platform/adapter';
 import { api, mapApiErrorToGerman, ApiError } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
-import { useUserStore } from '../store/userStore';
+import { useUserStore, RECENT_SCAN_FALLBACK_WINDOW_MS } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, serializeError } from '../utils/logger';
 import { isRfidEnabled } from '../utils/tauriContext';
@@ -22,6 +23,7 @@ const isRealScanningEnabled = (): boolean => {
 
 // Mock scanning interval for development
 let mockScanInterval: ReturnType<typeof setInterval> | null = null;
+let mockScanCounter = 0;
 
 /** Reset module-level state between tests. Not for production use. */
 export function __resetModuleStateForTesting(): void {
@@ -29,9 +31,11 @@ export function __resetModuleStateForTesting(): void {
     clearInterval(mockScanInterval);
     mockScanInterval = null;
   }
+  mockScanCounter = 0;
 }
 
 const logger = createLogger('useRfidScanning');
+const PROCESSED_SCAN_ID_TTL_MS = 30_000;
 
 // ============================================================================
 // Helper functions to reduce cognitive complexity in processScan
@@ -289,6 +293,7 @@ export const useRfidScanning = () => {
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
   const scannedSupervisorsRef = useRef<Set<number>>(new Set());
+  const processedScanIdsRef = useRef<Map<number, number>>(new Map());
 
   const showSupervisorRedirect = useCallback(
     (scanId?: string) => {
@@ -378,7 +383,10 @@ export const useRfidScanning = () => {
       if (!canProcessTag(tagId)) {
         logger.debug('Tag blocked by duplicate prevention', { tagId });
         const recentScan = rfid.recentTagScans.get(tagId);
-        if (recentScan?.result && Date.now() - recentScan.timestamp < 2000) {
+        if (
+          recentScan?.result &&
+          Date.now() - recentScan.timestamp < RECENT_SCAN_FALLBACK_WINDOW_MS
+        ) {
           setScanResult(recentScan.result);
           showScanModal();
         } else {
@@ -495,10 +503,30 @@ export const useRfidScanning = () => {
 
   // Create onScan callback for the adapter (checks blocked tags + processes scan)
   const onAdapterScan = useCallback(
-    (tagId: string) => {
-      logger.info('RFID scan event received', { tagId });
+    (event: NfcScanEvent) => {
+      const { tagId, scanId } = event;
+      const now = Date.now();
+      const processedScanIds = processedScanIdsRef.current;
+
+      processedScanIds.forEach((timestamp, processedScanId) => {
+        if (now - timestamp >= PROCESSED_SCAN_ID_TTL_MS) {
+          processedScanIds.delete(processedScanId);
+        }
+      });
+
+      if (processedScanIds.has(scanId)) {
+        logger.debug('RFID scan event already handled, skipping duplicate delivery', {
+          tagId,
+          scanId,
+        });
+        return;
+      }
+
+      processedScanIds.set(scanId, now);
+
+      logger.info('RFID scan event received', { tagId, scanId });
       if (isTagBlocked(tagId)) {
-        logger.debug('Tag blocked, skipping', { tagId });
+        logger.debug('Tag blocked, skipping', { tagId, scanId });
       } else {
         void processScan(tagId);
       }
@@ -584,9 +612,11 @@ export const useRfidScanning = () => {
             // Pick a random tag from the list using unbiased secure randomness
             const randomIndex = getSecureRandomInt(mockStudentTags.length);
             const mockTagId = mockStudentTags[randomIndex];
+            const scanId = ++mockScanCounter;
 
             logger.info('Mock RFID scan generated', {
               tagId: mockTagId,
+              scanId,
               platform: 'Development Mock',
             });
 
@@ -594,7 +624,7 @@ export const useRfidScanning = () => {
             if (isTagBlocked(mockTagId)) {
               logger.debug('Mock tag blocked, skipping', { tagId: mockTagId });
             } else {
-              void processScan(mockTagId);
+              onAdapterScan({ tagId: mockTagId, scanId });
             }
           },
           5000 + getSecureRandomInt(5000)
@@ -634,14 +664,7 @@ export const useRfidScanning = () => {
         'Das RFID-Lesegerät konnte nicht gestartet werden. Bitte Gerät prüfen.'
       );
     }
-  }, [
-    startRfidScanning,
-    isTagBlocked,
-    processScan,
-    showSystemError,
-    waitForBackendServiceState,
-    onAdapterScan,
-  ]);
+  }, [startRfidScanning, isTagBlocked, showSystemError, waitForBackendServiceState, onAdapterScan]);
 
   const stopScanning = useCallback(async () => {
     const callTimestamp = Date.now();

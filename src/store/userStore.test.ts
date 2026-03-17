@@ -14,7 +14,7 @@ import {
   type SessionSettings,
 } from '../services/sessionStorage';
 
-import { useUserStore } from './userStore';
+import { useUserStore, RECENT_SCAN_FALLBACK_WINDOW_MS } from './userStore';
 
 // ====================================================================
 // Mock api and sessionStorage modules
@@ -764,7 +764,9 @@ describe('canProcessTag (duplicate prevention)', () => {
   });
 
   it('allows tag after scan expires (Layer 2)', () => {
-    useUserStore.getState().recordTagScan('04:AA:BB', { timestamp: Date.now() - 3000 });
+    useUserStore.getState().recordTagScan('04:AA:BB', {
+      timestamp: Date.now() - (RECENT_SCAN_FALLBACK_WINDOW_MS + 1),
+    });
     expect(useUserStore.getState().canProcessTag('04:AA:BB')).toBe(true);
   });
 
@@ -1023,8 +1025,10 @@ describe('NFC scan', () => {
 // ====================================================================
 
 describe('clearOldTagScans', () => {
-  it('removes scans older than 2 seconds', () => {
-    useUserStore.getState().recordTagScan('old-tag', { timestamp: Date.now() - 5000 });
+  it('removes scans older than the fallback window', () => {
+    useUserStore.getState().recordTagScan('old-tag', {
+      timestamp: Date.now() - (RECENT_SCAN_FALLBACK_WINDOW_MS + 100),
+    });
     useUserStore.getState().recordTagScan('new-tag', { timestamp: Date.now() });
 
     useUserStore.getState().clearOldTagScans();

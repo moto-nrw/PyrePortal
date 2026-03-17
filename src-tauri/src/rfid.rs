@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, Mutex as TokioMutex};
 
@@ -21,6 +22,7 @@ pub struct RfidScannerStatus {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RfidScanEvent {
     pub tag_id: String,
+    pub scan_id: u64,
     pub timestamp: u64,
     pub platform: String,
 }
@@ -49,10 +51,48 @@ pub struct RfidBackgroundService {
 
 // Safe global service instance using OnceLock
 static RFID_SERVICE: OnceLock<Arc<Mutex<RfidBackgroundService>>> = OnceLock::new();
+static SCAN_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 // Global SPI guard used by BOTH continuous background scanning and one-shot scans.
 // This avoids concurrent access/reset races on /dev/spidev0.0 and MFRC522 state corruption.
 static SPI_ACCESS_MUTEX: OnceLock<TokioMutex<()>> = OnceLock::new();
+
+#[derive(Debug, Clone)]
+struct ScanPresenceState {
+    last_tag: Option<String>,
+    tag_present: bool,
+    absent_since: Option<Instant>,
+}
+
+impl ScanPresenceState {
+    const ABSENCE_THRESHOLD: Duration = Duration::from_millis(300);
+
+    fn new() -> Self {
+        Self {
+            last_tag: None,
+            tag_present: false,
+            absent_since: None,
+        }
+    }
+
+    fn register_success(&mut self, tag_id: &str) -> bool {
+        let is_same_present_tag = self.tag_present && self.last_tag.as_deref() == Some(tag_id);
+
+        self.last_tag = Some(tag_id.to_string());
+        self.tag_present = true;
+        self.absent_since = None;
+
+        !is_same_present_tag
+    }
+
+    fn register_absence(&mut self, now: Instant) {
+        let absent_since = self.absent_since.get_or_insert(now);
+        if now.duration_since(*absent_since) >= Self::ABSENCE_THRESHOLD {
+            self.tag_present = false;
+            self.absent_since = None;
+        }
+    }
+}
 
 impl RfidBackgroundService {
     pub fn new() -> Self {
@@ -117,6 +157,7 @@ impl RfidBackgroundService {
         state: &Arc<Mutex<RfidServiceState>>,
         app_handle: Option<&AppHandle>,
         tag_id: &str,
+        scan_id: u64,
     ) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -125,6 +166,7 @@ impl RfidBackgroundService {
 
         let scan_event = RfidScanEvent {
             tag_id: tag_id.to_string(),
+            scan_id,
             timestamp,
             platform: Self::get_platform_name(),
         };
@@ -142,11 +184,7 @@ impl RfidBackgroundService {
 
     /// Handle scan error - update state if it's a real error (not just "no card")
     fn handle_scan_error(state: &Arc<Mutex<RfidServiceState>>, error: &str) {
-        let error_lower = error.to_lowercase();
-        if error_lower.contains("no card")
-            || error_lower.contains("timeout")
-            || error_lower.contains("no card detected")
-        {
+        if Self::is_normal_poll_error(error) {
             return;
         }
 
@@ -155,6 +193,17 @@ impl RfidBackgroundService {
             guard.last_error = Some(error.to_string());
         }
         println!("RFID scan error: {error}");
+    }
+
+    fn is_normal_poll_error(error: &str) -> bool {
+        let error_lower = error.to_lowercase();
+        error_lower.contains("no card")
+            || error_lower.contains("timeout")
+            || error_lower.contains("no card detected")
+    }
+
+    fn next_scan_id() -> u64 {
+        SCAN_COUNTER.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// Handle scanner initialization failure
@@ -465,6 +514,7 @@ impl RfidBackgroundService {
         scanner: &mut raspberry_pi::PersistentRfidScanner,
     ) -> bool {
         let mut consecutive_errors: u32 = 0;
+        let mut presence_state = ScanPresenceState::new();
         const MAX_CONSECUTIVE_ERRORS: u32 = 15;
 
         loop {
@@ -476,19 +526,25 @@ impl RfidBackgroundService {
             match raspberry_pi::scan_with_persistent_scanner_sync(scanner) {
                 Ok(tag_id) => {
                     consecutive_errors = 0;
-                    Self::handle_successful_scan(state, app_handle.as_ref(), &tag_id);
+                    if presence_state.register_success(&tag_id) {
+                        Self::handle_successful_scan(
+                            state,
+                            app_handle.as_ref(),
+                            &tag_id,
+                            Self::next_scan_id(),
+                        );
+                    }
                     // Wait after successful scan to prevent duplicate reads
                     std::thread::sleep(Duration::from_millis(200));
                 }
                 Err(error) => {
                     Self::handle_scan_error(state, &error);
+                    if Self::is_normal_poll_error(&error) {
+                        presence_state.register_absence(Instant::now());
+                    }
 
                     // Track consecutive real errors (not "no card" which is normal polling)
-                    let error_lower = error.to_lowercase();
-                    if !error_lower.contains("no card")
-                        && !error_lower.contains("timeout")
-                        && !error_lower.contains("no card detected")
-                    {
+                    if !Self::is_normal_poll_error(&error) {
                         consecutive_errors += 1;
                         if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
                             println!(
@@ -509,6 +565,7 @@ impl RfidBackgroundService {
         state: &Arc<Mutex<RfidServiceState>>,
         app_handle: Option<&AppHandle>,
     ) {
+        let mut presence_state = ScanPresenceState::new();
         loop {
             if !Self::should_continue_scanning(state) {
                 break;
@@ -516,12 +573,22 @@ impl RfidBackgroundService {
 
             match Self::perform_platform_scan().await {
                 Ok(tag_id) => {
-                    Self::handle_successful_scan(state, app_handle, &tag_id);
+                    if presence_state.register_success(&tag_id) {
+                        Self::handle_successful_scan(
+                            state,
+                            app_handle,
+                            &tag_id,
+                            Self::next_scan_id(),
+                        );
+                    }
                     // Minimal wait after successful scan - frontend handles duplicate prevention
                     tokio::time::sleep(Duration::from_millis(30)).await;
                 }
                 Err(error) => {
                     Self::handle_scan_error(state, &error);
+                    if Self::is_normal_poll_error(&error) {
+                        presence_state.register_absence(Instant::now());
+                    }
                 }
             }
         }
@@ -919,7 +986,7 @@ mod mock_platform {
     use super::{Duration, RfidScannerStatus};
     use std::sync::Mutex;
 
-    // Track last scan for duplicate prevention (mimics real hardware behavior)
+    // Track recent mock scans so local development still simulates a tag being held in place.
     static LAST_SCAN: Mutex<Option<(String, std::time::Instant)>> = Mutex::new(None);
 
     pub async fn scan_rfid_hardware() -> Result<String, String> {
@@ -937,7 +1004,7 @@ mod mock_platform {
     }
 
     pub(crate) fn scan_rfid_mock_internal() -> Result<String, String> {
-        // Check for duplicate read (2-second cooldown like real hardware)
+        // Bias toward re-reading the same tag while it remains "present".
         let mut last_scan = LAST_SCAN.lock().unwrap();
         if let Some((last_tag, last_time)) = &*last_scan {
             if last_time.elapsed() < Duration::from_secs(2) {
@@ -1364,12 +1431,14 @@ mod tests {
     fn rfid_scan_event_serialization() {
         let event = RfidScanEvent {
             tag_id: "04:A7:B3:C2:D1:E0:F5".to_string(),
+            scan_id: 7,
             timestamp: 1_718_000_000,
             platform: "Development Platform".to_string(),
         };
         let d: RfidScanEvent =
             serde_json::from_str(&serde_json::to_string(&event).unwrap()).unwrap();
         assert_eq!(d.tag_id, "04:A7:B3:C2:D1:E0:F5");
+        assert_eq!(d.scan_id, 7);
         assert_eq!(d.timestamp, 1_718_000_000);
     }
 
@@ -1405,6 +1474,7 @@ mod tests {
             is_running: true,
             last_scan: Some(RfidScanEvent {
                 tag_id: "AA:BB".to_string(),
+                scan_id: 9,
                 timestamp: 42,
                 platform: "test".to_string(),
             }),
@@ -1515,21 +1585,50 @@ mod tests {
             guard.error_count = 5;
             guard.last_error = Some("old error".to_string());
         }
-        RfidBackgroundService::handle_successful_scan(&state, None, "04:D6:94:82:97:6A:80");
+        RfidBackgroundService::handle_successful_scan(&state, None, "04:D6:94:82:97:6A:80", 42);
         let guard = state.lock().unwrap();
         assert_eq!(guard.error_count, 5); // NOT reset
         assert!(guard.last_error.is_none()); // cleared
         let scan = guard.last_scan.as_ref().unwrap();
         assert_eq!(scan.tag_id, "04:D6:94:82:97:6A:80");
+        assert_eq!(scan.scan_id, 42);
         assert!(scan.timestamp > 0);
     }
 
     #[test]
     fn handle_successful_scan_sets_platform() {
         let state = test_state();
-        RfidBackgroundService::handle_successful_scan(&state, None, "AA:BB");
+        RfidBackgroundService::handle_successful_scan(&state, None, "AA:BB", 1);
         let scan = state.lock().unwrap().last_scan.clone().unwrap();
         assert!(!scan.platform.is_empty());
+    }
+
+    #[test]
+    fn scan_presence_state_suppresses_same_present_tag() {
+        let mut presence = ScanPresenceState::new();
+        assert!(presence.register_success("AA:BB"));
+        assert!(!presence.register_success("AA:BB"));
+    }
+
+    #[test]
+    fn scan_presence_state_allows_different_tag_without_absence() {
+        let mut presence = ScanPresenceState::new();
+        assert!(presence.register_success("AA:BB"));
+        assert!(presence.register_success("CC:DD"));
+    }
+
+    #[test]
+    fn scan_presence_state_requires_continuous_absence_before_reemit() {
+        let mut presence = ScanPresenceState::new();
+        let start = Instant::now();
+
+        assert!(presence.register_success("AA:BB"));
+        presence.register_absence(start);
+        presence.register_absence(start + Duration::from_millis(100));
+        assert!(presence.tag_present);
+
+        presence.register_absence(start + Duration::from_millis(400));
+        assert!(presence.register_success("AA:BB"));
     }
 
     // ====================================================================

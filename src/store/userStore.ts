@@ -401,6 +401,11 @@ interface RecentTagScan {
   syncPromise?: Promise<void>; // Background sync promise (for race condition prevention)
 }
 
+// Keep at 2s: Tauri doesn't need this (Rust presence detection deduplicates at the source),
+// but GKT sensor-path/legacy payloads lack eventNumber — every callback gets a unique
+// fallback scanId so this time-based window is the only remaining duplicate guard.
+export const RECENT_SCAN_FALLBACK_WINDOW_MS = 2000;
+
 // RFID scanning state
 interface RfidState {
   isScanning: boolean;
@@ -1469,9 +1474,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       return false;
     }
 
-    // Layer 2: Check recent tag scans (within 2 seconds)
+    // Layer 2: Check recent tag scans within the short fallback window
     const recentScan = rfid.recentTagScans.get(tagId);
-    if (recentScan && Date.now() - recentScan.timestamp < 2000) {
+    if (recentScan && Date.now() - recentScan.timestamp < RECENT_SCAN_FALLBACK_WINDOW_MS) {
       return false;
     }
 
@@ -1539,9 +1544,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const now = Date.now();
       const newScans = new Map<string, RecentTagScan>();
 
-      // Keep only scans from last 2 seconds
+      // Keep only scans from the short fallback window
       state.rfid.recentTagScans.forEach((scan, tagId) => {
-        if (now - scan.timestamp < 2000) {
+        if (now - scan.timestamp < RECENT_SCAN_FALLBACK_WINDOW_MS) {
           newScans.set(tagId, scan);
         }
       });

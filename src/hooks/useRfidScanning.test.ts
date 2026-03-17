@@ -1,13 +1,14 @@
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { NfcScanEvent } from '../platform/adapter';
 import {
   api,
   mapApiErrorToGerman,
   type RfidScanResult,
   type CurrentSession,
 } from '../services/api';
-import { useUserStore } from '../store/userStore';
+import { useUserStore, RECENT_SCAN_FALLBACK_WINDOW_MS } from '../store/userStore';
 import { isRfidEnabled } from '../utils/tauriContext';
 
 import { useRfidScanning, __resetModuleStateForTesting } from './useRfidScanning';
@@ -599,7 +600,7 @@ describe('useRfidScanning', () => {
     });
 
     it('captures onScan callback via adapter.startScanning', async () => {
-      let capturedOnScan: ((tagId: string) => void) | undefined;
+      let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
       mockAdapterStartScanning.mockImplementation(async onScan => {
         capturedOnScan = onScan;
       });
@@ -1092,7 +1093,7 @@ describe('useRfidScanning', () => {
         vi.advanceTimersByTime(4900);
       });
 
-      // Record scan at current time - will be within 2s of next interval
+      // Record scan at current time - will be within the short fallback window
       useUserStore.getState().recordTagScan(MOCK_TAG, {
         timestamp: Date.now(),
         studentId: '42',
@@ -1114,7 +1115,7 @@ describe('useRfidScanning', () => {
     it('silently ignores when no cached result and scan in progress', async () => {
       // Add recent scan without result (still processing)
       useUserStore.getState().recordTagScan(MOCK_TAG, {
-        timestamp: Date.now() - 3000, // older than 2s
+        timestamp: Date.now() - (RECENT_SCAN_FALLBACK_WINDOW_MS + 10),
       });
       // Also add to processing queue to trigger the else branch
       useUserStore.getState().addToProcessingQueue(MOCK_TAG);
@@ -1373,7 +1374,7 @@ describe('useRfidScanning', () => {
       setRoom();
       setSession();
 
-      let capturedOnScan: ((tagId: string) => void) | undefined;
+      let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
       mockAdapterStartScanning.mockImplementation(async onScan => {
         capturedOnScan = onScan;
       });
@@ -1389,7 +1390,7 @@ describe('useRfidScanning', () => {
 
       // Trigger a scan event via the captured callback
       await act(async () => {
-        capturedOnScan!('04:AA:BB:CC:DD:EE:FF');
+        capturedOnScan!({ tagId: '04:AA:BB:CC:DD:EE:FF', scanId: 101 });
       });
 
       await act(async () => {
@@ -1407,7 +1408,7 @@ describe('useRfidScanning', () => {
       setAuthenticated();
       setRoom();
 
-      let capturedOnScan: ((tagId: string) => void) | undefined;
+      let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
       mockAdapterStartScanning.mockImplementation(async onScan => {
         capturedOnScan = onScan;
       });
@@ -1423,7 +1424,7 @@ describe('useRfidScanning', () => {
       useUserStore.getState().blockTag('04:AA:BB:CC:DD:EE:FF', 60000);
 
       await act(async () => {
-        capturedOnScan!('04:AA:BB:CC:DD:EE:FF');
+        capturedOnScan!({ tagId: '04:AA:BB:CC:DD:EE:FF', scanId: 202 });
       });
 
       await act(async () => {
@@ -1431,6 +1432,36 @@ describe('useRfidScanning', () => {
       });
 
       expect(mockedProcessRfidScan).not.toHaveBeenCalled();
+    });
+
+    it('ignores duplicate delivery of the same scanId', async () => {
+      mockedIsRfidEnabled.mockReturnValue(true);
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
+      mockAdapterStartScanning.mockImplementation(async onScan => {
+        capturedOnScan = onScan;
+      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await act(async () => {
+        capturedOnScan!({ tagId: '04:AA:BB:CC:DD:EE:FF', scanId: 303 });
+        capturedOnScan!({ tagId: '04:AA:BB:CC:DD:EE:FF', scanId: 303 });
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -1540,7 +1571,7 @@ describe('useRfidScanning', () => {
     it('onScan callback is captured on startScanning for real RFID', async () => {
       mockedIsRfidEnabled.mockReturnValue(true);
 
-      let capturedOnScan: ((tagId: string) => void) | undefined;
+      let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
       mockAdapterStartScanning.mockImplementation(async onScan => {
         capturedOnScan = onScan;
       });

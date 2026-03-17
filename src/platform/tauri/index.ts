@@ -8,7 +8,7 @@
 
 import type { SessionSettings } from '../../services/sessionStorage';
 import { safeInvoke } from '../../utils/tauriContext';
-import type { PlatformAdapter } from '../adapter';
+import type { NfcScanEvent, PlatformAdapter } from '../adapter';
 
 class TauriAdapter implements PlatformAdapter {
   readonly platform = 'tauri' as const;
@@ -20,7 +20,7 @@ class TauriAdapter implements PlatformAdapter {
 
   private unlisten: (() => void) | null = null;
 
-  async startScanning(onScan: (tagId: string) => void): Promise<void> {
+  async startScanning(onScan: (event: NfcScanEvent) => void): Promise<void> {
     // Clean up previous listener first (post-mortem #13: prevent duplicates)
     if (this.unlisten) {
       this.unlisten();
@@ -29,8 +29,11 @@ class TauriAdapter implements PlatformAdapter {
 
     // Set up listener BEFORE starting service (post-mortem #6: don't miss first scan)
     const { listen } = await import('@tauri-apps/api/event');
-    this.unlisten = await listen<{ tag_id: string }>('rfid-scan', event => {
-      onScan(event.payload.tag_id);
+    this.unlisten = await listen<{ tag_id: string; scan_id: number }>('rfid-scan', event => {
+      onScan({
+        tagId: event.payload.tag_id,
+        scanId: event.payload.scan_id,
+      });
     });
 
     try {

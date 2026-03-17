@@ -9,12 +9,17 @@ import type { SessionSettings } from '../services/sessionStorage';
 
 export type Platform = 'tauri' | 'gkt' | 'browser';
 
+export interface NfcScanEvent {
+  tagId: string;
+  scanId: number;
+}
+
 export interface PlatformAdapter {
   readonly platform: Platform;
 
   // --- NFC / RFID Scanning ---
   initializeNfc(): Promise<void>;
-  startScanning(onScan: (tagId: string) => void): Promise<void>;
+  startScanning(onScan: (event: NfcScanEvent) => void): Promise<void>;
   stopScanning(): Promise<void>;
 
   // --- Service Lifecycle (Tauri: polls backend, GKT: no-op) ---

@@ -6,50 +6,50 @@ describe('normalizeNfcPayload', () => {
   // Intent-path payload: {uid, eventSource, eventNumber}
   it('extracts uid from intent-path payload', () => {
     const payload = { uid: 'f0:bc:e8:44', eventSource: 'NFC', eventNumber: 3 };
-    expect(normalizeNfcPayload(payload)).toBe('F0:BC:E8:44');
+    expect(normalizeNfcPayload(payload, 99)).toEqual({ tagId: 'F0:BC:E8:44', scanId: 3 });
   });
 
   // Sensor-path payload: {eventSource, barcode}
   it('extracts barcode from sensor-path payload', () => {
     const payload = { eventSource: 'nfc', barcode: 'f0:bc:e8:44' };
-    expect(normalizeNfcPayload(payload)).toBe('F0:BC:E8:44');
+    expect(normalizeNfcPayload(payload, 11)).toEqual({ tagId: 'F0:BC:E8:44', scanId: 11 });
   });
 
   // Legacy string payload
   it('handles legacy string payload', () => {
-    expect(normalizeNfcPayload('f0:bc:e8:44')).toBe('F0:BC:E8:44');
+    expect(normalizeNfcPayload('f0:bc:e8:44', 7)).toEqual({ tagId: 'F0:BC:E8:44', scanId: 7 });
   });
 
   // uid takes precedence over barcode
   it('prefers uid over barcode when both present', () => {
     const payload = { uid: 'aa:bb:cc:dd', barcode: '11:22:33:44', eventSource: 'NFC' };
-    expect(normalizeNfcPayload(payload)).toBe('AA:BB:CC:DD');
+    expect(normalizeNfcPayload(payload, 4)).toEqual({ tagId: 'AA:BB:CC:DD', scanId: 4 });
   });
 
   // Already uppercase
   it('handles already uppercase UIDs', () => {
     const payload = { uid: 'F0:BC:E8:44', eventSource: 'NFC', eventNumber: 1 };
-    expect(normalizeNfcPayload(payload)).toBe('F0:BC:E8:44');
+    expect(normalizeNfcPayload(payload, 6)).toEqual({ tagId: 'F0:BC:E8:44', scanId: 1 });
   });
 
   // Edge cases
   it('returns null for null input', () => {
-    expect(normalizeNfcPayload(null)).toBeNull();
+    expect(normalizeNfcPayload(null, 1)).toBeNull();
   });
 
   it('returns null for undefined input', () => {
-    expect(normalizeNfcPayload(undefined)).toBeNull();
+    expect(normalizeNfcPayload(undefined, 1)).toBeNull();
   });
 
   it('returns null for empty object', () => {
-    expect(normalizeNfcPayload({})).toBeNull();
+    expect(normalizeNfcPayload({}, 1)).toBeNull();
   });
 
   it('returns null for object with empty uid', () => {
-    expect(normalizeNfcPayload({ uid: '', eventSource: 'NFC' })).toBeNull();
+    expect(normalizeNfcPayload({ uid: '', eventSource: 'NFC' }, 1)).toBeNull();
   });
 
   it('returns null for number input', () => {
-    expect(normalizeNfcPayload(42)).toBeNull();
+    expect(normalizeNfcPayload(42, 1)).toBeNull();
   });
 });
