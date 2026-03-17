@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
-import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
@@ -1170,7 +1169,7 @@ const ActivityScanningPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Main Student Count Display */}
+            {/* Main Student Count Display / RFID Processing Spinner */}
             <div
               style={{
                 display: 'flex',
@@ -1180,20 +1179,36 @@ const ActivityScanningPage: React.FC = () => {
                 flex: 1,
               }}
             >
-              <div>
+              {rfid.processingQueue.size > 0 ? (
                 <div
                   style={{
-                    fontSize: '220px',
-                    fontWeight: 800,
-                    color: '#83cd2d',
-                    lineHeight: 1,
-                    marginBottom: '0px',
-                    marginTop: '-12px',
+                    width: '140px',
+                    height: '140px',
+                    borderRadius: '50%',
+                    background:
+                      'conic-gradient(from 0deg, transparent 0%, #5080D8 50%, #83CD2D 100%)',
+                    mask: 'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
+                    WebkitMask:
+                      'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
+                    animation: 'rfid-center-spin 0.8s linear infinite',
                   }}
-                >
-                  {studentCount ?? 0}
+                />
+              ) : (
+                <div>
+                  <div
+                    style={{
+                      fontSize: '220px',
+                      fontWeight: 800,
+                      color: '#83cd2d',
+                      lineHeight: 1,
+                      marginBottom: '0px',
+                      marginTop: '-12px',
+                    }}
+                  >
+                    {studentCount ?? 0}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -1463,8 +1478,13 @@ const ActivityScanningPage: React.FC = () => {
         />
       )}
 
-      {/* Bottom-left spinner: visible between RFID tag detection and API response */}
-      <RfidProcessingIndicator isVisible={rfid.processingQueue.size > 0} />
+      {/* Keyframes for center RFID processing spinner */}
+      <style>{`
+        @keyframes rfid-center-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 };

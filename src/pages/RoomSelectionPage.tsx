@@ -945,7 +945,6 @@ function RoomSelectionPage() {
         onBack={handleGoBack}
         isLoading={isLoading}
         error={error}
-        spinnerColor="#f87C10"
       >
         {rooms.length === 0 ? (
           <div
