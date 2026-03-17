@@ -1,10 +1,4 @@
-import {
-  faFaceSmile,
-  faFaceMeh,
-  faFaceFrown,
-  faTree,
-  faRestroom,
-} from '@fortawesome/free-solid-svg-icons';
+import { faFaceSmile, faFaceMeh, faFaceFrown, faRestroom } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -966,7 +960,33 @@ const ActivityScanningPage: React.FC = () => {
                 label: 'Schulhof',
                 colorScheme: 'schulhof' as const,
                 icon: (
-                  <FontAwesomeIcon icon={faTree} style={{ fontSize: '48px', color: '#FFFFFF' }} />
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 64 64"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {/* Top horizontal bar */}
+                    <line x1="6" y1="8" x2="58" y2="8" strokeWidth="3" />
+                    {/* Left A-leg front */}
+                    <line x1="6" y1="8" x2="12" y2="58" />
+                    {/* Left A-leg back */}
+                    <line x1="6" y1="8" x2="2" y2="58" />
+                    {/* Right A-leg front */}
+                    <line x1="58" y1="8" x2="52" y2="58" />
+                    {/* Right A-leg back */}
+                    <line x1="58" y1="8" x2="62" y2="58" />
+                    {/* Left chain */}
+                    <line x1="24" y1="8" x2="22" y2="40" />
+                    {/* Right chain */}
+                    <line x1="40" y1="8" x2="42" y2="40" />
+                    {/* Seat */}
+                    <rect x="19" y="40" width="26" height="4" rx="2" fill="#FFFFFF" />
+                  </svg>
                 ),
                 onClick: () => void handleDestinationSelect('schulhof'),
               },
