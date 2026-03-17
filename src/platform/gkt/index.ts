@@ -55,43 +55,24 @@ export function normalizeNfcPayload(
   return null;
 }
 
-/**
- * Presence window for GKT scanId assignment.
- * Callbacks for the same tag within this window reuse the same scanId,
- * regardless of whether eventNumber is available. eventNumber increments
- * per NFC read (not per physical tap), so it cannot be trusted for dedup.
- */
-const GKT_PRESENCE_WINDOW_MS = 2000;
-
 class GKTAdapter implements PlatformAdapter {
   readonly platform = 'gkt' as const;
   private scanCallback: ((event: NfcScanEvent) => void) | null = null;
   private cachedApiKey: string | null = null;
   private scanCounter = 0;
-  private lastScanTag: string | null = null;
-  private lastScanTime = 0;
 
   async initializeNfc(): Promise<void> {
-    // Register NFC callback with system.js — handles all payload shapes
+    // Register NFC callback with system.js — handles all payload shapes.
+    // GKT NFC fires once per physical tap (Android intent-based dispatch),
+    // unlike MFRC522 which polls continuously. No adapter-level dedup needed —
+    // every callback is a distinct scan. Tauri handles its own dedup in Rust.
     SYSTEM.registerNfc((payload: unknown) => {
       if (!this.scanCallback) return;
 
       const parsed = normalizeNfcPayload(payload);
       if (!parsed) return;
 
-      // Always use presence tracking for scanId — eventNumber is NOT trustworthy
-      // for dedup because it increments per NFC read, not per physical tap.
-      const now = Date.now();
-      const isSameTagPresent =
-        this.lastScanTag === parsed.tagId && now - this.lastScanTime < GKT_PRESENCE_WINDOW_MS;
-
-      if (!isSameTagPresent) {
-        this.scanCounter++;
-      }
-      this.lastScanTag = parsed.tagId;
-      this.lastScanTime = now;
-
-      this.scanCallback({ tagId: parsed.tagId, scanId: this.scanCounter });
+      this.scanCallback({ tagId: parsed.tagId, scanId: ++this.scanCounter });
     });
   }
 
