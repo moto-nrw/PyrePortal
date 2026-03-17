@@ -1169,7 +1169,7 @@ const ActivityScanningPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Main Student Count Display / RFID Processing Spinner */}
+            {/* Main Student Count Display / RFID Processing Spinner (cross-fade) */}
             <div
               style={{
                 display: 'flex',
@@ -1177,38 +1177,42 @@ const ActivityScanningPage: React.FC = () => {
                 justifyContent: 'center',
                 textAlign: 'center',
                 flex: 1,
+                position: 'relative',
               }}
             >
-              {rfid.processingQueue.size > 0 ? (
-                <div
-                  style={{
-                    width: '140px',
-                    height: '140px',
-                    borderRadius: '50%',
-                    background:
-                      'conic-gradient(from 0deg, transparent 0%, #5080D8 50%, #83CD2D 100%)',
-                    mask: 'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
-                    WebkitMask:
-                      'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
-                    animation: 'rfid-center-spin 0.8s linear infinite',
-                  }}
-                />
-              ) : (
-                <div>
-                  <div
-                    style={{
-                      fontSize: '220px',
-                      fontWeight: 800,
-                      color: '#83cd2d',
-                      lineHeight: 1,
-                      marginBottom: '0px',
-                      marginTop: '-12px',
-                    }}
-                  >
-                    {studentCount ?? 0}
-                  </div>
-                </div>
-              )}
+              <div
+                style={{
+                  fontSize: '220px',
+                  fontWeight: 800,
+                  color: '#83cd2d',
+                  lineHeight: 1,
+                  marginTop: '-12px',
+                  transition: 'opacity 0.3s ease',
+                  opacity: rfid.processingQueue.size > 0 ? 0 : 1,
+                }}
+              >
+                {studentCount ?? 0}
+              </div>
+              <div
+                style={{
+                  position: 'absolute',
+                  width: '140px',
+                  height: '140px',
+                  borderRadius: '50%',
+                  background:
+                    'conic-gradient(from 0deg, transparent 0%, #5080D8 50%, #83CD2D 100%)',
+                  mask: 'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
+                  WebkitMask:
+                    'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
+                  animation:
+                    rfid.processingQueue.size > 0
+                      ? 'rfid-center-spin 0.8s linear infinite'
+                      : 'none',
+                  transition: 'opacity 0.3s ease',
+                  opacity: rfid.processingQueue.size > 0 ? 1 : 0,
+                  pointerEvents: 'none',
+                }}
+              />
             </div>
           </div>
         </div>
