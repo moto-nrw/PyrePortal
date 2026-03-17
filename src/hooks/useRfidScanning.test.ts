@@ -8,7 +8,7 @@ import {
   type RfidScanResult,
   type CurrentSession,
 } from '../services/api';
-import { useUserStore, RECENT_SCAN_FALLBACK_WINDOW_MS } from '../store/userStore';
+import { useUserStore } from '../store/userStore';
 import { isRfidEnabled } from '../utils/tauriContext';
 
 import { useRfidScanning, __resetModuleStateForTesting } from './useRfidScanning';
@@ -1078,8 +1078,13 @@ describe('useRfidScanning', () => {
       expect(mockedProcessRfidScan).not.toHaveBeenCalled();
     });
 
-    it('shows cached result for recently scanned tag', async () => {
-      const cachedResult = makeCheckinResult({ student_name: 'Cached Result' });
+    it('allows recently scanned tag (Layer 2 removed — scanId dedup handles this)', async () => {
+      // Record a previous scan — should NOT block because dedup is now scanId-based
+      useUserStore.getState().recordTagScan(MOCK_TAG, {
+        timestamp: Date.now(),
+        studentId: '42',
+        result: makeCheckinResult({ student_name: 'Previous' }),
+      });
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -1087,37 +1092,13 @@ describe('useRfidScanning', () => {
         await result.current.startScanning();
       });
 
-      // Record scan AFTER starting (so timestamp is close to interval fire time)
-      // Advance most of the way, then record, then advance the rest
-      await act(async () => {
-        vi.advanceTimersByTime(4900);
-      });
+      await triggerMockScanAndDrain();
 
-      // Record scan at current time - will be within the short fallback window
-      useUserStore.getState().recordTagScan(MOCK_TAG, {
-        timestamp: Date.now(),
-        studentId: '42',
-        result: cachedResult,
-      });
-
-      await act(async () => {
-        vi.advanceTimersByTime(200);
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
-
-      // Should show the cached result instead of making API call
-      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
+      // Should make API call — the tag is not in the processing queue
+      expect(mockedProcessRfidScan).toHaveBeenCalled();
     });
 
-    it('silently ignores when no cached result and scan in progress', async () => {
-      // Add recent scan without result (still processing)
-      useUserStore.getState().recordTagScan(MOCK_TAG, {
-        timestamp: Date.now() - (RECENT_SCAN_FALLBACK_WINDOW_MS + 10),
-      });
-      // Also add to processing queue to trigger the else branch
+    it('silently blocks when tag is in processing queue', async () => {
       useUserStore.getState().addToProcessingQueue(MOCK_TAG);
 
       const { result } = renderHook(() => useRfidScanning());

@@ -23,44 +23,82 @@ declare const SYSTEM: {
  * 2. Sensor-path: {eventSource: "nfc", barcode: "f0:bc:e8:44"}
  * 3. Legacy string: "f0:bc:e8:44"
  */
-export function normalizeNfcPayload(payload: unknown, fallbackScanId: number): NfcScanEvent | null {
+/**
+ * Extract a tag ID and (when available) hardware-provided scan identity
+ * from the raw system.js NFC payload.
+ *
+ * Returns `{ tagId, eventNumber? }` so the caller can decide how to
+ * assign a scanId (hardware eventNumber vs. fallback counter).
+ */
+export function normalizeNfcPayload(
+  payload: unknown
+): { tagId: string; eventNumber: number | null } | null {
   if (typeof payload === 'string') {
-    return { tagId: payload.toUpperCase(), scanId: fallbackScanId };
+    return { tagId: payload.toUpperCase(), eventNumber: null };
   }
 
   if (typeof payload === 'object' && payload !== null) {
     const obj = payload as Record<string, unknown>;
-    const eventNumber = typeof obj.eventNumber === 'number' ? obj.eventNumber : fallbackScanId;
+    const eventNumber = typeof obj.eventNumber === 'number' ? obj.eventNumber : null;
 
     // Intent-path: {uid: "f0:bc:e8:44", eventSource: "NFC"}
     if (typeof obj.uid === 'string' && obj.uid) {
-      return { tagId: obj.uid.toUpperCase(), scanId: eventNumber };
+      return { tagId: obj.uid.toUpperCase(), eventNumber };
     }
 
     // Sensor-path: {eventSource: "nfc", barcode: "f0:bc:e8:44"}
     if (typeof obj.barcode === 'string' && obj.barcode) {
-      return { tagId: obj.barcode.toUpperCase(), scanId: eventNumber };
+      return { tagId: obj.barcode.toUpperCase(), eventNumber };
     }
   }
 
   return null;
 }
 
+/**
+ * Presence window for GKT fallback scanId assignment.
+ * When the hardware doesn't provide eventNumber, callbacks for the same tag
+ * within this window reuse the same scanId (mirrors Rust presence detection).
+ */
+const GKT_PRESENCE_WINDOW_MS = 2000;
+
 class GKTAdapter implements PlatformAdapter {
   readonly platform = 'gkt' as const;
   private scanCallback: ((event: NfcScanEvent) => void) | null = null;
   private cachedApiKey: string | null = null;
   private fallbackScanCounter = 0;
+  private lastFallbackTag: string | null = null;
+  private lastFallbackTime = 0;
 
   async initializeNfc(): Promise<void> {
     // Register NFC callback with system.js — handles all payload shapes
     SYSTEM.registerNfc((payload: unknown) => {
       if (!this.scanCallback) return;
 
-      const scanEvent = normalizeNfcPayload(payload, ++this.fallbackScanCounter);
-      if (scanEvent) {
-        this.scanCallback(scanEvent);
+      const parsed = normalizeNfcPayload(payload);
+      if (!parsed) return;
+
+      let scanId: number;
+      if (parsed.eventNumber !== null) {
+        // Hardware-provided identity — trustworthy
+        scanId = parsed.eventNumber;
+      } else {
+        // No eventNumber: use presence tracking to group rapid same-tag callbacks
+        // into one logical scan (mirrors Rust-side presence detection for Tauri).
+        const now = Date.now();
+        const isSameTagPresent =
+          this.lastFallbackTag === parsed.tagId &&
+          now - this.lastFallbackTime < GKT_PRESENCE_WINDOW_MS;
+
+        if (!isSameTagPresent) {
+          this.fallbackScanCounter++;
+        }
+        this.lastFallbackTag = parsed.tagId;
+        this.lastFallbackTime = now;
+        scanId = this.fallbackScanCounter;
       }
+
+      this.scanCallback({ tagId: parsed.tagId, scanId });
     });
   }
 

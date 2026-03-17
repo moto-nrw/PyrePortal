@@ -5,7 +5,7 @@ import { adapter } from '@platform';
 import type { NfcScanEvent } from '../platform/adapter';
 import { api, mapApiErrorToGerman, ApiError } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
-import { useUserStore, RECENT_SCAN_FALLBACK_WINDOW_MS } from '../store/userStore';
+import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, serializeError } from '../utils/logger';
 import { isRfidEnabled } from '../utils/tauriContext';
@@ -379,19 +379,9 @@ export const useRfidScanning = () => {
 
       logger.info('Processing RFID scan', { tagId });
 
-      // Handle duplicate prevention
+      // Handle duplicate prevention (Layer 1: processing queue, Layer 3: student history)
       if (!canProcessTag(tagId)) {
         logger.debug('Tag blocked by duplicate prevention', { tagId });
-        const recentScan = rfid.recentTagScans.get(tagId);
-        if (
-          recentScan?.result &&
-          Date.now() - recentScan.timestamp < RECENT_SCAN_FALLBACK_WINDOW_MS
-        ) {
-          setScanResult(recentScan.result);
-          showScanModal();
-        } else {
-          logger.debug('Scan already in progress, please wait');
-        }
         return;
       }
 
@@ -496,7 +486,6 @@ export const useRfidScanning = () => {
       addSupervisorFromRfid,
       addActiveSupervisorTag,
       isActiveSupervisor,
-      rfid.recentTagScans,
       showSupervisorRedirect,
     ]
   );
