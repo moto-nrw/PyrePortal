@@ -56,9 +56,10 @@ export function normalizeNfcPayload(
 }
 
 /**
- * Presence window for GKT fallback scanId assignment.
- * When the hardware doesn't provide eventNumber, callbacks for the same tag
- * within this window reuse the same scanId (mirrors Rust presence detection).
+ * Presence window for GKT scanId assignment.
+ * Callbacks for the same tag within this window reuse the same scanId,
+ * regardless of whether eventNumber is available. eventNumber increments
+ * per NFC read (not per physical tap), so it cannot be trusted for dedup.
  */
 const GKT_PRESENCE_WINDOW_MS = 2000;
 
@@ -66,9 +67,9 @@ class GKTAdapter implements PlatformAdapter {
   readonly platform = 'gkt' as const;
   private scanCallback: ((event: NfcScanEvent) => void) | null = null;
   private cachedApiKey: string | null = null;
-  private fallbackScanCounter = 0;
-  private lastFallbackTag: string | null = null;
-  private lastFallbackTime = 0;
+  private scanCounter = 0;
+  private lastScanTag: string | null = null;
+  private lastScanTime = 0;
 
   async initializeNfc(): Promise<void> {
     // Register NFC callback with system.js — handles all payload shapes
@@ -78,27 +79,19 @@ class GKTAdapter implements PlatformAdapter {
       const parsed = normalizeNfcPayload(payload);
       if (!parsed) return;
 
-      let scanId: number;
-      if (parsed.eventNumber !== null) {
-        // Hardware-provided identity — trustworthy
-        scanId = parsed.eventNumber;
-      } else {
-        // No eventNumber: use presence tracking to group rapid same-tag callbacks
-        // into one logical scan (mirrors Rust-side presence detection for Tauri).
-        const now = Date.now();
-        const isSameTagPresent =
-          this.lastFallbackTag === parsed.tagId &&
-          now - this.lastFallbackTime < GKT_PRESENCE_WINDOW_MS;
+      // Always use presence tracking for scanId — eventNumber is NOT trustworthy
+      // for dedup because it increments per NFC read, not per physical tap.
+      const now = Date.now();
+      const isSameTagPresent =
+        this.lastScanTag === parsed.tagId && now - this.lastScanTime < GKT_PRESENCE_WINDOW_MS;
 
-        if (!isSameTagPresent) {
-          this.fallbackScanCounter++;
-        }
-        this.lastFallbackTag = parsed.tagId;
-        this.lastFallbackTime = now;
-        scanId = this.fallbackScanCounter;
+      if (!isSameTagPresent) {
+        this.scanCounter++;
       }
+      this.lastScanTag = parsed.tagId;
+      this.lastScanTime = now;
 
-      this.scanCallback({ tagId: parsed.tagId, scanId });
+      this.scanCallback({ tagId: parsed.tagId, scanId: this.scanCounter });
     });
   }
 
