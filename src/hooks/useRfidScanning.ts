@@ -742,7 +742,7 @@ export const useRfidScanning = () => {
   useEffect(() => {
     const cleanupInterval = setInterval(() => {
       clearOldTagScans();
-    }, 2000); // Clean up every 2 seconds
+    }, 30000); // Clean up every 30 seconds (memory hygiene only, not dedup-critical)
 
     return () => {
       clearInterval(cleanupInterval);
