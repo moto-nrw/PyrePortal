@@ -1038,6 +1038,12 @@ mod mock_platform {
         Ok(tag)
     }
 
+    /// Reset cached last-scan state so each call independently hits the error check.
+    #[cfg(test)]
+    pub(crate) fn reset_last_scan() {
+        *LAST_SCAN.lock().unwrap() = None;
+    }
+
     pub fn check_rfid_hardware() -> RfidScannerStatus {
         // Log that we're using mock implementation
         println!("[RFID] Using mock implementation with hardware format (XX:XX:XX:XX:XX:XX:XX)");
@@ -1878,11 +1884,17 @@ mod tests {
             RfidBackgroundService::continuous_scan_loop(loop_state, None).await;
         });
 
-        // Let it scan for a bit
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        // It should have scanned at least once
-        let had_scan = state.lock().unwrap().last_scan.is_some();
+        // Poll for a successful scan instead of a fixed sleep.
+        // Mock scan_rfid_hardware() sleeps 200-500ms per attempt and has a 5%
+        // error rate, so waiting up to 3s gives plenty of headroom.
+        let mut had_scan = false;
+        for _ in 0..30 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            if state.lock().unwrap().last_scan.is_some() {
+                had_scan = true;
+                break;
+            }
+        }
 
         // Signal stop
         state.lock().unwrap().should_run = false;
@@ -1937,11 +1949,12 @@ mod tests {
 
         #[tokio::test]
         async fn mock_scan_can_produce_errors() {
-            // With 5% error rate, 500 calls to the internal fn (no sleep) should
-            // produce at least one error. Avoids the 200-500ms per-call sleep in
-            // scan_rfid_hardware() which caused CI timeouts.
+            // With 5% error rate AND reset_last_scan() before each call, every
+            // iteration independently reaches the error check. P(zero errors in
+            // 500 trials) = 0.95^500 ≈ 0 — this can no longer flake.
             let mut got_error = false;
             for _ in 0..500 {
+                mock_platform::reset_last_scan();
                 if mock_platform::scan_rfid_mock_internal().is_err() {
                     got_error = true;
                     break;
