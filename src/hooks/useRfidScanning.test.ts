@@ -134,28 +134,37 @@ function setSession(overrides: Partial<CurrentSession> = {}): CurrentSession {
 const MOCK_TAG = '04:D6:94:82:97:6A:80';
 
 /**
- * Triggers mock scan interval and drains all resulting async operations.
- * processScan() is called fire-and-forget (`void processScan(...)`) from the
- * setInterval callback, so its async chain (API call → state updates →
- * supervisor auth → cleanup) runs as detached microtasks.
+ * Flush microtasks in a loop until the RFID store state settles.
+ * processScan() runs fire-and-forget, spawning a variable-depth promise
+ * chain (API mock → catch → logger.persistLog → safeInvoke mock → state
+ * updates). A fixed iteration count is unreliable across CI environments.
  *
- * We drain in two phases:
- * 1. advanceTimersByTimeAsync(5100) fires the 5000ms interval and flushes
- *    timer-level microtasks, but may not resolve the full detached promise chain.
- * 2. Explicit Promise.resolve() rounds guarantee microtask boundaries that flush
- *    the remaining async operations (mock rejections, catch blocks, Zustand set()
- *    calls). This is more reliable than advanceTimersByTimeAsync(0) which may
- *    short-circuit when no timers are pending, especially in slower CI runners.
+ * Instead we drain in batches of 10 Promise.resolve() rounds and check
+ * whether the store's processingQueue has emptied (processScan always
+ * clears it in its finally block). We cap at 500 rounds to avoid hangs.
  */
+async function drainMicrotasks() {
+  const MAX_ROUNDS = 500;
+  for (let i = 0; i < MAX_ROUNDS; i += 10) {
+    for (let j = 0; j < 10; j++) {
+      await Promise.resolve();
+    }
+    // processScan's finally block clears the processing queue — once empty
+    // and either showModal or currentScan is set, the chain has settled.
+    const s = useUserStore.getState().rfid;
+    if (s.processingQueue.size === 0 && (s.showModal || s.currentScan)) {
+      // One extra flush to let any trailing fire-and-forget (logger) settle
+      for (let k = 0; k < 10; k++) await Promise.resolve();
+      return;
+    }
+  }
+}
+
 async function triggerMockScanAndDrain() {
   await act(async () => {
     // Fire the mock interval callback
     await vi.advanceTimersByTimeAsync(5100);
-    // Explicit microtask drain: each await creates a microtask boundary that
-    // lets the detached processScan() promise chain advance one step.
-    for (let i = 0; i < 50; i++) {
-      await Promise.resolve();
-    }
+    await drainMicrotasks();
   });
 }
 
