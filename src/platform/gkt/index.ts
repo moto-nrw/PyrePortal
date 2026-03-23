@@ -60,6 +60,7 @@ class GKTAdapter implements PlatformAdapter {
   private scanCallback: ((event: NfcScanEvent) => void) | null = null;
   private cachedApiKey: string | null = null;
   private scanCounter = 0;
+  private singleScanTimer: ReturnType<typeof setTimeout> | null = null;
 
   async initializeNfc(): Promise<void> {
     // Register NFC callback with system.js — handles all payload shapes.
@@ -76,12 +77,22 @@ class GKTAdapter implements PlatformAdapter {
     });
   }
 
+  private cancelPendingSingleScan(): void {
+    if (this.singleScanTimer) {
+      clearTimeout(this.singleScanTimer);
+      this.singleScanTimer = null;
+    }
+  }
+
   async startScanning(onScan: (event: NfcScanEvent) => void): Promise<void> {
-    // GKT NFC is always-on after registerNfc — just set callback
+    // Cancel any pending scanSingleTag timeout so its stale closure
+    // can't overwrite this newer callback when it fires.
+    this.cancelPendingSingleScan();
     this.scanCallback = onScan;
   }
 
   async stopScanning(): Promise<void> {
+    this.cancelPendingSingleScan();
     this.scanCallback = null;
   }
 
@@ -97,16 +108,27 @@ class GKTAdapter implements PlatformAdapter {
     // NFC callback and resolving the promise with it.
     const previousCallback = this.scanCallback;
     return new Promise(resolve => {
+      const oneShotCallback = (event: NfcScanEvent) => {
+        this.singleScanTimer = null;
+        clearTimeout(timer);
+        // Only restore if we're still the active callback
+        if (this.scanCallback === oneShotCallback) {
+          this.scanCallback = previousCallback;
+        }
+        resolve({ success: true, tag_id: event.tagId });
+      };
+
       const timer = setTimeout(() => {
-        this.scanCallback = previousCallback;
+        this.singleScanTimer = null;
+        // Only restore if we're still the active callback
+        if (this.scanCallback === oneShotCallback) {
+          this.scanCallback = previousCallback;
+        }
         resolve({ success: false, error: 'Scan timed out' });
       }, timeoutMs);
 
-      this.scanCallback = (event: NfcScanEvent) => {
-        clearTimeout(timer);
-        this.scanCallback = previousCallback;
-        resolve({ success: true, tag_id: event.tagId });
-      };
+      this.singleScanTimer = timer;
+      this.scanCallback = oneShotCallback;
     });
   }
 

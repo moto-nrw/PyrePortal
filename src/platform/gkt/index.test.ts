@@ -263,6 +263,63 @@ describe('GKTAdapter', () => {
 
       vi.useRealTimers();
     });
+
+    it('startScanning cancels pending single-scan timer', async () => {
+      vi.useFakeTimers();
+
+      let nfcCallback: ((payload: unknown) => void) | undefined;
+      mockRegisterNfc.mockImplementation((cb: (payload: unknown) => void) => {
+        nfcCallback = cb;
+      });
+
+      await adapter.initializeNfc();
+      await adapter.startScanning(vi.fn());
+
+      // Start a single-tag scan — don't await (it's pending)
+      void adapter.scanSingleTag(20_000);
+
+      // User navigates away — new page starts normal scanning
+      const newCallback = vi.fn();
+      await adapter.startScanning(newCallback);
+
+      // Advance past the old timeout — timer was cancelled, so it's a no-op
+      vi.advanceTimersByTime(20_000);
+
+      // New callback must still be active
+      nfcCallback!({ uid: 'de:ad:be:ef' });
+      expect(newCallback).toHaveBeenCalledWith(expect.objectContaining({ tagId: 'DE:AD:BE:EF' }));
+
+      vi.useRealTimers();
+    });
+
+    it('stopScanning cancels pending single-scan timer', async () => {
+      vi.useFakeTimers();
+
+      let nfcCallback: ((payload: unknown) => void) | undefined;
+      mockRegisterNfc.mockImplementation((cb: (payload: unknown) => void) => {
+        nfcCallback = cb;
+      });
+
+      await adapter.initializeNfc();
+      await adapter.startScanning(vi.fn());
+
+      // Start a single-tag scan — don't await
+      void adapter.scanSingleTag(20_000);
+
+      // User navigates: stop, then new page starts scanning
+      await adapter.stopScanning();
+      const newCallback = vi.fn();
+      await adapter.startScanning(newCallback);
+
+      // Advance past the old timeout
+      vi.advanceTimersByTime(20_000);
+
+      // New callback must still be active
+      nfcCallback!({ uid: 'de:ad:be:ef' });
+      expect(newCallback).toHaveBeenCalledWith(expect.objectContaining({ tagId: 'DE:AD:BE:EF' }));
+
+      vi.useRealTimers();
+    });
   });
 
   describe('recoverScanner', () => {
