@@ -79,13 +79,11 @@
     "project": [
       "src/**/*.{ts,tsx}"
     ],
-    "ignore": [
-      "src-tauri/**"
+    "entry": [
+      "src/platform/*/index.ts"
     ],
     "ignoreDependencies": [
-      "@tauri-apps/plugin-opener",
-      "@testing-library/react",
-      "@testing-library/user-event"
+      "@tauri-apps/plugin-opener"
     ]
   }
 }
