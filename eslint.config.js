@@ -1,4 +1,3 @@
-import { FlatCompat } from '@eslint/eslintrc';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import a11yPlugin from 'eslint-plugin-jsx-a11y';
@@ -7,10 +6,6 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import securityPlugin from 'eslint-plugin-security';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-});
 
 export default tseslint.config(
   // Prettier must come first to turn off conflicting rules
