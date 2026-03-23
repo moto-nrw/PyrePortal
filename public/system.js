@@ -469,15 +469,11 @@ var SYSTEM = {
   },
   requestInputStates: function (inputboardid) {
     if (inputboardid) {
-      if (typeof inputboardid != 'undefined') {
-        SYSTEM.log2('IOConnector', 'request input states from board ' + inputboardid);
-        SYSTEM.sendIntent('de.gekartel.ISMLight.send', {
-          command: 'getboardstates',
-          boardid: inputboardid,
-        });
-      } else {
-        SYSTEM.log2('IOConnector', 'no callback(4)');
-      }
+      SYSTEM.log2('IOConnector', 'request input states from board ' + inputboardid);
+      SYSTEM.sendIntent('de.gekartel.ISMLight.send', {
+        command: 'getboardstates',
+        boardid: inputboardid,
+      });
       return;
     }
   },
