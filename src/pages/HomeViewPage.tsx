@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
-import { ErrorModal, ModalBase } from '../components/ui';
+import { ErrorModal, ModalBase, ModalActionButtons } from '../components/ui';
 import {
   api,
   formatRoomName,
@@ -812,69 +812,14 @@ function HomeViewPage() {
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={() => setShowConfirmModal(false)}
-            onPointerDown={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onPointerUp={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            onPointerLeave={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: '2px solid #E5E7EB',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-            }}
-          >
-            Abbrechen
-          </button>
-
-          <button
-            onClick={handleConfirmRecreation}
-            disabled={isValidatingLastSession}
-            onPointerDown={e => {
-              if (!isValidatingLastSession) e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onPointerUp={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            onPointerLeave={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              background: isValidatingLastSession
-                ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                : 'linear-gradient(to right, #83CD2D, #70B525)',
-              border: 'none',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              boxShadow: isValidatingLastSession ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
-              opacity: isValidatingLastSession ? 0.6 : 1,
-            }}
-          >
-            {isValidatingLastSession ? 'Starte...' : 'Aufsicht starten'}
-          </button>
-        </div>
+        <ModalActionButtons
+          onCancel={() => setShowConfirmModal(false)}
+          onConfirm={handleConfirmRecreation}
+          isLoading={isValidatingLastSession}
+          confirmLabel="Aufsicht starten"
+          loadingLabel="Starte..."
+          confirmGradient="linear-gradient(to right, #83CD2D, #70B525)"
+        />
       </ModalBase>
 
       {/* End Session Confirmation Modal */}
@@ -909,158 +854,13 @@ function HomeViewPage() {
           <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
         </p>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={() => setShowEndSessionModal(false)}
-            onPointerDown={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onPointerUp={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            onPointerLeave={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: '2px solid #E5E7EB',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-            }}
-          >
-            Abbrechen
-          </button>
-
-          <button
-            onClick={handleConfirmEndSession}
-            onPointerDown={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onPointerUp={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            onPointerLeave={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              background: 'linear-gradient(to right, #EF4444, #DC2626)',
-              border: 'none',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.4)',
-            }}
-          >
-            Ja, beenden
-          </button>
-        </div>
-      </ModalBase>
-
-      {/* End Session Confirmation Modal */}
-      <ModalBase
-        isOpen={showEndSessionModal}
-        onClose={() => setShowEndSessionModal(false)}
-        size="sm"
-        backgroundColor="#FFFFFF"
-      >
-        {/* Title */}
-        <h2
-          style={{
-            fontSize: '28px',
-            fontWeight: 700,
-            color: '#1F2937',
-            marginBottom: '16px',
-          }}
-        >
-          Aktivität beenden?
-        </h2>
-
-        {/* Warning Text */}
-        <p
-          style={{
-            fontSize: '20px',
-            color: '#6B7280',
-            marginBottom: '28px',
-            lineHeight: 1.5,
-          }}
-        >
-          Alle Kinder, die in dieser Aktivität sind, werden auf den Status{' '}
-          <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
-        </p>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={() => setShowEndSessionModal(false)}
-            onPointerDown={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onPointerUp={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            onPointerLeave={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: '2px solid #E5E7EB',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-            }}
-          >
-            Abbrechen
-          </button>
-
-          <button
-            onClick={handleConfirmEndSession}
-            onPointerDown={e => {
-              e.currentTarget.style.transform = 'scale(0.95)';
-            }}
-            onPointerUp={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            onPointerLeave={e => {
-              e.currentTarget.style.transform = '';
-            }}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              background: 'linear-gradient(to right, #EF4444, #DC2626)',
-              border: 'none',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.4)',
-            }}
-          >
-            Ja, beenden
-          </button>
-        </div>
+        <ModalActionButtons
+          onCancel={() => setShowEndSessionModal(false)}
+          onConfirm={handleConfirmEndSession}
+          confirmLabel="Ja, beenden"
+          confirmGradient="linear-gradient(to right, #EF4444, #DC2626)"
+          confirmShadow="0 4px 14px 0 rgba(239, 68, 68, 0.4)"
+        />
       </ModalBase>
     </BackgroundWrapper>
   );

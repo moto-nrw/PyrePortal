@@ -16,6 +16,7 @@ import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
+import { pressHandlers } from '../utils/pressHandlers';
 import { isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
@@ -472,15 +473,7 @@ function TagAssignmentPage() {
 
             <button
               onClick={cancelScan}
-              onPointerDown={e => {
-                e.currentTarget.style.transform = 'scale(0.95)';
-              }}
-              onPointerUp={e => {
-                e.currentTarget.style.transform = '';
-              }}
-              onPointerLeave={e => {
-                e.currentTarget.style.transform = '';
-              }}
+              {...pressHandlers()}
               style={{
                 padding: '12px 32px',
                 fontSize: '18px',
@@ -877,15 +870,7 @@ function TagAssignmentPage() {
                 >
                   <button
                     onClick={handleScanAnother}
-                    onPointerDown={e => {
-                      e.currentTarget.style.transform = 'scale(0.95)';
-                    }}
-                    onPointerUp={e => {
-                      e.currentTarget.style.transform = '';
-                    }}
-                    onPointerLeave={e => {
-                      e.currentTarget.style.transform = '';
-                    }}
+                    {...pressHandlers()}
                     style={{
                       height: '68px',
                       padding: '0 40px',
@@ -905,15 +890,7 @@ function TagAssignmentPage() {
                   </button>
                   <button
                     onClick={handleBack}
-                    onPointerDown={e => {
-                      e.currentTarget.style.transform = 'scale(0.95)';
-                    }}
-                    onPointerUp={e => {
-                      e.currentTarget.style.transform = '';
-                    }}
-                    onPointerLeave={e => {
-                      e.currentTarget.style.transform = '';
-                    }}
+                    {...pressHandlers()}
                     style={{
                       height: '68px',
                       padding: '0 40px',
@@ -1001,15 +978,7 @@ function TagAssignmentPage() {
             <button
               onClick={handleUnassignTag}
               disabled={isUnassigning}
-              onPointerDown={e => {
-                if (!isUnassigning) e.currentTarget.style.transform = 'scale(0.95)';
-              }}
-              onPointerUp={e => {
-                e.currentTarget.style.transform = '';
-              }}
-              onPointerLeave={e => {
-                e.currentTarget.style.transform = '';
-              }}
+              {...pressHandlers(isUnassigning)}
               style={{
                 height: '52px',
                 padding: '0 32px',
@@ -1030,15 +999,7 @@ function TagAssignmentPage() {
             <button
               onClick={() => setShowUnassignConfirm(false)}
               disabled={isUnassigning}
-              onPointerDown={e => {
-                if (!isUnassigning) e.currentTarget.style.transform = 'scale(0.95)';
-              }}
-              onPointerUp={e => {
-                e.currentTarget.style.transform = '';
-              }}
-              onPointerLeave={e => {
-                e.currentTarget.style.transform = '';
-              }}
+              {...pressHandlers(isUnassigning)}
               style={{
                 height: '52px',
                 padding: '0 32px',

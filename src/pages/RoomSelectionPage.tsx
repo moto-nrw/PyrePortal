@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ErrorModal,
   ModalBase,
+  ModalActionButtons,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
@@ -254,71 +255,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       </div>
     </div>
 
-    {/* Action Buttons */}
-    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-      <button
-        onClick={onCancel}
-        disabled={isLoading}
-        onPointerDown={e => {
-          if (!isLoading) e.currentTarget.style.transform = 'scale(0.95)';
-        }}
-        onPointerUp={e => {
-          e.currentTarget.style.transform = '';
-        }}
-        onPointerLeave={e => {
-          e.currentTarget.style.transform = '';
-        }}
-        style={{
-          flex: 1,
-          height: '68px',
-          fontSize: '20px',
-          fontWeight: 600,
-          color: '#6B7280',
-          backgroundColor: 'transparent',
-          border: '2px solid #E5E7EB',
-          borderRadius: designSystem.borderRadius.lg,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          outline: 'none',
-          opacity: isLoading ? 0.6 : 1,
-        }}
-      >
-        Abbrechen
-      </button>
-
-      <button
-        onClick={onConfirm}
-        disabled={isLoading}
-        onPointerDown={e => {
-          if (!isLoading) e.currentTarget.style.transform = 'scale(0.95)';
-        }}
-        onPointerUp={e => {
-          e.currentTarget.style.transform = '';
-        }}
-        onPointerLeave={e => {
-          e.currentTarget.style.transform = '';
-        }}
-        style={{
-          flex: 1,
-          height: '68px',
-          fontSize: '20px',
-          fontWeight: 600,
-          color: '#FFFFFF',
-          background: isLoading
-            ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-            : 'linear-gradient(to right, #83cd2d, #6ba529)',
-          border: 'none',
-          borderRadius: designSystem.borderRadius.lg,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          outline: 'none',
-          boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
-          opacity: isLoading ? 0.6 : 1,
-        }}
-      >
-        {isLoading ? 'Starte...' : 'Aufsicht starten'}
-      </button>
-    </div>
+    <ModalActionButtons
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      isLoading={isLoading}
+      confirmLabel="Aufsicht starten"
+      loadingLabel="Starte..."
+    />
   </ModalBase>
 );
 
@@ -569,71 +512,15 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
       </div>
     </div>
 
-    {/* Action Buttons */}
-    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-      <button
-        onClick={onCancel}
-        disabled={isLoading}
-        onPointerDown={e => {
-          if (!isLoading) e.currentTarget.style.transform = 'scale(0.95)';
-        }}
-        onPointerUp={e => {
-          e.currentTarget.style.transform = '';
-        }}
-        onPointerLeave={e => {
-          e.currentTarget.style.transform = '';
-        }}
-        style={{
-          flex: 1,
-          height: '68px',
-          fontSize: '20px',
-          fontWeight: 600,
-          color: '#6B7280',
-          backgroundColor: 'transparent',
-          border: '2px solid #E5E7EB',
-          borderRadius: designSystem.borderRadius.lg,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          outline: 'none',
-          opacity: isLoading ? 0.6 : 1,
-        }}
-      >
-        Abbrechen
-      </button>
-
-      <button
-        onClick={onForceStart}
-        disabled={isLoading}
-        onPointerDown={e => {
-          if (!isLoading) e.currentTarget.style.transform = 'scale(0.95)';
-        }}
-        onPointerUp={e => {
-          e.currentTarget.style.transform = '';
-        }}
-        onPointerLeave={e => {
-          e.currentTarget.style.transform = '';
-        }}
-        style={{
-          flex: 1,
-          height: '68px',
-          fontSize: '20px',
-          fontWeight: 600,
-          color: '#FFFFFF',
-          background: isLoading
-            ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-            : 'linear-gradient(to right, #DC2626, #B91C1C)',
-          border: 'none',
-          borderRadius: designSystem.borderRadius.lg,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          outline: 'none',
-          boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
-          opacity: isLoading ? 0.6 : 1,
-        }}
-      >
-        {isLoading ? 'Starte...' : 'Trotzdem starten'}
-      </button>
-    </div>
+    <ModalActionButtons
+      onCancel={onCancel}
+      onConfirm={onForceStart}
+      isLoading={isLoading}
+      confirmLabel="Trotzdem starten"
+      loadingLabel="Starte..."
+      confirmGradient="linear-gradient(to right, #DC2626, #B91C1C)"
+      confirmShadow="0 4px 14px 0 rgba(220, 38, 38, 0.4)"
+    />
   </ModalBase>
 );
 
