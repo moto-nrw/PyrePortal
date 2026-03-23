@@ -711,7 +711,8 @@ export const useRfidScanning = () => {
     try {
       const serviceStatus = await adapter.getServiceStatus();
       if (serviceStatus?.is_running) {
-        logger.info('RFID service is already running, synchronizing state');
+        logger.info('RFID service is already running, re-registering listener');
+        await adapter.startScanning(onAdapterScan);
         isServiceStartedRef.current = true;
         startRfidScanning(); // Update store state
       } else {
@@ -721,7 +722,7 @@ export const useRfidScanning = () => {
     } catch (error) {
       logger.debug('Could not get RFID service status', { error });
     }
-  }, [startRfidScanning, stopRfidScanning]);
+  }, [onAdapterScan, startRfidScanning, stopRfidScanning]);
 
   // Initialize service and setup event listener on mount
   useEffect(() => {

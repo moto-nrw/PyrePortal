@@ -679,7 +679,6 @@ describe('useRfidScanning', () => {
 
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           student_rfid: expect.any(String),
           action: 'checkin',
           room_id: 10,
