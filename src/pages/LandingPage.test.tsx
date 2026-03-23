@@ -284,6 +284,24 @@ describe('LandingPage', () => {
     expect(button.style.boxShadow).toBe('0 4px 12px rgba(0, 0, 0, 0.15)');
   });
 
+  it('restores original styles on pointerLeave', () => {
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    const button = screen.getByText('Anmelden');
+    fireEvent.pointerDown(button);
+    expect(button.style.transform).toBe('scale(0.95)');
+
+    fireEvent.pointerLeave(button);
+
+    expect(button.style.transform).toBe('');
+    expect(button.style.backgroundColor).toBe('#111827');
+    expect(button.style.boxShadow).toBe('0 4px 12px rgba(0, 0, 0, 0.15)');
+  });
+
   // --- Additional styling tests ---
 
   it('login button has correct dimensions and font size', () => {
