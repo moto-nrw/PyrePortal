@@ -135,17 +135,26 @@ const MOCK_TAG = '04:D6:94:82:97:6A:80';
 
 /**
  * Triggers mock scan interval and drains all resulting async operations.
- * processScan() has a long async chain (API call → state updates → supervisor auth →
- * fire-and-forget activity update → cleanup), so we drain in a single act()
- * with multiple timer ticks to ensure all microtasks resolve.
+ * processScan() is called fire-and-forget (`void processScan(...)`) from the
+ * setInterval callback, so its async chain (API call → state updates →
+ * supervisor auth → cleanup) runs as detached microtasks.
+ *
+ * We drain in two phases:
+ * 1. advanceTimersByTimeAsync(5100) fires the 5000ms interval and flushes
+ *    timer-level microtasks, but may not resolve the full detached promise chain.
+ * 2. Explicit Promise.resolve() rounds guarantee microtask boundaries that flush
+ *    the remaining async operations (mock rejections, catch blocks, Zustand set()
+ *    calls). This is more reliable than advanceTimersByTimeAsync(0) which may
+ *    short-circuit when no timers are pending, especially in slower CI runners.
  */
 async function triggerMockScanAndDrain() {
   await act(async () => {
     // Fire the mock interval callback
     await vi.advanceTimersByTimeAsync(5100);
-    // Multiple microtask drain rounds to flush the full processScan async chain
-    for (let i = 0; i < 20; i++) {
-      await vi.advanceTimersByTimeAsync(0);
+    // Explicit microtask drain: each await creates a microtask boundary that
+    // lets the detached processScan() promise chain advance one step.
+    for (let i = 0; i < 50; i++) {
+      await Promise.resolve();
     }
   });
 }
