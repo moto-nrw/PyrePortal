@@ -51,19 +51,15 @@ export const SelectableCard = memo(function SelectableCard({
   const { iconColor, backgroundColor } = getColors(colorType, isSelected, isDisabled);
   const IconComponent = cardIcons[icon];
 
-  const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (!isDisabled) {
       e.currentTarget.style.transform = 'scale(0.98)';
     }
   };
 
-  const handleTouchEnd = (e: React.TouchEvent<HTMLButtonElement>) => {
+  const handlePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
     if (!isDisabled) {
-      setTimeout(() => {
-        if (e.currentTarget) {
-          e.currentTarget.style.transform = 'scale(1)';
-        }
-      }, 50);
+      e.currentTarget.style.transform = '';
     }
   };
 
@@ -71,8 +67,9 @@ export const SelectableCard = memo(function SelectableCard({
     <button
       onClick={onClick}
       disabled={isDisabled}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
       style={{
         width: '100%',
         height: '160px',
@@ -83,7 +80,7 @@ export const SelectableCard = memo(function SelectableCard({
         borderRadius: designSystem.borderRadius.xl,
         cursor: isDisabled ? 'not-allowed' : 'pointer',
         outline: 'none',
-        WebkitTapHighlightColor: 'transparent',
+
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

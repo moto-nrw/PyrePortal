@@ -1,10 +1,4 @@
-import {
-  faFaceSmile,
-  faFaceMeh,
-  faFaceFrown,
-  faTree,
-  faRestroom,
-} from '@fortawesome/free-solid-svg-icons';
+import { faFaceSmile, faFaceMeh, faFaceFrown, faRestroom } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
-import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
@@ -145,11 +138,15 @@ function DestinationButton({
         alignItems: 'center',
         gap: '12px',
       }}
-      onMouseEnter={e => {
+      onPointerDown={e => {
         e.currentTarget.style.backgroundColor = colors.bgHover;
         e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.hover.transform;
       }}
-      onMouseLeave={e => {
+      onPointerUp={e => {
+        e.currentTarget.style.backgroundColor = colors.bg;
+        e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
+      }}
+      onPointerLeave={e => {
         e.currentTarget.style.backgroundColor = colors.bg;
         e.currentTarget.style.transform = DESTINATION_BUTTON_STYLES.normal.transform;
       }}
@@ -430,10 +427,10 @@ const ActivityScanningPage: React.FC = () => {
     // Initial fetch
     void fetchSessionInfo();
 
-    // Set up periodic updates every 10 seconds (for multi-kiosk sync)
+    // Set up periodic updates every 15 seconds (for multi-kiosk sync)
     const interval = setInterval(() => {
       void fetchSessionInfo();
-    }, 10000);
+    }, 15000);
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -891,11 +888,15 @@ const ActivityScanningPage: React.FC = () => {
                     backgroundColor: colorScheme.background,
                     borderColor: colorScheme.border,
                   }}
-                  onMouseEnter={e => {
+                  onPointerDown={e => {
                     e.currentTarget.style.backgroundColor = colorScheme.hoverBackground;
                     e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
                   }}
-                  onMouseLeave={e => {
+                  onPointerUp={e => {
+                    e.currentTarget.style.backgroundColor = colorScheme.background;
+                    e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
+                  }}
+                  onPointerLeave={e => {
                     e.currentTarget.style.backgroundColor = colorScheme.background;
                     e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
                   }}
@@ -959,7 +960,33 @@ const ActivityScanningPage: React.FC = () => {
                 label: 'Schulhof',
                 colorScheme: 'schulhof' as const,
                 icon: (
-                  <FontAwesomeIcon icon={faTree} style={{ fontSize: '48px', color: '#FFFFFF' }} />
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 64 64"
+                    fill="none"
+                    stroke="#FFFFFF"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {/* Top horizontal bar */}
+                    <line x1="6" y1="8" x2="58" y2="8" strokeWidth="3" />
+                    {/* Left A-leg front */}
+                    <line x1="6" y1="8" x2="12" y2="58" />
+                    {/* Left A-leg back */}
+                    <line x1="6" y1="8" x2="2" y2="58" />
+                    {/* Right A-leg front */}
+                    <line x1="58" y1="8" x2="52" y2="58" />
+                    {/* Right A-leg back */}
+                    <line x1="58" y1="8" x2="62" y2="58" />
+                    {/* Left chain */}
+                    <line x1="24" y1="8" x2="22" y2="40" />
+                    {/* Right chain */}
+                    <line x1="40" y1="8" x2="42" y2="40" />
+                    {/* Seat */}
+                    <rect x="19" y="40" width="26" height="4" rx="2" fill="#FFFFFF" />
+                  </svg>
                 ),
                 onClick: () => void handleDestinationSelect('schulhof'),
               },
@@ -1162,7 +1189,7 @@ const ActivityScanningPage: React.FC = () => {
               </p>
             </div>
 
-            {/* Main Student Count Display */}
+            {/* Main Student Count Display / RFID Processing Spinner (cross-fade) */}
             <div
               style={{
                 display: 'flex',
@@ -1170,22 +1197,42 @@ const ActivityScanningPage: React.FC = () => {
                 justifyContent: 'center',
                 textAlign: 'center',
                 flex: 1,
+                position: 'relative',
               }}
             >
-              <div>
-                <div
-                  style={{
-                    fontSize: '220px',
-                    fontWeight: 800,
-                    color: '#83cd2d',
-                    lineHeight: 1,
-                    marginBottom: '0px',
-                    marginTop: '-12px',
-                  }}
-                >
-                  {studentCount ?? 0}
-                </div>
+              <div
+                style={{
+                  fontSize: '220px',
+                  fontWeight: 800,
+                  color: '#83cd2d',
+                  lineHeight: 1,
+                  marginTop: '-12px',
+                  transition: 'opacity 0.3s ease',
+                  opacity: rfid.processingQueue.size > 0 ? 0 : 1,
+                }}
+              >
+                {studentCount ?? 0}
               </div>
+              <div
+                style={{
+                  position: 'absolute',
+                  width: '140px',
+                  height: '140px',
+                  borderRadius: '50%',
+                  background:
+                    'conic-gradient(from 0deg, transparent 0%, #5080D8 50%, #83CD2D 100%)',
+                  mask: 'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
+                  WebkitMask:
+                    'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
+                  animation:
+                    rfid.processingQueue.size > 0
+                      ? 'rfid-center-spin 0.8s linear infinite'
+                      : 'none',
+                  transition: 'opacity 0.3s ease',
+                  opacity: rfid.processingQueue.size > 0 ? 1 : 0,
+                  pointerEvents: 'none',
+                }}
+              />
             </div>
           </div>
         </div>
@@ -1448,13 +1495,20 @@ const ActivityScanningPage: React.FC = () => {
         </ModalBase>
       )}
 
-      <ScannerRestartButton
-        onBeforeRecover={() => stopScanning()}
-        onAfterRecover={() => startScanning()}
-      />
+      {__BUILD_TARGET__ !== 'gkt' && (
+        <ScannerRestartButton
+          onBeforeRecover={() => stopScanning()}
+          onAfterRecover={() => startScanning()}
+        />
+      )}
 
-      {/* Bottom-left spinner: visible between RFID tag detection and API response */}
-      <RfidProcessingIndicator isVisible={rfid.processingQueue.size > 0} />
+      {/* Keyframes for center RFID processing spinner */}
+      <style>{`
+        @keyframes rfid-center-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </>
   );
 };

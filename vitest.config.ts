@@ -1,4 +1,5 @@
 import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
@@ -9,6 +10,13 @@ export default defineConfig({
 
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
+    __BUILD_TARGET__: JSON.stringify('browser'),
+  },
+
+  resolve: {
+    alias: {
+      '@platform': resolve(__dirname, 'src/platform/browser'),
+    },
   },
 
   test: {

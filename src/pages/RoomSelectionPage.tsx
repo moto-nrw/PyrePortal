@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   ErrorModal,
   ModalBase,
+  ModalActionButtons,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
@@ -254,79 +255,13 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       </div>
     </div>
 
-    {/* Action Buttons */}
-    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-      <button
-        onClick={onCancel}
-        disabled={isLoading}
-        style={{
-          flex: 1,
-          height: '68px',
-          fontSize: '20px',
-          fontWeight: 600,
-          color: '#6B7280',
-          backgroundColor: 'transparent',
-          border: '2px solid #E5E7EB',
-          borderRadius: designSystem.borderRadius.lg,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
-          opacity: isLoading ? 0.6 : 1,
-        }}
-        onTouchStart={e => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
-            e.currentTarget.style.borderColor = '#D1D5DB';
-          }
-        }}
-        onTouchEnd={e => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.borderColor = '#E5E7EB';
-          }
-        }}
-      >
-        Abbrechen
-      </button>
-
-      <button
-        onClick={onConfirm}
-        disabled={isLoading}
-        style={{
-          flex: 1,
-          height: '68px',
-          fontSize: '20px',
-          fontWeight: 600,
-          color: '#FFFFFF',
-          background: isLoading
-            ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-            : 'linear-gradient(to right, #83cd2d, #6ba529)',
-          border: 'none',
-          borderRadius: designSystem.borderRadius.lg,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
-          boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
-          opacity: isLoading ? 0.6 : 1,
-        }}
-        onTouchStart={e => {
-          if (!isLoading) {
-            e.currentTarget.style.transform = 'scale(0.98)';
-            e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(131, 205, 45, 0.5)';
-          }
-        }}
-        onTouchEnd={e => {
-          if (!isLoading) {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(131, 205, 45, 0.4)';
-          }
-        }}
-      >
-        {isLoading ? 'Starte...' : 'Aufsicht starten'}
-      </button>
-    </div>
+    <ModalActionButtons
+      onCancel={onCancel}
+      onConfirm={onConfirm}
+      isLoading={isLoading}
+      confirmLabel="Aufsicht starten"
+      loadingLabel="Starte..."
+    />
   </ModalBase>
 );
 
@@ -577,79 +512,15 @@ const ConflictModal: React.FC<ConflictModalProps> = ({
       </div>
     </div>
 
-    {/* Action Buttons */}
-    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-      <button
-        onClick={onCancel}
-        disabled={isLoading}
-        style={{
-          flex: 1,
-          height: '68px',
-          fontSize: '20px',
-          fontWeight: 600,
-          color: '#6B7280',
-          backgroundColor: 'transparent',
-          border: '2px solid #E5E7EB',
-          borderRadius: designSystem.borderRadius.lg,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
-          opacity: isLoading ? 0.6 : 1,
-        }}
-        onTouchStart={e => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = '#F9FAFB';
-            e.currentTarget.style.borderColor = '#D1D5DB';
-          }
-        }}
-        onTouchEnd={e => {
-          if (!isLoading) {
-            e.currentTarget.style.backgroundColor = 'transparent';
-            e.currentTarget.style.borderColor = '#E5E7EB';
-          }
-        }}
-      >
-        Abbrechen
-      </button>
-
-      <button
-        onClick={onForceStart}
-        disabled={isLoading}
-        style={{
-          flex: 1,
-          height: '68px',
-          fontSize: '20px',
-          fontWeight: 600,
-          color: '#FFFFFF',
-          background: isLoading
-            ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-            : 'linear-gradient(to right, #DC2626, #B91C1C)',
-          border: 'none',
-          borderRadius: designSystem.borderRadius.lg,
-          cursor: isLoading ? 'not-allowed' : 'pointer',
-          transition: 'all 200ms',
-          outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
-          boxShadow: isLoading ? 'none' : '0 4px 14px 0 rgba(220, 38, 38, 0.4)',
-          opacity: isLoading ? 0.6 : 1,
-        }}
-        onTouchStart={e => {
-          if (!isLoading) {
-            e.currentTarget.style.transform = 'scale(0.98)';
-            e.currentTarget.style.boxShadow = '0 2px 8px 0 rgba(220, 38, 38, 0.5)';
-          }
-        }}
-        onTouchEnd={e => {
-          if (!isLoading) {
-            e.currentTarget.style.transform = 'scale(1)';
-            e.currentTarget.style.boxShadow = '0 4px 14px 0 rgba(220, 38, 38, 0.4)';
-          }
-        }}
-      >
-        {isLoading ? 'Starte...' : 'Trotzdem starten'}
-      </button>
-    </div>
+    <ModalActionButtons
+      onCancel={onCancel}
+      onConfirm={onForceStart}
+      isLoading={isLoading}
+      confirmLabel="Trotzdem starten"
+      loadingLabel="Starte..."
+      confirmGradient="linear-gradient(to right, #DC2626, #B91C1C)"
+      confirmShadow="0 4px 14px 0 rgba(220, 38, 38, 0.4)"
+    />
   </ModalBase>
 );
 
@@ -961,7 +832,6 @@ function RoomSelectionPage() {
         onBack={handleGoBack}
         isLoading={isLoading}
         error={error}
-        spinnerColor="#f87C10"
       >
         {rooms.length === 0 ? (
           <div

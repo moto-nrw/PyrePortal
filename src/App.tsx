@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { RfidServiceInitializer } from './components/RfidServiceInitializer';
+import ScreenDimmer from './components/ScreenDimmer';
 import NetworkStatus from './components/ui/NetworkStatus';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import ActivityScanningPage from './pages/ActivityScanningPage';
@@ -60,6 +61,7 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <ScreenDimmer />
       <RfidServiceInitializer />
       {/* Network Status Indicator - shown on all pages when poor/offline */}
       {(storeNetworkStatus.quality === 'poor' || storeNetworkStatus.quality === 'offline') && (

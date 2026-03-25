@@ -1420,7 +1420,7 @@ describe('ActivityScanningPage', () => {
   // Periodic session fetch
   // =======================================================================
 
-  it('periodically fetches session info every 10 seconds', async () => {
+  it('periodically fetches session info every 15 seconds', async () => {
     mockedApi.getCurrentSessionInfo.mockResolvedValue({
       active_students: 3,
       activity_name: 'Test Activity',
@@ -1433,9 +1433,9 @@ describe('ActivityScanningPage', () => {
 
     const initialCallCount = mockedApi.getCurrentSessionInfo.mock.calls.length;
 
-    // Advance timer by 10 seconds
+    // Advance timer by 15 seconds
     await act(async () => {
-      vi.advanceTimersByTime(10000);
+      vi.advanceTimersByTime(15000);
     });
 
     expect(mockedApi.getCurrentSessionInfo.mock.calls.length).toBeGreaterThan(initialCallCount);

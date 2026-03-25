@@ -3,6 +3,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
+import { adapter } from '@platform';
+
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
@@ -14,9 +16,16 @@ import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
 import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
-import { safeInvoke, isRfidEnabled } from '../utils/tauriContext';
+import { pressHandlers } from '../utils/pressHandlers';
+import { isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
+
+/**
+ * True when the current platform uses real NFC/RFID hardware.
+ * GKT always uses real NFC via system.js, Tauri depends on VITE_ENABLE_RFID.
+ */
+const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt' || isRfidEnabled();
 
 /**
  * Helper to get assigned person from TagAssignmentCheck
@@ -27,12 +36,6 @@ const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
 };
 
 // RFID scanner types from Tauri backend
-interface RfidScanResult {
-  success: boolean;
-  tag_id?: string;
-  error?: string;
-}
-
 const SCAN_INVOKE_TIMEOUT_MS = 20_000;
 
 const withTimeout = <T,>(
@@ -170,7 +173,7 @@ function TagAssignmentPage() {
     setIsLoading(true);
 
     try {
-      if (!isRfidEnabled()) {
+      if (!isRealScanningEnabled()) {
         // Development mock behavior - store timeout ref for cancellation
         mockScanTimeoutRef.current = setTimeout(() => {
           // Check if scan was cancelled before processing
@@ -202,9 +205,9 @@ function TagAssignmentPage() {
         return;
       }
 
-      // Use real RFID scanner through Tauri with frontend timeout safety net.
+      // Use real RFID scanner via platform adapter with frontend timeout safety net.
       const result = await withTimeout(
-        safeInvoke<RfidScanResult>('scan_rfid_single'),
+        adapter.scanSingleTag(SCAN_INVOKE_TIMEOUT_MS),
         SCAN_INVOKE_TIMEOUT_MS,
         'RFID-Scan Zeitüberschreitung'
       );
@@ -470,6 +473,7 @@ function TagAssignmentPage() {
 
             <button
               onClick={cancelScan}
+              {...pressHandlers()}
               style={{
                 padding: '12px 32px',
                 fontSize: '18px',
@@ -480,6 +484,7 @@ function TagAssignmentPage() {
                 borderRadius: '24px',
                 cursor: 'pointer',
                 outline: 'none',
+                transition: 'all 200ms',
                 position: 'relative',
                 zIndex: 2,
               }}
@@ -548,7 +553,6 @@ function TagAssignmentPage() {
                     borderRadius: designSystem.borderRadius.full,
                     cursor: isScanStartDisabled ? 'not-allowed' : 'pointer',
                     outline: 'none',
-                    WebkitTapHighlightColor: 'transparent',
                     boxShadow: isScanStartDisabled ? 'none' : designSystem.shadows.blue,
                     opacity: isScanStartDisabled ? 0.6 : 1,
                   }}
@@ -739,7 +743,6 @@ function TagAssignmentPage() {
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
                         boxShadow: designSystem.shadows.blue,
                       }}
                       onTouchStart={e => {
@@ -766,7 +769,6 @@ function TagAssignmentPage() {
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
                       }}
                       onTouchStart={e => {
                         e.currentTarget.style.backgroundColor = '#F9FAFB';
@@ -796,7 +798,6 @@ function TagAssignmentPage() {
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
-                        WebkitTapHighlightColor: 'transparent',
                       }}
                       onTouchStart={e => {
                         e.currentTarget.style.backgroundColor = '#FEF2F2';
@@ -869,6 +870,7 @@ function TagAssignmentPage() {
                 >
                   <button
                     onClick={handleScanAnother}
+                    {...pressHandlers()}
                     style={{
                       height: '68px',
                       padding: '0 40px',
@@ -880,7 +882,7 @@ function TagAssignmentPage() {
                       borderRadius: '34px',
                       cursor: 'pointer',
                       outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
+                      transition: 'all 200ms',
                       boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
                     }}
                   >
@@ -888,6 +890,7 @@ function TagAssignmentPage() {
                   </button>
                   <button
                     onClick={handleBack}
+                    {...pressHandlers()}
                     style={{
                       height: '68px',
                       padding: '0 40px',
@@ -899,7 +902,7 @@ function TagAssignmentPage() {
                       borderRadius: '34px',
                       cursor: 'pointer',
                       outline: 'none',
-                      WebkitTapHighlightColor: 'transparent',
+                      transition: 'all 200ms',
                     }}
                   >
                     Zurück
@@ -975,6 +978,7 @@ function TagAssignmentPage() {
             <button
               onClick={handleUnassignTag}
               disabled={isUnassigning}
+              {...pressHandlers(isUnassigning)}
               style={{
                 height: '52px',
                 padding: '0 32px',
@@ -986,7 +990,7 @@ function TagAssignmentPage() {
                 borderRadius: designSystem.borderRadius.full,
                 cursor: isUnassigning ? 'not-allowed' : 'pointer',
                 outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 200ms',
                 opacity: isUnassigning ? 0.7 : 1,
               }}
             >
@@ -995,6 +999,7 @@ function TagAssignmentPage() {
             <button
               onClick={() => setShowUnassignConfirm(false)}
               disabled={isUnassigning}
+              {...pressHandlers(isUnassigning)}
               style={{
                 height: '52px',
                 padding: '0 32px',
@@ -1006,7 +1011,7 @@ function TagAssignmentPage() {
                 borderRadius: designSystem.borderRadius.full,
                 cursor: isUnassigning ? 'not-allowed' : 'pointer',
                 outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
+                transition: 'all 200ms',
                 opacity: isUnassigning ? 0.5 : 1,
               }}
             >
@@ -1027,7 +1032,7 @@ function TagAssignmentPage() {
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />
 
-      <ScannerRestartButton />
+      {__BUILD_TARGET__ !== 'gkt' && <ScannerRestartButton />}
     </>
   );
 }

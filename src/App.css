@@ -16,7 +16,6 @@ body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  background-attachment: fixed;
 }
 
 .content-box {
@@ -130,6 +129,7 @@ button:hover {
 button:active {
   border-color: #396cd8;
   background-color: #e8e8e8;
+  transform: scale(0.97);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -140,7 +140,6 @@ button:active {
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
-    background-attachment: fixed;
   }
 
   a:hover {
@@ -159,5 +158,6 @@ button:active {
   }
   button:active {
     background-color: #0f0f0f69;
+    transform: scale(0.97);
   }
 }

@@ -258,7 +258,6 @@ function TeamManagementPage() {
             cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',
             transition: designSystem.transitions.base,
             outline: 'none',
-            WebkitTapHighlightColor: 'transparent',
             boxShadow:
               selectedSupervisors.length === 0 || isSaving ? 'none' : designSystem.shadows.green,
             opacity: selectedSupervisors.length === 0 || isSaving ? 0.6 : 1,

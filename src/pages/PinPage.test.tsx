@@ -527,10 +527,10 @@ describe('PinPage', () => {
   });
 
   // =========================================================================
-  // NumpadButton touch events
+  // NumpadButton pointer events (components use onPointerDown/onPointerUp)
   // =========================================================================
 
-  it('handles touch events on numpad buttons', () => {
+  it('handles pointer events on numpad buttons', () => {
     render(
       <MemoryRouter>
         <PinPage />
@@ -539,18 +539,14 @@ describe('PinPage', () => {
 
     const button1 = screen.getByText('1').closest('button')!;
 
-    // Simulate touch start
-    fireEvent.touchStart(button1);
+    fireEvent.pointerDown(button1);
     expect(button1.style.transform).toBe('scale(0.95)');
 
-    // Simulate touch end
-    fireEvent.touchEnd(button1);
-
-    // After 100ms timeout the style reverts — but we can at least confirm
-    // the touchEnd handler ran without error
+    fireEvent.pointerUp(button1);
+    expect(button1.style.transform).toBe('');
   });
 
-  it('handles touch events on action buttons (clear/delete)', () => {
+  it('handles pointer events on action buttons (clear/delete)', () => {
     render(
       <MemoryRouter>
         <PinPage />
@@ -559,17 +555,16 @@ describe('PinPage', () => {
 
     const clearBtn = screen.getByText('C').closest('button')!;
 
-    fireEvent.touchStart(clearBtn);
+    fireEvent.pointerDown(clearBtn);
     expect(clearBtn.style.transform).toBe('scale(0.95)');
     // Action buttons use different background colors
     expect(clearBtn.style.backgroundColor).toBe('#F3F4F6');
 
-    fireEvent.touchEnd(clearBtn);
+    fireEvent.pointerUp(clearBtn);
+    expect(clearBtn.style.transform).toBe('');
   });
 
-  it('touchEnd reverts style after timeout', async () => {
-    vi.useFakeTimers();
-
+  it('pointerUp reverts pressed styles', () => {
     render(
       <MemoryRouter>
         <PinPage />
@@ -578,17 +573,12 @@ describe('PinPage', () => {
 
     const button1 = screen.getByText('1').closest('button')!;
 
-    fireEvent.touchStart(button1);
+    fireEvent.pointerDown(button1);
     expect(button1.style.transform).toBe('scale(0.95)');
 
-    // Create a mock currentTarget that persists (fireEvent synthetic events
-    // may have null currentTarget after dispatch)
-    fireEvent.touchEnd(button1);
-
-    // Advance timers to trigger the setTimeout callback
-    vi.advanceTimersByTime(150);
-
-    vi.useRealTimers();
+    fireEvent.pointerUp(button1);
+    expect(button1.style.transform).toBe('');
+    expect(button1.style.boxShadow).toBe('0 3px 8px rgba(0, 0, 0, 0.1)');
   });
 
   // =========================================================================
@@ -644,14 +634,7 @@ describe('PinPage', () => {
     }
   });
 
-  it('touchEnd setTimeout callback executes when currentTarget persists', () => {
-    // Override setTimeout to invoke the callback immediately (synchronously),
-    // so e.currentTarget is still available during handler execution.
-    vi.spyOn(globalThis, 'setTimeout').mockImplementation(((fn: (...args: unknown[]) => void) => {
-      fn();
-      return 0 as unknown as ReturnType<typeof setTimeout>;
-    }) as typeof setTimeout);
-
+  it('pointerLeave reverts pressed styles (simulates finger drag off button)', () => {
     render(
       <MemoryRouter>
         <PinPage />
@@ -660,16 +643,11 @@ describe('PinPage', () => {
 
     const button = screen.getByText('3').closest('button')!;
 
-    // Touch start sets pressed style
-    fireEvent.touchStart(button);
+    fireEvent.pointerDown(button);
     expect(button.style.transform).toBe('scale(0.95)');
 
-    // Touch end — setTimeout callback runs immediately (synchronously),
-    // so e.currentTarget is still available during the handler
-    fireEvent.touchEnd(button);
-
-    // Restore
-    vi.mocked(globalThis.setTimeout).mockRestore();
+    fireEvent.pointerLeave(button);
+    expect(button.style.transform).toBe('');
   });
 
   // =========================================================================

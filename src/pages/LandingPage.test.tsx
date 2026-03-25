@@ -1,13 +1,22 @@
-import { invoke } from '@tauri-apps/api/core';
 import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
-import { type Mock, vi } from 'vitest';
+import { vi } from 'vitest';
 
 import { logError } from '../utils/logger';
 
 import LandingPage from './LandingPage';
+
+// Mock the platform adapter
+vi.mock('@platform', () => ({
+  adapter: {
+    restartApp: vi.fn(),
+  },
+}));
+
+const { adapter } = await import('@platform');
+const mockRestartApp = vi.mocked(adapter.restartApp);
 
 /**
  * Helper component that reports location changes via callback.
@@ -152,8 +161,8 @@ describe('LandingPage', () => {
 
   // --- handleRestart tests ---
 
-  it('calls invoke("restart_app") when restart button is clicked', async () => {
-    (invoke as Mock).mockResolvedValueOnce(undefined);
+  it('calls adapter.restartApp() when restart button is clicked', async () => {
+    mockRestartApp.mockResolvedValueOnce(undefined);
     const user = userEvent.setup();
 
     render(
@@ -164,11 +173,11 @@ describe('LandingPage', () => {
 
     await user.click(screen.getByText('Neu starten'));
 
-    expect(invoke).toHaveBeenCalledWith('restart_app', {});
+    expect(mockRestartApp).toHaveBeenCalled();
   });
 
-  it('resolves successfully when restart invoke succeeds', async () => {
-    (invoke as Mock).mockResolvedValueOnce(undefined);
+  it('resolves successfully when restartApp succeeds', async () => {
+    mockRestartApp.mockResolvedValueOnce(undefined);
 
     const user = userEvent.setup();
 
@@ -180,15 +189,14 @@ describe('LandingPage', () => {
 
     await user.click(screen.getByText('Neu starten'));
 
-    // Wait for the resolved promise's .then() to execute (covers logger.debug branch)
     await vi.waitFor(() => {
-      expect(invoke).toHaveBeenCalledWith('restart_app', {});
+      expect(mockRestartApp).toHaveBeenCalled();
     });
   });
 
-  it('calls logError when restart invoke rejects with an Error', async () => {
+  it('calls logError when restartApp rejects with an Error', async () => {
     const restartError = new Error('restart failed');
-    (invoke as Mock).mockRejectedValueOnce(restartError);
+    mockRestartApp.mockRejectedValueOnce(restartError);
 
     const user = userEvent.setup();
 
@@ -205,8 +213,8 @@ describe('LandingPage', () => {
     });
   });
 
-  it('calls logError with wrapped Error when restart invoke rejects with a string', async () => {
-    (invoke as Mock).mockRejectedValueOnce('string error');
+  it('calls logError with wrapped Error when restartApp rejects with a string', async () => {
+    mockRestartApp.mockRejectedValueOnce('string error');
 
     const user = userEvent.setup();
 
@@ -226,9 +234,9 @@ describe('LandingPage', () => {
     });
   });
 
-  // --- Touch event tests ---
+  // --- Pointer event tests (components use onPointerDown/onPointerUp) ---
 
-  it('applies pressed styles on touchStart of login button', () => {
+  it('applies pressed styles on pointerDown of login button', () => {
     render(
       <MemoryRouter>
         <LandingPage />
@@ -236,14 +244,14 @@ describe('LandingPage', () => {
     );
 
     const button = screen.getByText('Anmelden');
-    fireEvent.touchStart(button);
+    fireEvent.pointerDown(button);
 
     expect(button.style.transform).toBe('scale(0.95)');
     expect(button.style.backgroundColor).toBe('#1F2937');
     expect(button.style.boxShadow).toBe('0 2px 8px rgba(0, 0, 0, 0.2)');
   });
 
-  it('fires touchEnd handler without error', () => {
+  it('fires pointerUp handler without error', () => {
     render(
       <MemoryRouter>
         <LandingPage />
@@ -251,17 +259,14 @@ describe('LandingPage', () => {
     );
 
     const button = screen.getByText('Anmelden');
-    fireEvent.touchStart(button);
-    // touchEnd triggers setTimeout — covers the onTouchEnd handler entry
-    fireEvent.touchEnd(button);
+    fireEvent.pointerDown(button);
+    fireEvent.pointerUp(button);
 
-    // The touchStart styles are still applied (setTimeout hasn't fired yet)
-    expect(button.style.transform).toBe('scale(0.95)');
+    // pointerUp immediately restores styles (no setTimeout)
+    expect(button.style.transform).toBe('');
   });
 
-  it('restores original styles after touchEnd timeout completes', () => {
-    vi.useFakeTimers();
-
+  it('restores original styles on pointerUp', () => {
     render(
       <MemoryRouter>
         <LandingPage />
@@ -269,27 +274,32 @@ describe('LandingPage', () => {
     );
 
     const button = screen.getByText('Anmelden');
-    fireEvent.touchStart(button);
+    fireEvent.pointerDown(button);
     expect(button.style.transform).toBe('scale(0.95)');
 
-    // Replace setTimeout to execute synchronously so e.currentTarget is still valid
-    const origSetTimeout = globalThis.setTimeout;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-    globalThis.setTimeout = ((fn: () => void) => {
-      fn();
-      return 0;
-    }) as any;
+    fireEvent.pointerUp(button);
 
-    fireEvent.touchEnd(button);
-
-    globalThis.setTimeout = origSetTimeout;
-
-    // Styles should be restored since the callback ran while currentTarget was live
-    expect(button.style.transform).toBe('scale(1)');
+    expect(button.style.transform).toBe('');
     expect(button.style.backgroundColor).toBe('#111827');
     expect(button.style.boxShadow).toBe('0 4px 12px rgba(0, 0, 0, 0.15)');
+  });
 
-    vi.useRealTimers();
+  it('restores original styles on pointerLeave', () => {
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    const button = screen.getByText('Anmelden');
+    fireEvent.pointerDown(button);
+    expect(button.style.transform).toBe('scale(0.95)');
+
+    fireEvent.pointerLeave(button);
+
+    expect(button.style.transform).toBe('');
+    expect(button.style.backgroundColor).toBe('#111827');
+    expect(button.style.boxShadow).toBe('0 4px 12px rgba(0, 0, 0, 0.15)');
   });
 
   // --- Additional styling tests ---

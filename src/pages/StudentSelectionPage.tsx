@@ -360,7 +360,6 @@ function StudentSelectionPage() {
     boxShadow: active ? designSystem.shadows.blue : 'none',
     cursor: 'pointer',
     outline: 'none',
-    WebkitTapHighlightColor: 'transparent',
   });
 
   const handleResetAll = () => {
@@ -592,7 +591,6 @@ function StudentSelectionPage() {
                   borderRadius: designSystem.borderRadius.full,
                   cursor: !selectedEntityId || isSaving ? 'not-allowed' : 'pointer',
                   outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
                   boxShadow: !selectedEntityId || isSaving ? 'none' : designSystem.shadows.green,
                   opacity: !selectedEntityId || isSaving ? 0.6 : 1,
                 }}
@@ -641,7 +639,6 @@ function StudentSelectionPage() {
             fontWeight: 600,
             cursor: 'pointer',
             outline: 'none',
-            WebkitTapHighlightColor: 'transparent',
           }}
         >
           Alle Gruppen
@@ -670,7 +667,6 @@ function StudentSelectionPage() {
                 fontWeight: 600,
                 cursor: 'pointer',
                 outline: 'none',
-                WebkitTapHighlightColor: 'transparent',
                 boxShadow: groupFilter === group ? designSystem.shadows.blue : 'none',
               }}
             >

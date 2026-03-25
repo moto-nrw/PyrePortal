@@ -18,7 +18,14 @@
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+
+    /* Platform adapter alias — browser/ is the default for type-checking.
+       Vite overrides this at build time with the correct BUILD_TARGET. */
+    "paths": {
+      "@platform": ["./src/platform/browser"],
+      "@platform/*": ["./src/platform/browser/*"]
+    }
   },
   "include": ["src"],
   "references": [{ "path": "./tsconfig.node.json" }]

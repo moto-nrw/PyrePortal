@@ -1,4 +1,4 @@
-import type { CSSProperties, TouchEvent } from 'react';
+import type { CSSProperties, PointerEvent } from 'react';
 
 import { designSystem } from '../../../styles/designSystem';
 
@@ -80,7 +80,7 @@ export function PillButton({
     borderRadius: '34px',
     cursor: disabled ? 'not-allowed' : 'pointer',
     outline: 'none',
-    WebkitTapHighlightColor: 'transparent',
+
     transition: designSystem.transitions.base,
     boxShadow: disabled ? 'none' : vstyle.shadow,
     opacity: disabled ? 0.6 : 1,
@@ -90,7 +90,7 @@ export function PillButton({
     }),
   };
 
-  const handleTouchStart = (e: TouchEvent<HTMLButtonElement>) => {
+  const handlePointerDown = (e: PointerEvent<HTMLButtonElement>) => {
     if (disabled) return;
     e.currentTarget.style.transform = designSystem.scales.activeSmall;
     e.currentTarget.style.boxShadow = designSystem.shadows.button;
@@ -99,16 +99,13 @@ export function PillButton({
     }
   };
 
-  const handleTouchEnd = (e: TouchEvent<HTMLButtonElement>) => {
+  const handlePointerUp = (e: PointerEvent<HTMLButtonElement>) => {
     if (disabled) return;
-    const target = e.currentTarget;
-    setTimeout(() => {
-      target.style.transform = 'scale(1)';
-      target.style.boxShadow = vstyle.shadow;
-      if (variant === 'secondary') {
-        target.style.backgroundColor = designSystem.glass.background;
-      }
-    }, 150);
+    e.currentTarget.style.transform = '';
+    e.currentTarget.style.boxShadow = vstyle.shadow;
+    if (variant === 'secondary') {
+      e.currentTarget.style.backgroundColor = designSystem.glass.background;
+    }
   };
 
   return (
@@ -118,9 +115,9 @@ export function PillButton({
       disabled={disabled}
       aria-label={ariaLabel}
       style={baseStyle}
-      onTouchStart={handleTouchStart}
-      onTouchEnd={handleTouchEnd}
-      onTouchCancel={handleTouchEnd}
+      onPointerDown={handlePointerDown}
+      onPointerUp={handlePointerUp}
+      onPointerLeave={handlePointerUp}
     >
       {icon && iconPosition === 'left' && icon}
       <span>{children}</span>

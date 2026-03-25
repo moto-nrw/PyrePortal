@@ -5,9 +5,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { isRfidEnabled, safeInvoke } from '../utils/tauriContext';
+import { isRfidEnabled } from '../utils/tauriContext';
 
 import TagAssignmentPage from './TagAssignmentPage';
+
+// Mock the platform adapter
+vi.mock('@platform', () => ({
+  adapter: {
+    platform: 'browser',
+    scanSingleTag: vi.fn(),
+  },
+}));
+
+const { adapter } = await import('@platform');
+const mockScanSingleTag = vi.mocked(adapter.scanSingleTag);
 
 // ---------------------------------------------------------------------------
 // Mock react-router-dom navigate
@@ -89,6 +100,7 @@ describe('TagAssignmentPage', () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    (adapter as unknown as Record<string, unknown>).platform = 'browser';
     vi.restoreAllMocks();
   });
 
@@ -1025,7 +1037,7 @@ describe('TagAssignmentPage', () => {
 
     it('successful RFID scan processes the tag', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      vi.mocked(safeInvoke).mockResolvedValue({
+      mockScanSingleTag.mockResolvedValue({
         success: true,
         tag_id: '04:AA:BB:CC:DD:EE:FF',
       });
@@ -1042,7 +1054,7 @@ describe('TagAssignmentPage', () => {
 
     it('failed RFID scan (success: false) shows error', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      vi.mocked(safeInvoke).mockResolvedValue({
+      mockScanSingleTag.mockResolvedValue({
         success: false,
         error: 'Reader not found',
       });
@@ -1059,7 +1071,7 @@ describe('TagAssignmentPage', () => {
 
     it('failed RFID scan without error message uses fallback', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      vi.mocked(safeInvoke).mockResolvedValue({
+      mockScanSingleTag.mockResolvedValue({
         success: false,
       });
 
@@ -1076,7 +1088,7 @@ describe('TagAssignmentPage', () => {
     it('RFID scan timeout error shows timeout message', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       // Simulate a timeout by rejecting with the German timeout message
-      vi.mocked(safeInvoke).mockRejectedValue(new Error('RFID-Scan Zeitüberschreitung'));
+      mockScanSingleTag.mockRejectedValue(new Error('RFID-Scan Zeitüberschreitung'));
 
       renderPage();
       await user.click(screen.getByText('Scan starten'));
@@ -1092,7 +1104,7 @@ describe('TagAssignmentPage', () => {
 
     it('RFID scan non-timeout error shows generic error', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      vi.mocked(safeInvoke).mockRejectedValue(new Error('SPI communication failed'));
+      mockScanSingleTag.mockRejectedValue(new Error('SPI communication failed'));
 
       renderPage();
       await user.click(screen.getByText('Scan starten'));
@@ -1106,7 +1118,7 @@ describe('TagAssignmentPage', () => {
 
     it('RFID scan non-Error rejection is handled', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      vi.mocked(safeInvoke).mockRejectedValue('string error');
+      mockScanSingleTag.mockRejectedValue('string error');
 
       renderPage();
       await user.click(screen.getByText('Scan starten'));
@@ -1120,8 +1132,8 @@ describe('TagAssignmentPage', () => {
 
     it('cancelled RFID scan ignores result', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      let resolveInvoke!: (value: unknown) => void;
-      vi.mocked(safeInvoke).mockImplementation(
+      let resolveInvoke!: (value: { success: boolean; tag_id?: string; error?: string }) => void;
+      mockScanSingleTag.mockImplementation(
         () =>
           new Promise(resolve => {
             resolveInvoke = resolve;
@@ -1135,7 +1147,7 @@ describe('TagAssignmentPage', () => {
       const cancelButtons = screen.getAllByText('Abbrechen');
       await user.click(cancelButtons[0]);
 
-      // Now resolve the safeInvoke — should be ignored
+      // Now resolve the adapter call — should be ignored
       await act(async () => {
         resolveInvoke({ success: true, tag_id: '04:AA:BB:CC:DD:EE:FF' });
       });
@@ -1149,7 +1161,7 @@ describe('TagAssignmentPage', () => {
     it('cancelled RFID scan ignores errors', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       let rejectInvoke!: (error: Error) => void;
-      vi.mocked(safeInvoke).mockImplementation(
+      mockScanSingleTag.mockImplementation(
         () =>
           new Promise((_resolve, reject) => {
             rejectInvoke = reject;
@@ -1169,6 +1181,33 @@ describe('TagAssignmentPage', () => {
       });
 
       expect(screen.getByText('Scan starten')).toBeInTheDocument();
+    });
+  });
+
+  describe('with GKT platform', () => {
+    beforeEach(() => {
+      vi.mocked(isRfidEnabled).mockReturnValue(false);
+      (adapter as unknown as Record<string, unknown>).platform = 'gkt';
+    });
+
+    it('uses adapter.scanSingleTag instead of the mock timeout flow', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      mockScanSingleTag.mockResolvedValue({
+        success: true,
+        tag_id: '04:AA:BB:CC:DD:EE:FF',
+      });
+      const checkSpy = vi.spyOn(api, 'checkTagAssignment').mockResolvedValue(unassignedTag);
+
+      renderPage();
+      await user.click(screen.getByText('Scan starten'));
+
+      expect(mockScanSingleTag).toHaveBeenCalledWith(20_000);
+
+      await act(async () => {
+        vi.advanceTimersByTime(2100);
+      });
+
+      expect(checkSpy).toHaveBeenCalledWith('1234', '04:AA:BB:CC:DD:EE:FF');
     });
   });
 

@@ -5,7 +5,7 @@
  * with support for different log levels, contextual information, and persistence options.
  */
 
-import { safeInvoke } from './tauriContext';
+import { adapter } from '@platform';
 
 // Log levels in ascending order of severity
 export enum LogLevel {
@@ -132,6 +132,14 @@ class Logger {
     this.source = source;
     this.config = { ...DEFAULT_CONFIG, ...config };
     this.sessionId = SESSION_ID;
+  }
+
+  /**
+   * Check if a message at the given level would actually be logged.
+   * Use this to guard expensive log payload computation.
+   */
+  public wouldLog(level: LogLevel): boolean {
+    return level >= this.config.level! || level >= this.config.persistLevel!;
   }
 
   /**
@@ -307,22 +315,17 @@ class Logger {
   }
 
   /**
-   * Persist log entry using Tauri functionality
+   * Persist log entry via platform adapter
    *
    * @param logEntry The log entry to persist
    */
   private async persistLog(logEntry: LogEntry): Promise<void> {
     try {
-      // Call Tauri command to write log to filesystem
-      // Note: This requires implementing the corresponding Rust command
-      await safeInvoke('write_log', {
-        entry: JSON.stringify(logEntry),
-      });
+      await adapter.persistLog(JSON.stringify(logEntry));
     } catch (error) {
       // Avoid recursive logging by writing directly to console
-      // Only log if it's not a Tauri context issue
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (!error || !errorMessage.includes('Tauri context not available')) {
+      if (!errorMessage.includes('not implemented yet')) {
         // eslint-disable-next-line no-console
         console.error('Failed to persist log:', errorMessage);
       }

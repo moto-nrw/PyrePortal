@@ -79,7 +79,7 @@ export const PaginationControls = memo(function PaginationControls({
           opacity: isPrevDisabled ? 0.5 : 1,
           transition: designSystem.transitions.base,
           outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
+
           boxShadow: 'none',
           justifySelf: 'start',
         }}
@@ -116,7 +116,7 @@ export const PaginationControls = memo(function PaginationControls({
           opacity: isNextDisabled ? 0.5 : 1,
           transition: designSystem.transitions.base,
           outline: 'none',
-          WebkitTapHighlightColor: 'transparent',
+
           boxShadow: 'none',
           justifySelf: 'end',
         }}

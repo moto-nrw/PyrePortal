@@ -129,6 +129,10 @@ export default tseslint.config(
       '@typescript-eslint/no-non-null-assertion': 'off',
       // Empty functions are common in mock factories (noop callbacks)
       '@typescript-eslint/no-empty-function': 'off',
+      // Vitest matchers (expect.objectContaining, expect.any) return any
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      // Comparing numbers with enums is common in test assertions
+      '@typescript-eslint/no-unsafe-enum-comparison': 'off',
     },
   },
 

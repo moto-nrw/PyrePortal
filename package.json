@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:gkt": "BUILD_TARGET=gkt VITE_API_BASE_URL=https://api.moto-app.de tsc && BUILD_TARGET=gkt VITE_API_BASE_URL=https://api.moto-app.de vite build",
     "preview": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src --ext .ts,.tsx",
@@ -78,13 +79,11 @@
     "project": [
       "src/**/*.{ts,tsx}"
     ],
-    "ignore": [
-      "src-tauri/**"
+    "entry": [
+      "src/platform/*/index.ts"
     ],
     "ignoreDependencies": [
-      "@tauri-apps/plugin-opener",
-      "@testing-library/react",
-      "@testing-library/user-event"
+      "@tauri-apps/plugin-opener"
     ]
   }
 }
