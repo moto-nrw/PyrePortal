@@ -1,20 +1,22 @@
 import { memo } from 'react';
 
 interface LoadingSpinnerProps {
-  /** Spinner color (default: blue) */
-  readonly color?: string;
   /** Container min height (default: 400px) */
   readonly minHeight?: string;
+  /** Spinner size in px (default: 48) */
+  readonly size?: number;
 }
 
 /**
- * Centered loading spinner with animation.
- * Used across selection pages during data fetching.
+ * Centered gradient ring loading spinner.
+ * Uses brand colors (blue → green) conic gradient with mask.
  */
 export const LoadingSpinner = memo(function LoadingSpinner({
-  color = '#5080D8',
   minHeight = '400px',
+  size = 48,
 }: LoadingSpinnerProps) {
+  const thickness = Math.max(3, Math.round(size * 0.08));
+
   return (
     <div
       style={{
@@ -26,11 +28,12 @@ export const LoadingSpinner = memo(function LoadingSpinner({
     >
       <div
         style={{
-          width: '48px',
-          height: '48px',
-          border: '3px solid #E5E7EB',
-          borderTopColor: color,
+          width: `${size}px`,
+          height: `${size}px`,
           borderRadius: '50%',
+          background: 'conic-gradient(from 0deg, transparent 0%, #5080D8 50%, #83CD2D 100%)',
+          mask: `radial-gradient(farthest-side, transparent calc(100% - ${thickness}px), #000 calc(100% - ${thickness}px))`,
+          WebkitMask: `radial-gradient(farthest-side, transparent calc(100% - ${thickness}px), #000 calc(100% - ${thickness}px))`,
           animation: 'spin 1s linear infinite',
         }}
       />

@@ -16,7 +16,7 @@ lerna-debug.log*
 
 node_modules
 dist
-dist-ssr
+dist-*
 *.local
 
 # Editor directories and files
@@ -32,6 +32,9 @@ dist-ssr
 
 **/.claude/settings.local.json
 /.vscode/
+
+# Test coverage
+coverage/
 
 # SonarQube
 .scannerwork/

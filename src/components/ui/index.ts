@@ -1,5 +1,6 @@
 // Export UI components used via barrel imports
 export { ModalBase } from './ModalBase';
+export { ModalActionButtons } from './ModalActionButtons';
 export { ErrorModal } from './ErrorModal';
 export { SuccessModal } from './SuccessModal';
 export { ContinueButton } from './ContinueButton';

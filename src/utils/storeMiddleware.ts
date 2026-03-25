@@ -215,12 +215,12 @@ const getActionName = (args: unknown): string => {
   }
 
   // For redux-style actions with type
-  if (args && typeof args === 'object' && args !== null && 'type' in args) {
+  if (args && typeof args === 'object' && 'type' in args) {
     return String((args as { type: unknown }).type);
   }
 
   // For plain object updates, summarize the fields being changed
-  if (args && typeof args === 'object' && args !== null) {
+  if (args && typeof args === 'object') {
     const keys = Object.keys(args as Record<string, unknown>);
     if (keys.length === 1) {
       return `set:${keys[0]}`;
@@ -388,11 +388,70 @@ export const loggerMiddleware =
     // Create a dedicated logger for this store
     const storeLogger = createLogger(name ?? 'store');
 
+    // Pre-compute whether each log level would actually be emitted.
+    // This avoids expensive diff/stack-trace work when the logger would discard the message.
+    const stateChangeLevel = logLevel ?? LogLevel.DEBUG;
+    const wouldLogStateChanges = stateChanges && storeLogger.wouldLog(stateChangeLevel);
+    const wouldLogActivity = activityTracking && storeLogger.wouldLog(LogLevel.WARN);
+
     // Enhance the state setter function
     return config(
       args => {
-        const actionId = ++actionCounter;
-        const timestamp = new Date();
+        // Fast path: if nothing would be logged at any level, just apply the update
+        if (!wouldLogStateChanges && !wouldLogActivity) {
+          set(args);
+          return;
+        }
+
+        // Activity-only fast path: when only activity tracking is active (typical production),
+        // do a cheap reference check on currentActivity instead of full diff + stack trace.
+        // Falls through to the full path if stateFilter is set (needs full prev/next state).
+        if (!wouldLogStateChanges && wouldLogActivity && !stateFilter) {
+          // Respect action filtering (same contract as full path)
+          const actionName = getActionName(args);
+          const shouldLog =
+            (includedActions?.length === 0 || includedActions?.includes(actionName)) &&
+            !excludedActions?.includes(actionName) &&
+            (!actionFilter || actionFilter(actionName));
+
+          if (!shouldLog) {
+            set(args);
+            return;
+          }
+
+          const prevActivity = (get() as Record<string, unknown>).currentActivity;
+          set(args);
+          const nextActivity = (get() as Record<string, unknown>).currentActivity;
+
+          // No activity change — nothing to log
+          if (prevActivity === nextActivity) {
+            return;
+          }
+
+          // Activity reference changed — check if name specifically changed
+          const prevName = prevActivity
+            ? (prevActivity as Record<string, unknown>).name
+            : undefined;
+          const nextName = nextActivity
+            ? (nextActivity as Record<string, unknown>).name
+            : undefined;
+
+          if (prevName === nextName) {
+            return;
+          }
+
+          const actionId = ++actionCounter;
+          storeLogger.warn('Activity name changed', {
+            actionId,
+            actionName,
+            prev: prevName,
+            next: nextName,
+            timestamp: new Date().toISOString(),
+          });
+          return;
+        }
+
+        // Full logging path: state change logging is active (dev mode or debug override)
         const actionName = getActionName(args);
 
         // Apply action filtering
@@ -430,6 +489,9 @@ export const loggerMiddleware =
           return;
         }
 
+        const actionId = ++actionCounter;
+        const timestamp = new Date();
+
         // Capture caller information if enabled (after filtering to avoid unnecessary stack trace parsing)
         let callerInfo = '';
         if (actionSource) {
@@ -442,8 +504,7 @@ export const loggerMiddleware =
         }
 
         // Standard state change logging
-        if (stateChanges) {
-          const level = logLevel ?? LogLevel.DEBUG;
+        if (wouldLogStateChanges) {
           const logPayload = {
             actionId,
             actionName,
@@ -454,7 +515,7 @@ export const loggerMiddleware =
           const logMessage = 'State updated';
 
           // Use the appropriate public logging method based on level
-          switch (level) {
+          switch (stateChangeLevel) {
             case LogLevel.INFO:
               storeLogger.info(logMessage, logPayload);
               break;
@@ -472,7 +533,7 @@ export const loggerMiddleware =
 
         // Special handling for activity name changes
         if (
-          activityTracking &&
+          wouldLogActivity &&
           changes.currentActivity &&
           typeof changes.currentActivity === 'object' &&
           changes.currentActivity !== null &&
@@ -482,14 +543,11 @@ export const loggerMiddleware =
           const nameChanges = activityChanges.name as { prev: unknown; next: unknown } | undefined;
 
           if (nameChanges) {
-            const prevName = nameChanges.prev;
-            const nextName = nameChanges.next;
-
             storeLogger.warn('Activity name changed', {
               actionId,
               actionName,
-              prev: prevName,
-              next: nextName,
+              prev: nameChanges.prev,
+              next: nameChanges.next,
               source: callerInfo,
               timestamp: timestamp.toISOString(),
             });

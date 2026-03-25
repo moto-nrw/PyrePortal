@@ -401,6 +401,11 @@ interface RecentTagScan {
   syncPromise?: Promise<void>; // Background sync promise (for race condition prevention)
 }
 
+// Cache TTL for recentTagScans. This is NOT a dedup window — dedup is handled by
+// scanId (adapter-level) + processingQueue (Layer 1) + studentHistory (Layer 3).
+// recentTagScans only exists as a short-lived cache for result replay and syncPromise.
+export const RECENT_SCAN_CACHE_TTL_MS = 10_000;
+
 // RFID scanning state
 interface RfidState {
   isScanning: boolean;
@@ -1469,11 +1474,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       return false;
     }
 
-    // Layer 2: Check recent tag scans (within 2 seconds)
-    const recentScan = rfid.recentTagScans.get(tagId);
-    if (recentScan && Date.now() - recentScan.timestamp < 2000) {
-      return false;
-    }
+    // Layer 2 (scanId-based) is handled in onAdapterScan before this function is called.
+    // recentTagScans is a cache, not a dedup gate.
 
     // Layer 3: If we know the studentId, check student history
     const studentId = rfid.tagToStudentMap.get(tagId);
@@ -1539,9 +1541,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const now = Date.now();
       const newScans = new Map<string, RecentTagScan>();
 
-      // Keep only scans from last 2 seconds
+      // Purge stale cache entries
       state.rfid.recentTagScans.forEach((scan, tagId) => {
-        if (now - scan.timestamp < 2000) {
+        if (now - scan.timestamp < RECENT_SCAN_CACHE_TTL_MS) {
           newScans.set(tagId, scan);
         }
       });

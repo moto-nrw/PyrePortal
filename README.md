@@ -52,7 +52,7 @@ flowchart TB
 ### Key Design Decisions
 
 1. **Server-first RFID scans.** Every scan hits the backend before the UI reacts. No local student cache.
-2. **Multi-layer duplicate prevention.** Hardware emits repeated events per tap; three filters (processing queue, 2-second cooldown, student history) stop duplicates.
+2. **Edge-triggered duplicate prevention.** Tauri emits one event per physical tap via Rust-side presence detection; the frontend keeps processing-queue and short fallback guards.
 3. **Runtime config via Rust.** API keys live in `.env` and are read by Rust at startup — never baked into the frontend build.
 4. **Two-level auth on every request.** Device API key (`Authorization: Bearer ...`) plus staff PIN (`X-Staff-PIN` header).
 

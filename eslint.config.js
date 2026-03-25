@@ -1,4 +1,3 @@
-import { FlatCompat } from '@eslint/eslintrc';
 import prettierConfig from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 import a11yPlugin from 'eslint-plugin-jsx-a11y';
@@ -7,10 +6,6 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import securityPlugin from 'eslint-plugin-security';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-});
 
 export default tseslint.config(
   // Prettier must come first to turn off conflicting rules
@@ -113,6 +108,31 @@ export default tseslint.config(
       parserOptions: {
         projectService: true,
       },
+    },
+  },
+
+  // Test file overrides — relax rules that conflict with test patterns
+  {
+    files: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx', 'src/test/**'],
+    rules: {
+      // Tests commonly use any for mocking
+      '@typescript-eslint/no-explicit-any': 'off',
+      // Unbound methods are common in mock assertions
+      '@typescript-eslint/unbound-method': 'off',
+      // Console usage is fine in tests
+      'no-console': 'off',
+      // Tests don't need safe Tauri invoke patterns
+      'no-restricted-syntax': 'off',
+      // Floating promises are common with act() and fireEvent
+      '@typescript-eslint/no-floating-promises': 'off',
+      // Allow non-null assertions in tests (simpler mock access)
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // Empty functions are common in mock factories (noop callbacks)
+      '@typescript-eslint/no-empty-function': 'off',
+      // Vitest matchers (expect.objectContaining, expect.any) return any
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      // Comparing numbers with enums is common in test assertions
+      '@typescript-eslint/no-unsafe-enum-comparison': 'off',
     },
   },
 

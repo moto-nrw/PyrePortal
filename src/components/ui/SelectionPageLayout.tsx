@@ -16,8 +16,6 @@ interface SelectionPageLayoutProps {
   readonly error?: string | null;
   /** Page content when not loading */
   readonly children: ReactNode;
-  /** Spinner color (default: blue) */
-  readonly spinnerColor?: string;
   /** Optional content to show between title and main content (e.g., filters) */
   readonly headerContent?: ReactNode;
 }
@@ -32,7 +30,6 @@ export function SelectionPageLayout({
   isLoading,
   error,
   children,
-  spinnerColor = '#5080D8',
   headerContent,
 }: SelectionPageLayoutProps) {
   return (
@@ -93,7 +90,7 @@ export function SelectionPageLayout({
         {headerContent}
 
         {/* Loading or content */}
-        {isLoading ? <LoadingSpinner color={spinnerColor} /> : children}
+        {isLoading ? <LoadingSpinner /> : children}
 
         <SpinKeyframes />
       </div>

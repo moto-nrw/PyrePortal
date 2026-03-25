@@ -1,8 +1,8 @@
 [package]
 name = "pyreportal"
-version = "1.1.2"
-description = "A Tauri App"
-authors = ["you"]
+version = "1.2.0"
+description = "NFC-basiertes Kiosk-Terminal für die digitale Ganztagsbetreuung"
+authors = ["Yannick Wenger <kontakt@moto.nrw>"]
 edition = "2021"
 default-run = "pyreportal"
 
@@ -42,4 +42,9 @@ rfid = ["mfrc522", "rppal", "embedded-hal", "linux-embedded-hal"]
 pedantic = { level = "deny", priority = -1 }
 # Allow specific pedantic lints that are too restrictive
 too_many_lines = "allow"  # Platform-conditional code often exceeds 100 lines legitimately
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tauri = { version = "2", features = ["test"] }
 

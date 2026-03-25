@@ -3,8 +3,9 @@
  * Handles saving and loading of last session configuration
  */
 
+import { adapter } from '@platform';
+
 import { createLogger, serializeError } from '../utils/logger';
-import { safeInvoke } from '../utils/tauriContext';
 
 const logger = createLogger('SessionStorage');
 
@@ -35,7 +36,7 @@ export async function saveSessionSettings(settings: SessionSettings): Promise<vo
       hasLastSession: !!settings.last_session,
     });
 
-    await safeInvoke('save_session_settings', { settings });
+    await adapter.saveSessionSettings(settings);
 
     logger.info('Session settings saved successfully');
   } catch (error) {
@@ -51,7 +52,7 @@ export async function loadSessionSettings(): Promise<SessionSettings | null> {
   try {
     logger.debug('Loading session settings');
 
-    const settings = await safeInvoke<SessionSettings | null>('load_session_settings');
+    const settings = await adapter.loadSessionSettings();
 
     if (settings) {
       logger.info('Session settings loaded', {
@@ -78,7 +79,7 @@ export async function clearLastSession(): Promise<void> {
   try {
     logger.debug('Clearing last session data');
 
-    await safeInvoke('clear_last_session');
+    await adapter.clearLastSession();
 
     logger.info('Last session data cleared');
   } catch (error) {

@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
-import { ErrorModal, ModalBase } from '../components/ui';
+import { ErrorModal, ModalBase, ModalActionButtons } from '../components/ui';
 import {
   api,
   formatRoomName,
@@ -141,6 +141,7 @@ function HomeViewPage() {
   const [errorMessage, setErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
+  const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -163,6 +164,7 @@ function HomeViewPage() {
   };
 
   const handleLogout = async () => {
+    setTouchedButton(null);
     if (currentSession) {
       setShowEndSessionModal(true);
     } else {
@@ -176,6 +178,7 @@ function HomeViewPage() {
   };
 
   const handleTagAssignment = () => {
+    setTouchedButton(null);
     logNavigation('Home View', '/tag-assignment');
     void navigate('/tag-assignment');
   };
@@ -252,6 +255,8 @@ function HomeViewPage() {
     });
 
     try {
+      setIsNavigatingToScanning(true);
+
       const sessionRequest: SessionStartRequest = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id,
@@ -270,6 +275,7 @@ function HomeViewPage() {
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');
     } catch (error) {
+      setIsNavigatingToScanning(false);
       showRecreationError(formatRecreationError(error));
     } finally {
       setShowConfirmModal(false);
@@ -313,6 +319,10 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleTagAssignment}
+            onTouchStart={() => setTouchedButton('tag')}
+            onTouchEnd={() => setTouchedButton(null)}
+            onTouchCancel={() => setTouchedButton(null)}
+            onPointerLeave={() => setTouchedButton(current => (current === 'tag' ? null : current))}
             style={{
               height: '68px',
               display: 'flex',
@@ -320,30 +330,17 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '12px',
               padding: '0 32px',
-              backgroundColor: designSystem.glass.background,
+              backgroundColor:
+                touchedButton === 'tag' ? 'rgba(80, 128, 216, 0.1)' : designSystem.glass.background,
               border: '1px solid rgba(80, 128, 216, 0.2)',
               borderRadius: '34px',
               cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
               boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
-            }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = designSystem.scales.activeSmall;
-              e.currentTarget.style.backgroundColor = 'rgba(80, 128, 216, 0.1)';
-              e.currentTarget.style.boxShadow = designSystem.shadows.button;
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                }
-              }, 150);
+              transform: touchedButton === 'tag' ? designSystem.scales.activeSmall : 'scale(1)',
             }}
           >
             <FontAwesomeIcon
@@ -375,6 +372,12 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleLogout}
+            onTouchStart={() => setTouchedButton('logout')}
+            onTouchEnd={() => setTouchedButton(null)}
+            onTouchCancel={() => setTouchedButton(null)}
+            onPointerLeave={() =>
+              setTouchedButton(current => (current === 'logout' ? null : current))
+            }
             style={{
               height: '68px',
               display: 'flex',
@@ -382,30 +385,19 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '12px',
               padding: '0 32px',
-              backgroundColor: designSystem.glass.background,
+              backgroundColor:
+                touchedButton === 'logout'
+                  ? 'rgba(255, 49, 48, 0.1)'
+                  : designSystem.glass.background,
               border: '1px solid rgba(255, 49, 48, 0.2)',
               borderRadius: '34px',
               cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
-              WebkitTapHighlightColor: 'transparent',
               boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
-            }}
-            onTouchStart={e => {
-              e.currentTarget.style.transform = designSystem.scales.activeSmall;
-              e.currentTarget.style.backgroundColor = 'rgba(255, 49, 48, 0.1)';
-              e.currentTarget.style.boxShadow = designSystem.shadows.button;
-            }}
-            onTouchEnd={e => {
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.transform = 'scale(1)';
-                  e.currentTarget.style.backgroundColor = designSystem.glass.background;
-                  e.currentTarget.style.boxShadow = designSystem.shadows.button;
-                }
-              }, 150);
+              transform: touchedButton === 'logout' ? designSystem.scales.activeSmall : 'scale(1)',
             }}
           >
             <svg
@@ -429,7 +421,7 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              {currentSession ? 'Aufsicht beenden' : 'Abmelden'}
+              {currentSession && !isNavigatingToScanning ? 'Aufsicht beenden' : 'Abmelden'}
             </span>
           </button>
         </div>
@@ -487,7 +479,6 @@ function HomeViewPage() {
                   padding: '36px',
                   transition: 'all 300ms ease-out',
                   outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
                   minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -633,7 +624,6 @@ function HomeViewPage() {
                   cursor: 'pointer',
                   transition: 'all 300ms ease-out',
                   outline: 'none',
-                  WebkitTapHighlightColor: 'transparent',
                   minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -822,51 +812,14 @@ function HomeViewPage() {
           </div>
         )}
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={() => setShowConfirmModal(false)}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: '2px solid #E5E7EB',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-            }}
-          >
-            Abbrechen
-          </button>
-
-          <button
-            onClick={handleConfirmRecreation}
-            disabled={isValidatingLastSession}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              background: isValidatingLastSession
-                ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                : 'linear-gradient(to right, #83CD2D, #70B525)',
-              border: 'none',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              boxShadow: isValidatingLastSession ? 'none' : '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
-              opacity: isValidatingLastSession ? 0.6 : 1,
-            }}
-          >
-            {isValidatingLastSession ? 'Starte...' : 'Aufsicht starten'}
-          </button>
-        </div>
+        <ModalActionButtons
+          onCancel={() => setShowConfirmModal(false)}
+          onConfirm={handleConfirmRecreation}
+          isLoading={isValidatingLastSession}
+          confirmLabel="Aufsicht starten"
+          loadingLabel="Starte..."
+          confirmGradient="linear-gradient(to right, #83CD2D, #70B525)"
+        />
       </ModalBase>
 
       {/* End Session Confirmation Modal */}
@@ -901,122 +854,13 @@ function HomeViewPage() {
           <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
         </p>
 
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={() => setShowEndSessionModal(false)}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: '2px solid #E5E7EB',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-            }}
-          >
-            Abbrechen
-          </button>
-
-          <button
-            onClick={handleConfirmEndSession}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              background: 'linear-gradient(to right, #EF4444, #DC2626)',
-              border: 'none',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.4)',
-            }}
-          >
-            Ja, beenden
-          </button>
-        </div>
-      </ModalBase>
-
-      {/* End Session Confirmation Modal */}
-      <ModalBase
-        isOpen={showEndSessionModal}
-        onClose={() => setShowEndSessionModal(false)}
-        size="sm"
-        backgroundColor="#FFFFFF"
-      >
-        {/* Title */}
-        <h2
-          style={{
-            fontSize: '28px',
-            fontWeight: 700,
-            color: '#1F2937',
-            marginBottom: '16px',
-          }}
-        >
-          Aktivität beenden?
-        </h2>
-
-        {/* Warning Text */}
-        <p
-          style={{
-            fontSize: '20px',
-            color: '#6B7280',
-            marginBottom: '28px',
-            lineHeight: 1.5,
-          }}
-        >
-          Alle Kinder, die in dieser Aktivität sind, werden auf den Status{' '}
-          <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
-        </p>
-
-        {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-          <button
-            onClick={() => setShowEndSessionModal(false)}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: '2px solid #E5E7EB',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-            }}
-          >
-            Abbrechen
-          </button>
-
-          <button
-            onClick={handleConfirmEndSession}
-            style={{
-              flex: 1,
-              height: '68px',
-              fontSize: '18px',
-              fontWeight: 600,
-              color: '#FFFFFF',
-              background: 'linear-gradient(to right, #EF4444, #DC2626)',
-              border: 'none',
-              borderRadius: designSystem.borderRadius.lg,
-              cursor: 'pointer',
-              transition: 'all 200ms',
-              outline: 'none',
-              boxShadow: '0 4px 14px 0 rgba(239, 68, 68, 0.4)',
-            }}
-          >
-            Ja, beenden
-          </button>
-        </div>
+        <ModalActionButtons
+          onCancel={() => setShowEndSessionModal(false)}
+          onConfirm={handleConfirmEndSession}
+          confirmLabel="Ja, beenden"
+          confirmGradient="linear-gradient(to right, #EF4444, #DC2626)"
+          confirmShadow="0 4px 14px 0 rgba(239, 68, 68, 0.4)"
+        />
       </ModalBase>
     </BackgroundWrapper>
   );

@@ -30,6 +30,14 @@ fn get_api_config() -> Result<ApiConfig, String> {
     })
 }
 
+/// Parse the fullscreen env var into a boolean. Extracted for testability.
+fn parse_fullscreen_env() -> bool {
+    env::var("TAURI_FULLSCREEN")
+        .unwrap_or_else(|_| "true".to_string())
+        .to_lowercase()
+        == "true"
+}
+
 #[tauri::command]
 fn restart_app() {
     // Exit with code 0 - Balena's restart: always policy will restart the container
@@ -48,10 +56,7 @@ pub fn run() {
     dotenvy::dotenv().ok();
 
     // Read fullscreen setting from environment variable
-    let fullscreen = env::var("TAURI_FULLSCREEN")
-        .unwrap_or_else(|_| "true".to_string())
-        .to_lowercase()
-        == "true";
+    let fullscreen = parse_fullscreen_env();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -90,4 +95,126 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+
+    /// Env-var tests mutate process-global state and must not run in parallel.
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Clear all env vars these tests touch so each case starts from a clean slate.
+    fn clear_env() {
+        for key in [
+            "API_BASE_URL",
+            "DEVICE_API_KEY",
+            "VITE_API_BASE_URL",
+            "VITE_DEVICE_API_KEY",
+            "TAURI_FULLSCREEN",
+        ] {
+            env::remove_var(key);
+        }
+    }
+
+    #[test]
+    fn api_config_serialization_roundtrip() {
+        let config = ApiConfig {
+            api_base_url: "http://localhost:8080".to_string(),
+            device_api_key: "test-key-123".to_string(),
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+        let deserialized: ApiConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.api_base_url, "http://localhost:8080");
+        assert_eq!(deserialized.device_api_key, "test-key-123");
+    }
+
+    #[test]
+    fn get_api_config_uses_env_vars() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
+        env::set_var("API_BASE_URL", "http://test-server:9090");
+        env::set_var("DEVICE_API_KEY", "test-device-key");
+
+        let config = get_api_config().unwrap();
+        assert_eq!(config.api_base_url, "http://test-server:9090");
+        assert_eq!(config.device_api_key, "test-device-key");
+
+        clear_env();
+    }
+
+    #[test]
+    fn get_api_config_falls_back_to_vite_prefix() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
+        env::set_var("VITE_API_BASE_URL", "http://vite-server:3000");
+        env::set_var("VITE_DEVICE_API_KEY", "vite-key");
+
+        let config = get_api_config().unwrap();
+        assert_eq!(config.api_base_url, "http://vite-server:3000");
+        assert_eq!(config.device_api_key, "vite-key");
+
+        clear_env();
+    }
+
+    #[test]
+    fn get_api_config_defaults_base_url_when_missing() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
+        env::set_var("DEVICE_API_KEY", "some-key");
+
+        let config = get_api_config().unwrap();
+        assert_eq!(config.api_base_url, "http://localhost:8080");
+
+        clear_env();
+    }
+
+    #[test]
+    fn get_api_config_errors_when_no_api_key() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
+        let result = get_api_config();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("API key not found"));
+    }
+
+    #[test]
+    fn parse_fullscreen_defaults_to_true() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
+        assert!(parse_fullscreen_env());
+    }
+
+    #[test]
+    fn parse_fullscreen_respects_false() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
+        env::set_var("TAURI_FULLSCREEN", "false");
+        assert!(!parse_fullscreen_env());
+
+        clear_env();
+    }
+
+    #[test]
+    fn parse_fullscreen_case_insensitive() {
+        let _lock = ENV_LOCK.lock().unwrap();
+        clear_env();
+
+        env::set_var("TAURI_FULLSCREEN", "TRUE");
+        assert!(parse_fullscreen_env());
+
+        env::set_var("TAURI_FULLSCREEN", "False");
+        assert!(!parse_fullscreen_env());
+
+        clear_env();
+    }
 }

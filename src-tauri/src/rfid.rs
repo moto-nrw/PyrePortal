@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::{mpsc, Mutex as TokioMutex};
 
@@ -21,6 +22,7 @@ pub struct RfidScannerStatus {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RfidScanEvent {
     pub tag_id: String,
+    pub scan_id: u64,
     pub timestamp: u64,
     pub platform: String,
 }
@@ -49,10 +51,48 @@ pub struct RfidBackgroundService {
 
 // Safe global service instance using OnceLock
 static RFID_SERVICE: OnceLock<Arc<Mutex<RfidBackgroundService>>> = OnceLock::new();
+static SCAN_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 // Global SPI guard used by BOTH continuous background scanning and one-shot scans.
 // This avoids concurrent access/reset races on /dev/spidev0.0 and MFRC522 state corruption.
 static SPI_ACCESS_MUTEX: OnceLock<TokioMutex<()>> = OnceLock::new();
+
+#[derive(Debug, Clone)]
+struct ScanPresenceState {
+    last_tag: Option<String>,
+    tag_present: bool,
+    absent_since: Option<Instant>,
+}
+
+impl ScanPresenceState {
+    const ABSENCE_THRESHOLD: Duration = Duration::from_millis(300);
+
+    fn new() -> Self {
+        Self {
+            last_tag: None,
+            tag_present: false,
+            absent_since: None,
+        }
+    }
+
+    fn register_success(&mut self, tag_id: &str) -> bool {
+        let is_same_present_tag = self.tag_present && self.last_tag.as_deref() == Some(tag_id);
+
+        self.last_tag = Some(tag_id.to_string());
+        self.tag_present = true;
+        self.absent_since = None;
+
+        !is_same_present_tag
+    }
+
+    fn register_absence(&mut self, now: Instant) {
+        let absent_since = self.absent_since.get_or_insert(now);
+        if now.duration_since(*absent_since) >= Self::ABSENCE_THRESHOLD {
+            self.tag_present = false;
+            self.absent_since = None;
+        }
+    }
+}
 
 impl RfidBackgroundService {
     pub fn new() -> Self {
@@ -117,6 +157,7 @@ impl RfidBackgroundService {
         state: &Arc<Mutex<RfidServiceState>>,
         app_handle: Option<&AppHandle>,
         tag_id: &str,
+        scan_id: u64,
     ) {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -125,6 +166,7 @@ impl RfidBackgroundService {
 
         let scan_event = RfidScanEvent {
             tag_id: tag_id.to_string(),
+            scan_id,
             timestamp,
             platform: Self::get_platform_name(),
         };
@@ -142,11 +184,7 @@ impl RfidBackgroundService {
 
     /// Handle scan error - update state if it's a real error (not just "no card")
     fn handle_scan_error(state: &Arc<Mutex<RfidServiceState>>, error: &str) {
-        let error_lower = error.to_lowercase();
-        if error_lower.contains("no card")
-            || error_lower.contains("timeout")
-            || error_lower.contains("no card detected")
-        {
+        if Self::is_normal_poll_error(error) {
             return;
         }
 
@@ -155,6 +193,17 @@ impl RfidBackgroundService {
             guard.last_error = Some(error.to_string());
         }
         println!("RFID scan error: {error}");
+    }
+
+    fn is_normal_poll_error(error: &str) -> bool {
+        let error_lower = error.to_lowercase();
+        error_lower.contains("no card")
+            || error_lower.contains("timeout")
+            || error_lower.contains("no card detected")
+    }
+
+    fn next_scan_id() -> u64 {
+        SCAN_COUNTER.fetch_add(1, Ordering::Relaxed) + 1
     }
 
     /// Handle scanner initialization failure
@@ -465,6 +514,7 @@ impl RfidBackgroundService {
         scanner: &mut raspberry_pi::PersistentRfidScanner,
     ) -> bool {
         let mut consecutive_errors: u32 = 0;
+        let mut presence_state = ScanPresenceState::new();
         const MAX_CONSECUTIVE_ERRORS: u32 = 15;
 
         loop {
@@ -476,19 +526,25 @@ impl RfidBackgroundService {
             match raspberry_pi::scan_with_persistent_scanner_sync(scanner) {
                 Ok(tag_id) => {
                     consecutive_errors = 0;
-                    Self::handle_successful_scan(state, app_handle.as_ref(), &tag_id);
+                    if presence_state.register_success(&tag_id) {
+                        Self::handle_successful_scan(
+                            state,
+                            app_handle.as_ref(),
+                            &tag_id,
+                            Self::next_scan_id(),
+                        );
+                    }
                     // Wait after successful scan to prevent duplicate reads
                     std::thread::sleep(Duration::from_millis(200));
                 }
                 Err(error) => {
                     Self::handle_scan_error(state, &error);
+                    if Self::is_normal_poll_error(&error) {
+                        presence_state.register_absence(Instant::now());
+                    }
 
                     // Track consecutive real errors (not "no card" which is normal polling)
-                    let error_lower = error.to_lowercase();
-                    if !error_lower.contains("no card")
-                        && !error_lower.contains("timeout")
-                        && !error_lower.contains("no card detected")
-                    {
+                    if !Self::is_normal_poll_error(&error) {
                         consecutive_errors += 1;
                         if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
                             println!(
@@ -509,6 +565,7 @@ impl RfidBackgroundService {
         state: &Arc<Mutex<RfidServiceState>>,
         app_handle: Option<&AppHandle>,
     ) {
+        let mut presence_state = ScanPresenceState::new();
         loop {
             if !Self::should_continue_scanning(state) {
                 break;
@@ -516,12 +573,22 @@ impl RfidBackgroundService {
 
             match Self::perform_platform_scan().await {
                 Ok(tag_id) => {
-                    Self::handle_successful_scan(state, app_handle, &tag_id);
+                    if presence_state.register_success(&tag_id) {
+                        Self::handle_successful_scan(
+                            state,
+                            app_handle,
+                            &tag_id,
+                            Self::next_scan_id(),
+                        );
+                    }
                     // Minimal wait after successful scan - frontend handles duplicate prevention
                     tokio::time::sleep(Duration::from_millis(30)).await;
                 }
                 Err(error) => {
                     Self::handle_scan_error(state, &error);
+                    if Self::is_normal_poll_error(&error) {
+                        presence_state.register_absence(Instant::now());
+                    }
                 }
             }
         }
@@ -919,7 +986,7 @@ mod mock_platform {
     use super::{Duration, RfidScannerStatus};
     use std::sync::Mutex;
 
-    // Track last scan for duplicate prevention (mimics real hardware behavior)
+    // Track recent mock scans so local development still simulates a tag being held in place.
     static LAST_SCAN: Mutex<Option<(String, std::time::Instant)>> = Mutex::new(None);
 
     pub async fn scan_rfid_hardware() -> Result<String, String> {
@@ -936,8 +1003,8 @@ mod mock_platform {
         scan_rfid_mock_internal()
     }
 
-    fn scan_rfid_mock_internal() -> Result<String, String> {
-        // Check for duplicate read (2-second cooldown like real hardware)
+    pub(crate) fn scan_rfid_mock_internal() -> Result<String, String> {
+        // Bias toward re-reading the same tag while it remains "present".
         let mut last_scan = LAST_SCAN.lock().unwrap();
         if let Some((last_tag, last_time)) = &*last_scan {
             if last_time.elapsed() < Duration::from_secs(2) {
@@ -971,6 +1038,12 @@ mod mock_platform {
         Ok(tag)
     }
 
+    /// Reset cached last-scan state so each call independently hits the error check.
+    #[cfg(test)]
+    pub(crate) fn reset_last_scan() {
+        *LAST_SCAN.lock().unwrap() = None;
+    }
+
     pub fn check_rfid_hardware() -> RfidScannerStatus {
         // Log that we're using mock implementation
         println!("[RFID] Using mock implementation with hardware format (XX:XX:XX:XX:XX:XX:XX)");
@@ -986,35 +1059,50 @@ mod mock_platform {
     }
 }
 
-fn send_service_command(command: ServiceCommand) -> Result<(), String> {
-    if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        let command_tx = {
-            let service = service_arc
-                .lock()
-                .map_err(|e| format!("Failed to lock service: {e}"))?;
-            service
-                .command_tx
-                .clone()
-                .ok_or_else(|| "Service command channel not initialized".to_string())?
-        };
+/// Send a command to a given service instance (testable without global state).
+fn send_command_to(
+    service_arc: &Arc<Mutex<RfidBackgroundService>>,
+    command: ServiceCommand,
+) -> Result<(), String> {
+    let command_tx = {
+        let service = service_arc
+            .lock()
+            .map_err(|e| format!("Failed to lock service: {e}"))?;
+        service
+            .command_tx
+            .clone()
+            .ok_or_else(|| "Service command channel not initialized".to_string())?
+    };
 
-        command_tx
-            .send(command)
-            .map_err(|e| format!("Failed to send command: {e}"))
-    } else {
-        Err("RFID service not initialized".to_string())
-    }
+    command_tx
+        .send(command)
+        .map_err(|e| format!("Failed to send command: {e}"))
 }
 
-async fn wait_for_service_running(expected_running: bool, timeout: Duration) -> Result<(), String> {
+fn send_service_command(command: ServiceCommand) -> Result<(), String> {
+    let service_arc = RfidBackgroundService::get_instance()
+        .ok_or_else(|| "RFID service not initialized".to_string())?;
+    send_command_to(&service_arc, command)
+}
+
+/// Wait for the service state to match expected running state (testable with state Arc).
+async fn wait_for_state(
+    state: &Arc<Mutex<RfidServiceState>>,
+    expected_running: bool,
+    timeout: Duration,
+) -> Result<(), String> {
     let deadline = std::time::Instant::now() + timeout;
 
     loop {
-        let state = get_rfid_service_status().await?;
+        let current = state
+            .lock()
+            .map(|guard| guard.clone())
+            .map_err(|e| format!("Failed to lock state: {e}"))?;
+
         let reached_target = if expected_running {
-            state.is_running && state.should_run
+            current.is_running && current.should_run
         } else {
-            !state.is_running
+            !current.is_running
         };
 
         if reached_target {
@@ -1029,12 +1117,24 @@ async fn wait_for_service_running(expected_running: bool, timeout: Duration) -> 
             };
             return Err(format!(
                 "Timed out waiting for RFID service to become {expected}. Current state: is_running={}, should_run={}, last_error={:?}",
-                state.is_running, state.should_run, state.last_error
+                current.is_running, current.should_run, current.last_error
             ));
         }
 
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+}
+
+async fn wait_for_service_running(expected_running: bool, timeout: Duration) -> Result<(), String> {
+    let service_arc = RfidBackgroundService::get_instance()
+        .ok_or_else(|| "RFID service not initialized".to_string())?;
+    let state = {
+        let service = service_arc
+            .lock()
+            .map_err(|e| format!("Failed to lock service: {e}"))?;
+        Arc::clone(&service.state)
+    };
+    wait_for_state(&state, expected_running, timeout).await
 }
 
 async fn stop_service_for_exclusive_hardware_access() {
@@ -1257,5 +1357,877 @@ pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResu
             tag_id: Some(format!("MOCK:TIMEOUT:{timeout_seconds}:SEC")),
             error: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a fresh state Arc for testing
+    fn test_state() -> Arc<Mutex<RfidServiceState>> {
+        Arc::new(Mutex::new(RfidServiceState {
+            is_running: false,
+            last_scan: None,
+            error_count: 0,
+            last_error: None,
+            should_run: false,
+        }))
+    }
+
+    // ====================================================================
+    // Struct serialization tests
+    // ====================================================================
+
+    #[test]
+    fn rfid_scan_result_success_serialization() {
+        let result = RfidScanResult {
+            success: true,
+            tag_id: Some("04:D6:94:82:97:6A:80".to_string()),
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let d: RfidScanResult = serde_json::from_str(&json).unwrap();
+        assert!(d.success);
+        assert_eq!(d.tag_id.as_deref(), Some("04:D6:94:82:97:6A:80"));
+        assert!(d.error.is_none());
+    }
+
+    #[test]
+    fn rfid_scan_result_error_serialization() {
+        let result = RfidScanResult {
+            success: false,
+            tag_id: None,
+            error: Some("Scan timeout - no card detected".to_string()),
+        };
+        let d: RfidScanResult =
+            serde_json::from_str(&serde_json::to_string(&result).unwrap()).unwrap();
+        assert!(!d.success);
+        assert!(d.tag_id.is_none());
+        assert!(d.error.unwrap().contains("timeout"));
+    }
+
+    #[test]
+    fn rfid_scanner_status_serialization() {
+        let status = RfidScannerStatus {
+            is_available: true,
+            platform: "Dev".to_string(),
+            last_error: None,
+        };
+        let d: RfidScannerStatus =
+            serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
+        assert!(d.is_available);
+        assert!(!d.platform.is_empty());
+    }
+
+    #[test]
+    fn rfid_scanner_status_with_error() {
+        let status = RfidScannerStatus {
+            is_available: false,
+            platform: "Pi".to_string(),
+            last_error: Some("SPI fail".to_string()),
+        };
+        let d: RfidScannerStatus =
+            serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
+        assert!(!d.is_available);
+        assert_eq!(d.last_error.as_deref(), Some("SPI fail"));
+    }
+
+    #[test]
+    fn rfid_scan_event_serialization() {
+        let event = RfidScanEvent {
+            tag_id: "04:A7:B3:C2:D1:E0:F5".to_string(),
+            scan_id: 7,
+            timestamp: 1_718_000_000,
+            platform: "Development Platform".to_string(),
+        };
+        let d: RfidScanEvent =
+            serde_json::from_str(&serde_json::to_string(&event).unwrap()).unwrap();
+        assert_eq!(d.tag_id, "04:A7:B3:C2:D1:E0:F5");
+        assert_eq!(d.scan_id, 7);
+        assert_eq!(d.timestamp, 1_718_000_000);
+    }
+
+    #[test]
+    fn rfid_service_state_default_values() {
+        let state = test_state();
+        let guard = state.lock().unwrap();
+        assert!(!guard.is_running);
+        assert!(!guard.should_run);
+        assert_eq!(guard.error_count, 0);
+        assert!(guard.last_scan.is_none());
+        assert!(guard.last_error.is_none());
+    }
+
+    #[test]
+    fn rfid_service_state_should_run_not_serialized() {
+        let state = RfidServiceState {
+            is_running: true,
+            last_scan: None,
+            error_count: 0,
+            last_error: None,
+            should_run: true,
+        };
+        let json = serde_json::to_string(&state).unwrap();
+        assert!(!json.contains("should_run"));
+        let d: RfidServiceState = serde_json::from_str(&json).unwrap();
+        assert!(!d.should_run);
+    }
+
+    #[test]
+    fn rfid_service_state_clone_is_independent() {
+        let state = RfidServiceState {
+            is_running: true,
+            last_scan: Some(RfidScanEvent {
+                tag_id: "AA:BB".to_string(),
+                scan_id: 9,
+                timestamp: 42,
+                platform: "test".to_string(),
+            }),
+            error_count: 3,
+            last_error: Some("err".to_string()),
+            should_run: true,
+        };
+        let mut cloned = state.clone();
+        cloned.is_running = false;
+        cloned.error_count = 99;
+        // Original unchanged
+        assert!(state.is_running);
+        assert_eq!(state.error_count, 3);
+    }
+
+    // ====================================================================
+    // Service constructor & get_state
+    // ====================================================================
+
+    #[test]
+    fn rfid_background_service_new_creates_stopped_state() {
+        let service = RfidBackgroundService::new();
+        let state = service.state.lock().unwrap();
+        assert!(!state.is_running);
+        assert!(!state.should_run);
+        assert_eq!(state.error_count, 0);
+        assert!(service.command_tx.is_none());
+        assert!(service.app_handle.is_none());
+    }
+
+    #[test]
+    fn get_state_returns_clone_of_current_state() {
+        let service = RfidBackgroundService::new();
+        {
+            let mut guard = service.state.lock().unwrap();
+            guard.is_running = true;
+            guard.error_count = 7;
+            guard.last_error = Some("test-error".to_string());
+        }
+        let snapshot = service.get_state().unwrap();
+        assert!(snapshot.is_running);
+        assert_eq!(snapshot.error_count, 7);
+        assert_eq!(snapshot.last_error.as_deref(), Some("test-error"));
+    }
+
+    #[test]
+    fn get_platform_name_returns_nonempty_string() {
+        let name = RfidBackgroundService::get_platform_name();
+        assert!(!name.is_empty());
+        #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
+        assert!(name.contains("Development Platform"));
+    }
+
+    // ====================================================================
+    // State helper functions
+    // ====================================================================
+
+    #[test]
+    fn should_continue_scanning_checks_should_run() {
+        let state = test_state();
+        state.lock().unwrap().should_run = true;
+        assert!(RfidBackgroundService::should_continue_scanning(&state));
+        state.lock().unwrap().should_run = false;
+        assert!(!RfidBackgroundService::should_continue_scanning(&state));
+    }
+
+    #[test]
+    fn set_running_state_sets_is_running() {
+        let state = test_state();
+        RfidBackgroundService::set_running_state(&state, true);
+        let guard = state.lock().unwrap();
+        assert!(guard.is_running);
+        assert!(guard.last_error.is_none()); // clears error when set to running
+    }
+
+    #[test]
+    fn set_running_state_false_keeps_error() {
+        let state = test_state();
+        {
+            let mut guard = state.lock().unwrap();
+            guard.last_error = Some("some error".to_string());
+        }
+        RfidBackgroundService::set_running_state(&state, false);
+        let guard = state.lock().unwrap();
+        assert!(!guard.is_running);
+        // last_error is only cleared when setting to true
+        assert_eq!(guard.last_error.as_deref(), Some("some error"));
+    }
+
+    #[test]
+    fn set_should_run_updates_flag() {
+        let state = test_state();
+        RfidBackgroundService::set_should_run(&state, true);
+        assert!(state.lock().unwrap().should_run);
+        RfidBackgroundService::set_should_run(&state, false);
+        assert!(!state.lock().unwrap().should_run);
+    }
+
+    // ====================================================================
+    // handle_successful_scan
+    // ====================================================================
+
+    #[test]
+    fn handle_successful_scan_updates_state() {
+        let state = test_state();
+        {
+            let mut guard = state.lock().unwrap();
+            guard.error_count = 5;
+            guard.last_error = Some("old error".to_string());
+        }
+        RfidBackgroundService::handle_successful_scan(&state, None, "04:D6:94:82:97:6A:80", 42);
+        let guard = state.lock().unwrap();
+        assert_eq!(guard.error_count, 5); // NOT reset
+        assert!(guard.last_error.is_none()); // cleared
+        let scan = guard.last_scan.as_ref().unwrap();
+        assert_eq!(scan.tag_id, "04:D6:94:82:97:6A:80");
+        assert_eq!(scan.scan_id, 42);
+        assert!(scan.timestamp > 0);
+    }
+
+    #[test]
+    fn handle_successful_scan_sets_platform() {
+        let state = test_state();
+        RfidBackgroundService::handle_successful_scan(&state, None, "AA:BB", 1);
+        let scan = state.lock().unwrap().last_scan.clone().unwrap();
+        assert!(!scan.platform.is_empty());
+    }
+
+    #[test]
+    fn scan_presence_state_suppresses_same_present_tag() {
+        let mut presence = ScanPresenceState::new();
+        assert!(presence.register_success("AA:BB"));
+        assert!(!presence.register_success("AA:BB"));
+    }
+
+    #[test]
+    fn scan_presence_state_allows_different_tag_without_absence() {
+        let mut presence = ScanPresenceState::new();
+        assert!(presence.register_success("AA:BB"));
+        assert!(presence.register_success("CC:DD"));
+    }
+
+    #[test]
+    fn scan_presence_state_requires_continuous_absence_before_reemit() {
+        let mut presence = ScanPresenceState::new();
+        let start = Instant::now();
+
+        assert!(presence.register_success("AA:BB"));
+        presence.register_absence(start);
+        presence.register_absence(start + Duration::from_millis(100));
+        assert!(presence.tag_present);
+
+        presence.register_absence(start + Duration::from_millis(400));
+        assert!(presence.register_success("AA:BB"));
+    }
+
+    // ====================================================================
+    // handle_scan_error
+    // ====================================================================
+
+    #[test]
+    fn handle_scan_error_increments_counter() {
+        let state = test_state();
+        RfidBackgroundService::handle_scan_error(&state, "SPI communication failure");
+        let guard = state.lock().unwrap();
+        assert_eq!(guard.error_count, 1);
+        assert_eq!(
+            guard.last_error.as_deref(),
+            Some("SPI communication failure")
+        );
+    }
+
+    #[test]
+    fn handle_scan_error_ignores_no_card() {
+        let state = test_state();
+        RfidBackgroundService::handle_scan_error(&state, "No card detected");
+        assert_eq!(state.lock().unwrap().error_count, 0);
+        assert!(state.lock().unwrap().last_error.is_none());
+    }
+
+    #[test]
+    fn handle_scan_error_ignores_timeout() {
+        let state = test_state();
+        RfidBackgroundService::handle_scan_error(&state, "Scan timeout - no card detected");
+        assert_eq!(state.lock().unwrap().error_count, 0);
+    }
+
+    #[test]
+    fn handle_scan_error_ignores_no_card_case_insensitive() {
+        let state = test_state();
+        RfidBackgroundService::handle_scan_error(&state, "NO CARD");
+        assert_eq!(state.lock().unwrap().error_count, 0);
+    }
+
+    #[test]
+    fn handle_scan_error_counts_real_errors() {
+        let state = test_state();
+        RfidBackgroundService::handle_scan_error(&state, "SPI error 1");
+        RfidBackgroundService::handle_scan_error(&state, "SPI error 2");
+        RfidBackgroundService::handle_scan_error(&state, "SPI error 3");
+        let guard = state.lock().unwrap();
+        assert_eq!(guard.error_count, 3);
+        assert_eq!(guard.last_error.as_deref(), Some("SPI error 3"));
+    }
+
+    // ====================================================================
+    // Async service lifecycle tests (tokio runtime)
+    // ====================================================================
+
+    #[tokio::test]
+    async fn reap_finished_scan_task_clears_completed_handle() {
+        let state = test_state();
+        state.lock().unwrap().is_running = true;
+
+        // Create a task that finishes immediately
+        let mut handle: Option<tokio::task::JoinHandle<()>> = Some(tokio::spawn(async {}));
+        // Let it finish
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        RfidBackgroundService::reap_finished_scan_task(&state, &mut handle).await;
+
+        assert!(handle.is_none());
+        assert!(!state.lock().unwrap().is_running);
+        assert!(!state.lock().unwrap().should_run);
+    }
+
+    #[tokio::test]
+    async fn reap_finished_scan_task_ignores_running_handle() {
+        let state = test_state();
+        state.lock().unwrap().is_running = true;
+
+        // Create a task that takes a while
+        let mut handle: Option<tokio::task::JoinHandle<()>> = Some(tokio::spawn(async {
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }));
+
+        RfidBackgroundService::reap_finished_scan_task(&state, &mut handle).await;
+
+        // Handle should still be there (task not finished)
+        assert!(handle.is_some());
+        assert!(state.lock().unwrap().is_running);
+
+        // Cleanup
+        handle.unwrap().abort();
+    }
+
+    #[tokio::test]
+    async fn reap_finished_scan_task_noop_on_none() {
+        let state = test_state();
+        let mut handle: Option<tokio::task::JoinHandle<()>> = None;
+        RfidBackgroundService::reap_finished_scan_task(&state, &mut handle).await;
+        assert!(handle.is_none());
+    }
+
+    #[tokio::test]
+    async fn handle_start_command_spawns_scan_task() {
+        let state = test_state();
+        let mut handle: Option<tokio::task::JoinHandle<()>> = None;
+
+        RfidBackgroundService::handle_start_command(&state, None, &mut handle).await;
+
+        assert!(handle.is_some());
+        assert!(state.lock().unwrap().is_running);
+        assert!(state.lock().unwrap().should_run);
+
+        // Stop and cleanup
+        state.lock().unwrap().should_run = false;
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if let Some(h) = handle {
+            h.abort();
+        }
+    }
+
+    #[tokio::test]
+    async fn handle_start_command_ignores_if_already_running() {
+        let state = test_state();
+
+        // First start
+        let mut handle: Option<tokio::task::JoinHandle<()>> = None;
+        RfidBackgroundService::handle_start_command(&state, None, &mut handle).await;
+        let first_handle_ptr = handle.as_ref().map(|h| format!("{h:?}"));
+
+        // Second start — should be ignored
+        RfidBackgroundService::handle_start_command(&state, None, &mut handle).await;
+        let second_handle_ptr = handle.as_ref().map(|h| format!("{h:?}"));
+
+        // Same handle (not replaced)
+        assert_eq!(first_handle_ptr, second_handle_ptr);
+
+        // Cleanup
+        state.lock().unwrap().should_run = false;
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        if let Some(h) = handle {
+            h.abort();
+        }
+    }
+
+    #[tokio::test]
+    async fn handle_stop_command_stops_scan_task() {
+        let state = test_state();
+
+        // Start first
+        let mut handle: Option<tokio::task::JoinHandle<()>> = None;
+        RfidBackgroundService::handle_start_command(&state, None, &mut handle).await;
+        assert!(handle.is_some());
+
+        // Stop
+        RfidBackgroundService::handle_stop_command(&state, &mut handle).await;
+
+        assert!(handle.is_none());
+        assert!(!state.lock().unwrap().is_running);
+    }
+
+    #[tokio::test]
+    async fn handle_stop_command_noop_when_no_handle() {
+        let state = test_state();
+        let mut handle: Option<tokio::task::JoinHandle<()>> = None;
+
+        RfidBackgroundService::handle_stop_command(&state, &mut handle).await;
+
+        assert!(handle.is_none());
+        assert!(!state.lock().unwrap().is_running);
+    }
+
+    #[tokio::test]
+    async fn handle_stop_command_with_still_running_state_no_handle() {
+        let state = test_state();
+        state.lock().unwrap().is_running = true;
+        let mut handle: Option<tokio::task::JoinHandle<()>> = None;
+
+        RfidBackgroundService::handle_stop_command(&state, &mut handle).await;
+        // is_running stays true when no handle but state says running (draining)
+        assert!(state.lock().unwrap().is_running);
+    }
+
+    #[tokio::test]
+    async fn background_scanning_loop_processes_start_and_stop() {
+        let state = test_state();
+        let (tx, mut rx) = mpsc::unbounded_channel::<ServiceCommand>();
+
+        let loop_state = Arc::clone(&state);
+        let loop_handle = tokio::spawn(async move {
+            RfidBackgroundService::background_scanning_loop(loop_state, None, &mut rx).await;
+        });
+
+        // Send Start
+        tx.send(ServiceCommand::Start).unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(state.lock().unwrap().is_running);
+
+        // Send Stop
+        tx.send(ServiceCommand::Stop).unwrap();
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        // Drop sender to exit the loop
+        drop(tx);
+        let _ = tokio::time::timeout(Duration::from_secs(2), loop_handle).await;
+
+        assert!(!state.lock().unwrap().is_running);
+    }
+
+    #[tokio::test]
+    async fn background_scanning_loop_exits_on_channel_close() {
+        let state = test_state();
+        let (tx, mut rx) = mpsc::unbounded_channel::<ServiceCommand>();
+
+        let loop_state = Arc::clone(&state);
+        let loop_handle = tokio::spawn(async move {
+            RfidBackgroundService::background_scanning_loop(loop_state, None, &mut rx).await;
+        });
+
+        // Close immediately
+        drop(tx);
+        let result = tokio::time::timeout(Duration::from_secs(2), loop_handle).await;
+        assert!(result.is_ok(), "Loop should exit when channel closes");
+    }
+
+    #[tokio::test]
+    async fn continuous_scan_loop_exits_when_should_run_false() {
+        let state = test_state();
+        // should_run starts as false → loop should exit immediately
+        let loop_state = Arc::clone(&state);
+        let handle = tokio::spawn(async move {
+            RfidBackgroundService::continuous_scan_loop(loop_state, None).await;
+        });
+
+        let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
+        assert!(
+            result.is_ok(),
+            "Loop should exit immediately when should_run=false"
+        );
+    }
+
+    #[tokio::test]
+    async fn continuous_scan_loop_scans_then_stops() {
+        let state = test_state();
+        state.lock().unwrap().should_run = true;
+
+        let loop_state = Arc::clone(&state);
+        let handle = tokio::spawn(async move {
+            RfidBackgroundService::continuous_scan_loop(loop_state, None).await;
+        });
+
+        // Poll for a successful scan instead of a fixed sleep.
+        // Mock scan_rfid_hardware() sleeps 200-500ms per attempt and has a 5%
+        // error rate, so waiting up to 3s gives plenty of headroom.
+        let mut had_scan = false;
+        for _ in 0..30 {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            if state.lock().unwrap().last_scan.is_some() {
+                had_scan = true;
+                break;
+            }
+        }
+
+        // Signal stop
+        state.lock().unwrap().should_run = false;
+        let result = tokio::time::timeout(Duration::from_secs(3), handle).await;
+        assert!(result.is_ok(), "Loop should exit after should_run=false");
+        assert!(!state.lock().unwrap().should_run);
+        assert!(!state.lock().unwrap().is_running);
+        // On mock platform we should have gotten at least one scan
+        assert!(had_scan, "Should have scanned at least once");
+    }
+
+    // ====================================================================
+    // Mock platform tests (only on non-ARM)
+    // ====================================================================
+
+    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
+    mod mock_tests {
+        use super::*;
+
+        #[test]
+        fn mock_check_hardware_is_always_available() {
+            let status = mock_platform::check_rfid_hardware();
+            assert!(status.is_available);
+            assert!(status.platform.contains("MOCK"));
+            assert!(status.last_error.is_none());
+        }
+
+        #[tokio::test]
+        async fn mock_scan_returns_valid_tag_format() {
+            let mut got_success = false;
+            for _ in 0..50 {
+                if let Ok(tag) = mock_platform::scan_rfid_hardware().await {
+                    assert!(tag.contains(':'), "Tag should contain colons: {tag}");
+                    let parts: Vec<&str> = tag.split(':').collect();
+                    assert_eq!(parts.len(), 7, "Tag should have 7 hex bytes: {tag}");
+                    assert!(tag.starts_with("04:"), "Tag should start with 04: {tag}");
+                    got_success = true;
+                    break;
+                }
+            }
+            assert!(got_success);
+        }
+
+        #[tokio::test]
+        async fn mock_single_scan_returns_valid_tag() {
+            let result = mock_platform::scan_rfid_hardware_single().await;
+            // May error (5% rate) but if Ok, should be valid format
+            if let Ok(tag) = result {
+                assert!(tag.starts_with("04:"));
+            }
+        }
+
+        #[tokio::test]
+        async fn mock_scan_can_produce_errors() {
+            // With 5% error rate AND reset_last_scan() before each call, every
+            // iteration independently reaches the error check. P(zero errors in
+            // 500 trials) = 0.95^500 ≈ 0 — this can no longer flake.
+            let mut got_error = false;
+            for _ in 0..500 {
+                mock_platform::reset_last_scan();
+                if mock_platform::scan_rfid_mock_internal().is_err() {
+                    got_error = true;
+                    break;
+                }
+            }
+            assert!(got_error, "Mock should produce errors occasionally");
+        }
+
+        #[tokio::test]
+        async fn perform_platform_scan_delegates_to_mock() {
+            // Just verify it doesn't panic and returns a Result
+            let result = RfidBackgroundService::perform_platform_scan().await;
+            assert!(result.is_ok() || result.is_err());
+        }
+
+        #[tokio::test]
+        async fn run_mock_scan_loop_exits_when_not_running() {
+            let state = test_state();
+            // should_run is false → exits immediately
+            RfidBackgroundService::run_mock_scan_loop(&state, None).await;
+            assert!(!state.lock().unwrap().is_running);
+        }
+
+        #[tokio::test]
+        async fn run_mock_scan_loop_scans_until_stopped() {
+            let state = test_state();
+            state.lock().unwrap().should_run = true;
+
+            let loop_state = Arc::clone(&state);
+            let handle = tokio::spawn(async move {
+                RfidBackgroundService::run_mock_scan_loop(&loop_state, None).await;
+            });
+
+            // Let mock scanning run briefly
+            tokio::time::sleep(Duration::from_millis(800)).await;
+            state.lock().unwrap().should_run = false;
+
+            let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
+            assert!(result.is_ok());
+        }
+    }
+
+    // ====================================================================
+    // handle_stop_command: abort path (task doesn't stop in time)
+    // ====================================================================
+
+    #[tokio::test]
+    async fn handle_stop_command_aborts_stuck_task() {
+        let state = test_state();
+        state.lock().unwrap().is_running = true;
+
+        // Create a task that ignores cancellation (blocks forever)
+        let mut handle: Option<tokio::task::JoinHandle<()>> = Some(tokio::spawn(async {
+            // This task won't check should_run, simulating a stuck scanner
+            loop {
+                tokio::time::sleep(Duration::from_secs(60)).await;
+            }
+        }));
+
+        // handle_stop_command will timeout after STOP_JOIN_TIMEOUT (3s), then abort
+        RfidBackgroundService::handle_stop_command(&state, &mut handle).await;
+
+        // After abort, handle should be cleared
+        assert!(handle.is_none());
+        // SPI mutex is free (no real SPI in test), so state should be stopped
+        assert!(!state.lock().unwrap().is_running);
+    }
+
+    #[tokio::test]
+    async fn handle_stop_command_handles_panicked_task() {
+        let state = test_state();
+        state.lock().unwrap().is_running = true;
+
+        // Create a task that panics
+        let mut handle: Option<tokio::task::JoinHandle<()>> = Some(tokio::spawn(async {
+            panic!("simulated RFID scanner panic");
+        }));
+
+        // Wait for the panic to propagate
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        RfidBackgroundService::handle_stop_command(&state, &mut handle).await;
+
+        assert!(handle.is_none());
+        assert!(!state.lock().unwrap().is_running);
+    }
+
+    // ====================================================================
+    // handle_start_command: deferred start when stop in progress
+    // ====================================================================
+
+    #[tokio::test]
+    async fn handle_start_command_deferred_when_stopping() {
+        let state = test_state();
+        {
+            let mut guard = state.lock().unwrap();
+            guard.is_running = true;
+            guard.should_run = false; // stop in progress
+        }
+
+        // No actual handle, but state says running with should_run=false
+        let mut handle: Option<tokio::task::JoinHandle<()>> = None;
+        RfidBackgroundService::handle_start_command(&state, None, &mut handle).await;
+
+        // Should NOT spawn a new task (stop still in progress)
+        assert!(handle.is_none());
+    }
+
+    // ====================================================================
+    // reap_finished_scan_task: panicked task
+    // ====================================================================
+
+    #[tokio::test]
+    async fn reap_finished_scan_task_handles_panicked_task() {
+        let state = test_state();
+        state.lock().unwrap().is_running = true;
+
+        let mut handle: Option<tokio::task::JoinHandle<()>> = Some(tokio::spawn(async {
+            panic!("scanner crash");
+        }));
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        RfidBackgroundService::reap_finished_scan_task(&state, &mut handle).await;
+
+        assert!(handle.is_none());
+        assert!(!state.lock().unwrap().is_running);
+    }
+
+    // ====================================================================
+    // set_running_state: clears error when set to true
+    // ====================================================================
+
+    #[test]
+    fn set_running_state_clears_error_on_start() {
+        let state = test_state();
+        {
+            let mut guard = state.lock().unwrap();
+            guard.last_error = Some("old error".to_string());
+        }
+        RfidBackgroundService::set_running_state(&state, true);
+        assert!(state.lock().unwrap().last_error.is_none());
+    }
+
+    // ====================================================================
+    // send_command_to (testable without global RFID_SERVICE)
+    // ====================================================================
+
+    #[test]
+    fn send_command_to_fails_without_channel() {
+        let service = RfidBackgroundService::new();
+        let service_arc = Arc::new(Mutex::new(service));
+
+        let result = send_command_to(&service_arc, ServiceCommand::Start);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not initialized"));
+    }
+
+    #[test]
+    fn send_command_to_succeeds_with_channel() {
+        let mut service = RfidBackgroundService::new();
+        let (tx, _rx) = mpsc::unbounded_channel::<ServiceCommand>();
+        service.command_tx = Some(tx);
+        let service_arc = Arc::new(Mutex::new(service));
+
+        let result = send_command_to(&service_arc, ServiceCommand::Start);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn send_command_to_fails_when_receiver_dropped() {
+        let mut service = RfidBackgroundService::new();
+        let (tx, rx) = mpsc::unbounded_channel::<ServiceCommand>();
+        service.command_tx = Some(tx);
+        drop(rx); // Drop receiver
+
+        let service_arc = Arc::new(Mutex::new(service));
+        let result = send_command_to(&service_arc, ServiceCommand::Stop);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Failed to send"));
+    }
+
+    #[test]
+    fn send_service_command_fails_when_not_initialized() {
+        if RfidBackgroundService::get_instance().is_none() {
+            let result = send_service_command(ServiceCommand::Start);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().contains("not initialized"));
+        }
+    }
+
+    // ====================================================================
+    // wait_for_state (testable without global RFID_SERVICE)
+    // ====================================================================
+
+    #[tokio::test]
+    async fn wait_for_state_returns_immediately_when_already_target() {
+        let state = test_state();
+        // Already stopped → wait_for_state(false) should return immediately
+        let result = wait_for_state(&state, false, Duration::from_millis(100)).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn wait_for_state_returns_when_running() {
+        let state = test_state();
+        {
+            let mut guard = state.lock().unwrap();
+            guard.is_running = true;
+            guard.should_run = true;
+        }
+        let result = wait_for_state(&state, true, Duration::from_millis(100)).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn wait_for_state_times_out() {
+        let state = test_state();
+        // State is stopped, wait for running → should timeout
+        let result = wait_for_state(&state, true, Duration::from_millis(100)).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("Timed out"));
+        assert!(err.contains("running"));
+    }
+
+    #[tokio::test]
+    async fn wait_for_state_timeout_for_stop() {
+        let state = test_state();
+        state.lock().unwrap().is_running = true;
+        // State is running, wait for stop → should timeout
+        let result = wait_for_state(&state, false, Duration::from_millis(100)).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("stopped"));
+    }
+
+    #[tokio::test]
+    async fn wait_for_state_detects_transition() {
+        let state = test_state();
+        let state_clone = Arc::clone(&state);
+
+        // Spawn a task that sets running after a delay
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            let mut guard = state_clone.lock().unwrap();
+            guard.is_running = true;
+            guard.should_run = true;
+        });
+
+        let result = wait_for_state(&state, true, Duration::from_secs(1)).await;
+        assert!(result.is_ok());
+    }
+
+    // ====================================================================
+    // STOP_JOIN_TIMEOUT constant
+    // ====================================================================
+
+    #[test]
+    fn stop_join_timeout_is_reasonable() {
+        assert_eq!(
+            RfidBackgroundService::STOP_JOIN_TIMEOUT,
+            Duration::from_secs(3)
+        );
+    }
+
+    // ====================================================================
+    // ServiceCommand enum
+    // ====================================================================
+
+    #[test]
+    fn service_command_debug_format() {
+        let start = ServiceCommand::Start;
+        let stop = ServiceCommand::Stop;
+        assert_eq!(format!("{start:?}"), "Start");
+        assert_eq!(format!("{stop:?}"), "Stop");
     }
 }
