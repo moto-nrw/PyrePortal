@@ -1815,3 +1815,8 @@ export const useUserStore = create<UserState>(
     excludedActions: ['functionalUpdate'],
   })
 );
+
+// Expose store for Playwright screenshot automation (dev/test only)
+if (import.meta.env.DEV) {
+  (window as unknown as Record<string, unknown>).__PYREPORTAL_STORE__ = useUserStore;
+}
