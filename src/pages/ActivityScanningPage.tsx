@@ -1091,7 +1091,22 @@ const ActivityScanningPage: React.FC = () => {
 
           switch (currentScan.action) {
             case 'checked_in':
-              return `Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`;
+              return (
+                <>
+                  {`Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`}
+                  {currentScan.pickup_time && (
+                    <div
+                      style={{
+                        marginTop: '12px',
+                        fontSize: '24px',
+                        opacity: 0.85,
+                      }}
+                    >
+                      Abholzeit heute: {currentScan.pickup_time} Uhr
+                    </div>
+                  )}
+                </>
+              );
             case 'checked_out':
               return ''; // Checkout shows destination buttons, no extra text needed
             case 'transferred':
