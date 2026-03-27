@@ -754,7 +754,7 @@ function TagAssignmentPage() {
                         e.currentTarget.style.boxShadow = designSystem.shadows.blue;
                       }}
                     >
-                      {tagAssignment.assigned ? 'Anderem Kind zuweisen' : 'Kind auswählen'}
+                      {tagAssignment.assigned ? 'Anderer Person zuweisen' : 'Person auswählen'}
                     </button>
                     <button
                       onClick={handleScanAnother}

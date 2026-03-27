@@ -127,8 +127,8 @@ test.describe('PyrePortal User Journey', () => {
   });
 
   test('07 — Student Selection (unfiltered)', async () => {
-    const reassignBtn = page.locator('button:has-text("Anderem Kind zuweisen")');
-    const selectBtn = page.locator('button:has-text("Kind auswählen")');
+    const reassignBtn = page.locator('button:has-text("Anderer Person zuweisen")');
+    const selectBtn = page.locator('button:has-text("Person auswählen")');
     if ((await reassignBtn.count()) > 0) {
       await reassignBtn.click();
     } else {
