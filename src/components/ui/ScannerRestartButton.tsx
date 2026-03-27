@@ -98,6 +98,10 @@ export function ScannerRestartButton({
     }
   };
 
+  if (!isRfidEnabled()) {
+    return null;
+  }
+
   return (
     <>
       <div
