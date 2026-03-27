@@ -45,3 +45,7 @@ openspec/specs/
 
 # Git worktrees
 .worktrees/
+
+# Playwright
+screenshots/output/*.png
+screenshots/test-results/

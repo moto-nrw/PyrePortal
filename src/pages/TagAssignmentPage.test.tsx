@@ -220,7 +220,7 @@ describe('TagAssignmentPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Armband erkannt')).toBeInTheDocument();
       expect(screen.getByText('Armband ist nicht zugewiesen')).toBeInTheDocument();
-      expect(screen.getByText('Kind auswählen')).toBeInTheDocument();
+      expect(screen.getByText('Person auswählen')).toBeInTheDocument();
     });
   });
 
@@ -242,7 +242,7 @@ describe('TagAssignmentPage', () => {
       expect(nameElements.length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Klasse 3a')).toBeInTheDocument();
       expect(screen.getByText('Aktuell zugewiesen an:')).toBeInTheDocument();
-      expect(screen.getByText('Anderem Kind zuweisen')).toBeInTheDocument();
+      expect(screen.getByText('Anderer Person zuweisen')).toBeInTheDocument();
     });
   });
 
@@ -496,7 +496,7 @@ describe('TagAssignmentPage', () => {
   // Tag assignment result actions
   // =======================================================================
 
-  it('shows "Kind auswählen" button for unassigned tag', () => {
+  it('shows "Person auswählen" button for unassigned tag', () => {
     renderPage({
       initialEntries: [
         {
@@ -509,10 +509,10 @@ describe('TagAssignmentPage', () => {
       ],
     });
 
-    expect(screen.getByText('Kind auswählen')).toBeInTheDocument();
+    expect(screen.getByText('Person auswählen')).toBeInTheDocument();
   });
 
-  it('shows "Anderem Kind zuweisen" button for assigned tag', () => {
+  it('shows "Anderer Person zuweisen" button for assigned tag', () => {
     renderPage({
       initialEntries: [
         {
@@ -525,7 +525,7 @@ describe('TagAssignmentPage', () => {
       ],
     });
 
-    expect(screen.getByText('Anderem Kind zuweisen')).toBeInTheDocument();
+    expect(screen.getByText('Anderer Person zuweisen')).toBeInTheDocument();
   });
 
   it('shows assigned student name and class', () => {
@@ -602,7 +602,7 @@ describe('TagAssignmentPage', () => {
     });
   });
 
-  it('clicking "Kind auswählen" navigates to /student-selection with state', async () => {
+  it('clicking "Person auswählen" navigates to /student-selection with state', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderPage({
       initialEntries: [
@@ -616,7 +616,7 @@ describe('TagAssignmentPage', () => {
       ],
     });
 
-    await user.click(screen.getByText('Kind auswählen'));
+    await user.click(screen.getByText('Person auswählen'));
     expect(mockNavigate).toHaveBeenCalledWith('/student-selection', {
       state: {
         scannedTag: '04:D6:94:82:97:6A:80',
@@ -625,7 +625,7 @@ describe('TagAssignmentPage', () => {
     });
   });
 
-  it('clicking "Anderem Kind zuweisen" navigates to /student-selection', async () => {
+  it('clicking "Anderer Person zuweisen" navigates to /student-selection', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     renderPage({
       initialEntries: [
@@ -639,7 +639,7 @@ describe('TagAssignmentPage', () => {
       ],
     });
 
-    await user.click(screen.getByText('Anderem Kind zuweisen'));
+    await user.click(screen.getByText('Anderer Person zuweisen'));
     expect(mockNavigate).toHaveBeenCalledWith('/student-selection', {
       state: {
         scannedTag: '04:D6:94:82:97:6A:80',
@@ -1237,8 +1237,8 @@ describe('TagAssignmentPage', () => {
       ],
     });
 
-    // "Anderem Kind zuweisen" button
-    const assignButton = screen.getByText('Anderem Kind zuweisen').closest('button')!;
+    // "Anderer Person zuweisen" button
+    const assignButton = screen.getByText('Anderer Person zuweisen').closest('button')!;
     fireEvent.touchStart(assignButton);
     fireEvent.touchEnd(assignButton);
 
