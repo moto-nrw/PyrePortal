@@ -1409,6 +1409,8 @@ export interface RfidScanResult {
   greeting?: string;
   /** Whether the student is eligible for daily checkout ("nach Hause") */
   daily_checkout_available?: boolean;
+  /** Today's scheduled pickup time in HH:MM format (e.g. "15:30") */
+  pickup_time?: string;
   visit_id?: number;
   room_name?: string;
   previous_room?: string;
