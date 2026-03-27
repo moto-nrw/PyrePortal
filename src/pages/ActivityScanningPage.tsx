@@ -1100,23 +1100,34 @@ const ActivityScanningPage: React.FC = () => {
                   {currentScan.pickup_time && (
                     <div
                       style={{
-                        marginBottom: '16px',
+                        marginBottom: '24px',
                         textAlign: 'center',
                       }}
                     >
-                      <div style={{ fontSize: '22px', opacity: 0.8 }}>Abholzeit heute</div>
                       <div
                         style={{
-                          fontSize: '52px',
+                          fontSize: '20px',
+                          opacity: 0.9,
+                          marginBottom: '4px',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Abholzeit heute
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '48px',
                           fontWeight: 700,
-                          letterSpacing: '2px',
+                          lineHeight: 1.1,
                         }}
                       >
                         {currentScan.pickup_time} Uhr
                       </div>
                     </div>
                   )}
-                  {`Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`}
+                  <div style={{ fontSize: currentScan.pickup_time ? '22px' : undefined }}>
+                    {`Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`}
+                  </div>
                 </>
               );
             case 'checked_out':
