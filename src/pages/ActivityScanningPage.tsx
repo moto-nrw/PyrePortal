@@ -537,9 +537,13 @@ const ActivityScanningPage: React.FC = () => {
     if (checkoutDestinationState || showFeedbackPrompt) {
       return DAILY_CHECKOUT_TIMEOUT_MS;
     }
+    // Check-in with pickup time needs longer so the child can read it
+    if (currentScan?.action === 'checked_in' && currentScan.pickup_time) {
+      return 3500;
+    }
     // Normal scans use configured display time
     return rfid.modalDisplayTime;
-  }, [checkoutDestinationState, showFeedbackPrompt, rfid.modalDisplayTime]);
+  }, [checkoutDestinationState, showFeedbackPrompt, rfid.modalDisplayTime, currentScan]);
 
   // Handle modal timeout - cleanup state and dismiss modal
   // Student is already checked out by the server, so timeout just closes the modal
@@ -1093,18 +1097,26 @@ const ActivityScanningPage: React.FC = () => {
             case 'checked_in':
               return (
                 <>
-                  {`Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`}
                   {currentScan.pickup_time && (
                     <div
                       style={{
-                        marginTop: '12px',
-                        fontSize: '24px',
-                        opacity: 0.85,
+                        marginBottom: '16px',
+                        textAlign: 'center',
                       }}
                     >
-                      Abholzeit heute: {currentScan.pickup_time} Uhr
+                      <div style={{ fontSize: '22px', opacity: 0.8 }}>Abholzeit heute</div>
+                      <div
+                        style={{
+                          fontSize: '52px',
+                          fontWeight: 700,
+                          letterSpacing: '2px',
+                        }}
+                      >
+                        {currentScan.pickup_time} Uhr
+                      </div>
                     </div>
                   )}
+                  {`Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`}
                 </>
               );
             case 'checked_out':
