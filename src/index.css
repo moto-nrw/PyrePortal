@@ -8,9 +8,8 @@
 }
 
 /* Tailwind directives */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "@moto-nrw/design-system/tailwind";
 
 /* Base styles */
 @layer base {
