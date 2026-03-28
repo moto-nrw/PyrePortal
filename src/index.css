@@ -1,3 +1,6 @@
+/* Design System tokens (CSS variables) */
+@import "@moto-nrw/design-system/tokens";
+
 /* Box model reset - must come before Tailwind's base to override it */
 * {
   margin: 0;
