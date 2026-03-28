@@ -86,7 +86,8 @@
       "src/platform/*/index.ts"
     ],
     "ignoreDependencies": [
-      "@tauri-apps/plugin-opener"
+      "@tauri-apps/plugin-opener",
+      "@moto-nrw/design-system"
     ]
   }
 }
