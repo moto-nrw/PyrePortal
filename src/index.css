@@ -1,4 +1,8 @@
-/* Box model reset - must come before Tailwind's base to override it */
+/* Tailwind + Design System tokens */
+@import "tailwindcss";
+@import "@moto-nrw/design-system/tailwind";
+
+/* Box model reset */
 * {
   margin: 0;
   padding: 0;
@@ -6,10 +10,6 @@
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-
-/* Tailwind directives */
-@import "tailwindcss";
-@import "@moto-nrw/design-system/tailwind";
 
 /* Base styles */
 @layer base {
