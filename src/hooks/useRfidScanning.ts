@@ -279,6 +279,7 @@ export const useRfidScanning = () => {
     updateStudentHistory,
     addToProcessingQueue,
     removeFromProcessingQueue,
+    lockPickupQueryTag,
     // Enhanced duplicate prevention
     canProcessTag,
     recordTagScan,
@@ -288,7 +289,6 @@ export const useRfidScanning = () => {
     addSupervisorFromRfid,
     addActiveSupervisorTag,
     isActiveSupervisor,
-    resetScanMode,
   } = useUserStore();
 
   const isInitializedRef = useRef<boolean>(false);
@@ -373,11 +373,29 @@ export const useRfidScanning = () => {
       }
 
       if (freshRfid.scanMode === 'pickupQuery') {
+        if (freshRfid.pickupQueryTagId && freshRfid.pickupQueryTagId !== tagId) {
+          logger.debug('Pickup query already locked to another tag, skipping scan', {
+            requestedTagId: tagId,
+            lockedTagId: freshRfid.pickupQueryTagId,
+            scanContextId: freshRfid.scanContextId,
+          });
+          return;
+        }
+
+        if (freshRfid.pickupQueryTagId === tagId) {
+          logger.debug('Pickup query already completed or in progress for this tag, skipping', {
+            tagId,
+            scanContextId: freshRfid.scanContextId,
+          });
+          return;
+        }
+
         if (freshRfid.processingQueue.has(tagId)) {
           logger.debug('Pickup query tag already processing, skipping', { tagId });
           return;
         }
 
+        lockPickupQueryTag(tagId);
         addToProcessingQueue(tagId);
         try {
           const result = await api.queryPickupInfo({ student_rfid: tagId }, freshUser.pin);
@@ -395,7 +413,6 @@ export const useRfidScanning = () => {
 
           setScanResult({ ...result, scannedTagId: tagId });
           showScanModal();
-          resetScanMode();
           return;
         } catch (error) {
           logger.error('Failed to query pickup info', { error: serializeError(error) });
@@ -414,7 +431,6 @@ export const useRfidScanning = () => {
 
           setScanResult(createScanErrorResult(error));
           showScanModal();
-          resetScanMode();
           return;
         } finally {
           removeFromProcessingQueue(tagId);
@@ -531,13 +547,13 @@ export const useRfidScanning = () => {
       updateStudentHistory,
       addToProcessingQueue,
       removeFromProcessingQueue,
+      lockPickupQueryTag,
       canProcessTag,
       recordTagScan,
       mapTagToStudent,
       addSupervisorFromRfid,
       addActiveSupervisorTag,
       isActiveSupervisor,
-      resetScanMode,
       showSupervisorRedirect,
     ]
   );

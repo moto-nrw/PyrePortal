@@ -418,6 +418,7 @@ interface RfidState {
   showModal: boolean;
   scanMode: RfidScanMode;
   scanContextId: number;
+  pickupQueryTagId: string | null;
 
   // New optimistic state management
   optimisticScans: OptimisticScanState[];
@@ -510,6 +511,7 @@ interface UserState {
   showScanModal: () => void;
   hideScanModal: () => void;
   startPickupQueryMode: () => void;
+  lockPickupQueryTag: (tagId: string) => void;
   resetScanMode: () => void;
 
   // New optimistic RFID actions
@@ -576,6 +578,7 @@ const RFID_SESSION_INITIAL_STATE = {
   optimisticScans: [] as OptimisticScanState[],
   scanMode: 'checkin' as RfidScanMode,
   scanContextId: 0,
+  pickupQueryTagId: null as string | null,
 };
 
 // Generate a unique id for new activities using unbiased secure randomness
@@ -623,6 +626,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     showModal: false,
     scanMode: 'checkin' as RfidScanMode,
     scanContextId: 0,
+    pickupQueryTagId: null,
 
     // New optimistic state
     optimisticScans: [],
@@ -1398,6 +1402,16 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         ...state.rfid,
         scanMode: 'pickupQuery' as RfidScanMode,
         scanContextId: state.rfid.scanContextId + 1,
+        pickupQueryTagId: null,
+      },
+    }));
+  },
+
+  lockPickupQueryTag: (tagId: string) => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        pickupQueryTagId: state.rfid.pickupQueryTagId ?? tagId,
       },
     }));
   },
@@ -1408,6 +1422,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         ...state.rfid,
         scanMode: 'checkin' as RfidScanMode,
         scanContextId: state.rfid.scanContextId + 1,
+        pickupQueryTagId: null,
       },
     }));
   },

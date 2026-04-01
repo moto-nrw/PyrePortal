@@ -38,6 +38,12 @@ const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
  */
 const FAREWELL_TIMEOUT_MS = 1500;
 
+/**
+ * Timeout duration for successful pickup lookups.
+ * Longer than transient attendance toasts so children can actually read the result.
+ */
+const PICKUP_QUERY_RESULT_TIMEOUT_MS = 5000;
+
 // Feedback button color schemes: green (positive), yellow (neutral), red (negative)
 const FEEDBACK_BUTTON_COLORS = {
   positive: {
@@ -564,6 +570,9 @@ const ActivityScanningPage: React.FC = () => {
     if (checkoutDestinationState || showFeedbackPrompt) {
       return DAILY_CHECKOUT_TIMEOUT_MS;
     }
+    if (currentScan?.action === 'pickup_info') {
+      return PICKUP_QUERY_RESULT_TIMEOUT_MS;
+    }
     // Check-in with pickup time needs longer so the child can read it
     if (currentScan?.action === 'checked_in' && currentScan.pickup_time) {
       return 3500;
@@ -609,6 +618,9 @@ const ActivityScanningPage: React.FC = () => {
 
     if (isAwaitingPickupQueryScan) {
       setIsAwaitingPickupQueryScan(false);
+    }
+
+    if (rfid.scanMode === 'pickupQuery') {
       resetScanMode();
     }
 
@@ -631,6 +643,7 @@ const ActivityScanningPage: React.FC = () => {
     isAwaitingPickupQueryScan,
     isPickupQueryLoading,
     navigate,
+    rfid.scanMode,
     resetScanMode,
     showFeedbackPrompt,
   ]);
