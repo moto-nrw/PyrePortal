@@ -89,6 +89,9 @@ interface ModalBaseProps {
   /** Allow closing by clicking the modal content itself. Default: false.
    *  Useful for display-only modals without interactive buttons. */
   closeOnContentClick?: boolean;
+
+  /** Allow closing via the native Escape key cancel behavior. Default: true */
+  closeOnEscapeKey?: boolean;
 }
 
 /**
@@ -128,6 +131,7 @@ export function ModalBase({
   timeoutTrackColor,
   closeOnBackdropClick = true,
   closeOnContentClick = false,
+  closeOnEscapeKey = true,
 }: Readonly<ModalBaseProps>) {
   // Get size preset values
   const sizePreset = SIZE_PRESETS[size];
@@ -195,6 +199,19 @@ export function ModalBase({
     dialog.addEventListener('click', handleClick);
     return () => dialog.removeEventListener('click', handleClick);
   }, [closeOnBackdropClick]);
+
+  // Prevent the native Escape key from closing non-dismissible dialogs.
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog || closeOnEscapeKey) return;
+
+    const handleCancel = (event: Event) => {
+      event.preventDefault();
+    };
+
+    dialog.addEventListener('cancel', handleCancel);
+    return () => dialog.removeEventListener('cancel', handleCancel);
+  }, [closeOnEscapeKey]);
 
   const shouldShowIndicator = showTimeoutIndicator && timeout !== undefined;
 

@@ -44,6 +44,18 @@ const FAREWELL_TIMEOUT_MS = 1500;
  */
 const PICKUP_QUERY_RESULT_TIMEOUT_MS = 5000;
 
+/**
+ * Build a visible error result when pickup lookup stalls long enough to time out.
+ * This keeps the kiosk responsive instead of silently dropping back to idle.
+ */
+const createPickupQueryTimeoutResult = (): RfidScanResult => ({
+  student_name: 'Abholzeit konnte nicht geladen werden',
+  student_id: null,
+  action: 'error',
+  message: 'Zeitüberschreitung beim Laden der Abholzeit. Bitte erneut scannen.',
+  showAsError: true,
+});
+
 // Feedback button color schemes: green (positive), yellow (neutral), red (negative)
 const FEEDBACK_BUTTON_COLORS = {
   positive: {
@@ -270,8 +282,14 @@ const ActivityScanningPage: React.FC = () => {
 
   // Get access to the store's RFID functions
   const { recentTagScans } = useUserStore(state => state.rfid);
-  const { hideScanModal, resetScanMode, setScanResult, showScanModal, startPickupQueryMode } =
-    useUserStore();
+  const {
+    hideScanModal,
+    removeFromProcessingQueue,
+    resetScanMode,
+    setScanResult,
+    showScanModal,
+    startPickupQueryMode,
+  } = useUserStore();
 
   // Debug logging for selectedActivity
   useEffect(() => {
@@ -557,7 +575,8 @@ const ActivityScanningPage: React.FC = () => {
   // Determine modal timeout duration based on current state
   const modalTimeoutDuration = useMemo(() => {
     if (isPickupQueryLoading) {
-      return undefined;
+      // Loading is also kiosk-blocking, so it needs the same bounded timeout as the scan prompt.
+      return rfid.scanTimeout;
     }
     if (isAwaitingPickupQueryScan) {
       return rfid.scanTimeout;
@@ -604,6 +623,27 @@ const ActivityScanningPage: React.FC = () => {
     // Check if navigation is required after modal close
     const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
 
+    if (isPickupQueryLoading) {
+      logger.warn('Pickup query loading timed out, resetting modal state', {
+        tagId: rfid.pickupQueryTagId,
+        scanContextId: rfid.scanContextId,
+      });
+
+      if (rfid.pickupQueryTagId) {
+        removeFromProcessingQueue(rfid.pickupQueryTagId);
+      }
+
+      setIsAwaitingPickupQueryScan(false);
+
+      if (rfid.scanMode === 'pickupQuery') {
+        resetScanMode();
+      }
+
+      setScanResult(createPickupQueryTimeoutResult());
+      showScanModal();
+      return;
+    }
+
     // Clean up checkout destination state
     if (checkoutDestinationState) {
       setCheckoutDestinationState(null);
@@ -640,12 +680,17 @@ const ActivityScanningPage: React.FC = () => {
     checkoutDestinationState,
     currentScan,
     hideScanModal,
+    removeFromProcessingQueue,
     isAwaitingPickupQueryScan,
     isPickupQueryLoading,
     navigate,
+    rfid.pickupQueryTagId,
     rfid.scanMode,
+    rfid.scanContextId,
     resetScanMode,
+    setScanResult,
     showFeedbackPrompt,
+    showScanModal,
   ]);
 
   // Guard clause - if data is missing, show loading or error state
@@ -1526,6 +1571,7 @@ const ActivityScanningPage: React.FC = () => {
             )
           }
           closeOnBackdropClick={!shouldKeepPickupQueryModalOpen}
+          closeOnEscapeKey={!shouldKeepPickupQueryModalOpen}
         >
           {/* Background pattern for visual interest */}
           <div

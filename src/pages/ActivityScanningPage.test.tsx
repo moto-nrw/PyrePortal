@@ -232,7 +232,7 @@ describe('ActivityScanningPage', () => {
     expect(screen.getByText('Bitte halte dein Armband an das Lesegeraet.')).toBeInTheDocument();
   });
 
-  it('keeps the pickup query modal open while the backend response is loading', async () => {
+  it('times out a stalled pickup query load and resets the kiosk state', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const view = renderPage();
 
@@ -242,6 +242,7 @@ describe('ActivityScanningPage', () => {
       rfid: {
         ...useUserStore.getState().rfid,
         scanMode: 'pickupQuery',
+        pickupQueryTagId: '04:AA:BB:CC:DD:EE:FF',
         processingQueue: new Set(['04:AA:BB:CC:DD:EE:FF']),
       },
     });
@@ -261,10 +262,54 @@ describe('ActivityScanningPage', () => {
     expect(screen.getByText('Abholzeit wird geladen...')).toBeInTheDocument();
 
     await act(async () => {
-      vi.advanceTimersByTime(5000);
+      vi.advanceTimersByTime(2500);
     });
 
     expect(screen.getByText('Abholzeit wird geladen...')).toBeInTheDocument();
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      const { rfid } = useUserStore.getState();
+      expect(rfid.scanMode).toBe('checkin');
+      expect(rfid.processingQueue.size).toBe(0);
+      expect(rfid.currentScan).toMatchObject({
+        action: 'error',
+        showAsError: true,
+      });
+    });
+  });
+
+  it('prevents Escape from canceling the pickup query prompt', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      showModal: true,
+      currentScan: null,
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+
+    const dialog = document.querySelector('dialog');
+    expect(dialog).toBeInTheDocument();
+
+    const cancelEvent = new Event('cancel', { cancelable: true });
+    const dispatchResult = dialog?.dispatchEvent(cancelEvent);
+
+    expect(dispatchResult).toBe(false);
+    expect(cancelEvent.defaultPrevented).toBe(true);
     expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
   });
 
