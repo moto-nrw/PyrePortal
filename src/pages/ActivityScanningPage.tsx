@@ -1,4 +1,10 @@
-import { faFaceSmile, faFaceMeh, faFaceFrown, faRestroom } from '@fortawesome/free-solid-svg-icons';
+import {
+  faClock,
+  faFaceSmile,
+  faFaceMeh,
+  faFaceFrown,
+  faRestroom,
+} from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -258,7 +264,8 @@ const ActivityScanningPage: React.FC = () => {
 
   // Get access to the store's RFID functions
   const { recentTagScans } = useUserStore(state => state.rfid);
-  const { hideScanModal, setScanResult, showScanModal } = useUserStore();
+  const { hideScanModal, resetScanMode, setScanResult, showScanModal, startPickupQueryMode } =
+    useUserStore();
 
   // Debug logging for selectedActivity
   useEffect(() => {
@@ -355,6 +362,17 @@ const ActivityScanningPage: React.FC = () => {
   // WC room ID (discovered dynamically from server)
   const [wcRoomId, setWcRoomId] = useState<number | null>(null);
 
+  // Pickup query prompt state
+  const [isAwaitingPickupQueryScan, setIsAwaitingPickupQueryScan] = useState(false);
+  const isPickupQueryLoading =
+    rfid.scanMode === 'pickupQuery' && rfid.processingQueue.size > 0 && !currentScan;
+
+  useEffect(() => {
+    if (currentScan && isAwaitingPickupQueryScan) {
+      setIsAwaitingPickupQueryScan(false);
+    }
+  }, [currentScan, isAwaitingPickupQueryScan]);
+
   // Clear stale checkout/feedback/farewell state when a new scan arrives.
   // A "new scan" is detected by: different RFID tag, different visit_id, or
   // a check-in arriving while we're in a checkout flow (always means new scan).
@@ -396,6 +414,9 @@ const ActivityScanningPage: React.FC = () => {
 
     // Cleanup: stop scanning when component unmounts
     return () => {
+      const { hideScanModal, resetScanMode } = useUserStore.getState();
+      hideScanModal();
+      resetScanMode();
       void stopScanning();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -529,6 +550,12 @@ const ActivityScanningPage: React.FC = () => {
 
   // Determine modal timeout duration based on current state
   const modalTimeoutDuration = useMemo(() => {
+    if (isPickupQueryLoading) {
+      return undefined;
+    }
+    if (isAwaitingPickupQueryScan) {
+      return rfid.scanTimeout;
+    }
     // Farewell messages use shorter timeout (just showing goodbye)
     if (checkoutDestinationState?.showingFarewell) {
       return FAREWELL_TIMEOUT_MS;
@@ -543,7 +570,15 @@ const ActivityScanningPage: React.FC = () => {
     }
     // Normal scans use configured display time
     return rfid.modalDisplayTime;
-  }, [checkoutDestinationState, showFeedbackPrompt, rfid.modalDisplayTime, currentScan]);
+  }, [
+    checkoutDestinationState,
+    currentScan,
+    isAwaitingPickupQueryScan,
+    isPickupQueryLoading,
+    rfid.modalDisplayTime,
+    rfid.scanTimeout,
+    showFeedbackPrompt,
+  ]);
 
   // Handle modal timeout - cleanup state and dismiss modal
   // Student is already checked out by the server, so timeout just closes the modal
@@ -552,6 +587,8 @@ const ActivityScanningPage: React.FC = () => {
       hasDestinationState: !!checkoutDestinationState,
       showingFarewell: checkoutDestinationState?.showingFarewell,
       showFeedbackPrompt,
+      isAwaitingPickupQueryScan,
+      isPickupQueryLoading,
       navigateOnClose: (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose,
     });
 
@@ -570,6 +607,11 @@ const ActivityScanningPage: React.FC = () => {
     // Always clear visit ID ref to prevent stale ref from wiping next checkout's destination state
     feedbackVisitIdRef.current = null;
 
+    if (isAwaitingPickupQueryScan) {
+      setIsAwaitingPickupQueryScan(false);
+      resetScanMode();
+    }
+
     hideScanModal();
 
     // Navigate after modal is closed if required
@@ -582,7 +624,16 @@ const ActivityScanningPage: React.FC = () => {
         });
       }
     }
-  }, [checkoutDestinationState, showFeedbackPrompt, hideScanModal, currentScan, navigate]);
+  }, [
+    checkoutDestinationState,
+    currentScan,
+    hideScanModal,
+    isAwaitingPickupQueryScan,
+    isPickupQueryLoading,
+    navigate,
+    resetScanMode,
+    showFeedbackPrompt,
+  ]);
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -606,6 +657,14 @@ const ActivityScanningPage: React.FC = () => {
     void stopScanning(); // Handle async function
     // Navigate to PIN page for teacher access
     void navigate('/pin');
+  };
+
+  const handlePickupQueryClick = () => {
+    logger.info('Starting pickup query mode');
+    setScanResult(null);
+    setIsAwaitingPickupQueryScan(true);
+    startPickupQueryMode();
+    showScanModal();
   };
 
   // Handle "nach Hause" button - student confirmed going home
@@ -858,7 +917,41 @@ const ActivityScanningPage: React.FC = () => {
 
   // Helper function to render modal content area - extracted to avoid nested ternaries
   const renderModalContent = () => {
-    if (!currentScan) return null;
+    if (!currentScan) {
+      if (isPickupQueryLoading) {
+        return (
+          <div
+            style={{
+              fontSize: '28px',
+              color: 'rgba(255, 255, 255, 0.95)',
+              fontWeight: 600,
+              position: 'relative',
+              zIndex: 2,
+              textAlign: 'center',
+            }}
+          >
+            Abholzeit wird geladen...
+          </div>
+        );
+      }
+
+      if (!isAwaitingPickupQueryScan) return null;
+
+      return (
+        <div
+          style={{
+            fontSize: '28px',
+            color: 'rgba(255, 255, 255, 0.95)',
+            fontWeight: 600,
+            position: 'relative',
+            zIndex: 2,
+            textAlign: 'center',
+          }}
+        >
+          Bitte halte dein Armband an das Lesegeraet.
+        </div>
+      );
+    }
 
     // Feedback prompt UI - styled to match Check In/Check Out modals
     if (showFeedbackPrompt) {
@@ -1130,6 +1223,56 @@ const ActivityScanningPage: React.FC = () => {
                   </div>
                 </>
               );
+            case 'pickup_info':
+              return (
+                <>
+                  {currentScan.pickup_time ? (
+                    <div
+                      style={{
+                        marginBottom: currentScan.pickup_note ? '20px' : '0',
+                        textAlign: 'center',
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: '20px',
+                          opacity: 0.9,
+                          marginBottom: '4px',
+                          fontWeight: 500,
+                        }}
+                      >
+                        Abholzeit heute
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '52px',
+                          fontWeight: 700,
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        {currentScan.pickup_time} Uhr
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center' }}>
+                      Fuer heute ist keine Abholzeit hinterlegt.
+                    </div>
+                  )}
+                  {currentScan.pickup_note && (
+                    <div
+                      style={{
+                        marginTop: currentScan.pickup_time ? '8px' : '24px',
+                        fontSize: '22px',
+                        lineHeight: 1.4,
+                        textAlign: 'center',
+                        whiteSpace: 'pre-line',
+                      }}
+                    >
+                      {currentScan.pickup_note}
+                    </div>
+                  )}
+                </>
+              );
             case 'checked_out':
               return ''; // Checkout shows destination buttons, no extra text needed
             case 'transferred':
@@ -1142,7 +1285,11 @@ const ActivityScanningPage: React.FC = () => {
     );
   };
 
-  const shouldShowCheckModal = showModal && !!currentScan;
+  const shouldShowCheckModal = showModal && (!!currentScan || isAwaitingPickupQueryScan);
+  const shouldKeepPickupQueryModalOpen = isAwaitingPickupQueryScan || isPickupQueryLoading;
+  const isPickupQueryPromptOpen =
+    shouldShowCheckModal && isAwaitingPickupQueryScan && !isPickupQueryLoading && !currentScan;
+  const pickupQueryButtonDisabled = showModal || rfid.processingQueue.size > 0;
 
   return (
     <>
@@ -1185,6 +1332,47 @@ const ActivityScanningPage: React.FC = () => {
               ariaLabel="Anmelden - zur PIN-Eingabe"
             />
           </div>
+
+          <button
+            type="button"
+            onClick={handlePickupQueryClick}
+            disabled={pickupQueryButtonDisabled}
+            aria-label="Abholzeit abfragen"
+            style={{
+              position: 'absolute',
+              top: '20px',
+              left: '20px',
+              zIndex: 10,
+              width: '76px',
+              height: '76px',
+              borderRadius: '50%',
+              border: 'none',
+              backgroundColor: pickupQueryButtonDisabled ? 'rgba(80, 128, 216, 0.35)' : '#5080D8',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: pickupQueryButtonDisabled
+                ? 'none'
+                : '0 12px 24px rgba(80, 128, 216, 0.28)',
+              cursor: pickupQueryButtonDisabled ? 'not-allowed' : 'pointer',
+              transition:
+                'transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease',
+              opacity: pickupQueryButtonDisabled ? 0.7 : 1,
+            }}
+            onPointerDown={e => {
+              if (pickupQueryButtonDisabled) return;
+              e.currentTarget.style.transform = 'scale(0.96)';
+            }}
+            onPointerUp={e => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.transform = 'scale(1)';
+            }}
+          >
+            <FontAwesomeIcon icon={faClock} style={{ fontSize: '34px' }} />
+          </button>
 
           <div
             style={{
@@ -1277,48 +1465,54 @@ const ActivityScanningPage: React.FC = () => {
       </BackgroundWrapper>
 
       {/* Check-in/Check-out Modal */}
-      {currentScan && (
+      {shouldShowCheckModal && (
         <ModalBase
           isOpen={shouldShowCheckModal}
           onClose={handleModalTimeout}
           size={
+            !isPickupQueryPromptOpen &&
             !showFeedbackPrompt &&
-            currentScan.action === 'checked_out' &&
+            currentScan?.action === 'checked_out' &&
             checkoutDestinationState &&
             !checkoutDestinationState.showingFarewell
               ? 'xl'
               : 'lg'
           }
           backgroundColor={(() => {
+            if (isPickupQueryPromptOpen || currentScan?.action === 'pickup_info') return '#5080D8';
             // "nach Hause" flow states (farewell, feedback) use blue
             if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) return '#6366f1';
             // Check for Schulhof check-in (special yellow)
-            if ((currentScan as { isSchulhof?: boolean }).isSchulhof) return '#F59E0B'; // Yellow for Schulhof
-            if ((currentScan as { isToilette?: boolean }).isToilette) return '#60A5FA'; // Blue for Toilette
+            if ((currentScan as { isSchulhof?: boolean } | null)?.isSchulhof) return '#F59E0B'; // Yellow for Schulhof
+            if ((currentScan as { isToilette?: boolean } | null)?.isToilette) return '#60A5FA'; // Blue for Toilette
             // Check for supervisor authentication
-            if (currentScan.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
+            if (currentScan?.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
             // Check for error or info states
-            if ((currentScan as { showAsError?: boolean }).showAsError) return '#ef4444'; // Red for errors
-            if ((currentScan as { isInfo?: boolean }).isInfo) return '#6366f1'; // Blue for info
+            if ((currentScan as { showAsError?: boolean } | null)?.showAsError) return '#ef4444'; // Red for errors
+            if ((currentScan as { isInfo?: boolean } | null)?.isInfo) return '#6366f1'; // Blue for info
             // Original logic for success states
-            return currentScan.action === 'checked_in' || currentScan.action === 'transferred'
+            return currentScan?.action === 'checked_in' || currentScan?.action === 'transferred'
               ? '#83cd2d'
               : '#f87C10';
           })()}
           timeout={modalTimeoutDuration}
           timeoutResetKey={
-            showFeedbackPrompt
-              ? `feedback-${checkoutDestinationState?.studentId}`
-              : `${currentScan.student_id}-${currentScan.action}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
+            isPickupQueryPromptOpen
+              ? `pickup-query-prompt-${rfid.scanContextId}`
+              : showFeedbackPrompt
+                ? `feedback-${checkoutDestinationState?.studentId}`
+                : `${currentScan?.student_id ?? 'none'}-${currentScan?.action ?? 'none'}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
           }
           closeOnContentClick={
+            !shouldKeepPickupQueryModalOpen &&
             !showFeedbackPrompt &&
             !(
-              currentScan.action === 'checked_out' &&
+              currentScan?.action === 'checked_out' &&
               checkoutDestinationState &&
               !checkoutDestinationState.showingFarewell
             )
           }
+          closeOnBackdropClick={!shouldKeepPickupQueryModalOpen}
         >
           {/* Background pattern for visual interest */}
           <div
@@ -1335,9 +1529,10 @@ const ActivityScanningPage: React.FC = () => {
           />
 
           {/* Icon container with background circle - hidden during checkout destination selection (but visible during feedback) */}
-          {(showFeedbackPrompt ||
+          {(isPickupQueryPromptOpen ||
+            showFeedbackPrompt ||
             !(
-              currentScan.action === 'checked_out' &&
+              currentScan?.action === 'checked_out' &&
               checkoutDestinationState &&
               !checkoutDestinationState.showingFarewell
             )) && (
@@ -1356,6 +1551,14 @@ const ActivityScanningPage: React.FC = () => {
               }}
             >
               {(() => {
+                if (isPickupQueryPromptOpen || currentScan?.action === 'pickup_info') {
+                  return (
+                    <FontAwesomeIcon
+                      icon={faClock}
+                      style={{ fontSize: '72px', color: '#FFFFFF' }}
+                    />
+                  );
+                }
                 // "nach Hause" flow - Home icon for farewell and feedback states
                 if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
                   return (
@@ -1374,7 +1577,7 @@ const ActivityScanningPage: React.FC = () => {
                   );
                 }
                 // Supervisor authentication icon
-                if (currentScan.action === 'supervisor_authenticated') {
+                if (currentScan?.action === 'supervisor_authenticated') {
                   return (
                     <svg
                       width="80"
@@ -1392,7 +1595,7 @@ const ActivityScanningPage: React.FC = () => {
                   );
                 }
                 // Error state - X icon
-                if ((currentScan as { showAsError?: boolean }).showAsError) {
+                if ((currentScan as { showAsError?: boolean } | null)?.showAsError) {
                   return (
                     <svg
                       width="80"
@@ -1410,7 +1613,7 @@ const ActivityScanningPage: React.FC = () => {
                   );
                 }
                 // Info state - Info icon
-                if ((currentScan as { isInfo?: boolean }).isInfo) {
+                if ((currentScan as { isInfo?: boolean } | null)?.isInfo) {
                   return (
                     <svg
                       width="80"
@@ -1428,8 +1631,8 @@ const ActivityScanningPage: React.FC = () => {
                   );
                 }
                 // Success states
-                return currentScan.action === 'checked_in' ||
-                  currentScan.action === 'transferred' ? (
+                return currentScan?.action === 'checked_in' ||
+                  currentScan?.action === 'transferred' ? (
                   <svg
                     width="80"
                     height="80"
@@ -1474,6 +1677,10 @@ const ActivityScanningPage: React.FC = () => {
             }}
           >
             {(() => {
+              if (isPickupQueryPromptOpen) {
+                return 'Abholzeit abfragen';
+              }
+
               // Feedback prompt
               if (showFeedbackPrompt) {
                 const firstName = checkoutDestinationState?.studentName?.split(' ')[0] ?? '';
@@ -1487,7 +1694,7 @@ const ActivityScanningPage: React.FC = () => {
               }
 
               // Supervisor authentication - prefer custom message (e.g., redirect hint)
-              if (currentScan.action === 'supervisor_authenticated') {
+              if (currentScan?.action === 'supervisor_authenticated') {
                 if (currentScan.message) return currentScan.message;
 
                 const roomName = selectedRoom?.name ?? 'diesen Raum';
@@ -1496,35 +1703,40 @@ const ActivityScanningPage: React.FC = () => {
 
               // Error/Info states use student_name as the title
               if (
-                (currentScan as { showAsError?: boolean }).showAsError ||
-                (currentScan as { isInfo?: boolean }).isInfo
+                (currentScan as { showAsError?: boolean } | null)?.showAsError ||
+                (currentScan as { isInfo?: boolean } | null)?.isInfo
               ) {
-                return currentScan.student_name;
+                return currentScan?.student_name ?? '';
+              }
+
+              if (currentScan?.action === 'pickup_info') {
+                const firstName = (currentScan?.student_name ?? '').split(' ')[0];
+                return `Abholzeit fuer ${firstName}`;
               }
 
               // Check-in: use backend message if available, otherwise default greeting
-              if (currentScan.action === 'checked_in') {
+              if (currentScan?.action === 'checked_in') {
                 return currentScan.message ?? `Hallo, ${currentScan.student_name}!`;
               }
 
               // Checkout with destination buttons: ask where the student is going
               if (
-                currentScan.action === 'checked_out' &&
+                currentScan?.action === 'checked_out' &&
                 checkoutDestinationState &&
                 !checkoutDestinationState.showingFarewell
               ) {
-                const firstName = currentScan.student_name.split(' ')[0];
+                const firstName = (currentScan?.student_name ?? '').split(' ')[0];
                 return `Wohin geht ${firstName}?`;
               }
 
               // Checkout after destination selected (e.g. Raumwechsel): confirmation
-              if (currentScan.action === 'checked_out') {
-                const firstName = currentScan.student_name.split(' ')[0];
+              if (currentScan?.action === 'checked_out') {
+                const firstName = (currentScan?.student_name ?? '').split(' ')[0];
                 return `${firstName} ist unterwegs`;
               }
 
               // Fallback: use backend message or student name
-              return currentScan.message ?? currentScan.student_name;
+              return currentScan?.message ?? currentScan?.student_name ?? '';
             })()}
           </h2>
 

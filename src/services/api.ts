@@ -123,6 +123,7 @@ const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
     'staff RFID authentication must be done via session management',
     'Betreuer-Armband kann hier nicht verwendet werden.',
   ],
+  ['student RFID tag required for pickup query', 'Bitte Schueler-Armband scannen.'],
   ['RFID parameter is required', 'RFID-Tag fehlt in der Anfrage.'],
 
   // 6. ATTENDANCE/VISIT ERRORS (404)
@@ -1210,6 +1211,32 @@ export const api = {
   },
 
   /**
+   * Query pickup info without mutating attendance
+   * Endpoint: POST /api/iot/pickup-query
+   */
+  async queryPickupInfo(
+    scanData: {
+      student_rfid: string;
+    },
+    pin: string
+  ): Promise<RfidScanResult> {
+    const response = await apiCall<{
+      data: RfidScanResult;
+      message: string;
+      status: string;
+    }>('/api/iot/pickup-query', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+      body: JSON.stringify(scanData),
+    });
+
+    return response.data;
+  },
+
+  /**
    * Update session activity to prevent timeout
    * Endpoint: POST /api/iot/session/activity
    */
@@ -1403,6 +1430,7 @@ export interface RfidScanResult {
     | 'checked_in'
     | 'checked_out'
     | 'transferred'
+    | 'pickup_info'
     | 'supervisor_authenticated'
     | 'error'
     | 'already_in';
@@ -1411,6 +1439,8 @@ export interface RfidScanResult {
   daily_checkout_available?: boolean;
   /** Today's scheduled pickup time in HH:MM format (e.g. "15:30") */
   pickup_time?: string;
+  /** Optional pickup note for the current day */
+  pickup_note?: string;
   visit_id?: number;
   room_name?: string;
   previous_room?: string;

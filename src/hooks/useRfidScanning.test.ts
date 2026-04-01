@@ -35,6 +35,7 @@ const mockAdapterInitializeNfc = vi.mocked(adapter.initializeNfc);
 vi.mock('../services/api', () => ({
   api: {
     processRfidScan: vi.fn(),
+    queryPickupInfo: vi.fn(),
     updateSessionActivity: vi.fn(),
     updateSessionSupervisors: vi.fn(),
   },
@@ -68,6 +69,7 @@ vi.mock('../utils/crypto', () => ({
 
 const mockedIsRfidEnabled = vi.mocked(isRfidEnabled);
 const mockedProcessRfidScan = vi.mocked(api.processRfidScan);
+const mockedQueryPickupInfo = vi.mocked(api.queryPickupInfo);
 const mockedUpdateSessionActivity = vi.mocked(api.updateSessionActivity);
 const mockedUpdateSessionSupervisors = vi.mocked(api.updateSessionSupervisors);
 
@@ -104,6 +106,8 @@ function resetStore() {
       showModal: false,
       scanTimeout: 3000,
       modalDisplayTime: 1500,
+      scanMode: 'checkin' as const,
+      scanContextId: 0,
       optimisticScans: [],
       studentHistory: new Map(),
       processingQueue: new Set(),
@@ -175,6 +179,16 @@ async function drainMicrotasks() {
   }
 }
 
+async function drainUntilProcessingQueueClears() {
+  const MAX_ROUNDS = 200;
+  for (let i = 0; i < MAX_ROUNDS; i++) {
+    await Promise.resolve();
+    if (useUserStore.getState().rfid.processingQueue.size === 0) {
+      return;
+    }
+  }
+}
+
 async function triggerMockScanAndDrain() {
   await act(async () => {
     // Fire the mock interval callback
@@ -233,6 +247,9 @@ describe('useRfidScanning', () => {
     mockAdapterStopScanning.mockResolvedValue(undefined);
     mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
     mockedProcessRfidScan.mockResolvedValue(makeCheckinResult());
+    mockedQueryPickupInfo.mockResolvedValue(
+      makeCheckinResult({ action: 'pickup_info', pickup_time: '15:30' })
+    );
     mockedUpdateSessionActivity.mockResolvedValue(undefined);
     mockedUpdateSessionSupervisors.mockResolvedValue({ supervisors: [] });
   });
@@ -1584,6 +1601,105 @@ describe('useRfidScanning', () => {
       // Callback should have been passed to adapter.startScanning
       expect(capturedOnScan).toBeDefined();
       expect(mockAdapterStartScanning).toHaveBeenCalledWith(expect.any(Function));
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // Pickup query mode
+  // ------------------------------------------------------------------
+
+  describe('pickup query mode', () => {
+    beforeEach(() => {
+      mockedIsRfidEnabled.mockReturnValue(true);
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+    });
+
+    it('routes scans to the pickup query endpoint and resets scanMode', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+      mockedQueryPickupInfo.mockResolvedValue(
+        makeCheckinResult({
+          action: 'pickup_info',
+          pickup_time: '15:30',
+          pickup_note: 'Mama holt ab',
+        })
+      );
+
+      const { result } = renderHook(() => useRfidScanning());
+      useUserStore.getState().startPickupQueryMode();
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+
+      expect(onScan).toBeDefined();
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 1 });
+        await drainMicrotasks();
+      });
+
+      expect(mockedQueryPickupInfo).toHaveBeenCalledWith({ student_rfid: MOCK_TAG }, '1234');
+      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
+
+      const state = useUserStore.getState();
+      expect(state.rfid.currentScan?.action).toBe('pickup_info');
+      expect(state.rfid.currentScan?.pickup_note).toBe('Mama holt ab');
+      expect(state.rfid.scanMode).toBe('checkin');
+      expect(state.rfid.showModal).toBe(true);
+    });
+
+    it('ignores stale pickup query results after scanMode reset', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      let resolveQuery: ((value: RfidScanResult) => void) | undefined;
+      mockedQueryPickupInfo.mockReturnValue(
+        new Promise(resolve => {
+          resolveQuery = resolve;
+        })
+      );
+
+      const { result } = renderHook(() => useRfidScanning());
+      useUserStore.getState().startPickupQueryMode();
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+
+      expect(onScan).toBeDefined();
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 2 });
+        await Promise.resolve();
+      });
+
+      useUserStore.getState().resetScanMode();
+
+      await act(async () => {
+        resolveQuery?.(
+          makeCheckinResult({
+            action: 'pickup_info',
+            pickup_time: '15:30',
+          })
+        );
+        await drainUntilProcessingQueueClears();
+      });
+
+      const state = useUserStore.getState();
+      expect(state.rfid.currentScan).toBeNull();
+      expect(state.rfid.showModal).toBe(false);
+      expect(state.rfid.scanMode).toBe('checkin');
     });
   });
 

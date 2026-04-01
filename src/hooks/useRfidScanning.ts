@@ -288,6 +288,7 @@ export const useRfidScanning = () => {
     addSupervisorFromRfid,
     addActiveSupervisorTag,
     isActiveSupervisor,
+    resetScanMode,
   } = useUserStore();
 
   const isInitializedRef = useRef<boolean>(false);
@@ -361,6 +362,7 @@ export const useRfidScanning = () => {
       const freshRoom = currentState.selectedRoom;
       const freshUser = currentState.authenticatedUser;
       const freshSession = currentState.currentSession;
+      const freshRfid = currentState.rfid;
 
       // Validate authentication state
       if (!freshUser?.pin || !freshRoom) {
@@ -368,6 +370,55 @@ export const useRfidScanning = () => {
         setScanResult(createSessionExpiredResult());
         showScanModal();
         return;
+      }
+
+      if (freshRfid.scanMode === 'pickupQuery') {
+        if (freshRfid.processingQueue.has(tagId)) {
+          logger.debug('Pickup query tag already processing, skipping', { tagId });
+          return;
+        }
+
+        addToProcessingQueue(tagId);
+        try {
+          const result = await api.queryPickupInfo({ student_rfid: tagId }, freshUser.pin);
+          const latestState = useUserStore.getState();
+          if (
+            latestState.rfid.scanMode !== 'pickupQuery' ||
+            latestState.rfid.scanContextId !== freshRfid.scanContextId
+          ) {
+            logger.debug('Discarding stale pickup query result', {
+              tagId,
+              scanContextId: freshRfid.scanContextId,
+            });
+            return;
+          }
+
+          setScanResult({ ...result, scannedTagId: tagId });
+          showScanModal();
+          resetScanMode();
+          return;
+        } catch (error) {
+          logger.error('Failed to query pickup info', { error: serializeError(error) });
+
+          const latestState = useUserStore.getState();
+          if (
+            latestState.rfid.scanMode !== 'pickupQuery' ||
+            latestState.rfid.scanContextId !== freshRfid.scanContextId
+          ) {
+            logger.debug('Discarding stale pickup query error', {
+              tagId,
+              scanContextId: freshRfid.scanContextId,
+            });
+            return;
+          }
+
+          setScanResult(createScanErrorResult(error));
+          showScanModal();
+          resetScanMode();
+          return;
+        } finally {
+          removeFromProcessingQueue(tagId);
+        }
       }
 
       // Fast path for already-authenticated supervisors
@@ -486,6 +537,7 @@ export const useRfidScanning = () => {
       addSupervisorFromRfid,
       addActiveSupervisorTag,
       isActiveSupervisor,
+      resetScanMode,
       showSupervisorRedirect,
     ]
   );

@@ -401,6 +401,8 @@ interface RecentTagScan {
   syncPromise?: Promise<void>; // Background sync promise (for race condition prevention)
 }
 
+type RfidScanMode = 'checkin' | 'pickupQuery';
+
 // Cache TTL for recentTagScans. This is NOT a dedup window — dedup is handled by
 // scanId (adapter-level) + processingQueue (Layer 1) + studentHistory (Layer 3).
 // recentTagScans only exists as a short-lived cache for result replay and syncPromise.
@@ -414,6 +416,8 @@ interface RfidState {
   scanTimeout: number; // 3 seconds default
   modalDisplayTime: number; // 1.5 seconds default
   showModal: boolean;
+  scanMode: RfidScanMode;
+  scanContextId: number;
 
   // New optimistic state management
   optimisticScans: OptimisticScanState[];
@@ -505,6 +509,8 @@ interface UserState {
   clearBlockedTag: (tagId: string) => void;
   showScanModal: () => void;
   hideScanModal: () => void;
+  startPickupQueryMode: () => void;
+  resetScanMode: () => void;
 
   // New optimistic RFID actions
   addOptimisticScan: (scan: OptimisticScanState) => void;
@@ -568,6 +574,8 @@ const RFID_SESSION_INITIAL_STATE = {
   studentHistory: new Map<string, StudentActionHistory>(),
   processingQueue: new Set<string>(),
   optimisticScans: [] as OptimisticScanState[],
+  scanMode: 'checkin' as RfidScanMode,
+  scanContextId: 0,
 };
 
 // Generate a unique id for new activities using unbiased secure randomness
@@ -613,6 +621,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     scanTimeout: 3000, // 3 seconds
     modalDisplayTime: 1500, // 1.5 seconds - fast turnover for kiosk queues
     showModal: false,
+    scanMode: 'checkin' as RfidScanMode,
+    scanContextId: 0,
 
     // New optimistic state
     optimisticScans: [],
@@ -1379,6 +1389,26 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   hideScanModal: () => {
     set(state => ({
       rfid: { ...state.rfid, showModal: false, currentScan: null },
+    }));
+  },
+
+  startPickupQueryMode: () => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        scanMode: 'pickupQuery' as RfidScanMode,
+        scanContextId: state.rfid.scanContextId + 1,
+      },
+    }));
+  },
+
+  resetScanMode: () => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        scanMode: 'checkin' as RfidScanMode,
+        scanContextId: state.rfid.scanContextId + 1,
+      },
     }));
   },
 

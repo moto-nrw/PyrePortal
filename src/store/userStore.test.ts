@@ -77,6 +77,8 @@ function resetStore() {
       showModal: false,
       scanTimeout: 3000,
       modalDisplayTime: 1500,
+      scanMode: 'checkin' as const,
+      scanContextId: 0,
       optimisticScans: [],
       studentHistory: new Map(),
       processingQueue: new Set(),
