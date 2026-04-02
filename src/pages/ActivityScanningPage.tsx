@@ -624,7 +624,7 @@ const ActivityScanningPage: React.FC = () => {
     const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
 
     if (isPickupQueryLoading) {
-      logger.warn('Pickup query loading timed out, resetting modal state', {
+      logger.warn('Pickup query loading timed out, showing timeout error before reset', {
         tagId: rfid.pickupQueryTagId,
         scanContextId: rfid.scanContextId,
       });
@@ -634,7 +634,6 @@ const ActivityScanningPage: React.FC = () => {
       }
 
       setIsAwaitingPickupQueryScan(false);
-      resetScanMode();
       setScanResult(createPickupQueryTimeoutResult());
       showScanModal();
       return;

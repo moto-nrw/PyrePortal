@@ -276,8 +276,8 @@ describe('ActivityScanningPage', () => {
 
     await waitFor(() => {
       const { rfid } = useUserStore.getState();
-      expect(rfid.scanMode).toBe('checkin');
-      expect(rfid.scanContextId).toBeGreaterThan(initialScanContextId);
+      expect(rfid.scanMode).toBe('pickupQuery');
+      expect(rfid.scanContextId).toBe(initialScanContextId);
       expect(rfid.processingQueue.size).toBe(0);
       expect(rfid.currentScan).toMatchObject({
         action: 'error',
@@ -304,6 +304,7 @@ describe('ActivityScanningPage', () => {
 
     await waitFor(() => {
       expect(useUserStore.getState().rfid.scanMode).toBe('checkin');
+      expect(useUserStore.getState().rfid.scanContextId).toBeGreaterThan(initialScanContextId);
     });
   });
 
