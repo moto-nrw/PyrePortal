@@ -307,6 +307,45 @@ describe('ActivityScanningPage', () => {
     });
   });
 
+  it('keeps the pickup query loading modal in the pickup visual state', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+
+    await act(async () => {
+      useUserStore.setState({
+        rfid: {
+          ...useUserStore.getState().rfid,
+          scanMode: 'pickupQuery',
+          processingQueue: new Set(['04:AA:BB:CC:DD:EE:FF']),
+        },
+      });
+
+      mockRfidHookReturn = {
+        ...mockRfidHookReturn,
+        showModal: true,
+        currentScan: null,
+      };
+
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+    });
+
+    expect(screen.getByRole('heading', { name: 'Abholzeit abfragen' })).toBeInTheDocument();
+    expect(screen.getByText('Abholzeit wird geladen...')).toBeInTheDocument();
+
+    const dialog = document.querySelector('dialog');
+    const modalContainer = dialog?.firstElementChild;
+    const clockIcon = dialog?.querySelector('svg[data-icon=\"clock\"]');
+
+    expect(modalContainer).toHaveStyle('background-color: #5080D8');
+    expect(clockIcon).not.toBeNull();
+  });
+
   it('prevents Escape from canceling the pickup query prompt', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const view = renderPage();

@@ -414,6 +414,7 @@ export const useRfidScanning = () => {
           const { active_students: _ignoredActiveStudents, ...pickupResult } = result;
           setScanResult({ ...pickupResult, scannedTagId: tagId });
           showScanModal();
+          removeFromProcessingQueue(tagId);
 
           try {
             await api.updateSessionActivity(freshUser.pin);

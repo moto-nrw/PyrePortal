@@ -1343,6 +1343,9 @@ const ActivityScanningPage: React.FC = () => {
   const shouldKeepPickupQueryModalOpen = isAwaitingPickupQueryScan || isPickupQueryLoading;
   const isPickupQueryPromptOpen =
     shouldShowCheckModal && isAwaitingPickupQueryScan && !isPickupQueryLoading && !currentScan;
+  const isPickupQueryVisualState =
+    isPickupQueryPromptOpen || isPickupQueryLoading || currentScan?.action === 'pickup_info';
+  const isPickupQueryHeadingState = isPickupQueryPromptOpen || isPickupQueryLoading;
   const pickupQueryButtonDisabled = showModal || rfid.processingQueue.size > 0;
 
   return (
@@ -1533,7 +1536,7 @@ const ActivityScanningPage: React.FC = () => {
               : 'lg'
           }
           backgroundColor={(() => {
-            if (isPickupQueryPromptOpen || currentScan?.action === 'pickup_info') return '#5080D8';
+            if (isPickupQueryVisualState) return '#5080D8';
             // "nach Hause" flow states (farewell, feedback) use blue
             if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) return '#6366f1';
             // Check for Schulhof check-in (special yellow)
@@ -1606,7 +1609,7 @@ const ActivityScanningPage: React.FC = () => {
               }}
             >
               {(() => {
-                if (isPickupQueryPromptOpen || currentScan?.action === 'pickup_info') {
+                if (isPickupQueryVisualState) {
                   return (
                     <FontAwesomeIcon
                       icon={faClock}
@@ -1732,7 +1735,7 @@ const ActivityScanningPage: React.FC = () => {
             }}
           >
             {(() => {
-              if (isPickupQueryPromptOpen) {
+              if (isPickupQueryHeadingState) {
                 return 'Abholzeit abfragen';
               }
 

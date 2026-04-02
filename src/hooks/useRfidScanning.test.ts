@@ -1728,6 +1728,69 @@ describe('useRfidScanning', () => {
       expect(state.rfid.currentScan?.action).toBe('pickup_info');
     });
 
+    it('releases the pickup query tag before waiting for keepalive to finish', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      let resolveKeepalive: (() => void) | undefined;
+      mockedQueryPickupInfo.mockResolvedValue(
+        makeCheckinResult({
+          action: 'pickup_info',
+          pickup_time: '15:30',
+        })
+      );
+      mockedUpdateSessionActivity
+        .mockImplementationOnce(
+          () =>
+            new Promise<void>(resolve => {
+              resolveKeepalive = resolve;
+            })
+        )
+        .mockResolvedValue(undefined);
+      mockedProcessRfidScan.mockResolvedValue(makeCheckinResult());
+
+      const { result } = renderHook(() => useRfidScanning());
+      useUserStore.getState().startPickupQueryMode();
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+
+      expect(onScan).toBeDefined();
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 13 });
+        await Promise.resolve();
+      });
+
+      const pickupState = useUserStore.getState().rfid;
+      expect(pickupState.currentScan?.action).toBe('pickup_info');
+      expect(pickupState.processingQueue.size).toBe(0);
+
+      useUserStore.getState().resetScanMode();
+      useUserStore.getState().hideScanModal();
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 14 });
+        await drainMicrotasks();
+      });
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledWith(
+        { student_rfid: MOCK_TAG, action: 'checkin', room_id: 10 },
+        '1234'
+      );
+
+      await act(async () => {
+        resolveKeepalive?.();
+        await Promise.resolve();
+      });
+    });
+
     it('ignores additional tags while a pickup query is already in flight', async () => {
       setAuthenticated();
       setRoom();
