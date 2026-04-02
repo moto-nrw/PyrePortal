@@ -634,6 +634,7 @@ const ActivityScanningPage: React.FC = () => {
       }
 
       setIsAwaitingPickupQueryScan(false);
+      resetScanMode();
       setScanResult(createPickupQueryTimeoutResult());
       showScanModal();
       return;

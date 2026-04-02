@@ -237,6 +237,7 @@ describe('ActivityScanningPage', () => {
     const view = renderPage();
 
     await user.click(screen.getByLabelText('Abholzeit abfragen'));
+    const initialScanContextId = useUserStore.getState().rfid.scanContextId;
 
     useUserStore.setState({
       rfid: {
@@ -275,7 +276,8 @@ describe('ActivityScanningPage', () => {
 
     await waitFor(() => {
       const { rfid } = useUserStore.getState();
-      expect(rfid.scanMode).toBe('pickupQuery');
+      expect(rfid.scanMode).toBe('checkin');
+      expect(rfid.scanContextId).toBeGreaterThan(initialScanContextId);
       expect(rfid.processingQueue.size).toBe(0);
       expect(rfid.currentScan).toMatchObject({
         action: 'error',
