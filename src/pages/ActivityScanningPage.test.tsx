@@ -275,12 +275,33 @@ describe('ActivityScanningPage', () => {
 
     await waitFor(() => {
       const { rfid } = useUserStore.getState();
-      expect(rfid.scanMode).toBe('checkin');
+      expect(rfid.scanMode).toBe('pickupQuery');
       expect(rfid.processingQueue.size).toBe(0);
       expect(rfid.currentScan).toMatchObject({
         action: 'error',
         showAsError: true,
       });
+    });
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: useUserStore.getState().rfid.currentScan,
+      showModal: true,
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(1600);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(useUserStore.getState().rfid.scanMode).toBe('checkin');
     });
   });
 

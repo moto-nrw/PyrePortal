@@ -1647,6 +1647,7 @@ describe('useRfidScanning', () => {
 
       expect(mockedQueryPickupInfo).toHaveBeenCalledWith({ student_rfid: MOCK_TAG }, '1234');
       expect(mockedProcessRfidScan).not.toHaveBeenCalled();
+      expect(mockedUpdateSessionActivity).toHaveBeenCalledWith('1234');
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.action).toBe('pickup_info');
@@ -1654,6 +1655,77 @@ describe('useRfidScanning', () => {
       expect(state.rfid.scanMode).toBe('pickupQuery');
       expect(state.rfid.pickupQueryTagId).toBe(MOCK_TAG);
       expect(state.rfid.showModal).toBe(true);
+    });
+
+    it('drops authoritative room counts from pickup query results', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+      mockedQueryPickupInfo.mockResolvedValue(
+        makeCheckinResult({
+          action: 'pickup_info',
+          pickup_time: '15:30',
+          active_students: 99,
+        })
+      );
+
+      const { result } = renderHook(() => useRfidScanning());
+      useUserStore.getState().startPickupQueryMode();
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+
+      expect(onScan).toBeDefined();
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 3 });
+        await drainMicrotasks();
+      });
+
+      const state = useUserStore.getState();
+      expect(state.rfid.currentScan?.action).toBe('pickup_info');
+      expect(state.rfid.currentScan?.active_students).toBeUndefined();
+    });
+
+    it('keeps the pickup result visible when pickup-query keepalive fails', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+      mockedQueryPickupInfo.mockResolvedValue(
+        makeCheckinResult({
+          action: 'pickup_info',
+          pickup_time: '15:30',
+        })
+      );
+      mockedUpdateSessionActivity.mockRejectedValue(new Error('Activity update failed'));
+
+      const { result } = renderHook(() => useRfidScanning());
+      useUserStore.getState().startPickupQueryMode();
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+
+      expect(onScan).toBeDefined();
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 4 });
+        await drainMicrotasks();
+      });
+
+      const state = useUserStore.getState();
+      expect(mockedUpdateSessionActivity).toHaveBeenCalledWith('1234');
+      expect(state.rfid.showModal).toBe(true);
+      expect(state.rfid.currentScan?.action).toBe('pickup_info');
     });
 
     it('ignores additional tags while a pickup query is already in flight', async () => {

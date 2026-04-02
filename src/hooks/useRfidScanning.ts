@@ -411,8 +411,19 @@ export const useRfidScanning = () => {
             return;
           }
 
-          setScanResult({ ...result, scannedTagId: tagId });
+          const { active_students: _ignoredActiveStudents, ...pickupResult } = result;
+          setScanResult({ ...pickupResult, scannedTagId: tagId });
           showScanModal();
+
+          try {
+            await api.updateSessionActivity(freshUser.pin);
+            logger.debug('Session activity updated after pickup query');
+          } catch (activityError) {
+            logger.warn('Failed to update session activity after pickup query', {
+              error: activityError,
+            });
+          }
+
           return;
         } catch (error) {
           logger.error('Failed to query pickup info', { error: serializeError(error) });

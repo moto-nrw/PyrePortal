@@ -634,11 +634,6 @@ const ActivityScanningPage: React.FC = () => {
       }
 
       setIsAwaitingPickupQueryScan(false);
-
-      if (rfid.scanMode === 'pickupQuery') {
-        resetScanMode();
-      }
-
       setScanResult(createPickupQueryTimeoutResult());
       showScanModal();
       return;
