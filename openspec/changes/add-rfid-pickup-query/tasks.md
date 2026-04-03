@@ -1,4 +1,0 @@
-- [x] Add RFID scan-mode state and actions for pickup queries
-- [x] Add frontend API support for the read-only pickup query endpoint
-- [x] Add the pickup query prompt and result handling to the activity scanning page
-- [x] Add or update tests for scan-mode routing and pickup query UI states
