@@ -87,7 +87,11 @@
     ],
     "ignoreDependencies": [
       "@tauri-apps/plugin-opener",
-      "@moto-nrw/design-system"
+      "@moto-nrw/design-system",
+      "lint-staged"
+    ],
+    "ignoreBinaries": [
+      "lefthook"
     ]
   }
 }
