@@ -22,7 +22,7 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "knip": "knip",
-    "screenshots": "pnpm playwright test --config playwright.config.ts",
+    "screenshots": "playwright test --config playwright.config.ts",
     "prepare": "lefthook install || true"
   },
   "dependencies": {
