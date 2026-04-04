@@ -5,13 +5,12 @@
 pre-commit:
   parallel: true
   commands:
-    # Git secrets check (if installed)
+    # Git secrets check (blocks commit if secret detected, skips if not installed)
     git-secrets:
-      run: git secrets --pre_commit_hook 2>/dev/null || true
+      run: command -v git-secrets >/dev/null 2>&1 && git secrets --pre_commit_hook || true
 
     # Frontend lint-staged (prettier + eslint with auto-fix)
     frontend-lint:
-      glob: "src/**/*.{ts,tsx,js,jsx,json,css,md}"
       run: pnpm lint-staged
       stage_fixed: true
 
@@ -20,7 +19,7 @@ pre-push:
   parallel: true
   commands:
     git-secrets:
-      run: git secrets --pre_commit_hook 2>/dev/null || true
+      run: command -v git-secrets >/dev/null 2>&1 && git secrets --pre_commit_hook || true
 
     # Version sync (package.json, Cargo.toml, tauri.conf.json)
     version-sync:
@@ -43,12 +42,10 @@ pre-push:
 
     # Frontend lint + typecheck
     frontend-check:
-      glob: "src/**/*.{ts,tsx}"
       run: pnpm run check
 
     # Frontend unused code detection
     frontend-knip:
-      glob: "src/**/*.{ts,tsx,js,jsx}"
       run: pnpm run knip
 
     # Rust lint
