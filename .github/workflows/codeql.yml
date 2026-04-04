@@ -43,13 +43,15 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: "lts/*"
-          cache: "npm"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build frontend
-        run: npm run build
+        run: pnpm run build
         env:
           # Prevent build failures from stopping analysis
           CI: true

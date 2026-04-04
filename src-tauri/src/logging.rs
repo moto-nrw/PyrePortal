@@ -25,7 +25,7 @@ fn write_log_to_dir(log_dir: &std::path::Path, entry: &str) -> Result<(), String
     let log_entry = serde_json::from_str::<LogEntry>(entry)
         .map_err(|e| format!("Failed to parse log entry: {e}"))?;
 
-    // Print frontend log to terminal (visible in `npm run tauri dev` and production binary)
+    // Print frontend log to terminal (visible in `pnpm run tauri dev` and production binary)
     let data_suffix = log_entry
         .data
         .as_ref()

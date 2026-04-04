@@ -1,4 +1,18 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "cleanupPeriodDays": 30,
+  "env": {
+    "MAX_MCP_OUTPUT_TOKENS": "100000",
+    "CLAUDE_CODE_MAX_READ_LINES": "50000",
+    "CLAUDE_CODE_MAX_OUTPUT_CHARS": "100000",
+    "MAX_THINKING_TOKENS": "10000",
+    "USE_BUILTIN_RIPGREP": "1",
+    "BASH_DEFAULT_TIMEOUT_MS": "120000",
+    "BASH_MAX_OUTPUT_LENGTH": "50000"
+  },
+  "includeCoAuthoredBy": false,
+  "enableAllProjectMcpServers": true,
+  "alwaysThinkingEnabled": true,
   "permissions": {
     "allow": [
       "Bash(cd:*)",
@@ -94,8 +108,46 @@
       "WebSearch",
       "WebFetch"
     ],
-    "deny": [],
-    "ask": []
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf /home)",
+      "Bash(dd:*)",
+      "Bash(mkfs:*)",
+      "Bash(fdisk:*)",
+      "Bash(shutdown:*)",
+      "Bash(reboot:*)",
+      "Bash(mv / *)",
+      "Bash(chmod -R 000 /)",
+      "Bash(chown -R root:root /)",
+      "Bash(:{ :|: & };::*)",
+      "Bash(> /dev/sda)",
+      "Bash(sudo:*)",
+      "Bash(su:*)",
+      "Bash(passwd:*)",
+      "Bash(chroot:*)",
+      "Bash(kill -9 -1)",
+      "Bash(killall:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin --delete:*)",
+      "Bash(git push --delete:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git clean -fd:*)",
+      "Bash(git branch -D:*)",
+      "Bash(git tag -d:*)",
+      "Bash(git rebase -i:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(rm -rf :*)",
+      "Bash(rm -r .:*)",
+      "Bash(rm -rf .:*)",
+      "Bash(chmod -R 000:*)",
+      "Bash(find :* -delete::*)",
+      "Bash(curl :* | sh::*)",
+      "Bash(wget :* | sh::*)",
+      "Bash(nc -l:*)",
+      "Bash(netcat -l:*)"
+    ]
   },
   "hooks": {
     "PostToolUse": [
@@ -104,11 +156,32 @@
         "hooks": [
           {
             "type": "command",
-            "command": ".claude/hooks/format-typescript.sh"
+            "command": "bash .claude/hooks/format-typescript.sh"
           },
           {
             "type": "command",
-            "command": ".claude/hooks/lint-fix.sh"
+            "command": "bash .claude/hooks/lint-fix.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash(git commit:*)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/check-commit-message.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'root=$(git rev-parse --show-toplevel 2>/dev/null) && bash \"$root/.claude/hooks/skill-reminder.sh\"'"
           }
         ]
       }
