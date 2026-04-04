@@ -123,7 +123,7 @@ const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
     'staff RFID authentication must be done via session management',
     'Betreuer-Armband kann hier nicht verwendet werden.',
   ],
-  ['student RFID tag required for pickup query', 'Bitte Schueler-Armband scannen.'],
+  ['student RFID tag required for pickup query', 'Bitte Schüler-Armband scannen.'],
   ['RFID parameter is required', 'RFID-Tag fehlt in der Anfrage.'],
 
   // 6. ATTENDANCE/VISIT ERRORS (404)

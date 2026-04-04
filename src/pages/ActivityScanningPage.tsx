@@ -1001,7 +1001,7 @@ const ActivityScanningPage: React.FC = () => {
             textAlign: 'center',
           }}
         >
-          Bitte halte dein Armband an das Lesegeraet.
+          Bitte halte dein Armband an das Lesegerät.
         </div>
       );
     }
@@ -1308,7 +1308,7 @@ const ActivityScanningPage: React.FC = () => {
                     </div>
                   ) : (
                     <div style={{ textAlign: 'center' }}>
-                      Fuer heute ist keine Abholzeit hinterlegt.
+                      Für heute ist keine Abholzeit hinterlegt.
                     </div>
                   )}
                   {currentScan.pickup_note && (
@@ -1768,7 +1768,7 @@ const ActivityScanningPage: React.FC = () => {
 
               if (currentScan?.action === 'pickup_info') {
                 const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return `Abholzeit fuer ${firstName}`;
+                return `Abholzeit für ${firstName}`;
               }
 
               // Check-in: use backend message if available, otherwise default greeting

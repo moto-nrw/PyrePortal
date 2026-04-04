@@ -229,7 +229,7 @@ describe('ActivityScanningPage', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Bitte halte dein Armband an das Lesegeraet.')).toBeInTheDocument();
+    expect(screen.getByText('Bitte halte dein Armband an das Lesegerät.')).toBeInTheDocument();
   });
 
   it('times out a stalled pickup query load and resets the kiosk state', async () => {
@@ -487,16 +487,16 @@ describe('ActivityScanningPage', () => {
         student_name: 'Max Mustermann',
         action: 'pickup_info',
         pickup_time: '15:30',
-        pickup_note: 'Mama holt heute frueher ab',
+        pickup_note: 'Mama holt heute früher ab',
       },
       showModal: true,
     };
 
     renderPage();
 
-    expect(screen.getByText('Abholzeit fuer Max')).toBeInTheDocument();
+    expect(screen.getByText('Abholzeit für Max')).toBeInTheDocument();
     expect(screen.getByText('15:30 Uhr')).toBeInTheDocument();
-    expect(screen.getByText('Mama holt heute frueher ab')).toBeInTheDocument();
+    expect(screen.getByText('Mama holt heute früher ab')).toBeInTheDocument();
   });
 
   it('keeps pickup query mode active until the pickup result modal times out', async () => {
@@ -550,7 +550,7 @@ describe('ActivityScanningPage', () => {
 
     renderPage();
 
-    expect(screen.getByText('Fuer heute ist keine Abholzeit hinterlegt.')).toBeInTheDocument();
+    expect(screen.getByText('Für heute ist keine Abholzeit hinterlegt.')).toBeInTheDocument();
   });
 
   // =======================================================================
