@@ -279,6 +279,7 @@ export const useRfidScanning = () => {
     updateStudentHistory,
     addToProcessingQueue,
     removeFromProcessingQueue,
+    lockPickupQueryTag,
     // Enhanced duplicate prevention
     canProcessTag,
     recordTagScan,
@@ -361,6 +362,7 @@ export const useRfidScanning = () => {
       const freshRoom = currentState.selectedRoom;
       const freshUser = currentState.authenticatedUser;
       const freshSession = currentState.currentSession;
+      const freshRfid = currentState.rfid;
 
       // Validate authentication state
       if (!freshUser?.pin || !freshRoom) {
@@ -368,6 +370,83 @@ export const useRfidScanning = () => {
         setScanResult(createSessionExpiredResult());
         showScanModal();
         return;
+      }
+
+      if (freshRfid.scanMode === 'pickupQuery') {
+        if (freshRfid.pickupQueryTagId && freshRfid.pickupQueryTagId !== tagId) {
+          logger.debug('Pickup query already locked to another tag, skipping scan', {
+            requestedTagId: tagId,
+            lockedTagId: freshRfid.pickupQueryTagId,
+            scanContextId: freshRfid.scanContextId,
+          });
+          return;
+        }
+
+        if (freshRfid.pickupQueryTagId === tagId) {
+          logger.debug('Pickup query already completed or in progress for this tag, skipping', {
+            tagId,
+            scanContextId: freshRfid.scanContextId,
+          });
+          return;
+        }
+
+        if (freshRfid.processingQueue.has(tagId)) {
+          logger.debug('Pickup query tag already processing, skipping', { tagId });
+          return;
+        }
+
+        lockPickupQueryTag(tagId);
+        addToProcessingQueue(tagId);
+        try {
+          const result = await api.queryPickupInfo({ student_rfid: tagId }, freshUser.pin);
+          const latestState = useUserStore.getState();
+          if (
+            latestState.rfid.scanMode !== 'pickupQuery' ||
+            latestState.rfid.scanContextId !== freshRfid.scanContextId
+          ) {
+            logger.debug('Discarding stale pickup query result', {
+              tagId,
+              scanContextId: freshRfid.scanContextId,
+            });
+            return;
+          }
+
+          const { active_students: _ignoredActiveStudents, ...pickupResult } = result;
+          setScanResult({ ...pickupResult, scannedTagId: tagId });
+          showScanModal();
+          removeFromProcessingQueue(tagId);
+
+          try {
+            await api.updateSessionActivity(freshUser.pin);
+            logger.debug('Session activity updated after pickup query');
+          } catch (activityError) {
+            logger.warn('Failed to update session activity after pickup query', {
+              error: activityError,
+            });
+          }
+
+          return;
+        } catch (error) {
+          logger.error('Failed to query pickup info', { error: serializeError(error) });
+
+          const latestState = useUserStore.getState();
+          if (
+            latestState.rfid.scanMode !== 'pickupQuery' ||
+            latestState.rfid.scanContextId !== freshRfid.scanContextId
+          ) {
+            logger.debug('Discarding stale pickup query error', {
+              tagId,
+              scanContextId: freshRfid.scanContextId,
+            });
+            return;
+          }
+
+          setScanResult(createScanErrorResult(error));
+          showScanModal();
+          return;
+        } finally {
+          removeFromProcessingQueue(tagId);
+        }
       }
 
       // Fast path for already-authenticated supervisors
@@ -480,6 +559,7 @@ export const useRfidScanning = () => {
       updateStudentHistory,
       addToProcessingQueue,
       removeFromProcessingQueue,
+      lockPickupQueryTag,
       canProcessTag,
       recordTagScan,
       mapTagToStudent,

@@ -38,6 +38,7 @@ vi.mock('../services/api', async () => {
       getCurrentSessionInfo: vi.fn().mockResolvedValue(null),
       getRooms: vi.fn().mockResolvedValue([]),
       processRfidScan: vi.fn().mockResolvedValue({}),
+      queryPickupInfo: vi.fn().mockResolvedValue({}),
       toggleAttendance: vi.fn().mockResolvedValue({}),
     },
   };
@@ -52,6 +53,9 @@ const defaultRfidState = {
   showModal: false,
   scanTimeout: 3000,
   modalDisplayTime: 1500,
+  scanMode: 'checkin' as const,
+  scanContextId: 0,
+  pickupQueryTagId: null,
   processingQueue: new Set<string>(),
   recentTagScans: new Map(),
   tagToStudentMap: new Map(),
@@ -205,6 +209,188 @@ describe('ActivityScanningPage', () => {
     expect(screen.getByText('Nachmittagsbetreuung')).toBeInTheDocument();
   });
 
+  it('starts pickup query mode when the clock button is pressed', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      showModal: true,
+      currentScan: null,
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Bitte halte dein Armband an das Lesegerät.')).toBeInTheDocument();
+  });
+
+  it('times out a stalled pickup query load and resets the kiosk state', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+    const initialScanContextId = useUserStore.getState().rfid.scanContextId;
+
+    useUserStore.setState({
+      rfid: {
+        ...useUserStore.getState().rfid,
+        scanMode: 'pickupQuery',
+        pickupQueryTagId: '04:AA:BB:CC:DD:EE:FF',
+        processingQueue: new Set(['04:AA:BB:CC:DD:EE:FF']),
+      },
+    });
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      showModal: true,
+      currentScan: null,
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Abholzeit wird geladen...')).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(2500);
+    });
+
+    expect(screen.getByText('Abholzeit wird geladen...')).toBeInTheDocument();
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
+
+    await act(async () => {
+      vi.advanceTimersByTime(600);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      const { rfid } = useUserStore.getState();
+      expect(rfid.scanMode).toBe('pickupQuery');
+      expect(rfid.scanContextId).toBe(initialScanContextId);
+      expect(rfid.processingQueue.size).toBe(0);
+      expect(rfid.currentScan).toMatchObject({
+        action: 'error',
+        showAsError: true,
+      });
+    });
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: useUserStore.getState().rfid.currentScan,
+      showModal: true,
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(1600);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(useUserStore.getState().rfid.scanMode).toBe('checkin');
+      expect(useUserStore.getState().rfid.scanContextId).toBeGreaterThan(initialScanContextId);
+    });
+  });
+
+  it('keeps the pickup query loading modal in the pickup visual state', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+
+    await act(async () => {
+      useUserStore.setState({
+        rfid: {
+          ...useUserStore.getState().rfid,
+          scanMode: 'pickupQuery',
+          processingQueue: new Set(['04:AA:BB:CC:DD:EE:FF']),
+        },
+      });
+
+      mockRfidHookReturn = {
+        ...mockRfidHookReturn,
+        showModal: true,
+        currentScan: null,
+      };
+
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+    });
+
+    expect(screen.getByRole('heading', { name: 'Abholzeit abfragen' })).toBeInTheDocument();
+    expect(screen.getByText('Abholzeit wird geladen...')).toBeInTheDocument();
+
+    const dialog = document.querySelector('dialog');
+    const modalContainer = dialog?.firstElementChild;
+    const clockIcon = dialog?.querySelector('svg[data-icon=\"clock\"]');
+
+    expect(modalContainer).toHaveStyle('background-color: #5080D8');
+    expect(clockIcon).not.toBeNull();
+  });
+
+  it('prevents Escape from canceling the pickup query prompt', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      showModal: true,
+      currentScan: null,
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+
+    const dialog = document.querySelector('dialog');
+    expect(dialog).toBeInTheDocument();
+
+    const cancelEvent = new Event('cancel', { cancelable: true });
+    const dispatchResult = dialog?.dispatchEvent(cancelEvent);
+
+    expect(dispatchResult).toBe(false);
+    expect(cancelEvent.defaultPrevented).toBe(true);
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
+  });
+
+  it('resets pickup query store state on unmount', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
+    expect(useUserStore.getState().rfid.showModal).toBe(true);
+
+    view.unmount();
+
+    expect(useUserStore.getState().rfid.scanMode).toBe('checkin');
+    expect(useUserStore.getState().rfid.showModal).toBe(false);
+  });
+
   // =======================================================================
   // Fallback navigation
   // =======================================================================
@@ -291,6 +477,80 @@ describe('ActivityScanningPage', () => {
     };
     renderPage();
     expect(screen.getByText('Du bist jetzt in diesem Raum')).toBeInTheDocument();
+  });
+
+  it('shows pickup query results with time and note', () => {
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Max Mustermann',
+        action: 'pickup_info',
+        pickup_time: '15:30',
+        pickup_note: 'Mama holt heute früher ab',
+      },
+      showModal: true,
+    };
+
+    renderPage();
+
+    expect(screen.getByText('Abholzeit für Max')).toBeInTheDocument();
+    expect(screen.getByText('15:30 Uhr')).toBeInTheDocument();
+    expect(screen.getByText('Mama holt heute früher ab')).toBeInTheDocument();
+  });
+
+  it('keeps pickup query mode active until the pickup result modal times out', async () => {
+    useUserStore.setState({
+      rfid: {
+        ...defaultRfidState,
+        showModal: true,
+        scanMode: 'pickupQuery',
+        pickupQueryTagId: '04:AA:BB:CC:DD:EE:FF',
+      },
+    });
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Max Mustermann',
+        action: 'pickup_info',
+        pickup_time: '15:30',
+      },
+      showModal: true,
+    };
+
+    renderPage();
+
+    await act(async () => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
+
+    await act(async () => {
+      vi.advanceTimersByTime(3200);
+    });
+
+    await waitFor(() => {
+      expect(useUserStore.getState().rfid.scanMode).toBe('checkin');
+    });
+  });
+
+  it('shows pickup query fallback when no pickup time exists', () => {
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Max Mustermann',
+        action: 'pickup_info',
+      },
+      showModal: true,
+    };
+
+    renderPage();
+
+    expect(screen.getByText('Für heute ist keine Abholzeit hinterlegt.')).toBeInTheDocument();
   });
 
   // =======================================================================

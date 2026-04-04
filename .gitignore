@@ -39,10 +39,6 @@ coverage/
 # SonarQube
 .scannerwork/
 
-# OpenSpec (local-only)
-openspec/changes/archive/
-openspec/specs/
-
 # Git worktrees
 .worktrees/
 
