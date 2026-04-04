@@ -35,13 +35,13 @@ When releasing e.g. `v1.0.7`:
 ## Release Steps
 
 1. **Bump version and push** (Mac) — update 3 files, commit, push to `development`
-2. **Build on Pi** — `ssh`, `git pull`, `npm install`, `npm run tauri build -- --features rfid`
+2. **Build on Pi** — `ssh`, `git pull`, `pnpm install`, `pnpm run tauri build -- --features rfid`
 3. **Download binary** (Mac) — `scp` from Pi to `~/Desktop/pyreportal-arm64-vX.Y.Z`
 4. **Create GitHub release** (Mac) — `gh release create vX.Y.Z ...` with binary attached
 5. **Verify Balena update** — Balena pulls new binary on next container start
 
 ## Rules
 
-- **Never** use `cargo build` alone for releases. Always `npm run tauri build` (bundles Frontend + Backend).
+- **Never** use `cargo build` alone for releases. Always `pnpm run tauri build` (bundles Frontend + Backend).
 - **Never** commit secrets, API keys, `.env` files, PINs, or credentials. This repo is public.
 - The version is baked into the binary at compile time and displayed on the Landing Page. If you skip the version bump, the app shows the wrong version.

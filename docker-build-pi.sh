@@ -67,9 +67,9 @@ docker run --rm -v $(pwd):/app -w /app ubuntu:22.04 bash -c "
   export PKG_CONFIG_LIBDIR=/usr/lib/arm-linux-gnueabihf/pkgconfig
   
   # Install dependencies and build
-  npm install
+  pnpm install
   source /root/.cargo/env
-  npm run tauri build -- --target armv7-unknown-linux-gnueabihf
+  pnpm run tauri build -- --target armv7-unknown-linux-gnueabihf
 "
 
 echo "Build complete!"

@@ -13,13 +13,13 @@ jobs:
         uses: ./.github/actions/setup-tauri-environment
       
       - name: Lint frontend code
-        run: npm run lint
+        run: pnpm run lint
       
       - name: Type check frontend code
-        run: npm run typecheck
+        run: pnpm run typecheck
         
       - name: Check formatting
-        run: npm run format:check
+        run: pnpm run format:check
 
       - name: Check for dead code
-        run: npm run knip
+        run: pnpm run knip

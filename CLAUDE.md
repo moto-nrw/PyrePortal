@@ -25,15 +25,15 @@ PyrePortal is a **Raspberry Pi kiosk application** for German after-school care 
 
 ```bash
 # Development
-npm run tauri dev       # Full app (Rust + Frontend) - required for RFID testing
-npm run dev            # Frontend only (faster, use when working on UI only)
+pnpm run tauri dev       # Full app (Rust + Frontend) - required for RFID testing
+pnpm run dev            # Frontend only (faster, use when working on UI only)
 
 # Code quality (ALWAYS run before committing)
-npm run check          # ESLint + TypeScript - must pass
-npm run format         # Auto-format with Prettier
+pnpm run check          # ESLint + TypeScript - must pass
+pnpm run format         # Auto-format with Prettier
 
 # Production build
-npm run tauri build    # Platform-specific installers in src-tauri/target/release/bundle/
+pnpm run tauri build    # Platform-specific installers in src-tauri/target/release/bundle/
 
 # Rust development (in src-tauri/)
 cargo clippy           # Linter (strict)
@@ -45,7 +45,7 @@ cargo test            # Run tests
 
 ```bash
 # Frontend tests (when implemented - currently no tests)
-npm test -- <test-file-pattern>
+pnpm test -- <test-file-pattern>
 
 # Rust tests
 cd src-tauri && cargo test <test-name>
@@ -350,10 +350,10 @@ const { isScanning, startScanning, stopScanning, currentScan, showModal } = useR
 ### Build Issues
 
 ```bash
-npm run clean:target   # Clean Rust artifacts
+pnpm run clean:target   # Clean Rust artifacts
 rm -rf node_modules dist
-npm install
-npm run tauri build
+pnpm install
+pnpm run tauri build
 ```
 
 ## Current Implementation Status

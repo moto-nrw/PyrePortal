@@ -12,7 +12,7 @@ pre-commit:
     # Frontend lint-staged (prettier + eslint with auto-fix)
     frontend-lint:
       glob: "src/**/*.{ts,tsx,js,jsx,json,css,md}"
-      run: npx lint-staged
+      run: pnpm lint-staged
       stage_fixed: true
 
 # Pre-push: Full quality checks (runs before pushing to remote)
@@ -44,12 +44,12 @@ pre-push:
     # Frontend lint + typecheck
     frontend-check:
       glob: "src/**/*.{ts,tsx}"
-      run: npm run check
+      run: pnpm run check
 
     # Frontend unused code detection
     frontend-knip:
       glob: "src/**/*.{ts,tsx,js,jsx}"
-      run: npm run knip
+      run: pnpm run knip
 
     # Rust lint
     rust-clippy:

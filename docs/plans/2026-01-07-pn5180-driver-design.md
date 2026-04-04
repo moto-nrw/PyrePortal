@@ -272,7 +272,7 @@ RFID_READER=mfrc522 cargo run --example rfid_test
 ```bash
 # Full app with PN5180
 cd /path/to/PyrePortal
-RFID_READER=pn5180 npm run tauri dev
+RFID_READER=pn5180 pnpm run tauri dev
 ```
 
 ## References

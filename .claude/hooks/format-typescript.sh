@@ -18,7 +18,7 @@ if [[ ! -f "${file_path}" ]]; then
 fi
 
 # Run prettier with failure tolerance
-if npx prettier --write "${file_path}" 2>&1 >/dev/null; then
+if pnpm prettier --write "${file_path}" 2>&1 >/dev/null; then
   echo "✓ Formatted: ${file_path}" >&2
 else
   echo "⚠ Prettier failed for: ${file_path}" >&2

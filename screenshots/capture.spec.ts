@@ -10,9 +10,9 @@ import { test, type Page } from '@playwright/test';
  * Mock RFID scanning fires automatically in browser dev mode.
  *
  * Usage:
- *   npm run screenshots                    # capture all screens
- *   npm run screenshots -- --grep "03"     # capture one specific step
- *   SCREENSHOT_PIN=9999 npm run screenshots # use a different PIN
+ *   pnpm run screenshots                    # capture all screens
+ *   pnpm run screenshots -- --grep "03"     # capture one specific step
+ *   SCREENSHOT_PIN=9999 pnpm run screenshots # use a different PIN
  *
  * To add a new screenshot:
  *   Add a step in the serial flow below.
