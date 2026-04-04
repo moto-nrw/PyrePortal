@@ -1,0 +1,57 @@
+# Lefthook - Git hooks manager
+# https://github.com/evilmartians/lefthook
+
+# Pre-commit: Quick checks on staged files
+pre-commit:
+  parallel: true
+  commands:
+    # Git secrets check (if installed)
+    git-secrets:
+      run: git secrets --pre_commit_hook 2>/dev/null || true
+
+    # Frontend lint-staged (prettier + eslint with auto-fix)
+    frontend-lint:
+      glob: "src/**/*.{ts,tsx,js,jsx,json,css,md}"
+      run: npx lint-staged
+      stage_fixed: true
+
+# Pre-push: Full quality checks (runs before pushing to remote)
+pre-push:
+  parallel: true
+  commands:
+    git-secrets:
+      run: git secrets --pre_commit_hook 2>/dev/null || true
+
+    # Version sync (package.json, Cargo.toml, tauri.conf.json)
+    version-sync:
+      run: |
+        NPM_VERSION=$(node -p "require('./package.json').version")
+        CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+        TAURI_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).version")
+        if [ "$NPM_VERSION" != "$CARGO_VERSION" ] || [ "$CARGO_VERSION" != "$TAURI_VERSION" ]; then
+          echo ""
+          echo "ERROR: Version mismatch detected!"
+          echo ""
+          echo "  package.json:      $NPM_VERSION"
+          echo "  Cargo.toml:        $CARGO_VERSION"
+          echo "  tauri.conf.json:   $TAURI_VERSION"
+          echo ""
+          echo "All three must be identical. Push aborted."
+          exit 1
+        fi
+        echo "version sync OK (v$NPM_VERSION)"
+
+    # Frontend lint + typecheck
+    frontend-check:
+      glob: "src/**/*.{ts,tsx}"
+      run: npm run check
+
+    # Frontend unused code detection
+    frontend-knip:
+      glob: "src/**/*.{ts,tsx,js,jsx}"
+      run: npm run knip
+
+    # Rust lint
+    rust-clippy:
+      glob: "src-tauri/**/*.rs"
+      run: cd src-tauri && cargo clippy -- -D warnings

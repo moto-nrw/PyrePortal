@@ -45,3 +45,6 @@ coverage/
 # Playwright
 screenshots/output/*.png
 screenshots/test-results/
+
+# Devbox
+.devbox/

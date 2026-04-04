@@ -1,0 +1,30 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.17.0/.schema/devbox.schema.json",
+  "packages": [
+    "nodejs@latest",
+    "jq@latest",
+    "ripgrep@latest",
+    "fd@latest",
+    "bat@latest",
+    "eza@latest",
+    "btop@latest",
+    "lefthook@latest",
+    "git-secrets@latest",
+    "tree@latest",
+    "curl@latest",
+    "git@latest",
+    "gh@latest",
+    "lazygit@latest",
+    "glow@latest",
+    "fzf@latest"
+  ],
+  "env": {},
+  "shell": {
+    "init_hook": [
+      "lefthook install --force > /dev/null 2>&1 || true",
+      "which agent-browser > /dev/null 2>&1 || (npm install -g agent-browser > /dev/null 2>&1 && agent-browser install > /dev/null 2>&1)",
+      "[ ! -d node_modules ] && echo 'installing frontend deps...' && npm install --silent || true",
+      "echo \"node $(node -v | sed 's/v//') npm $(npm -v) rust $(rustc --version 2>/dev/null | cut -d' ' -f2 || echo 'n/a') | bat eza fzf rg fd tree jq glow btop curl lazygit gh\""
+    ]
+  }
+}

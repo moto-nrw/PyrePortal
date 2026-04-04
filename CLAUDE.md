@@ -218,7 +218,7 @@ See `.claude/rules/release.md` for the full release checklist. Key rules:
 
 - **Before any release**: Run `./scripts/check-version.sh` and verify it passes
 - **Version sync**: `package.json`, `Cargo.toml`, and `tauri.conf.json` must be bumped before building on the Pi
-- **Pre-push hook**: `.husky/pre-push` blocks pushes with mismatched versions automatically
+- **Pre-push hook**: Lefthook `version-sync` command in `lefthook.yml` blocks pushes with mismatched versions automatically
 - **Security**: This repo is public. Never commit secrets, API keys, `.env` files, PINs, or credentials
 
 ## Adding New Features

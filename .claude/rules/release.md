@@ -22,7 +22,7 @@ This script checks that all 3 files match and the version is greater than the la
 
 ### Automated Guard
 
-The `pre-push` hook (`.husky/pre-push`) blocks any push where the 3 version files are out of sync. This catches mistakes automatically but does NOT check against GitHub tags — that requires the manual `check-version.sh` script above.
+The `pre-push` hook (Lefthook `version-sync` command in `lefthook.yml`) blocks any push where the 3 version files are out of sync. This catches mistakes automatically but does NOT check against GitHub tags — that requires the manual `check-version.sh` script above.
 
 ### Bumping
 
