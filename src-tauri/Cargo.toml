@@ -1,6 +1,6 @@
 [package]
 name = "pyreportal"
-version = "1.2.0"
+version = "1.3.0"
 description = "NFC-basiertes Kiosk-Terminal für die digitale Ganztagsbetreuung"
 authors = ["Yannick Wenger <kontakt@moto.nrw>"]
 edition = "2021"

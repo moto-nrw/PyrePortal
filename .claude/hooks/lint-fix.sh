@@ -18,7 +18,7 @@ if [[ ! -f "${file_path}" ]]; then
 fi
 
 # Run ESLint with auto-fix and failure tolerance
-if npx eslint --fix "${file_path}" 2>&1 >/dev/null; then
+if pnpm eslint --fix "${file_path}" 2>&1 >/dev/null; then
   echo "✓ Linted: ${file_path}" >&2
 else
   echo "⚠ ESLint warnings for: ${file_path}" >&2

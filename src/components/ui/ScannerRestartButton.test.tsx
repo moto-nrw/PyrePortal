@@ -25,7 +25,7 @@ const mockIsRfidEnabled = vi.mocked(isRfidEnabled);
 
 beforeEach(() => {
   (adapter as unknown as Record<string, unknown>).platform = 'tauri';
-  mockIsRfidEnabled.mockReturnValue(false);
+  mockIsRfidEnabled.mockReturnValue(true);
   mockRecoverScanner.mockResolvedValue(undefined);
   mockGetScannerStatus.mockResolvedValue({ is_available: true });
   mockGetServiceStatus.mockResolvedValue({ is_running: true });
@@ -138,6 +138,12 @@ describe('ScannerRestartButton', () => {
     expect(onAfter).not.toHaveBeenCalled();
   });
 
+  it('renders nothing when RFID is not enabled', () => {
+    mockIsRfidEnabled.mockReturnValue(false);
+    const { container } = render(<ScannerRestartButton />);
+    expect(container.firstChild).toBeNull();
+  });
+
   describe('RFID enabled path', () => {
     beforeEach(() => {
       mockIsRfidEnabled.mockReturnValue(true);
@@ -220,23 +226,6 @@ describe('ScannerRestartButton', () => {
       });
 
       vi.useRealTimers();
-    });
-
-    it('skips adapter calls but runs callbacks when RFID disabled', async () => {
-      mockIsRfidEnabled.mockReturnValue(false);
-
-      const onBefore = vi.fn().mockResolvedValue(undefined);
-      const onAfter = vi.fn().mockResolvedValue(undefined);
-      render(<ScannerRestartButton onBeforeRecover={onBefore} onAfterRecover={onAfter} />);
-      await userEvent.click(screen.getByLabelText('Lesegerät neu starten'));
-
-      await waitFor(() => {
-        expect(screen.getByText('Lesegerät wurde neu gestartet.')).toBeInTheDocument();
-      });
-
-      expect(onBefore).toHaveBeenCalledOnce();
-      expect(onAfter).toHaveBeenCalledOnce();
-      expect(mockRecoverScanner).not.toHaveBeenCalled();
     });
 
     it('handles status returning null/undefined gracefully', async () => {

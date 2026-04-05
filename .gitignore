@@ -39,9 +39,12 @@ coverage/
 # SonarQube
 .scannerwork/
 
-# OpenSpec (local-only)
-openspec/changes/archive/
-openspec/specs/
-
 # Git worktrees
 .worktrees/
+
+# Playwright
+screenshots/output/*.png
+screenshots/test-results/
+
+# Devbox
+.devbox/

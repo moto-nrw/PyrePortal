@@ -9,9 +9,9 @@ const host = process.env.TAURI_DEV_HOST;
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: string };
 
 // BUILD_TARGET determines which platform adapter is bundled.
-// Set via CLI env var (e.g. BUILD_TARGET=gkt npm run build).
+// Set via CLI env var (e.g. BUILD_TARGET=gkt pnpm run build).
 // Tauri sets BUILD_TARGET=tauri via tauri.conf.json beforeDevCommand/beforeBuildCommand.
-// Defaults to 'browser' for plain `npm run dev`.
+// Defaults to 'browser' for plain `pnpm run dev`.
 const buildTarget = process.env.BUILD_TARGET || 'browser';
 
 // https://vitejs.dev/config/

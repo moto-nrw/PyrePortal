@@ -31,7 +31,15 @@ vi.mock('../services/api', async () => {
     ...actual,
     api: {
       ...actual.api,
-      startSession: vi.fn().mockResolvedValue({ active_group_id: 99 }),
+      startSession: vi.fn().mockResolvedValue({
+        active_group_id: 99,
+        activity_id: 10,
+        device_id: 1,
+        start_time: '2026-03-15T10:00:00Z',
+        supervisors: [],
+        status: 'started',
+        message: 'Activity session started successfully',
+      }),
       endSession: vi.fn().mockResolvedValue(undefined),
     },
   };
@@ -491,21 +499,23 @@ describe('HomeViewPage', () => {
     });
   });
 
-  it('keeps logout label as "Abmelden" while recreation is redirecting', async () => {
+  it('keeps logout acting as logout while recreation is still redirecting', async () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => Promise.resolve(true));
-    const fetchCurrentSession = vi
-      .fn<() => Promise<void>>()
-      .mockResolvedValueOnce(undefined)
-      .mockImplementationOnce(async () => {
-        useUserStore.setState({ currentSession: activeSession });
-      });
+    const logout = vi.fn(() => Promise.resolve());
+    let resolveSaveLastSessionData: (() => void) | undefined;
+    const saveLastSessionData = vi.fn(
+      () =>
+        new Promise<void>(resolve => {
+          resolveSaveLastSessionData = resolve;
+        })
+    );
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
       validateAndRecreateSession: validateMock,
-      fetchCurrentSession,
-      saveLastSessionData: vi.fn(() => Promise.resolve()),
+      logout,
+      saveLastSessionData,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
       selectedSupervisors: [{ id: 1, name: 'Frau Müller' }] as never[],
@@ -522,12 +532,70 @@ describe('HomeViewPage', () => {
     await user.click(startButtons[startButtons.length - 1]);
 
     await waitFor(() => {
-      expect(fetchCurrentSession).toHaveBeenCalledTimes(2);
+      expect(mockedApi.startSession).toHaveBeenCalledOnce();
+      expect(saveLastSessionData).toHaveBeenCalledOnce();
     });
 
+    expect(useUserStore.getState().currentSession).toBeNull();
     expect(screen.getByText('Abmelden')).toBeInTheDocument();
     expect(screen.queryByText('Aufsicht beenden')).not.toBeInTheDocument();
-    expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
+
+    await user.click(screen.getByText('Abmelden'));
+
+    await waitFor(() => {
+      expect(logout).toHaveBeenCalledOnce();
+      expect(mockNavigate).toHaveBeenCalledWith('/');
+    });
+
+    resolveSaveLastSessionData?.();
+
+    await waitFor(() => {
+      expect(useUserStore.getState().currentSession).toBeNull();
+    });
+
+    expect(mockedApi.endSession).not.toHaveBeenCalled();
+    expect(mockNavigate.mock.calls).not.toContainEqual(['/nfc-scanning']);
+  });
+
+  it('stores the recreated session once home view unmounts for scanning navigation', async () => {
+    const user = userEvent.setup();
+    const validateMock = vi.fn(() => Promise.resolve(true));
+
+    useUserStore.setState({
+      sessionSettings: sessionSettingsWithLastSession,
+      validateAndRecreateSession: validateMock,
+      saveLastSessionData: vi.fn(() => Promise.resolve()),
+      selectedActivity: testActivity,
+      selectedRoom: testRoom,
+      selectedSupervisors: [{ id: 1, name: 'Frau Müller' }] as never[],
+    });
+    const { unmount } = renderPage();
+
+    await user.click(screen.getByText('Aufsicht wiederholen'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
+    });
+
+    const startButtons = screen.getAllByText('Aufsicht starten');
+    await user.click(startButtons[startButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
+    });
+
+    expect(useUserStore.getState().currentSession).toBeNull();
+
+    unmount();
+
+    expect(useUserStore.getState().currentSession).toMatchObject({
+      active_group_id: 99,
+      activity_id: 10,
+      room_id: 5,
+      room_name: 'Raum A',
+      activity_name: 'Hausaufgaben',
+      is_active: true,
+    });
   });
 
   it('confirm recreation shows error when session data is incomplete (no activity)', async () => {

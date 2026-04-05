@@ -1,6 +1,6 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
@@ -142,6 +142,21 @@ function HomeViewPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
+  const pendingSessionRef = useRef<CurrentSession | null>(null);
+  const recreationRequestIdRef = useRef(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+
+      // Commit the recreated session only after HomeView unmounts for the scan route.
+      if (pendingSessionRef.current) {
+        useUserStore.setState({ currentSession: pendingSessionRef.current });
+        pendingSessionRef.current = null;
+      }
+    };
+  }, []);
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -157,6 +172,9 @@ function HomeViewPage() {
 
   // Helper to perform user logout
   const performLogout = async () => {
+    pendingSessionRef.current = null;
+    recreationRequestIdRef.current += 1;
+    setIsNavigatingToScanning(false);
     logUserAction('User logout initiated');
     await logout();
     logNavigation('Home View', '/');
@@ -238,6 +256,9 @@ function HomeViewPage() {
   const handleConfirmRecreation = async () => {
     if (!authenticatedUser || !sessionSettings?.last_session) return;
 
+    const recreationRequestId = recreationRequestIdRef.current + 1;
+    recreationRequestIdRef.current = recreationRequestId;
+
     const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
 
     // Validate session data is complete
@@ -269,16 +290,44 @@ function HomeViewPage() {
         sessionId: sessionResponse.active_group_id,
       });
 
+      // Set current session directly from start response + local state
+      // instead of making a redundant GET /api/iot/session/current round-trip
+      const newSession: CurrentSession = {
+        active_group_id: sessionResponse.active_group_id,
+        activity_id: sessionResponse.activity_id,
+        activity_name: selectedActivity.name,
+        room_id: selectedRoom.id,
+        room_name: selectedRoom.name,
+        device_id: sessionResponse.device_id,
+        start_time: sessionResponse.start_time,
+        duration: '0s',
+        is_active: true,
+        active_students: 0,
+        supervisors: sessionResponse.supervisors,
+      };
+
       await useUserStore.getState().saveLastSessionData();
-      await fetchCurrentSession();
+
+      if (!isMountedRef.current || recreationRequestId !== recreationRequestIdRef.current) {
+        return;
+      }
+
+      pendingSessionRef.current = newSession;
 
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');
     } catch (error) {
+      if (!isMountedRef.current || recreationRequestId !== recreationRequestIdRef.current) {
+        return;
+      }
+
+      pendingSessionRef.current = null;
       setIsNavigatingToScanning(false);
       showRecreationError(formatRecreationError(error));
     } finally {
-      setShowConfirmModal(false);
+      if (isMountedRef.current && recreationRequestId === recreationRequestIdRef.current) {
+        setShowConfirmModal(false);
+      }
     }
   };
 
