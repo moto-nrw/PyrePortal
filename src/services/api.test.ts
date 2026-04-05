@@ -2190,4 +2190,54 @@ describe('api methods', () => {
       await freshApi.getTeachers();
     });
   });
+
+  // ------------------------------------------------------------------
+  // fetchSchoolName / getSchoolName
+  // ------------------------------------------------------------------
+
+  describe('fetchSchoolName', () => {
+    it('fetches and stores school name on success', async () => {
+      const { fetchSchoolName: freshFetch, getSchoolName: freshGet } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { name: 'OGS Testschule' }, message: 'ok' })
+      );
+
+      await freshFetch();
+
+      expect(freshGet()).toBe('OGS Testschule');
+    });
+
+    it('returns null when fetch fails', async () => {
+      const { fetchSchoolName: freshFetch, getSchoolName: freshGet } = await getFreshApi();
+
+      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await freshFetch();
+
+      expect(freshGet()).toBeNull();
+    });
+
+    it('returns null when server returns error status', async () => {
+      const { fetchSchoolName: freshFetch, getSchoolName: freshGet } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(
+          { status: 'error', message: 'unauthorized' },
+          { status: 401, statusText: 'Unauthorized' }
+        )
+      );
+
+      await freshFetch();
+
+      expect(freshGet()).toBeNull();
+    });
+  });
+
+  describe('getSchoolName', () => {
+    it('returns null before fetchSchoolName is called', async () => {
+      const { getSchoolName: freshGet } = await getFreshApi();
+      expect(freshGet()).toBeNull();
+    });
+  });
 });

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
 
+import { getSchoolName } from '../services/api';
 import { logError } from '../utils/logger';
 
 import LandingPage from './LandingPage';
@@ -14,6 +15,12 @@ vi.mock('@platform', () => ({
     restartApp: vi.fn(),
   },
 }));
+
+// Mock getSchoolName from api service
+vi.mock('../services/api', () => ({
+  getSchoolName: vi.fn(() => null),
+}));
+const mockGetSchoolName = vi.mocked(getSchoolName);
 
 const { adapter } = await import('@platform');
 const mockRestartApp = vi.mocked(adapter.restartApp);
@@ -333,5 +340,31 @@ describe('LandingPage', () => {
     expect(wrapper!.style.top).toBe('20px');
     expect(wrapper!.style.right).toBe('20px');
     expect(wrapper!.style.zIndex).toBe('50');
+  });
+
+  // --- School name display tests ---
+
+  it('displays school name when available', () => {
+    mockGetSchoolName.mockReturnValue('OGS Testschule');
+
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('OGS Testschule')).toBeInTheDocument();
+  });
+
+  it('does not render school name element when getSchoolName returns null', () => {
+    mockGetSchoolName.mockReturnValue(null);
+
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByText('OGS Testschule')).not.toBeInTheDocument();
   });
 });
