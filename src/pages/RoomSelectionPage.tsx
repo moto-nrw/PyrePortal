@@ -18,6 +18,7 @@ import {
   type Room,
   type SessionStartRequest,
   type ActivityResponse,
+  type CurrentSession,
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -534,7 +535,6 @@ function RoomSelectionPage() {
     error,
     fetchRooms,
     selectRoom,
-    fetchCurrentSession,
     saveLastSessionData,
   } = useUserStore();
 
@@ -620,6 +620,90 @@ function RoomSelectionPage() {
     setShowConfirmModal(true);
   };
 
+  // Build CurrentSession from start response + local state to avoid
+  // a redundant GET /api/iot/session/current round-trip
+  const buildSessionFromResponse = useCallback(
+    (sessionResponse: {
+      active_group_id: number;
+      activity_id: number;
+      device_id: number;
+      start_time: string;
+      supervisors: CurrentSession['supervisors'];
+    }) => {
+      if (!selectedActivity || !selectedRoom) return null;
+      const session: CurrentSession = {
+        active_group_id: sessionResponse.active_group_id,
+        activity_id: sessionResponse.activity_id,
+        activity_name: selectedActivity.name,
+        room_id: selectedRoom.id,
+        room_name: selectedRoom.name,
+        device_id: sessionResponse.device_id,
+        start_time: sessionResponse.start_time,
+        duration: '0s',
+        is_active: true,
+        active_students: 0,
+        supervisors: sessionResponse.supervisors,
+      };
+      return session;
+    },
+    [selectedActivity, selectedRoom]
+  );
+
+  // Shared post-start flow: set session state, save, log, and navigate
+  const completeSessionStart = useCallback(
+    async (
+      sessionResponse: {
+        active_group_id: number;
+        activity_id: number;
+        device_id: number;
+        start_time: string;
+        supervisors: CurrentSession['supervisors'];
+      },
+      actionLabel: string
+    ) => {
+      if (!selectedActivity || !selectedRoom) return;
+
+      selectRoom(selectedRoom.id);
+
+      const newSession = buildSessionFromResponse(sessionResponse);
+      if (newSession) {
+        useUserStore.setState({ currentSession: newSession });
+      }
+
+      await saveLastSessionData();
+
+      logUserAction(actionLabel, {
+        sessionId: sessionResponse.active_group_id,
+        activityId: selectedActivity.id,
+        activityName: selectedActivity.name,
+        roomId: selectedRoom.id,
+        roomName: selectedRoom.name,
+      });
+
+      // Close modals before navigation
+      setShowConfirmModal(false);
+      setShowConflictModal(false);
+      setIsStartingSession(false);
+      setSelectedRoom(null);
+
+      logNavigation('RoomSelectionPage', 'NFC-Scanning', {
+        sessionId: sessionResponse.active_group_id,
+        activityId: selectedActivity.id,
+        roomId: selectedRoom.id,
+      });
+
+      void navigate('/nfc-scanning');
+    },
+    [
+      selectedActivity,
+      selectedRoom,
+      selectRoom,
+      saveLastSessionData,
+      buildSessionFromResponse,
+      navigate,
+    ]
+  );
+
   // Handle session start confirmation
   const handleConfirmSession = async () => {
     if (!selectedRoom || !selectedActivity || !authenticatedUser) return;
@@ -654,36 +738,7 @@ function RoomSelectionPage() {
         duration_ms: measure.duration,
       });
 
-      // Store the selected room
-      selectRoom(selectedRoom.id);
-
-      // Fetch and update current session to ensure state consistency
-      await fetchCurrentSession();
-
-      // Auto-save this session for quick recreation
-      await saveLastSessionData();
-
-      logUserAction('session_started', {
-        sessionId: sessionResponse.active_group_id,
-        activityId: selectedActivity.id,
-        activityName: selectedActivity.name,
-        roomId: selectedRoom.id,
-        roomName: selectedRoom.name,
-      });
-
-      // Close modals before navigation
-      setShowConfirmModal(false);
-      setIsStartingSession(false);
-      setSelectedRoom(null);
-
-      // Navigate to NFC scanning page
-      logNavigation('RoomSelectionPage', 'NFC-Scanning', {
-        sessionId: sessionResponse.active_group_id,
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-      });
-
-      void navigate('/nfc-scanning');
+      await completeSessionStart(sessionResponse, 'session_started');
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : 'Fehler beim Starten der Session';
@@ -745,37 +800,7 @@ function RoomSelectionPage() {
         deviceId: sessionResponse.device_id,
       });
 
-      // Store the selected room
-      selectRoom(selectedRoom.id);
-
-      // Fetch and update current session to ensure state consistency
-      await fetchCurrentSession();
-
-      // Auto-save this session for quick recreation
-      await saveLastSessionData();
-
-      logUserAction('session_started_force', {
-        sessionId: sessionResponse.active_group_id,
-        activityId: selectedActivity.id,
-        activityName: selectedActivity.name,
-        roomId: selectedRoom.id,
-        roomName: selectedRoom.name,
-      });
-
-      // Close modals before navigation
-      setShowConfirmModal(false);
-      setShowConflictModal(false);
-      setIsStartingSession(false);
-      setSelectedRoom(null);
-
-      // Navigate to NFC scanning page
-      logNavigation('RoomSelectionPage', 'NFC-Scanning', {
-        sessionId: sessionResponse.active_group_id,
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-      });
-
-      void navigate('/nfc-scanning');
+      await completeSessionStart(sessionResponse, 'session_started_force');
     } catch (forceError) {
       const forceErrorMessage =
         forceError instanceof Error ? forceError.message : 'Fehler beim Überschreiben der Session';

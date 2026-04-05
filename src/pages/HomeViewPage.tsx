@@ -269,8 +269,24 @@ function HomeViewPage() {
         sessionId: sessionResponse.active_group_id,
       });
 
+      // Set current session directly from start response + local state
+      // instead of making a redundant GET /api/iot/session/current round-trip
+      const newSession: CurrentSession = {
+        active_group_id: sessionResponse.active_group_id,
+        activity_id: sessionResponse.activity_id,
+        activity_name: selectedActivity.name,
+        room_id: selectedRoom.id,
+        room_name: selectedRoom.name,
+        device_id: sessionResponse.device_id,
+        start_time: sessionResponse.start_time,
+        duration: '0s',
+        is_active: true,
+        active_students: 0,
+        supervisors: sessionResponse.supervisors,
+      };
+      useUserStore.setState({ currentSession: newSession });
+
       await useUserStore.getState().saveLastSessionData();
-      await fetchCurrentSession();
 
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');

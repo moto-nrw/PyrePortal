@@ -31,7 +31,15 @@ vi.mock('../services/api', async () => {
     ...actual,
     api: {
       ...actual.api,
-      startSession: vi.fn().mockResolvedValue({ active_group_id: 99 }),
+      startSession: vi.fn().mockResolvedValue({
+        active_group_id: 99,
+        activity_id: 10,
+        device_id: 1,
+        start_time: '2026-03-15T10:00:00Z',
+        supervisors: [],
+        status: 'started',
+        message: 'Activity session started successfully',
+      }),
       endSession: vi.fn().mockResolvedValue(undefined),
     },
   };
@@ -494,17 +502,10 @@ describe('HomeViewPage', () => {
   it('keeps logout label as "Abmelden" while recreation is redirecting', async () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => Promise.resolve(true));
-    const fetchCurrentSession = vi
-      .fn<() => Promise<void>>()
-      .mockResolvedValueOnce(undefined)
-      .mockImplementationOnce(async () => {
-        useUserStore.setState({ currentSession: activeSession });
-      });
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
       validateAndRecreateSession: validateMock,
-      fetchCurrentSession,
       saveLastSessionData: vi.fn(() => Promise.resolve()),
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -521,8 +522,11 @@ describe('HomeViewPage', () => {
     const startButtons = screen.getAllByText('Aufsicht starten');
     await user.click(startButtons[startButtons.length - 1]);
 
+    // currentSession is now set directly from startSession response
     await waitFor(() => {
-      expect(fetchCurrentSession).toHaveBeenCalledTimes(2);
+      const { currentSession } = useUserStore.getState();
+      expect(currentSession).toBeTruthy();
+      expect(currentSession!.active_group_id).toBe(99);
     });
 
     expect(screen.getByText('Abmelden')).toBeInTheDocument();
