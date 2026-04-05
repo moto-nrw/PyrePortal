@@ -383,15 +383,16 @@ describe('RoomSelectionPage', () => {
       });
     });
 
-    it('calls fetchCurrentSession after successful start', async () => {
-      const fetchCurrentSession = vi.fn(() => Promise.resolve());
-      setStoreState({ fetchCurrentSession });
+    it('sets currentSession in store after successful start', async () => {
       const user = userEvent.setup();
       renderPage();
       await user.click(screen.getByText('Raum A'));
       await user.click(screen.getByText('Aufsicht starten'));
       await waitFor(() => {
-        expect(fetchCurrentSession).toHaveBeenCalled();
+        const { currentSession } = useUserStore.getState();
+        expect(currentSession).toBeTruthy();
+        expect(currentSession!.active_group_id).toBe(42);
+        expect(currentSession!.is_active).toBe(true);
       });
     });
 
