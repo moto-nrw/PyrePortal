@@ -5,7 +5,7 @@ import { adapter } from '@platform';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import BackButton from '../components/ui/BackButton';
-import { getSchoolName } from '../services/api';
+import { getSchoolName, onSchoolNameLoaded } from '../services/api';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
@@ -14,17 +14,10 @@ function LandingPage() {
   const logger = createLogger('LandingPage');
   const [schoolName, setSchoolName] = useState<string | null>(getSchoolName());
 
-  // Pick up the school name once the background fetch completes
+  // Subscribe once: if the name arrives after mount, update state
   useEffect(() => {
     if (schoolName) return;
-    const timer = setInterval(() => {
-      const name = getSchoolName();
-      if (name) {
-        setSchoolName(name);
-        clearInterval(timer);
-      }
-    }, 200);
-    return () => clearInterval(timer);
+    return onSchoolNameLoaded(setSchoolName);
   }, [schoolName]);
 
   const handleLogin = () => {

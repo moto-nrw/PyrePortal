@@ -2240,4 +2240,52 @@ describe('api methods', () => {
       expect(freshGet()).toBeNull();
     });
   });
+
+  describe('onSchoolNameLoaded', () => {
+    it('calls listener immediately if school name is already loaded', async () => {
+      const { fetchSchoolName: freshFetch, onSchoolNameLoaded: freshOn } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { name: 'Already Loaded' }, message: 'ok' })
+      );
+      await freshFetch();
+
+      const listener = vi.fn();
+      freshOn(listener);
+
+      expect(listener).toHaveBeenCalledWith('Already Loaded');
+    });
+
+    it('calls listener when school name arrives later', async () => {
+      const { fetchSchoolName: freshFetch, onSchoolNameLoaded: freshOn } = await getFreshApi();
+
+      const listener = vi.fn();
+      freshOn(listener);
+
+      // Not called yet — name not loaded
+      expect(listener).not.toHaveBeenCalled();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { name: 'Delayed School' }, message: 'ok' })
+      );
+      await freshFetch();
+
+      expect(listener).toHaveBeenCalledWith('Delayed School');
+    });
+
+    it('returns unsubscribe function that prevents callback', async () => {
+      const { fetchSchoolName: freshFetch, onSchoolNameLoaded: freshOn } = await getFreshApi();
+
+      const listener = vi.fn();
+      const unsub = freshOn(listener);
+      unsub();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { name: 'Unsubscribed' }, message: 'ok' })
+      );
+      await freshFetch();
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+  });
 });

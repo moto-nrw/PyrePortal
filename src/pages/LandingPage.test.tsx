@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
 
-import { getSchoolName } from '../services/api';
+import { getSchoolName, onSchoolNameLoaded } from '../services/api';
 import { logError } from '../utils/logger';
 
 import LandingPage from './LandingPage';
@@ -16,11 +16,13 @@ vi.mock('@platform', () => ({
   },
 }));
 
-// Mock getSchoolName from api service
+// Mock school name API functions
 vi.mock('../services/api', () => ({
   getSchoolName: vi.fn(() => null),
+  onSchoolNameLoaded: vi.fn(() => () => {}),
 }));
 const mockGetSchoolName = vi.mocked(getSchoolName);
+const mockOnSchoolNameLoaded = vi.mocked(onSchoolNameLoaded);
 
 const { adapter } = await import('@platform');
 const mockRestartApp = vi.mocked(adapter.restartApp);
@@ -387,12 +389,14 @@ describe('LandingPage', () => {
     expect(schoolNameEl).toBeDefined();
   });
 
-  it('picks up school name after async fetch via polling', async () => {
-    // Start with null, then return a value on subsequent calls
-    let callCount = 0;
-    mockGetSchoolName.mockImplementation(() => {
-      callCount++;
-      return callCount >= 3 ? 'OGS Delayed School' : null;
+  it('picks up school name after async fetch via listener', async () => {
+    mockGetSchoolName.mockReturnValue(null);
+
+    // Capture the listener that LandingPage registers
+    let capturedListener: ((name: string) => void) | null = null;
+    mockOnSchoolNameLoaded.mockImplementation((listener: (name: string) => void) => {
+      capturedListener = listener;
+      return () => {};
     });
 
     render(
@@ -403,10 +407,14 @@ describe('LandingPage', () => {
 
     // Initially no school name visible
     expect(screen.queryByText('OGS Delayed School')).not.toBeInTheDocument();
+    expect(capturedListener).not.toBeNull();
 
-    // Wait for the polling interval to pick up the value and trigger re-render
-    await vi.waitFor(() => {
-      expect(screen.getByText('OGS Delayed School')).toBeInTheDocument();
+    // Simulate the fetch completing and notifying the listener
+    const { act } = await import('@testing-library/react');
+    act(() => {
+      capturedListener!('OGS Delayed School');
     });
+
+    expect(screen.getByText('OGS Delayed School')).toBeInTheDocument();
   });
 });
