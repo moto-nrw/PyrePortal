@@ -1,6 +1,6 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
@@ -142,6 +142,21 @@ function HomeViewPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
+  const pendingSessionRef = useRef<CurrentSession | null>(null);
+  const recreationRequestIdRef = useRef(0);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+
+      // Commit the recreated session only after HomeView unmounts for the scan route.
+      if (pendingSessionRef.current) {
+        useUserStore.setState({ currentSession: pendingSessionRef.current });
+        pendingSessionRef.current = null;
+      }
+    };
+  }, []);
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -157,6 +172,9 @@ function HomeViewPage() {
 
   // Helper to perform user logout
   const performLogout = async () => {
+    pendingSessionRef.current = null;
+    recreationRequestIdRef.current += 1;
+    setIsNavigatingToScanning(false);
     logUserAction('User logout initiated');
     await logout();
     logNavigation('Home View', '/');
@@ -238,6 +256,9 @@ function HomeViewPage() {
   const handleConfirmRecreation = async () => {
     if (!authenticatedUser || !sessionSettings?.last_session) return;
 
+    const recreationRequestId = recreationRequestIdRef.current + 1;
+    recreationRequestIdRef.current = recreationRequestId;
+
     const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
 
     // Validate session data is complete
@@ -284,17 +305,29 @@ function HomeViewPage() {
         active_students: 0,
         supervisors: sessionResponse.supervisors,
       };
-      useUserStore.setState({ currentSession: newSession });
 
       await useUserStore.getState().saveLastSessionData();
+
+      if (!isMountedRef.current || recreationRequestId !== recreationRequestIdRef.current) {
+        return;
+      }
+
+      pendingSessionRef.current = newSession;
 
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');
     } catch (error) {
+      if (!isMountedRef.current || recreationRequestId !== recreationRequestIdRef.current) {
+        return;
+      }
+
+      pendingSessionRef.current = null;
       setIsNavigatingToScanning(false);
       showRecreationError(formatRecreationError(error));
     } finally {
-      setShowConfirmModal(false);
+      if (isMountedRef.current && recreationRequestId === recreationRequestIdRef.current) {
+        setShowConfirmModal(false);
+      }
     }
   };
 
