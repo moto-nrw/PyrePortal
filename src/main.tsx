@@ -18,8 +18,8 @@ const logger = createLogger('main');
 // Initialize API before rendering to avoid race conditions with network status checks
 try {
   await initializeApi();
-  // Best-effort: fetch school name for landing page display
-  await fetchSchoolName();
+  // Best-effort: fetch school name for landing page display (non-blocking)
+  void fetchSchoolName();
 } catch (error) {
   logger.error('Failed to initialize API', { error: serializeError(error) });
   // Still render the app even if API init fails - it will show offline status
