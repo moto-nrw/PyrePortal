@@ -116,10 +116,10 @@ function LandingPage() {
 
             <p
               style={{
-                fontSize: '28px',
-                color: '#6B7280',
+                fontSize: '36px',
+                color: '#4B5563',
                 textAlign: 'center',
-                fontWeight: 500,
+                fontWeight: 700,
                 marginTop: '-8px',
                 opacity: schoolName ? 1 : 0,
                 transition: 'opacity 500ms ease-in',
