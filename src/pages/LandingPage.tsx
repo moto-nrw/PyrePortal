@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { adapter } from '@platform';
@@ -11,7 +12,20 @@ import { createLogger, logNavigation, logUserAction, logError } from '../utils/l
 function LandingPage() {
   const navigate = useNavigate();
   const logger = createLogger('LandingPage');
-  const schoolName = getSchoolName();
+  const [schoolName, setSchoolName] = useState<string | null>(getSchoolName());
+
+  // Pick up the school name once the background fetch completes
+  useEffect(() => {
+    if (schoolName) return;
+    const timer = setInterval(() => {
+      const name = getSchoolName();
+      if (name) {
+        setSchoolName(name);
+        clearInterval(timer);
+      }
+    }, 200);
+    return () => clearInterval(timer);
+  }, [schoolName]);
 
   const handleLogin = () => {
     logger.info('User initiated login from landing page');
@@ -107,19 +121,20 @@ function LandingPage() {
               Willkommen bei moto!
             </h1>
 
-            {schoolName && (
-              <p
-                style={{
-                  fontSize: '28px',
-                  color: '#6B7280',
-                  textAlign: 'center',
-                  fontWeight: 500,
-                  marginTop: '-8px',
-                }}
-              >
-                {schoolName}
-              </p>
-            )}
+            <p
+              style={{
+                fontSize: '28px',
+                color: '#6B7280',
+                textAlign: 'center',
+                fontWeight: 500,
+                marginTop: '-8px',
+                opacity: schoolName ? 1 : 0,
+                transition: 'opacity 500ms ease-in',
+                minHeight: '1.5em',
+              }}
+            >
+              {schoolName ?? '\u00A0'}
+            </p>
 
             {/* Login Button - Phoenix shadcn style (NO GRADIENT) */}
             <button

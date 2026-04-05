@@ -344,7 +344,7 @@ describe('LandingPage', () => {
 
   // --- School name display tests ---
 
-  it('displays school name when available', () => {
+  it('displays school name when available on mount', () => {
     mockGetSchoolName.mockReturnValue('OGS Testschule');
 
     render(
@@ -356,7 +356,21 @@ describe('LandingPage', () => {
     expect(screen.getByText('OGS Testschule')).toBeInTheDocument();
   });
 
-  it('does not render school name element when getSchoolName returns null', () => {
+  it('shows school name with full opacity when available', () => {
+    mockGetSchoolName.mockReturnValue('OGS Testschule');
+
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    const el = screen.getByText('OGS Testschule');
+    expect(el.style.opacity).toBe('1');
+    expect(el.style.transition).toContain('opacity');
+  });
+
+  it('renders placeholder with zero opacity when school name is null', () => {
     mockGetSchoolName.mockReturnValue(null);
 
     render(
@@ -365,6 +379,34 @@ describe('LandingPage', () => {
       </MemoryRouter>
     );
 
+    // The <p> is always rendered (with &nbsp;) but invisible
     expect(screen.queryByText('OGS Testschule')).not.toBeInTheDocument();
+    // Find the placeholder paragraph by its transition style
+    const paragraphs = document.querySelectorAll('p');
+    const schoolNameEl = Array.from(paragraphs).find(p => p.style.opacity === '0');
+    expect(schoolNameEl).toBeDefined();
+  });
+
+  it('picks up school name after async fetch via polling', async () => {
+    // Start with null, then return a value on subsequent calls
+    let callCount = 0;
+    mockGetSchoolName.mockImplementation(() => {
+      callCount++;
+      return callCount >= 3 ? 'OGS Delayed School' : null;
+    });
+
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    // Initially no school name visible
+    expect(screen.queryByText('OGS Delayed School')).not.toBeInTheDocument();
+
+    // Wait for the polling interval to pick up the value and trigger re-render
+    await vi.waitFor(() => {
+      expect(screen.getByText('OGS Delayed School')).toBeInTheDocument();
+    });
   });
 });
