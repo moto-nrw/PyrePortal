@@ -4,12 +4,14 @@ import { adapter } from '@platform';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import BackButton from '../components/ui/BackButton';
+import { getSchoolName } from '../services/api';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function LandingPage() {
   const navigate = useNavigate();
   const logger = createLogger('LandingPage');
+  const schoolName = getSchoolName();
 
   const handleLogin = () => {
     logger.info('User initiated login from landing page');
@@ -104,6 +106,20 @@ function LandingPage() {
             >
               Willkommen bei moto!
             </h1>
+
+            {schoolName && (
+              <p
+                style={{
+                  fontSize: '28px',
+                  color: '#6B7280',
+                  textAlign: 'center',
+                  fontWeight: 500,
+                  marginTop: '-8px',
+                }}
+              >
+                {schoolName}
+              </p>
+            )}
 
             {/* Login Button - Phoenix shadcn style (NO GRADIENT) */}
             <button
