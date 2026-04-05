@@ -396,7 +396,7 @@ function mapAttendanceErrorToGerman(
 let API_BASE_URL = '';
 let DEVICE_API_KEY = '';
 
-let SCHOOL_NAME: string | null = null;
+const schoolNameState = { value: null as string | null };
 let isInitialized = false;
 
 // Network status callback - set by the app to receive status updates from API calls
@@ -450,24 +450,29 @@ export async function initializeApi(): Promise<void> {
     baseUrl: API_BASE_URL,
     hasApiKey: !!DEVICE_API_KEY,
   });
-
-  // Fetch school name (best-effort, does not block app startup)
-  try {
-    const res = await apiCall<{ status: string; data: { name: string } }>('/api/iot/school-name', {
-      headers: { Authorization: `Bearer ${DEVICE_API_KEY}` },
-    });
-    SCHOOL_NAME = res.data.name;
-    logger.info('School name loaded', { schoolName: SCHOOL_NAME });
-  } catch {
-    logger.warn('Failed to fetch school name, continuing without it');
-  }
 }
 
 /**
  * Returns the school name for the device, or null if not yet loaded / unavailable.
  */
 export function getSchoolName(): string | null {
-  return SCHOOL_NAME;
+  return schoolNameState.value;
+}
+
+/**
+ * Fetch school name from the backend (best-effort).
+ * Call after initializeApi(). Failure is silently ignored.
+ */
+export async function fetchSchoolName(): Promise<void> {
+  try {
+    const res = await apiCall<{ status: string; data: { name: string } }>('/api/iot/school-name', {
+      headers: { Authorization: `Bearer ${DEVICE_API_KEY}` },
+    });
+    schoolNameState.value = res.data.name;
+    logger.info('School name loaded', { schoolName: schoolNameState.value });
+  } catch {
+    logger.warn('Failed to fetch school name, continuing without it');
+  }
 }
 
 /**

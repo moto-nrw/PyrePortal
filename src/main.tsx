@@ -7,7 +7,7 @@ import ReactDOM from 'react-dom/client';
 
 import './index.css';
 import App from './App';
-import { initializeApi } from './services/api';
+import { fetchSchoolName, initializeApi } from './services/api';
 import { createLogger, serializeError } from './utils/logger';
 
 // Prevent FontAwesome from auto-injecting CSS (we import it manually above)
@@ -18,6 +18,8 @@ const logger = createLogger('main');
 // Initialize API before rendering to avoid race conditions with network status checks
 try {
   await initializeApi();
+  // Best-effort: fetch school name for landing page display
+  await fetchSchoolName();
 } catch (error) {
   logger.error('Failed to initialize API', { error: serializeError(error) });
   // Still render the app even if API init fails - it will show offline status
