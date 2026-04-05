@@ -311,6 +311,7 @@ function PinPage() {
             >
               {isLoading ? (
                 <div
+                  data-testid="pin-loading-spinner"
                   style={{
                     width: '24px',
                     height: '24px',

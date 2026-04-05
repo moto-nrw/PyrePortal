@@ -306,7 +306,7 @@ describe('PinPage', () => {
     await enterPin(user);
 
     await waitFor(() => {
-      expect(screen.getByText('PIN wird überprüft...')).toBeInTheDocument();
+      expect(screen.getByTestId('pin-loading-spinner')).toBeInTheDocument();
     });
 
     // Cleanup
@@ -697,7 +697,7 @@ describe('PinPage', () => {
 
     // Wait for loading state
     await waitFor(() => {
-      expect(screen.getByText('PIN wird überprüft...')).toBeInTheDocument();
+      expect(screen.getByTestId('pin-loading-spinner')).toBeInTheDocument();
     });
 
     // Try to enter a 5th digit — should be rejected (line 116)
@@ -856,7 +856,7 @@ describe('PinPage', () => {
     await enterPin(user);
 
     await waitFor(() => {
-      expect(screen.getByText('PIN wird überprüft...')).toBeInTheDocument();
+      expect(screen.getByTestId('pin-loading-spinner')).toBeInTheDocument();
     });
 
     // API should have been called exactly once
