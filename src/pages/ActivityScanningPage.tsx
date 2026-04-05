@@ -1489,7 +1489,6 @@ const ActivityScanningPage: React.FC = () => {
                   color: '#83cd2d',
                   lineHeight: 1,
                   marginTop: '-12px',
-                  transition: 'opacity 0.3s ease',
                   opacity: rfid.processingQueue.size > 0 ? 0 : 1,
                 }}
               >
