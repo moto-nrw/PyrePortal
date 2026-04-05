@@ -411,7 +411,7 @@ export const useRfidScanning = () => {
             return;
           }
 
-          const { active_students: _ignoredActiveStudents, ...pickupResult } = result;
+          const { active_students: _, ...pickupResult } = result;
           setScanResult({ ...pickupResult, scannedTagId: tagId });
           showScanModal();
           removeFromProcessingQueue(tagId);
