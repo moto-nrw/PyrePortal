@@ -8,7 +8,6 @@ import { ErrorModal } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import theme from '../styles/theme';
 import {
   createLogger,
   logNavigation,
@@ -293,34 +292,49 @@ function PinPage() {
 
           {/* Main Content - Full Width */}
           <div style={{ width: '100%' }}>
-            {/* PIN display dots - BLACK (no blue!) */}
+            {/* PIN display dots - transforms into spinner when loading */}
             <div
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                gap: '20px',
-                marginBottom: '12px',
+                alignItems: 'center',
+                gap: isLoading ? '0px' : '20px',
                 padding: '16px 24px',
                 backgroundColor: '#F9FAFB',
                 borderRadius: '16px',
-                border: '2px solid #E5E7EB',
+                border: `2px solid ${isLoading ? '#5080D8' : '#E5E7EB'}`,
                 width: 'fit-content',
                 margin: '0 auto 12px auto',
+                transition: 'all 300ms ease-out',
+                minHeight: '56px',
               }}
             >
-              {pinDotIds.map((dotId, i) => (
+              {isLoading ? (
                 <div
-                  key={dotId}
                   style={{
                     width: '24px',
                     height: '24px',
+                    border: '3px solid #E5E7EB',
+                    borderTopColor: '#5080D8',
                     borderRadius: '50%',
-                    transition: 'all 200ms ease-out',
-                    backgroundColor: i < pin.length ? '#111827' : '#E5E7EB',
-                    transform: i < pin.length ? 'scale(1.15)' : 'scale(1)',
+                    animation: 'spin 0.8s linear infinite',
                   }}
                 />
-              ))}
+              ) : (
+                pinDotIds.map((dotId, i) => (
+                  <div
+                    key={dotId}
+                    style={{
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      transition: 'all 200ms ease-out',
+                      backgroundColor: i < pin.length ? '#111827' : '#E5E7EB',
+                      transform: i < pin.length ? 'scale(1.15)' : 'scale(1)',
+                    }}
+                  />
+                ))
+              )}
             </div>
 
             {/* Numpad Grid - 40% Viewport Width */}
@@ -351,37 +365,6 @@ function PinPage() {
                 <FontAwesomeIcon icon={faDeleteLeft} />
               </NumpadButton>
             </div>
-
-            {/* Loading state */}
-            {isLoading && (
-              <div
-                style={{
-                  textAlign: 'center',
-                  marginTop: '24px',
-                }}
-              >
-                <div
-                  style={{
-                    width: '32px',
-                    height: '32px',
-                    border: '3px solid #E5E7EB',
-                    borderTopColor: '#5080D8',
-                    borderRadius: '50%',
-                    animation: 'spin 1s linear infinite',
-                    margin: '0 auto 12px',
-                  }}
-                />
-                <p
-                  style={{
-                    fontSize: '16px',
-                    color: theme.colors.text.secondary,
-                    fontWeight: 500,
-                  }}
-                >
-                  PIN wird überprüft...
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>
