@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { vi } from 'vitest';
 
+import { getSchoolName, onSchoolNameLoaded } from '../services/api';
 import { logError } from '../utils/logger';
 
 import LandingPage from './LandingPage';
@@ -14,6 +15,14 @@ vi.mock('@platform', () => ({
     restartApp: vi.fn(),
   },
 }));
+
+// Mock school name API functions
+vi.mock('../services/api', () => ({
+  getSchoolName: vi.fn(() => null),
+  onSchoolNameLoaded: vi.fn(() => () => {}),
+}));
+const mockGetSchoolName = vi.mocked(getSchoolName);
+const mockOnSchoolNameLoaded = vi.mocked(onSchoolNameLoaded);
 
 const { adapter } = await import('@platform');
 const mockRestartApp = vi.mocked(adapter.restartApp);
@@ -333,5 +342,79 @@ describe('LandingPage', () => {
     expect(wrapper!.style.top).toBe('20px');
     expect(wrapper!.style.right).toBe('20px');
     expect(wrapper!.style.zIndex).toBe('50');
+  });
+
+  // --- School name display tests ---
+
+  it('displays school name when available on mount', () => {
+    mockGetSchoolName.mockReturnValue('OGS Testschule');
+
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('OGS Testschule')).toBeInTheDocument();
+  });
+
+  it('shows school name with full opacity when available', () => {
+    mockGetSchoolName.mockReturnValue('OGS Testschule');
+
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    const el = screen.getByText('OGS Testschule');
+    expect(el.style.opacity).toBe('1');
+    expect(el.style.transition).toContain('opacity');
+  });
+
+  it('renders placeholder with zero opacity when school name is null', () => {
+    mockGetSchoolName.mockReturnValue(null);
+
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    // The <p> is always rendered (with &nbsp;) but invisible
+    expect(screen.queryByText('OGS Testschule')).not.toBeInTheDocument();
+    // Find the placeholder paragraph by its transition style
+    const paragraphs = document.querySelectorAll('p');
+    const schoolNameEl = Array.from(paragraphs).find(p => p.style.opacity === '0');
+    expect(schoolNameEl).toBeDefined();
+  });
+
+  it('picks up school name after async fetch via listener', async () => {
+    mockGetSchoolName.mockReturnValue(null);
+
+    // Capture the listener that LandingPage registers
+    let capturedListener: ((name: string) => void) | null = null;
+    mockOnSchoolNameLoaded.mockImplementation((listener: (name: string) => void) => {
+      capturedListener = listener;
+      return () => {};
+    });
+
+    render(
+      <MemoryRouter>
+        <LandingPage />
+      </MemoryRouter>
+    );
+
+    // Initially no school name visible
+    expect(screen.queryByText('OGS Delayed School')).not.toBeInTheDocument();
+    expect(capturedListener).not.toBeNull();
+
+    // Simulate the fetch completing and notifying the listener
+    const { act } = await import('@testing-library/react');
+    act(() => {
+      capturedListener!('OGS Delayed School');
+    });
+
+    expect(screen.getByText('OGS Delayed School')).toBeInTheDocument();
   });
 });

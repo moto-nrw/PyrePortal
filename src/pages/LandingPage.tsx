@@ -1,15 +1,24 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { adapter } from '@platform';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import BackButton from '../components/ui/BackButton';
+import { getSchoolName, onSchoolNameLoaded } from '../services/api';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function LandingPage() {
   const navigate = useNavigate();
   const logger = createLogger('LandingPage');
+  const [schoolName, setSchoolName] = useState<string | null>(getSchoolName());
+
+  // Subscribe once: if the name arrives after mount, update state
+  useEffect(() => {
+    if (schoolName) return;
+    return onSchoolNameLoaded(setSchoolName);
+  }, [schoolName]);
 
   const handleLogin = () => {
     logger.info('User initiated login from landing page');
@@ -104,6 +113,21 @@ function LandingPage() {
             >
               Willkommen bei moto!
             </h1>
+
+            <p
+              style={{
+                fontSize: '36px',
+                color: '#4B5563',
+                textAlign: 'center',
+                fontWeight: 700,
+                marginTop: '-8px',
+                opacity: schoolName ? 1 : 0,
+                transition: 'opacity 500ms ease-in',
+                minHeight: '1.5em',
+              }}
+            >
+              {schoolName ?? '\u00A0'}
+            </p>
 
             {/* Login Button - Phoenix shadcn style (NO GRADIENT) */}
             <button
