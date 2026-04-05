@@ -142,19 +142,12 @@ function HomeViewPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
-  const pendingSessionRef = useRef<CurrentSession | null>(null);
   const recreationRequestIdRef = useRef(0);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
-
-      // Commit the recreated session only after HomeView unmounts for the scan route.
-      if (pendingSessionRef.current) {
-        useUserStore.setState({ currentSession: pendingSessionRef.current });
-        pendingSessionRef.current = null;
-      }
     };
   }, []);
 
@@ -172,7 +165,6 @@ function HomeViewPage() {
 
   // Helper to perform user logout
   const performLogout = async () => {
-    pendingSessionRef.current = null;
     recreationRequestIdRef.current += 1;
     setIsNavigatingToScanning(false);
     logUserAction('User logout initiated');
@@ -306,13 +298,9 @@ function HomeViewPage() {
         supervisors: sessionResponse.supervisors,
       };
 
+      useUserStore.setState({ currentSession: newSession });
+
       await useUserStore.getState().saveLastSessionData();
-
-      if (!isMountedRef.current || recreationRequestId !== recreationRequestIdRef.current) {
-        return;
-      }
-
-      pendingSessionRef.current = newSession;
 
       logNavigation('Home View', '/nfc-scanning');
       void navigate('/nfc-scanning');
@@ -321,7 +309,6 @@ function HomeViewPage() {
         return;
       }
 
-      pendingSessionRef.current = null;
       setIsNavigatingToScanning(false);
       showRecreationError(formatRecreationError(error));
     } finally {

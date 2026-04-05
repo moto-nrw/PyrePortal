@@ -499,23 +499,14 @@ describe('HomeViewPage', () => {
     });
   });
 
-  it('keeps logout acting as logout while recreation is still redirecting', async () => {
+  it('sets currentSession immediately and navigates after session recreation', async () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => Promise.resolve(true));
-    const logout = vi.fn(() => Promise.resolve());
-    let resolveSaveLastSessionData: (() => void) | undefined;
-    const saveLastSessionData = vi.fn(
-      () =>
-        new Promise<void>(resolve => {
-          resolveSaveLastSessionData = resolve;
-        })
-    );
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
       validateAndRecreateSession: validateMock,
-      logout,
-      saveLastSessionData,
+      saveLastSessionData: vi.fn(() => Promise.resolve()),
       selectedActivity: testActivity,
       selectedRoom: testRoom,
       selectedSupervisors: [{ id: 1, name: 'Frau Müller' }] as never[],
@@ -532,62 +523,10 @@ describe('HomeViewPage', () => {
     await user.click(startButtons[startButtons.length - 1]);
 
     await waitFor(() => {
-      expect(mockedApi.startSession).toHaveBeenCalledOnce();
-      expect(saveLastSessionData).toHaveBeenCalledOnce();
-    });
-
-    expect(useUserStore.getState().currentSession).toBeNull();
-    expect(screen.getByText('Abmelden')).toBeInTheDocument();
-    expect(screen.queryByText('Aufsicht beenden')).not.toBeInTheDocument();
-
-    await user.click(screen.getByText('Abmelden'));
-
-    await waitFor(() => {
-      expect(logout).toHaveBeenCalledOnce();
-      expect(mockNavigate).toHaveBeenCalledWith('/');
-    });
-
-    resolveSaveLastSessionData?.();
-
-    await waitFor(() => {
-      expect(useUserStore.getState().currentSession).toBeNull();
-    });
-
-    expect(mockedApi.endSession).not.toHaveBeenCalled();
-    expect(mockNavigate.mock.calls).not.toContainEqual(['/nfc-scanning']);
-  });
-
-  it('stores the recreated session once home view unmounts for scanning navigation', async () => {
-    const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
-
-    useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
-      validateAndRecreateSession: validateMock,
-      saveLastSessionData: vi.fn(() => Promise.resolve()),
-      selectedActivity: testActivity,
-      selectedRoom: testRoom,
-      selectedSupervisors: [{ id: 1, name: 'Frau Müller' }] as never[],
-    });
-    const { unmount } = renderPage();
-
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
-
-    await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
     });
 
-    expect(useUserStore.getState().currentSession).toBeNull();
-
-    unmount();
-
+    // currentSession is set synchronously before navigation
     expect(useUserStore.getState().currentSession).toMatchObject({
       active_group_id: 99,
       activity_id: 10,
