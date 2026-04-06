@@ -983,6 +983,201 @@ describe('ActivityScanningPage', () => {
     });
   });
 
+  it('skips feedback and shows farewell when backend disables feedback', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.toggleAttendance.mockResolvedValueOnce({
+      status: 'confirmed',
+      message: 'Daily checkout confirmed',
+      data: {
+        feedback_enabled: false,
+      },
+    } as never);
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'checked_out',
+        daily_checkout_available: true,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+      },
+      showModal: true,
+    };
+
+    renderPage();
+    await user.click(screen.getByText('nach Hause'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gut')).not.toBeInTheDocument();
+  });
+
+  it('skips feedback after checkout confirmation fails when scan disables feedback', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.toggleAttendance.mockRejectedValueOnce(new Error('Server error'));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'checked_out',
+        daily_checkout_available: true,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+        feedback_enabled: false,
+      },
+      showModal: true,
+    };
+
+    renderPage();
+    await user.click(screen.getByText('nach Hause'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Gut')).not.toBeInTheDocument();
+  });
+
+  it('keeps the new scan visible when feedback is disabled after checkout state was cleared', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    let resolveToggleAttendance: ((value: unknown) => void) | undefined;
+
+    mockedApi.toggleAttendance.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveToggleAttendance = resolve;
+        }) as never
+    );
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'checked_out',
+        daily_checkout_available: true,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+        visit_id: 100,
+      },
+      showModal: true,
+    };
+
+    const view = renderPage();
+    await user.click(screen.getByText('nach Hause'));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 43,
+        student_name: 'Max Mustermann',
+        action: 'checked_in',
+        room_name: 'Raum 101',
+        scannedTagId: '04:11:22:33:44:55:66',
+        visit_id: 101,
+      },
+      showModal: true,
+    };
+
+    await act(async () => {
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      resolveToggleAttendance?.({
+        status: 'confirmed',
+        message: 'Daily checkout confirmed',
+        data: {
+          feedback_enabled: false,
+        },
+      });
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
+    expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+  });
+
+  it('keeps the new scan visible when failed checkout confirmation falls back to disabled feedback', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    let rejectToggleAttendance: ((reason?: unknown) => void) | undefined;
+
+    mockedApi.toggleAttendance.mockImplementationOnce(
+      () =>
+        new Promise((_, reject) => {
+          rejectToggleAttendance = reject;
+        }) as never
+    );
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'checked_out',
+        daily_checkout_available: true,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+        feedback_enabled: false,
+        visit_id: 100,
+      },
+      showModal: true,
+    };
+
+    const view = renderPage();
+    await user.click(screen.getByText('nach Hause'));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 43,
+        student_name: 'Max Mustermann',
+        action: 'checked_in',
+        room_name: 'Raum 101',
+        scannedTagId: '04:11:22:33:44:55:66',
+        visit_id: 101,
+      },
+      showModal: true,
+    };
+
+    await act(async () => {
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
+    });
+
+    await act(async () => {
+      rejectToggleAttendance?.(new Error('Server error'));
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
+    });
+
+    expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+  });
+
   it('submits positive feedback and shows farewell', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.toggleAttendance.mockResolvedValueOnce({
