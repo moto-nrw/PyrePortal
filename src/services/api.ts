@@ -1480,6 +1480,8 @@ export interface RfidScanResult {
   greeting?: string;
   /** Whether the student is eligible for daily checkout ("nach Hause") */
   daily_checkout_available?: boolean;
+  /** Whether the feedback modal should be shown after daily checkout */
+  feedback_enabled?: boolean;
   /** Today's scheduled pickup time in HH:MM format (e.g. "15:30") */
   pickup_time?: string;
   /** Optional pickup note for the current day */
@@ -1552,6 +1554,8 @@ interface AttendanceToggleResponse {
       checked_out_by: string;
     };
     message: string;
+    /** Whether the feedback modal should be shown after daily checkout */
+    feedback_enabled?: boolean;
   };
   message: string;
 }
