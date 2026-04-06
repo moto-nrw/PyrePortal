@@ -731,24 +731,38 @@ const ActivityScanningPage: React.FC = () => {
     });
 
     try {
-      await api.toggleAttendance(
+      const response = await api.toggleAttendance(
         authenticatedUser.pin,
         checkoutDestinationState.rfid,
         'confirm_daily_checkout',
         'zuhause'
       );
-      logger.info('Daily checkout confirmed, showing feedback prompt');
+      logger.info('Daily checkout confirmed');
       feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
-      setShowFeedbackPrompt(true);
+
+      // Show feedback prompt only if feedback is enabled for this tenant
+      const feedbackEnabled = response.data?.feedback_enabled !== false;
+      if (feedbackEnabled) {
+        setShowFeedbackPrompt(true);
+      } else {
+        logger.info('Feedback disabled for tenant, skipping feedback prompt');
+        setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+      }
     } catch (error) {
       logger.error('Failed to confirm daily checkout', {
         rfid: checkoutDestinationState.rfid,
         error: error instanceof Error ? error.message : String(error),
       });
-      // Still show feedback prompt — the visit is already ended,
-      // attendance sync failure shouldn't block the student
+      // Still proceed — the visit is already ended,
+      // attendance sync failure shouldn't block the student.
+      // Fall back to checkin scan's feedback_enabled flag.
       feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
-      setShowFeedbackPrompt(true);
+      const feedbackEnabled = currentScan?.feedback_enabled !== false;
+      if (feedbackEnabled) {
+        setShowFeedbackPrompt(true);
+      } else {
+        setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+      }
     }
   };
 
