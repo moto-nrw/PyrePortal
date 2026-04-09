@@ -17,7 +17,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y xdg-utils
 
       - name: Build Tauri app with RFID support
-        run: npm run tauri build -- --features rfid --no-bundle
+        run: pnpm run tauri build --no-bundle -- --features rfid
         env:
           VITE_ENABLE_RFID: 'true'
 

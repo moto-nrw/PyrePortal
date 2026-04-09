@@ -1,12 +1,12 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "pyreportal",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "identifier": "com.pyreportal.app",
   "build": {
-    "beforeDevCommand": "BUILD_TARGET=tauri npm run dev",
+    "beforeDevCommand": "BUILD_TARGET=tauri pnpm run dev",
     "devUrl": "http://localhost:1420",
-    "beforeBuildCommand": "BUILD_TARGET=tauri npm run build",
+    "beforeBuildCommand": "BUILD_TARGET=tauri pnpm run build",
     "frontendDist": "../dist"
   },
   "app": {

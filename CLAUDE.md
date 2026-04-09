@@ -1,25 +1,3 @@
-<!-- OPENSPEC:START -->
-
-# OpenSpec Instructions
-
-These instructions are for AI assistants working in this project.
-
-Always open `@/openspec/AGENTS.md` when the request:
-
-- Mentions planning or proposals (words like proposal, spec, change, plan)
-- Introduces new capabilities, breaking changes, architecture shifts, or big performance/security work
-- Sounds ambiguous and you need the authoritative spec before coding
-
-Use `@/openspec/AGENTS.md` to learn:
-
-- How to create and apply change proposals
-- Spec format and conventions
-- Project structure and guidelines
-
-Keep this managed block so 'openspec update' can refresh the instructions.
-
-<!-- OPENSPEC:END -->
-
 # CLAUDE.md
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
@@ -47,15 +25,15 @@ PyrePortal is a **Raspberry Pi kiosk application** for German after-school care 
 
 ```bash
 # Development
-npm run tauri dev       # Full app (Rust + Frontend) - required for RFID testing
-npm run dev            # Frontend only (faster, use when working on UI only)
+pnpm run tauri dev       # Full app (Rust + Frontend) - required for RFID testing
+pnpm run dev            # Frontend only (faster, use when working on UI only)
 
 # Code quality (ALWAYS run before committing)
-npm run check          # ESLint + TypeScript - must pass
-npm run format         # Auto-format with Prettier
+pnpm run check          # ESLint + TypeScript - must pass
+pnpm run format         # Auto-format with Prettier
 
 # Production build
-npm run tauri build    # Platform-specific installers in src-tauri/target/release/bundle/
+pnpm run tauri build    # Platform-specific installers in src-tauri/target/release/bundle/
 
 # Rust development (in src-tauri/)
 cargo clippy           # Linter (strict)
@@ -67,7 +45,7 @@ cargo test            # Run tests
 
 ```bash
 # Frontend tests (when implemented - currently no tests)
-npm test -- <test-file-pattern>
+pnpm test -- <test-file-pattern>
 
 # Rust tests
 cd src-tauri && cargo test <test-name>
@@ -240,7 +218,7 @@ See `.claude/rules/release.md` for the full release checklist. Key rules:
 
 - **Before any release**: Run `./scripts/check-version.sh` and verify it passes
 - **Version sync**: `package.json`, `Cargo.toml`, and `tauri.conf.json` must be bumped before building on the Pi
-- **Pre-push hook**: `.husky/pre-push` blocks pushes with mismatched versions automatically
+- **Pre-push hook**: Lefthook `version-sync` command in `lefthook.yml` blocks pushes with mismatched versions automatically
 - **Security**: This repo is public. Never commit secrets, API keys, `.env` files, PINs, or credentials
 
 ## Adding New Features
@@ -372,10 +350,10 @@ const { isScanning, startScanning, stopScanning, currentScan, showModal } = useR
 ### Build Issues
 
 ```bash
-npm run clean:target   # Clean Rust artifacts
+pnpm run clean:target   # Clean Rust artifacts
 rm -rf node_modules dist
-npm install
-npm run tauri build
+pnpm install
+pnpm run tauri build
 ```
 
 ## Current Implementation Status

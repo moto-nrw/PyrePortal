@@ -1,7 +1,7 @@
 /**
  * Browser Platform Adapter (stub)
  *
- * Mock adapter for browser dev mode (npm run dev without Tauri).
+ * Mock adapter for browser dev mode (pnpm run dev without Tauri).
  * For now, this is a skeleton that satisfies the interface.
  * Actual implementation happens in Phase 1-4.
  */

@@ -2190,4 +2190,102 @@ describe('api methods', () => {
       await freshApi.getTeachers();
     });
   });
+
+  // ------------------------------------------------------------------
+  // fetchSchoolName / getSchoolName
+  // ------------------------------------------------------------------
+
+  describe('fetchSchoolName', () => {
+    it('fetches and stores school name on success', async () => {
+      const { fetchSchoolName: freshFetch, getSchoolName: freshGet } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { name: 'OGS Testschule' }, message: 'ok' })
+      );
+
+      await freshFetch();
+
+      expect(freshGet()).toBe('OGS Testschule');
+    });
+
+    it('returns null when fetch fails', async () => {
+      const { fetchSchoolName: freshFetch, getSchoolName: freshGet } = await getFreshApi();
+
+      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await freshFetch();
+
+      expect(freshGet()).toBeNull();
+    });
+
+    it('returns null when server returns error status', async () => {
+      const { fetchSchoolName: freshFetch, getSchoolName: freshGet } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(
+          { status: 'error', message: 'unauthorized' },
+          { status: 401, statusText: 'Unauthorized' }
+        )
+      );
+
+      await freshFetch();
+
+      expect(freshGet()).toBeNull();
+    });
+  });
+
+  describe('getSchoolName', () => {
+    it('returns null before fetchSchoolName is called', async () => {
+      const { getSchoolName: freshGet } = await getFreshApi();
+      expect(freshGet()).toBeNull();
+    });
+  });
+
+  describe('onSchoolNameLoaded', () => {
+    it('calls listener immediately if school name is already loaded', async () => {
+      const { fetchSchoolName: freshFetch, onSchoolNameLoaded: freshOn } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { name: 'Already Loaded' }, message: 'ok' })
+      );
+      await freshFetch();
+
+      const listener = vi.fn();
+      freshOn(listener);
+
+      expect(listener).toHaveBeenCalledWith('Already Loaded');
+    });
+
+    it('calls listener when school name arrives later', async () => {
+      const { fetchSchoolName: freshFetch, onSchoolNameLoaded: freshOn } = await getFreshApi();
+
+      const listener = vi.fn();
+      freshOn(listener);
+
+      // Not called yet — name not loaded
+      expect(listener).not.toHaveBeenCalled();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { name: 'Delayed School' }, message: 'ok' })
+      );
+      await freshFetch();
+
+      expect(listener).toHaveBeenCalledWith('Delayed School');
+    });
+
+    it('returns unsubscribe function that prevents callback', async () => {
+      const { fetchSchoolName: freshFetch, onSchoolNameLoaded: freshOn } = await getFreshApi();
+
+      const listener = vi.fn();
+      const unsub = freshOn(listener);
+      unsub();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { name: 'Unsubscribed' }, message: 'ok' })
+      );
+      await freshFetch();
+
+      expect(listener).not.toHaveBeenCalled();
+    });
+  });
 });

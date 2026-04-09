@@ -123,6 +123,7 @@ const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
     'staff RFID authentication must be done via session management',
     'Betreuer-Armband kann hier nicht verwendet werden.',
   ],
+  ['student RFID tag required for pickup query', 'Bitte Schüler-Armband scannen.'],
   ['RFID parameter is required', 'RFID-Tag fehlt in der Anfrage.'],
 
   // 6. ATTENDANCE/VISIT ERRORS (404)
@@ -394,6 +395,8 @@ function mapAttendanceErrorToGerman(
 // Environment configuration - will be loaded at runtime
 let API_BASE_URL = '';
 let DEVICE_API_KEY = '';
+
+const schoolNameState = { value: null as string | null };
 let isInitialized = false;
 
 // Network status callback - set by the app to receive status updates from API calls
@@ -447,6 +450,47 @@ export async function initializeApi(): Promise<void> {
     baseUrl: API_BASE_URL,
     hasApiKey: !!DEVICE_API_KEY,
   });
+}
+
+/**
+ * Returns the school name for the device, or null if not yet loaded / unavailable.
+ */
+export function getSchoolName(): string | null {
+  return schoolNameState.value;
+}
+
+/**
+ * Register a listener that fires once when the school name becomes available.
+ * If the name is already loaded, the listener is called synchronously.
+ * Returns an unsubscribe function.
+ */
+export function onSchoolNameLoaded(listener: (name: string) => void): () => void {
+  if (schoolNameState.value) {
+    listener(schoolNameState.value);
+    return () => undefined;
+  }
+  schoolNameListeners.add(listener);
+  return () => schoolNameListeners.delete(listener);
+}
+
+const schoolNameListeners = new Set<(name: string) => void>();
+
+/**
+ * Fetch school name from the backend (best-effort).
+ * Call after initializeApi(). Failure is silently ignored.
+ */
+export async function fetchSchoolName(): Promise<void> {
+  try {
+    const res = await apiCall<{ status: string; data: { name: string } }>('/api/iot/school-name', {
+      headers: { Authorization: `Bearer ${DEVICE_API_KEY}` },
+    });
+    schoolNameState.value = res.data.name;
+    logger.info('School name loaded', { schoolName: schoolNameState.value });
+    for (const listener of schoolNameListeners) listener(schoolNameState.value);
+    schoolNameListeners.clear();
+  } catch {
+    logger.warn('Failed to fetch school name, continuing without it');
+  }
 }
 
 /**
@@ -1210,6 +1254,32 @@ export const api = {
   },
 
   /**
+   * Query pickup info without mutating attendance
+   * Endpoint: POST /api/iot/pickup-query
+   */
+  async queryPickupInfo(
+    scanData: {
+      student_rfid: string;
+    },
+    pin: string
+  ): Promise<RfidScanResult> {
+    const response = await apiCall<{
+      data: RfidScanResult;
+      message: string;
+      status: string;
+    }>('/api/iot/pickup-query', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+        'X-Staff-PIN': pin,
+      },
+      body: JSON.stringify(scanData),
+    });
+
+    return response.data;
+  },
+
+  /**
    * Update session activity to prevent timeout
    * Endpoint: POST /api/iot/session/activity
    */
@@ -1403,12 +1473,19 @@ export interface RfidScanResult {
     | 'checked_in'
     | 'checked_out'
     | 'transferred'
+    | 'pickup_info'
     | 'supervisor_authenticated'
     | 'error'
     | 'already_in';
   greeting?: string;
   /** Whether the student is eligible for daily checkout ("nach Hause") */
   daily_checkout_available?: boolean;
+  /** Whether the feedback modal should be shown after daily checkout */
+  feedback_enabled?: boolean;
+  /** Today's scheduled pickup time in HH:MM format (e.g. "15:30") */
+  pickup_time?: string;
+  /** Optional pickup note for the current day */
+  pickup_note?: string;
   visit_id?: number;
   room_name?: string;
   previous_room?: string;
@@ -1477,6 +1554,8 @@ interface AttendanceToggleResponse {
       checked_out_by: string;
     };
     message: string;
+    /** Whether the feedback modal should be shown after daily checkout */
+    feedback_enabled?: boolean;
   };
   message: string;
 }

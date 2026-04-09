@@ -31,7 +31,15 @@ vi.mock('../services/api', async () => {
     ...actual,
     api: {
       ...actual.api,
-      startSession: vi.fn().mockResolvedValue({ active_group_id: 99 }),
+      startSession: vi.fn().mockResolvedValue({
+        active_group_id: 99,
+        activity_id: 10,
+        device_id: 1,
+        start_time: '2026-03-15T10:00:00Z',
+        supervisors: [],
+        status: 'started',
+        message: 'Activity session started successfully',
+      }),
       endSession: vi.fn().mockResolvedValue(undefined),
     },
   };
@@ -491,20 +499,13 @@ describe('HomeViewPage', () => {
     });
   });
 
-  it('keeps logout label as "Abmelden" while recreation is redirecting', async () => {
+  it('sets currentSession immediately and navigates after session recreation', async () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => Promise.resolve(true));
-    const fetchCurrentSession = vi
-      .fn<() => Promise<void>>()
-      .mockResolvedValueOnce(undefined)
-      .mockImplementationOnce(async () => {
-        useUserStore.setState({ currentSession: activeSession });
-      });
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
       validateAndRecreateSession: validateMock,
-      fetchCurrentSession,
       saveLastSessionData: vi.fn(() => Promise.resolve()),
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -522,12 +523,18 @@ describe('HomeViewPage', () => {
     await user.click(startButtons[startButtons.length - 1]);
 
     await waitFor(() => {
-      expect(fetchCurrentSession).toHaveBeenCalledTimes(2);
+      expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
     });
 
-    expect(screen.getByText('Abmelden')).toBeInTheDocument();
-    expect(screen.queryByText('Aufsicht beenden')).not.toBeInTheDocument();
-    expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
+    // currentSession is set synchronously before navigation
+    expect(useUserStore.getState().currentSession).toMatchObject({
+      active_group_id: 99,
+      activity_id: 10,
+      room_id: 5,
+      room_name: 'Raum A',
+      activity_name: 'Hausaufgaben',
+      is_active: true,
+    });
   });
 
   it('confirm recreation shows error when session data is incomplete (no activity)', async () => {

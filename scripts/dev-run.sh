@@ -235,9 +235,9 @@ case $RUN_MODE in
         echo ""
 
         if [[ "$VITE_ENABLE_RFID" == "true" ]]; then
-            exec npm run tauri dev -- --features rfid
+            exec pnpm run tauri dev -- --features rfid
         else
-            exec npm run tauri dev
+            exec pnpm run tauri dev
         fi
         ;;
 
@@ -247,10 +247,10 @@ case $RUN_MODE in
 
         if [[ "$VITE_ENABLE_RFID" == "true" ]]; then
             echo -e "${GREEN}Building with RFID support${NC}"
-            npm run tauri build -- --features rfid
+            pnpm run tauri build -- --features rfid
         else
             echo -e "${YELLOW}Building without RFID support${NC}"
-            npm run tauri build
+            pnpm run tauri build
         fi
 
         echo -e "${GREEN}Build complete!${NC}"
@@ -267,7 +267,7 @@ case $RUN_MODE in
         if [[ ! -f "$BINARY_PATH" ]]; then
             echo -e "${RED}Error: Binary not found at $BINARY_PATH${NC}"
             echo -e "${YELLOW}Run with --build flag or build manually first:${NC}"
-            echo -e "  npm run tauri build -- --features rfid"
+            echo -e "  pnpm run tauri build -- --features rfid"
             exit 1
         fi
 

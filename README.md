@@ -82,7 +82,7 @@ flowchart TB
 ```bash
 git clone git@github.com:moto-nrw/PyrePortal.git
 cd PyrePortal
-npm install
+pnpm install
 ```
 
 Create a `.env` file in the project root:
@@ -97,22 +97,22 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80
 ### Run
 
 ```bash
-npm run tauri dev    # Full app (Rust + React)
-npm run dev          # Frontend only (faster, no RFID)
+pnpm run tauri dev    # Full app (Rust + React)
+pnpm run dev          # Frontend only (faster, no RFID)
 ```
 
 ### Build
 
 ```bash
-npm run tauri build
+pnpm run tauri build
 # Output: src-tauri/target/release/bundle/
 ```
 
 ### Code Quality
 
 ```bash
-npm run check        # ESLint + TypeScript (must pass before committing)
-npm run format       # Prettier auto-format
+pnpm run check        # ESLint + TypeScript (must pass before committing)
+pnpm run format       # Prettier auto-format
 cd src-tauri && cargo clippy   # Rust linter
 ```
 
@@ -192,10 +192,10 @@ Start an activity, assign supervisors, and scan students in. At checkout, staff 
 ### Build errors
 
 ```bash
-npm run clean:target   # Clean Rust artifacts
+pnpm run clean:target   # Clean Rust artifacts
 rm -rf node_modules dist
-npm install
-npm run tauri build
+pnpm install
+pnpm run tauri build
 ```
 
 ### RFID not working
