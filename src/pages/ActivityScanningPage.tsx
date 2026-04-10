@@ -20,6 +20,7 @@ import {
   mapServerErrorToGerman,
   type RfidScanResult,
   type DailyFeedbackRating,
+  type DeviceConfig,
 } from '../services/api';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
@@ -386,6 +387,9 @@ const ActivityScanningPage: React.FC = () => {
   // WC room ID (discovered dynamically from server)
   const [wcRoomId, setWcRoomId] = useState<number | null>(null);
 
+  // Device config (checkout button visibility, fetched once on mount)
+  const [deviceConfig, setDeviceConfig] = useState<DeviceConfig | null>(null);
+
   // Pickup query prompt state
   const [isAwaitingPickupQueryScan, setIsAwaitingPickupQueryScan] = useState(false);
   const isPickupQueryLoading =
@@ -521,6 +525,27 @@ const ActivityScanningPage: React.FC = () => {
 
     void fetchSchulhofRoom();
   }, [authenticatedUser?.pin]);
+
+  // Fetch device config once on mount (checkout button visibility, feedback settings)
+  useEffect(() => {
+    const fetchDeviceConfig = async () => {
+      try {
+        const config = await api.getDeviceConfig();
+        setDeviceConfig(config);
+        logger.info('Device config loaded', {
+          raumwechsel: config.checkout.raumwechsel_enabled,
+          schulhof: config.checkout.schulhof_enabled,
+          wc: config.checkout.wc_enabled,
+          feedbackEnabled: config.feedback.enabled,
+        });
+      } catch (error) {
+        logger.error('Failed to fetch device config', { error: serializeError(error) });
+        // Non-critical — buttons default to visible when config is unavailable
+      }
+    };
+
+    void fetchDeviceConfig();
+  }, []);
 
   // Update student count based on scan result
   // Refactored to use extracted helper functions (SonarCloud S3776 fix)
@@ -1096,28 +1121,32 @@ const ActivityScanningPage: React.FC = () => {
         colorScheme?: keyof typeof DESTINATION_COLORS;
         onClick: () => void;
       }[] = [
-        {
-          destination: 'raumwechsel',
-          label: 'Raumwechsel',
-          icon: (
-            <svg
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="white"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-          ),
-          onClick: () => void handleDestinationSelect('raumwechsel'),
-        },
-        ...(schulhofRoomId
+        ...(deviceConfig?.checkout.raumwechsel_enabled !== false
+          ? [
+              {
+                destination: 'raumwechsel' as const,
+                label: 'Raumwechsel',
+                icon: (
+                  <svg
+                    width="48"
+                    height="48"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="white"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <polyline points="16 17 21 12 16 7" />
+                    <line x1="21" y1="12" x2="9" y2="12" />
+                  </svg>
+                ),
+                onClick: () => void handleDestinationSelect('raumwechsel'),
+              },
+            ]
+          : []),
+        ...(schulhofRoomId && deviceConfig?.checkout.schulhof_enabled !== false
           ? [
               {
                 destination: 'schulhof' as const,
@@ -1156,7 +1185,7 @@ const ActivityScanningPage: React.FC = () => {
               },
             ]
           : []),
-        ...(wcRoomId
+        ...(wcRoomId && deviceConfig?.checkout.wc_enabled !== false
           ? [
               {
                 destination: 'toilette' as const,
