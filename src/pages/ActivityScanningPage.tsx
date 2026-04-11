@@ -114,7 +114,7 @@ const DESTINATION_BUTTON_STYLES = {
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
-    width: '200px',
+    width: '240px',
     aspectRatio: '5 / 4',
   },
   hover: {
