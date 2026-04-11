@@ -680,7 +680,7 @@ describe('ActivityScanningPage', () => {
     await user.click(screen.getByText('Raumwechsel'));
     // After clicking Raumwechsel, destination state is cleared —
     // the modal should show the checked_out confirmation instead of destination buttons
-    expect(screen.getByText('Lisa ist unterwegs')).toBeInTheDocument();
+    expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
   });
 
   // =======================================================================
@@ -2075,7 +2075,7 @@ describe('ActivityScanningPage', () => {
     renderPage();
     expect(screen.getByText('Raumwechsel')).toBeInTheDocument();
     await user.click(screen.getByText('Raumwechsel'));
-    expect(screen.getByText('Max ist unterwegs')).toBeInTheDocument();
+    expect(screen.getByText('Tschüss, Max!')).toBeInTheDocument();
   });
 
   // =======================================================================
