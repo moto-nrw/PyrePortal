@@ -110,11 +110,12 @@ const DESTINATION_BUTTON_STYLES = {
     color: '#FFFFFF',
     fontSize: '32px',
     fontWeight: 700,
-    padding: '32px 48px',
+    padding: '28px 36px',
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
-    width: '280px',
+    width: '200px',
+    aspectRatio: '5 / 4',
   },
   hover: {
     backgroundColor: 'rgba(255, 255, 255, 0.35)',
@@ -133,6 +134,69 @@ const DESTINATION_COLORS = {
   toilette: { bg: 'rgba(96, 165, 250, 0.85)', bgHover: 'rgba(96, 165, 250, 0.95)' },
   destructive: { bg: 'rgba(220, 38, 38, 0.5)', bgHover: 'rgba(220, 38, 38, 0.65)' },
 };
+
+// Static SVG icons hoisted out of render path to avoid per-render allocation on Pi
+const ICON_RAUMWECHSEL = (
+  <svg
+    width="48"
+    height="48"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="white"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
+const ICON_SCHULHOF = (
+  <svg
+    width="48"
+    height="48"
+    viewBox="0 0 64 64"
+    fill="none"
+    stroke="#FFFFFF"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    {/* Top horizontal bar */}
+    <line x1="6" y1="8" x2="58" y2="8" strokeWidth="3" />
+    {/* Left A-leg front */}
+    <line x1="6" y1="8" x2="12" y2="58" />
+    {/* Left A-leg back */}
+    <line x1="6" y1="8" x2="2" y2="58" />
+    {/* Right A-leg front */}
+    <line x1="58" y1="8" x2="52" y2="58" />
+    {/* Right A-leg back */}
+    <line x1="58" y1="8" x2="62" y2="58" />
+    {/* Left chain */}
+    <line x1="24" y1="8" x2="22" y2="40" />
+    {/* Right chain */}
+    <line x1="40" y1="8" x2="42" y2="40" />
+    {/* Seat */}
+    <rect x="19" y="40" width="26" height="4" rx="2" fill="#FFFFFF" />
+  </svg>
+);
+
+const ICON_NACH_HAUSE = (
+  <svg
+    width="48"
+    height="48"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="white"
+    strokeWidth="2.2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+  </svg>
+);
 
 /** Reusable destination button for checkout modal */
 function DestinationButton({
@@ -161,6 +225,7 @@ function DestinationButton({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        justifyContent: 'center',
         gap: '12px',
       }}
       onPointerDown={e => {
@@ -389,6 +454,17 @@ const ActivityScanningPage: React.FC = () => {
 
   // Device config (checkout button visibility, fetched once on mount)
   const [deviceConfig, setDeviceConfig] = useState<DeviceConfig | null>(null);
+
+  // Compute how many destination buttons will be visible (drives modal size)
+  const destinationCount = useMemo(() => {
+    if (!checkoutDestinationState || checkoutDestinationState.showingFarewell) return 0;
+    let count = 0;
+    if (deviceConfig?.checkout.raumwechsel_enabled !== false) count++;
+    if (schulhofRoomId && deviceConfig?.checkout.schulhof_enabled !== false) count++;
+    if (wcRoomId && deviceConfig?.checkout.wc_enabled !== false) count++;
+    if (checkoutDestinationState.dailyCheckoutAvailable) count++;
+    return count;
+  }, [deviceConfig, schulhofRoomId, wcRoomId, checkoutDestinationState]);
 
   // Pickup query prompt state
   const [isAwaitingPickupQueryScan, setIsAwaitingPickupQueryScan] = useState(false);
@@ -1126,22 +1202,7 @@ const ActivityScanningPage: React.FC = () => {
               {
                 destination: 'raumwechsel' as const,
                 label: 'Raumwechsel',
-                icon: (
-                  <svg
-                    width="48"
-                    height="48"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                    <polyline points="16 17 21 12 16 7" />
-                    <line x1="21" y1="12" x2="9" y2="12" />
-                  </svg>
-                ),
+                icon: ICON_RAUMWECHSEL,
                 onClick: () => void handleDestinationSelect('raumwechsel'),
               },
             ]
@@ -1152,35 +1213,7 @@ const ActivityScanningPage: React.FC = () => {
                 destination: 'schulhof' as const,
                 label: 'Schulhof',
                 colorScheme: 'schulhof' as const,
-                icon: (
-                  <svg
-                    width="48"
-                    height="48"
-                    viewBox="0 0 64 64"
-                    fill="none"
-                    stroke="#FFFFFF"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    {/* Top horizontal bar */}
-                    <line x1="6" y1="8" x2="58" y2="8" strokeWidth="3" />
-                    {/* Left A-leg front */}
-                    <line x1="6" y1="8" x2="12" y2="58" />
-                    {/* Left A-leg back */}
-                    <line x1="6" y1="8" x2="2" y2="58" />
-                    {/* Right A-leg front */}
-                    <line x1="58" y1="8" x2="52" y2="58" />
-                    {/* Right A-leg back */}
-                    <line x1="58" y1="8" x2="62" y2="58" />
-                    {/* Left chain */}
-                    <line x1="24" y1="8" x2="22" y2="40" />
-                    {/* Right chain */}
-                    <line x1="40" y1="8" x2="42" y2="40" />
-                    {/* Seat */}
-                    <rect x="19" y="40" width="26" height="4" rx="2" fill="#FFFFFF" />
-                  </svg>
-                ),
+                icon: ICON_SCHULHOF,
                 onClick: () => void handleDestinationSelect('schulhof'),
               },
             ]
@@ -1207,25 +1240,19 @@ const ActivityScanningPage: React.FC = () => {
                 destination: 'nach_hause' as const,
                 label: 'nach Hause',
                 colorScheme: 'destructive' as const,
-                icon: (
-                  <svg
-                    width="48"
-                    height="48"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="white"
-                    strokeWidth="2.2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                ),
+                icon: ICON_NACH_HAUSE,
                 onClick: handleNachHause,
               },
             ]
           : []),
       ];
+
+      // No destinations available — skip straight to farewell instead of showing
+      // "Wohin geht X?" with an empty button grid
+      if (destinations.length === 0) {
+        setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+        return null;
+      }
 
       // Determine grid columns: 2x2 for 3-4 buttons, single row for 1-2
       const gridColumns = destinations.length >= 3 ? 2 : destinations.length;
@@ -1567,13 +1594,16 @@ const ActivityScanningPage: React.FC = () => {
         <ModalBase
           isOpen={shouldShowCheckModal}
           onClose={handleModalTimeout}
+          autoWidth
           size={
             !isPickupQueryPromptOpen &&
             !showFeedbackPrompt &&
             currentScan?.action === 'checked_out' &&
             checkoutDestinationState &&
             !checkoutDestinationState.showingFarewell
-              ? 'xl'
+              ? destinationCount >= 3
+                ? 'xl'
+                : 'lg'
               : 'lg'
           }
           backgroundColor={(() => {
@@ -1828,10 +1858,10 @@ const ActivityScanningPage: React.FC = () => {
                 return `Wohin geht ${firstName}?`;
               }
 
-              // Checkout after destination selected (e.g. Raumwechsel): confirmation
+              // Checkout farewell: after destination selected or no destinations available
               if (currentScan?.action === 'checked_out') {
                 const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return `${firstName} ist unterwegs`;
+                return `Tschüss, ${firstName}!`;
               }
 
               // Fallback: use backend message or student name
