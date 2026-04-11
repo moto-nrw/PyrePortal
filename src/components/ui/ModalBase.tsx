@@ -260,7 +260,7 @@ export function ModalBase({
           padding: sizePreset.padding,
           maxWidth: sizePreset.maxWidth,
           width: autoWidth ? 'fit-content' : '90vw',
-          minWidth: autoWidth ? '300px' : undefined,
+          minWidth: autoWidth ? '450px' : undefined,
           textAlign: 'center',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
           position: 'relative',
