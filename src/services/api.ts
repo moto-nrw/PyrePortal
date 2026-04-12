@@ -1422,7 +1422,39 @@ export const api = {
       throw new Error(mapAttendanceErrorToGerman(errorMessage, 'feedback'));
     }
   },
+
+  /**
+   * Get device configuration (checkout button visibility, feedback settings)
+   * Endpoint: GET /api/iot/config
+   * Auth: Device API key only (no PIN required)
+   */
+  async getDeviceConfig(): Promise<DeviceConfig> {
+    const response = await apiCall<{ status: string; data: DeviceConfig }>('/api/iot/config', {
+      headers: {
+        Authorization: `Bearer ${DEVICE_API_KEY}`,
+      },
+    });
+
+    return response.data;
+  },
 };
+
+/**
+ * Device configuration returned by GET /api/iot/config.
+ * Controls which buttons appear on the checkout screen and whether feedback is shown.
+ */
+export interface DeviceConfig {
+  checkout: {
+    raumwechsel_enabled: boolean;
+    schulhof_enabled: boolean;
+    wc_enabled: boolean;
+    /** "HH:MM" or null (null = "nach Hause" always available) */
+    daily_checkout_time: string | null;
+  };
+  feedback: {
+    enabled: boolean;
+  };
+}
 
 /**
  * Student data structure from /api/iot/students

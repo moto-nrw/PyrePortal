@@ -10,9 +10,9 @@ type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 /** Size preset configurations matching existing modal dimensions */
 const SIZE_PRESETS = {
   sm: { maxWidth: '500px', padding: '48px', borderRadius: '20px' }, // ErrorModal, SuccessModal, InfoModal
-  md: { maxWidth: '600px', padding: '56px', borderRadius: '24px' }, // Future use
+  md: { maxWidth: '600px', padding: '56px', borderRadius: '24px' }, // GroupPicker, TagAssignment scanner
   lg: { maxWidth: '700px', padding: '64px', borderRadius: '32px' }, // ActivityScanningPage (current default)
-  xl: { maxWidth: '1060px', padding: '64px', borderRadius: '32px' }, // Wide modals (e.g., 3-button checkout destination)
+  xl: { maxWidth: '1060px', padding: '64px', borderRadius: '32px' }, // Wide modals (e.g., 4-button checkout)
 } as const;
 
 /**
@@ -60,6 +60,9 @@ interface ModalBaseProps {
 
   /** Backdrop blur amount. Default: '4px' */
   backdropBlur?: string;
+
+  /** Use fit-content width instead of 90vw. Default: false */
+  autoWidth?: boolean;
 
   // --- Timeout ---
 
@@ -129,6 +132,7 @@ export function ModalBase({
   onTimeout,
   timeoutColor,
   timeoutTrackColor,
+  autoWidth = false,
   closeOnBackdropClick = true,
   closeOnContentClick = false,
   closeOnEscapeKey = true,
@@ -255,7 +259,8 @@ export function ModalBase({
           borderRadius: sizePreset.borderRadius,
           padding: sizePreset.padding,
           maxWidth: sizePreset.maxWidth,
-          width: '90vw',
+          width: autoWidth ? 'fit-content' : '90vw',
+          minWidth: autoWidth ? '700px' : undefined,
           textAlign: 'center',
           boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
           position: 'relative',
