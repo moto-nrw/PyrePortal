@@ -37,6 +37,18 @@ export function __resetModuleStateForTesting(): void {
 const logger = createLogger('useRfidScanning');
 const PROCESSED_SCAN_ID_TTL_MS = 30_000;
 
+// How long to hard-block a tag after a STUDENT_ALREADY_ACTIVE 409 (Issue
+// #844). This is the only mechanism that actually suppresses repeated
+// scans at the adapter level — canProcessTag() / isValidStudentScan()
+// allow same-action repeats, so populating tagToStudentMap alone does
+// not prevent the kiosk from re-firing 409s when a bracelet is left on
+// the reader. The duration covers the modal display window
+// (modalDisplayTime is ~1.5s) plus a generous buffer for the user to
+// remove the bracelet, while staying short enough that a deliberate
+// re-scan after the issue is resolved (e.g. backend checkout in another
+// flow) isn't locked out for too long.
+const STUDENT_ALREADY_ACTIVE_BLOCK_MS = 10_000;
+
 // ============================================================================
 // Helper functions to reduce cognitive complexity in processScan
 // ============================================================================
@@ -325,6 +337,7 @@ export const useRfidScanning = () => {
     stopRfidScanning,
     setScanResult,
     isTagBlocked,
+    blockTag,
     showScanModal,
     // Note: hideScanModal removed - modal timeout now handled exclusively by page components
     // New optimistic actions
@@ -601,25 +614,37 @@ export const useRfidScanning = () => {
         removeOptimisticScan(scanId);
         showScanModal();
 
-        // For STUDENT_ALREADY_ACTIVE the backend tells us exactly which
-        // student is on the reader. If we leave the bracelet sitting
-        // there, every subsequent scan event will fire another 409 at
-        // the backend unless we populate the dedup map ourselves —
-        // canProcessTag() only inspects tagToStudentMap once it's been
-        // written. Mirror what processStudentBookkeeping() does on the
-        // happy path so the second tap is suppressed locally instead of
-        // turning issue #844 into a 409 retry storm. Treat it as a
-        // checkin for history purposes — the student IS checked in,
-        // just not via this scan.
-        if (errorResult.action === 'already_in' && errorResult.student_id !== null) {
-          const studentId = errorResult.student_id.toString();
-          mapTagToStudent(tagId, studentId);
-          updateStudentHistory(studentId, 'checkin');
-          recordTagScan(tagId, {
-            timestamp: Date.now(),
-            studentId,
-            result: errorResult,
-          });
+        // For STUDENT_ALREADY_ACTIVE we have to actually block the tag —
+        // populating tagToStudentMap is not enough on its own.
+        // canProcessTag() delegates to isValidStudentScan(), which
+        // explicitly allows repeated 'checkin' actions
+        // (history.lastAction === action returns true), so a bracelet
+        // left on the reader would still slip past the soft Layer 3
+        // gate and fire another 409 on every scan event. blockTag()
+        // installs a hard gate at the adapter level (isTagBlocked is
+        // checked in onAdapterScan before processScan even runs), which
+        // is the only mechanism that actually closes the retry storm
+        // described in #844.
+        //
+        // We still mirror the happy-path bookkeeping (tag→student,
+        // history, recent scan) when the backend gave us a student_id:
+        // it carries identity for diagnostics and for any consumer that
+        // looks up the tag while the block window is active. Without
+        // student_id the block alone is enough — better to leave the
+        // dedup map untouched than poison it with a missing identity.
+        if (errorResult.action === 'already_in') {
+          blockTag(tagId, STUDENT_ALREADY_ACTIVE_BLOCK_MS);
+
+          if (errorResult.student_id !== null) {
+            const studentId = errorResult.student_id.toString();
+            mapTagToStudent(tagId, studentId);
+            updateStudentHistory(studentId, 'checkin');
+            recordTagScan(tagId, {
+              timestamp: Date.now(),
+              studentId,
+              result: errorResult,
+            });
+          }
         }
       } finally {
         if (isInProcessingQueue) {
@@ -640,6 +665,7 @@ export const useRfidScanning = () => {
       canProcessTag,
       recordTagScan,
       mapTagToStudent,
+      blockTag,
       addSupervisorFromRfid,
       addActiveSupervisorTag,
       isActiveSupervisor,

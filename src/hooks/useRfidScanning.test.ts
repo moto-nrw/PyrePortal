@@ -1063,14 +1063,15 @@ describe('useRfidScanning', () => {
       expect(state.rfid.currentScan?.message).toBe('Schüler*in ist bereits angemeldet.');
     });
 
-    // Issue #844 review fix: bracelet-on-reader dedup. When the backend
-    // returns STUDENT_ALREADY_ACTIVE with details.student_id, we must
-    // populate tagToStudentMap and recordTagScan so subsequent scan
-    // events for the same tag don't fire another 409 at the backend.
-    // Without this, a bracelet left on the reader turns one duplicate
-    // visit into a stream of 409 requests instead of one graceful
-    // already_in modal.
-    it('populates tag→student dedup map after STUDENT_ALREADY_ACTIVE 409', async () => {
+    // Issue #844 review fix (round 3): the actual bracelet-on-reader
+    // dedup gate. canProcessTag() / isValidStudentScan() allow repeated
+    // 'checkin' actions, so populating tagToStudentMap alone does NOT
+    // suppress the next 409. Only blockTag() + the isTagBlocked check
+    // in onAdapterScan installs a hard gate that prevents the second
+    // scan event from ever reaching the backend. This test asserts
+    // blockedTags is populated — the test below proves the resulting
+    // scan event is actually suppressed end-to-end.
+    it('blocks tag and populates dedup map after STUDENT_ALREADY_ACTIVE 409', async () => {
       const { ApiError: MockedApiError } = await import('../services/api');
       const duplicateError = new MockedApiError(
         'API Error: 409 - Conflict: student already has an active visit',
@@ -1094,20 +1095,100 @@ describe('useRfidScanning', () => {
       await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
-      // tagToStudentMap is the gate canProcessTag inspects on Layer 3.
+      // The hard gate: blockedTags installs a TTL'd block that
+      // isTagBlocked checks at the adapter level (before processScan
+      // is even invoked). Without this entry, a bracelet left on the
+      // reader continues to fire 409s.
+      const blockUntil = state.rfid.blockedTags.get(MOCK_TAG);
+      expect(blockUntil).toBeDefined();
+      expect(blockUntil!).toBeGreaterThan(Date.now());
+      // Soft gates kept for diagnostics/downstream consumers.
       expect(state.rfid.tagToStudentMap.get(MOCK_TAG)).toBe('231');
-      // recentTagScans + studentHistory mirror what the happy path
-      // populates so subsequent scans use the same dedup machinery.
       expect(state.rfid.recentTagScans.has(MOCK_TAG)).toBe(true);
       expect(state.rfid.studentHistory.get('231')?.lastAction).toBe('checkin');
     });
 
+    // End-to-end proof of the dedup contract: after a
+    // STUDENT_ALREADY_ACTIVE 409 the kiosk must NOT fire another
+    // processRfidScan() for the same tag while the block window is
+    // active, even if the underlying scanner emits another tag event.
+    // Without the blockTag() call this is exactly what regresses to
+    // a 409 retry storm (Issue #844).
+    //
+    // Note on timing: the mock scan interval fires every ~5s
+    // (triggerMockScanAndDrain advances 5100ms). The block window is
+    // 10s, so the second event lands inside the block but a third
+    // would expire it — that's the intended TTL behavior, not a bug.
+    // We assert both: second event is suppressed; third event runs
+    // again once the TTL expires.
+    it('suppresses second scan event of the same tag while block is active', async () => {
+      const { ApiError: MockedApiError } = await import('../services/api');
+      const duplicateError = new MockedApiError(
+        'API Error: 409 - Conflict: student already has an active visit',
+        409,
+        'STUDENT_ALREADY_ACTIVE',
+        { student_id: 231 }
+      );
+      mockedProcessRfidScan.mockRejectedValue(duplicateError);
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await triggerMockScanAndDrain();
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
+
+      // Second scan event from the bracelet still on the reader.
+      // isTagBlocked (checked in onAdapterScan) must short-circuit
+      // before processScan runs; processRfidScan call count must NOT
+      // increase.
+      await triggerMockScanAndDrain();
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
+    });
+
+    // Companion to the suppression test: prove the block has a TTL
+    // and isn't a permanent lockout. After the block window passes,
+    // a fresh scan event must reach the backend again — otherwise a
+    // student whose 409 was caused by transient state (race-window
+    // residue, mid-checkout, etc.) would be permanently locked out
+    // until the kiosk restarts.
+    it('lifts the block after the TTL elapses', async () => {
+      const { ApiError: MockedApiError } = await import('../services/api');
+      const duplicateError = new MockedApiError(
+        'API Error: 409 - Conflict: student already has an active visit',
+        409,
+        'STUDENT_ALREADY_ACTIVE',
+        { student_id: 231 }
+      );
+      mockedProcessRfidScan.mockRejectedValue(duplicateError);
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await triggerMockScanAndDrain();
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
+
+      // Advance the clock past the 10s block window without firing a
+      // scan in between, then trigger the next scan event.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(11_000);
+      });
+      await triggerMockScanAndDrain();
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(2);
+    });
+
     // When the backend's 409 omits details.student_id (degraded path or
     // older substring-only build), we have no identity to map. The scan
-    // must still resolve to the friendly already_in modal but we leave
-    // the dedup map untouched — better to allow another attempt than to
-    // map the tag to a wrong/missing student.
-    it('does not populate dedup map when STUDENT_ALREADY_ACTIVE lacks student_id', async () => {
+    // must still resolve to the friendly already_in modal AND must
+    // still install the hard block — the block is the actual retry
+    // suppressor and works without identity. The dedup-map / history
+    // bookkeeping stays empty because we have no student_id to write.
+    it('blocks tag even when STUDENT_ALREADY_ACTIVE lacks student_id', async () => {
       const { ApiError: MockedApiError } = await import('../services/api');
       const duplicateError = new MockedApiError(
         'API Error: 409 - Conflict: student already has an active visit',
@@ -1127,6 +1208,7 @@ describe('useRfidScanning', () => {
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.action).toBe('already_in');
+      expect(state.rfid.blockedTags.has(MOCK_TAG)).toBe(true);
       expect(state.rfid.tagToStudentMap.has(MOCK_TAG)).toBe(false);
     });
 
