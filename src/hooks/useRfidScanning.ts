@@ -3,7 +3,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { adapter } from '@platform';
 
 import type { NfcScanEvent } from '../platform/adapter';
-import { api, mapApiErrorToGerman, ApiError } from '../services/api';
+import { api, mapApiErrorToGerman, ApiError, formatRoomName } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
@@ -237,18 +237,26 @@ const getErrorTitle = (error: unknown): string => {
  * Build the duplicate-active-visit modal copy. The backend (Issue #844)
  * includes `room_name` in details so we can tell the user the actual room
  * the student is already in — which is often NOT the room being scanned.
- * If the field is missing (degraded 409 path), fall back to the generic
- * "in einem anderen Raum" wording rather than the old, often-wrong
- * "in diesem Raum".
+ *
+ * Two important details:
+ *   1. We pass `room_name` through `formatRoomName` so internal "WC"
+ *      surfaces as "Toilette" (consistent with `mapApiErrorToGerman` and
+ *      the rest of the kiosk UI).
+ *   2. If `room_name` is missing (degraded 409 path: backend couldn't
+ *      reload the existing visit, or it was just closed by another
+ *      scan), we do NOT know that the student is in a different room —
+ *      the lookup may simply have failed. Use the same neutral copy as
+ *      `mapApiErrorToGerman`'s fallback rather than claiming "anderer
+ *      Raum", which could send staff to the wrong place.
  */
 const buildAlreadyInMessage = (error: unknown): string => {
   if (error instanceof ApiError) {
     const roomName = error.details?.room_name;
     if (typeof roomName === 'string' && roomName.length > 0) {
-      return `Bereits angemeldet in ${roomName}.`;
+      return `Bereits angemeldet in ${formatRoomName(roomName)}.`;
     }
   }
-  return 'Schüler*in ist bereits in einem anderen Raum angemeldet.';
+  return 'Schüler*in ist bereits angemeldet.';
 };
 
 /**

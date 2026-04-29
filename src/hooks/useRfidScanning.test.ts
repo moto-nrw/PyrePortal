@@ -40,6 +40,10 @@ vi.mock('../services/api', () => ({
     updateSessionSupervisors: vi.fn(),
   },
   mapApiErrorToGerman: vi.fn(() => 'Ein Fehler ist aufgetreten'),
+  // Mirror the real `formatRoomName` translation table (currently just
+  // WC → Toilette) so the duplicate-active-visit modal renders the
+  // user-facing room name. Keep this in sync with src/services/api.ts.
+  formatRoomName: vi.fn((name: string) => (name === 'WC' ? 'Toilette' : name)),
   ApiError: class ApiError extends Error {
     public readonly code?: string;
     public readonly details?: Record<string, unknown>;
@@ -1030,8 +1034,11 @@ describe('useRfidScanning', () => {
     // Degraded 409 path: backend lookup of the existing visit failed (race
     // window in buildStudentAlreadyActiveResponse), so room_name is absent.
     // The modal must still trigger the friendly "already_in" state and use
-    // the generic fallback wording instead of the old, often-wrong "in
-    // diesem Raum" copy.
+    // the neutral fallback wording. We deliberately do NOT claim "in einem
+    // anderen Raum" here — the lookup failure means we don't actually know
+    // whether it's the same room or a different one, and guessing wrong
+    // sends staff to the wrong place. The copy mirrors
+    // mapApiErrorToGerman()'s generic fallback for the same scenario.
     it('falls back to generic copy when STUDENT_ALREADY_ACTIVE lacks room_name', async () => {
       const { ApiError: MockedApiError } = await import('../services/api');
       const duplicateError = new MockedApiError(
@@ -1053,9 +1060,40 @@ describe('useRfidScanning', () => {
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.action).toBe('already_in');
       expect(state.rfid.currentScan?.isInfo).toBe(true);
-      expect(state.rfid.currentScan?.message).toBe(
-        'Schüler*in ist bereits in einem anderen Raum angemeldet.'
+      expect(state.rfid.currentScan?.message).toBe('Schüler*in ist bereits angemeldet.');
+    });
+
+    // Issue #844 review fix: when the backend returns the internal "WC"
+    // room name, the modal must translate it to "Toilette" so the kiosk
+    // copy stays consistent with the rest of the UI (and with
+    // mapApiErrorToGerman, which already does this translation for the
+    // generic German error message).
+    it('translates internal WC room name to Toilette in already_in modal', async () => {
+      const { ApiError: MockedApiError } = await import('../services/api');
+      const duplicateError = new MockedApiError(
+        'API Error: 409 - Conflict: student already has an active visit',
+        409,
+        'STUDENT_ALREADY_ACTIVE',
+        {
+          student_id: 231,
+          existing_visit_id: 9002,
+          room_id: 7,
+          room_name: 'WC',
+        }
       );
+      mockedProcessRfidScan.mockRejectedValue(duplicateError);
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await triggerMockScanAndDrain();
+
+      const state = useUserStore.getState();
+      expect(state.rfid.currentScan?.action).toBe('already_in');
+      expect(state.rfid.currentScan?.message).toBe('Bereits angemeldet in Toilette.');
     });
 
     it('handles room capacity exceeded error', async () => {
