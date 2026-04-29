@@ -28,6 +28,10 @@ interface ApiErrorResponse {
     activity_name?: string;
     current_participants?: number;
     max_participants?: number;
+    // Duplicate-active-visit fields (Issue #844, backend STUDENT_ALREADY_ACTIVE)
+    student_id?: number;
+    existing_visit_id?: number;
+    entry_time?: string;
   };
 }
 
@@ -84,6 +88,11 @@ const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   [
     ['ROOM_CAPACITY_EXCEEDED', 'room capacity exceeded', 'Room capacity exceeded'],
     'Raum ist voll. Kein Platz mehr verfügbar.',
+  ],
+  // Duplicate active visit (Issue #844, backend migration 1.15.45 + checkin/workflow.go)
+  [
+    ['STUDENT_ALREADY_ACTIVE', 'student already has an active visit'],
+    'Schüler*in ist bereits angemeldet.',
   ],
 
   // 2. AUTHENTICATION ERRORS (401)
@@ -257,6 +266,23 @@ function formatRoomCapacityError(details: Record<string, unknown>): string {
 }
 
 /**
+ * Format duplicate-active-visit error message from details
+ * Backend (Issue #844) returns the existing visit's room so the kiosk can
+ * tell the user which room the student is already checked into rather than
+ * the generic "bereits angemeldet". `room_name` may be missing when the
+ * backend's best-effort lookup couldn't resolve the existing visit (rare
+ * race window between INSERT failure and response build) — fall back to
+ * the generic message in that case.
+ */
+function formatStudentAlreadyActiveError(details: Record<string, unknown>): string {
+  const roomName = details.room_name;
+  if (typeof roomName === 'string' && roomName.length > 0) {
+    return `Schüler*in ist bereits angemeldet in ${formatRoomName(roomName)}.`;
+  }
+  return 'Schüler*in ist bereits angemeldet.';
+}
+
+/**
  * Map API errors to German user-friendly messages with rich details support
  * Handles structured error responses (e.g., capacity errors with room/activity details)
  */
@@ -275,6 +301,11 @@ export function mapApiErrorToGerman(error: unknown): string {
   // Room capacity exceeded
   if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
     return formatRoomCapacityError(error.details);
+  }
+
+  // Duplicate active visit (Issue #844)
+  if (error.code === 'STUDENT_ALREADY_ACTIVE' && error.details) {
+    return formatStudentAlreadyActiveError(error.details);
   }
 
   // Fall back to message-based mapping

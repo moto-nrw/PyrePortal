@@ -234,18 +234,49 @@ const getErrorTitle = (error: unknown): string => {
 };
 
 /**
+ * Build the duplicate-active-visit modal copy. The backend (Issue #844)
+ * includes `room_name` in details so we can tell the user the actual room
+ * the student is already in — which is often NOT the room being scanned.
+ * If the field is missing (degraded 409 path), fall back to the generic
+ * "in einem anderen Raum" wording rather than the old, often-wrong
+ * "in diesem Raum".
+ */
+const buildAlreadyInMessage = (error: unknown): string => {
+  if (error instanceof ApiError) {
+    const roomName = error.details?.room_name;
+    if (typeof roomName === 'string' && roomName.length > 0) {
+      return `Bereits angemeldet in ${roomName}.`;
+    }
+  }
+  return 'Schüler*in ist bereits in einem anderen Raum angemeldet.';
+};
+
+/**
+ * Detect duplicate-active-visit responses. Prefer the structured
+ * `STUDENT_ALREADY_ACTIVE` code from the new 409 body (Issue #844). Keep
+ * the substring fallback so older backend builds without the structured
+ * response still resolve to the friendly modal instead of a generic error.
+ */
+const isStudentAlreadyActiveError = (error: unknown, errorMessage: string): boolean => {
+  if (error instanceof ApiError && error.code === 'STUDENT_ALREADY_ACTIVE') {
+    return true;
+  }
+  return errorMessage.includes('already has an active visit');
+};
+
+/**
  * Creates an error result for display when scan fails.
  */
 const createScanErrorResult = (error: unknown): RfidScanResult => {
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   // Special handling for "already checked in" scenario
-  if (errorMessage.includes('already has an active visit')) {
+  if (isStudentAlreadyActiveError(error, errorMessage)) {
     return {
       student_name: 'Bereits eingecheckt',
       student_id: null,
       action: 'already_in',
-      message: 'Dieser Schüler ist bereits in diesem Raum eingecheckt',
+      message: buildAlreadyInMessage(error),
       isInfo: true,
     };
   }
