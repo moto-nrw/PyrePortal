@@ -273,6 +273,22 @@ const isStudentAlreadyActiveError = (error: unknown, errorMessage: string): bool
 };
 
 /**
+ * Extract the student_id from a STUDENT_ALREADY_ACTIVE error if present.
+ * The backend (Issue #844) ships the student id in `details.student_id`
+ * even on the degraded 409 path, so we always have at least the identity
+ * to wire into the dedup map. Older backends that only emit the substring
+ * fallback won't include details — return null and accept that the next
+ * scan event will hit the backend again until a successful scan
+ * populates the mapping organically.
+ */
+const extractAlreadyActiveStudentId = (error: unknown): number | null => {
+  if (error instanceof ApiError && typeof error.details?.student_id === 'number') {
+    return error.details.student_id;
+  }
+  return null;
+};
+
+/**
  * Creates an error result for display when scan fails.
  */
 const createScanErrorResult = (error: unknown): RfidScanResult => {
@@ -282,7 +298,7 @@ const createScanErrorResult = (error: unknown): RfidScanResult => {
   if (isStudentAlreadyActiveError(error, errorMessage)) {
     return {
       student_name: 'Bereits eingecheckt',
-      student_id: null,
+      student_id: extractAlreadyActiveStudentId(error),
       action: 'already_in',
       message: buildAlreadyInMessage(error),
       isInfo: true,
@@ -580,9 +596,31 @@ export const useRfidScanning = () => {
       } catch (error) {
         logger.error('Failed to process RFID scan', { error: serializeError(error) });
         updateOptimisticScan(scanId, 'failed');
-        setScanResult(createScanErrorResult(error));
+        const errorResult = createScanErrorResult(error);
+        setScanResult(errorResult);
         removeOptimisticScan(scanId);
         showScanModal();
+
+        // For STUDENT_ALREADY_ACTIVE the backend tells us exactly which
+        // student is on the reader. If we leave the bracelet sitting
+        // there, every subsequent scan event will fire another 409 at
+        // the backend unless we populate the dedup map ourselves —
+        // canProcessTag() only inspects tagToStudentMap once it's been
+        // written. Mirror what processStudentBookkeeping() does on the
+        // happy path so the second tap is suppressed locally instead of
+        // turning issue #844 into a 409 retry storm. Treat it as a
+        // checkin for history purposes — the student IS checked in,
+        // just not via this scan.
+        if (errorResult.action === 'already_in' && errorResult.student_id !== null) {
+          const studentId = errorResult.student_id.toString();
+          mapTagToStudent(tagId, studentId);
+          updateStudentHistory(studentId, 'checkin');
+          recordTagScan(tagId, {
+            timestamp: Date.now(),
+            studentId,
+            result: errorResult,
+          });
+        }
       } finally {
         if (isInProcessingQueue) {
           removeFromProcessingQueue(tagId);
