@@ -3,7 +3,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { adapter } from '@platform';
 
 import type { NfcScanEvent } from '../platform/adapter';
-import { api, mapApiErrorToGerman, ApiError } from '../services/api';
+import { api, mapApiErrorToGerman, ApiError, formatRoomName } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
@@ -234,18 +234,73 @@ const getErrorTitle = (error: unknown): string => {
 };
 
 /**
+ * Build the duplicate-active-visit modal copy. The backend (Issue #844)
+ * includes `room_name` in details so we can tell the user the actual room
+ * the student is already in — which is often NOT the room being scanned.
+ *
+ * Two important details:
+ *   1. We pass `room_name` through `formatRoomName` so internal "WC"
+ *      surfaces as "Toilette" (consistent with `mapApiErrorToGerman` and
+ *      the rest of the kiosk UI).
+ *   2. If `room_name` is missing (degraded 409 path: backend couldn't
+ *      reload the existing visit, or it was just closed by another
+ *      scan), we do NOT know that the student is in a different room —
+ *      the lookup may simply have failed. Use the same neutral copy as
+ *      `mapApiErrorToGerman`'s fallback rather than claiming "anderer
+ *      Raum", which could send staff to the wrong place.
+ */
+const buildAlreadyInMessage = (error: unknown): string => {
+  if (error instanceof ApiError) {
+    const roomName = error.details?.room_name;
+    if (typeof roomName === 'string' && roomName.length > 0) {
+      return `Bereits angemeldet in ${formatRoomName(roomName)}.`;
+    }
+  }
+  return 'Schüler*in ist bereits angemeldet.';
+};
+
+/**
+ * Detect duplicate-active-visit responses. Prefer the structured
+ * `STUDENT_ALREADY_ACTIVE` code from the new 409 body (Issue #844). Keep
+ * the substring fallback so older backend builds without the structured
+ * response still resolve to the friendly modal instead of a generic error.
+ */
+const isStudentAlreadyActiveError = (error: unknown, errorMessage: string): boolean => {
+  if (error instanceof ApiError && error.code === 'STUDENT_ALREADY_ACTIVE') {
+    return true;
+  }
+  return errorMessage.includes('already has an active visit');
+};
+
+/**
+ * Extract the student_id from a STUDENT_ALREADY_ACTIVE error if present.
+ * The backend (Issue #844) ships the student id in `details.student_id`
+ * even on the degraded 409 path, so we always have at least the identity
+ * to wire into the dedup map. Older backends that only emit the substring
+ * fallback won't include details — return null and accept that the next
+ * scan event will hit the backend again until a successful scan
+ * populates the mapping organically.
+ */
+const extractAlreadyActiveStudentId = (error: unknown): number | null => {
+  if (error instanceof ApiError && typeof error.details?.student_id === 'number') {
+    return error.details.student_id;
+  }
+  return null;
+};
+
+/**
  * Creates an error result for display when scan fails.
  */
 const createScanErrorResult = (error: unknown): RfidScanResult => {
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   // Special handling for "already checked in" scenario
-  if (errorMessage.includes('already has an active visit')) {
+  if (isStudentAlreadyActiveError(error, errorMessage)) {
     return {
       student_name: 'Bereits eingecheckt',
-      student_id: null,
+      student_id: extractAlreadyActiveStudentId(error),
       action: 'already_in',
-      message: 'Dieser Schüler ist bereits in diesem Raum eingecheckt',
+      message: buildAlreadyInMessage(error),
       isInfo: true,
     };
   }
@@ -541,9 +596,31 @@ export const useRfidScanning = () => {
       } catch (error) {
         logger.error('Failed to process RFID scan', { error: serializeError(error) });
         updateOptimisticScan(scanId, 'failed');
-        setScanResult(createScanErrorResult(error));
+        const errorResult = createScanErrorResult(error);
+        setScanResult(errorResult);
         removeOptimisticScan(scanId);
         showScanModal();
+
+        // For STUDENT_ALREADY_ACTIVE the backend tells us exactly which
+        // student is on the reader. If we leave the bracelet sitting
+        // there, every subsequent scan event will fire another 409 at
+        // the backend unless we populate the dedup map ourselves —
+        // canProcessTag() only inspects tagToStudentMap once it's been
+        // written. Mirror what processStudentBookkeeping() does on the
+        // happy path so the second tap is suppressed locally instead of
+        // turning issue #844 into a 409 retry storm. Treat it as a
+        // checkin for history purposes — the student IS checked in,
+        // just not via this scan.
+        if (errorResult.action === 'already_in' && errorResult.student_id !== null) {
+          const studentId = errorResult.student_id.toString();
+          mapTagToStudent(tagId, studentId);
+          updateStudentHistory(studentId, 'checkin');
+          recordTagScan(tagId, {
+            timestamp: Date.now(),
+            studentId,
+            result: errorResult,
+          });
+        }
       } finally {
         if (isInProcessingQueue) {
           removeFromProcessingQueue(tagId);

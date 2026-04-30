@@ -117,6 +117,21 @@ describe('mapServerErrorToGerman', () => {
     );
   });
 
+  // Issue #844 — duplicate active visit (409). Substring + code variants
+  // are both registered so degraded paths or older response shapes still
+  // resolve to the friendly German copy instead of the generic 409 fallback.
+  it('maps STUDENT_ALREADY_ACTIVE code', () => {
+    expect(mapServerErrorToGerman('STUDENT_ALREADY_ACTIVE')).toBe(
+      'Schüler*in ist bereits angemeldet.'
+    );
+  });
+
+  it('maps "student already has an active visit" message', () => {
+    expect(mapServerErrorToGerman('student already has an active visit')).toBe(
+      'Schüler*in ist bereits angemeldet.'
+    );
+  });
+
   // Device errors
   it('maps device not active', () => {
     expect(mapServerErrorToGerman('device is not active')).toBe(
@@ -403,6 +418,50 @@ describe('mapApiErrorToGerman', () => {
       max_capacity: 10,
     });
     expect(mapApiErrorToGerman(error)).toBe('Raum 5 ist voll (10/10 Plätze belegt).');
+  });
+
+  // Issue #844: STUDENT_ALREADY_ACTIVE 409 surfaces the existing visit's
+  // room_name so the kiosk can tell the user where the student actually is.
+  it('formats STUDENT_ALREADY_ACTIVE with room_name from details', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      {
+        student_id: 231,
+        existing_visit_id: 9001,
+        room_id: 42,
+        room_name: 'Raum 1A',
+        entry_time: '2026-04-29T12:30:00Z',
+      }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet in Raum 1A.');
+  });
+
+  // The internal "WC" room name is a backend implementation detail; the UI
+  // shows it as "Toilette" everywhere else (formatRoomName) — duplicate
+  // visit copy must follow the same convention.
+  it('translates internal WC room name to Toilette in STUDENT_ALREADY_ACTIVE copy', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      { student_id: 231, room_name: 'WC' }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet in Toilette.');
+  });
+
+  // Degraded path: backend's best-effort lookup of the existing visit
+  // failed (race window) so room_name is missing — fall back to generic
+  // German wording rather than emit a half-formed sentence.
+  it('falls back to generic copy when STUDENT_ALREADY_ACTIVE lacks room_name', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      { student_id: 231 }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet.');
   });
 });
 
