@@ -149,7 +149,7 @@ impl RfidBackgroundService {
 
     /// Check if scanning should continue based on state
     fn should_continue_scanning(state: &Arc<Mutex<RfidServiceState>>) -> bool {
-        state.lock().map(|guard| guard.should_run).unwrap_or(false)
+        state.lock().is_ok_and(|guard| guard.should_run)
     }
 
     /// Handle a successful RFID scan - update state and emit event
@@ -267,13 +267,12 @@ impl RfidBackgroundService {
         Self::reap_finished_scan_task(state, scan_task_handle).await;
 
         let already_running = scan_task_handle.as_ref().is_some_and(|h| !h.is_finished());
-        let state_running = state.lock().map(|guard| guard.is_running).unwrap_or(false);
+        let state_running = state.lock().is_ok_and(|guard| guard.is_running);
 
         if already_running || state_running {
             let stop_in_progress = state
                 .lock()
-                .map(|guard| guard.is_running && !guard.should_run)
-                .unwrap_or(false);
+                .is_ok_and(|guard| guard.is_running && !guard.should_run);
 
             if stop_in_progress {
                 println!("RFID background scanning still stopping, start deferred");
@@ -350,10 +349,7 @@ impl RfidBackgroundService {
                         // Check whether a new scan session was started while we
                         // were waiting.  If should_run flipped back to true, the
                         // service was restarted and this drain must not touch state.
-                        let restarted = state_for_drain
-                            .lock()
-                            .map(|g| g.should_run)
-                            .unwrap_or(false);
+                        let restarted = state_for_drain.lock().is_ok_and(|g| g.should_run);
 
                         if restarted {
                             println!("RFID: drain complete but service was restarted during wait, preserving state");
@@ -380,7 +376,7 @@ impl RfidBackgroundService {
                 }
             }
         } else {
-            let still_running = state.lock().map(|guard| guard.is_running).unwrap_or(false);
+            let still_running = state.lock().is_ok_and(|guard| guard.is_running);
             if still_running {
                 println!("RFID stop requested but scanner thread is still draining");
             } else {
