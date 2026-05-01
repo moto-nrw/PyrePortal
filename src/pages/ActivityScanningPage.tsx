@@ -22,6 +22,7 @@ import {
   type RfidScanResult,
   type DailyFeedbackRating,
   type DeviceConfig,
+  type Room,
 } from '../services/api';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
@@ -330,6 +331,18 @@ const isNonActionableScan = (scan: ExtendedScanResult): boolean => {
   return Boolean(scan.showAsError) || Boolean(scan.isInfo);
 };
 
+/**
+ * Returns the first room whose name matches one of the given aliases.
+ * Aliases are tried in order, so callers can pass a canonical-first list.
+ */
+const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | undefined => {
+  for (const alias of aliases) {
+    const match = rooms.find(r => r.name === alias);
+    if (match) return match;
+  }
+  return undefined;
+};
+
 // =============================================================================
 // End helper functions
 // =============================================================================
@@ -588,9 +601,7 @@ const ActivityScanningPage: React.FC = () => {
 
         // Find toilet room by alias, preferring the canonical backend name.
         // WC_ROOM_ALIASES is canonical-first, so the first match wins.
-        const wcRoom = WC_ROOM_ALIASES.map(alias => rooms.find(r => r.name === alias)).find(
-          (r): r is NonNullable<typeof r> => r !== undefined
-        );
+        const wcRoom = findRoomByAliases(rooms, WC_ROOM_ALIASES);
         if (wcRoom) {
           setWcRoomId(wcRoom.id);
           logger.info('Found toilet room', { id: wcRoom.id, name: wcRoom.name });
