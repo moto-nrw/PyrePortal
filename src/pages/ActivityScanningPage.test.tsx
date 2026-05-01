@@ -659,6 +659,32 @@ describe('ActivityScanningPage', () => {
     });
   });
 
+  it('shows Toilette button when Toilette room alias is found', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce([
+      { id: 89, name: 'Toilette', room_type: 'facility', capacity: 5, is_occupied: false },
+    ]);
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'checked_out',
+        daily_checkout_available: false,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+      },
+      showModal: true,
+    };
+
+    await act(async () => {
+      renderPage();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Toilette')).toBeInTheDocument();
+    });
+  });
+
   // =======================================================================
   // Raumwechsel click
   // =======================================================================
@@ -805,6 +831,49 @@ describe('ActivityScanningPage', () => {
   it('handles Toilette click success', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.getRooms.mockResolvedValueOnce([
+      { id: 88, name: 'WC', room_type: 'facility', capacity: 5, is_occupied: false },
+    ]);
+    mockedApi.processRfidScan.mockResolvedValueOnce({
+      student_id: 42,
+      student_name: 'Lisa Schmidt',
+      action: 'checked_in',
+      room_name: 'WC',
+    });
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'checked_out',
+        daily_checkout_available: false,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+      },
+      showModal: true,
+    };
+
+    await act(async () => {
+      renderPage();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Toilette')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Toilette'));
+
+    await waitFor(() => {
+      expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
+        { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 88 },
+        '1234'
+      );
+    });
+  });
+
+  it('prefers canonical WC room when both toilet aliases exist', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce([
+      { id: 89, name: 'Toilette', room_type: 'facility', capacity: 5, is_occupied: false },
       { id: 88, name: 'WC', room_type: 'facility', capacity: 5, is_occupied: false },
     ]);
     mockedApi.processRfidScan.mockResolvedValueOnce({

@@ -18,9 +18,11 @@ import {
   api,
   formatRoomName,
   mapServerErrorToGerman,
+  WC_ROOM_ALIASES,
   type RfidScanResult,
   type DailyFeedbackRating,
   type DeviceConfig,
+  type Room,
 } from '../services/api';
 import { useUserStore, isNetworkRelatedError } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
@@ -329,6 +331,18 @@ const isNonActionableScan = (scan: ExtendedScanResult): boolean => {
   return Boolean(scan.showAsError) || Boolean(scan.isInfo);
 };
 
+/**
+ * Returns the first room whose name matches one of the given aliases.
+ * Aliases are tried in order, so callers can pass a canonical-first list.
+ */
+const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | undefined => {
+  for (const alias of aliases) {
+    const match = rooms.find(r => r.name === alias);
+    if (match) return match;
+  }
+  return undefined;
+};
+
 // =============================================================================
 // End helper functions
 // =============================================================================
@@ -585,13 +599,14 @@ const ActivityScanningPage: React.FC = () => {
           // Don't fail - just won't show Schulhof option
         }
 
-        // Find WC room by name
-        const wcRoom = rooms.find(r => r.name === 'WC');
+        // Find toilet room by alias, preferring the canonical backend name.
+        // WC_ROOM_ALIASES is canonical-first, so the first match wins.
+        const wcRoom = findRoomByAliases(rooms, WC_ROOM_ALIASES);
         if (wcRoom) {
           setWcRoomId(wcRoom.id);
-          logger.info('Found WC room', { id: wcRoom.id, name: wcRoom.name });
+          logger.info('Found toilet room', { id: wcRoom.id, name: wcRoom.name });
         } else {
-          logger.warn('No WC room found - Toilette button will not work');
+          logger.warn('No WC/Toilette room found - Toilette button will not work');
         }
       } catch (error) {
         logger.error('Failed to fetch Schulhof room', { error: serializeError(error) });
