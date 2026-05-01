@@ -226,11 +226,28 @@ function isStringOrNumber(value: unknown): value is string | number {
 }
 
 /**
+ * Canonical names a backend toilet special-room can come back with, in
+ * canonical-first order. The first entry is what Phoenix auto-creates;
+ * the second is an accepted alias a tenant may have created manually.
+ *
+ * Must stay in sync with Phoenix backend/constants/activities.go
+ * (WCRoomName, WCRoomAliasName) and frontend/src/lib/room-helpers.ts
+ * (SYSTEM_ROOM_NAMES). Matching is exact-case to mirror the backend's
+ * `IsWCRoomName` check. Adding a new alias requires updating all three.
+ */
+export const WC_ROOM_ALIASES = ['WC', 'Toilette'] as const;
+
+/** Returns true when the given room name is one of the toilet aliases. */
+export function isWCRoomAlias(name: string): boolean {
+  return (WC_ROOM_ALIASES as readonly string[]).includes(name);
+}
+
+/**
  * Map backend room names to German display names.
- * Backend uses "WC" internally but UI should show "Toilette".
+ * Any toilet-room alias is shown as "Toilette" in the kiosk UI.
  */
 export function formatRoomName(name: string): string {
-  if (name === 'WC') return 'Toilette';
+  if (isWCRoomAlias(name)) return 'Toilette';
   return name;
 }
 

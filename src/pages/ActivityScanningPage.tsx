@@ -18,6 +18,7 @@ import {
   api,
   formatRoomName,
   mapServerErrorToGerman,
+  WC_ROOM_ALIASES,
   type RfidScanResult,
   type DailyFeedbackRating,
   type DeviceConfig,
@@ -585,13 +586,16 @@ const ActivityScanningPage: React.FC = () => {
           // Don't fail - just won't show Schulhof option
         }
 
-        // Find WC room by name
-        const wcRoom = rooms.find(r => r.name === 'WC');
+        // Find toilet room by alias, preferring the canonical backend name.
+        // WC_ROOM_ALIASES is canonical-first, so the first match wins.
+        const wcRoom = WC_ROOM_ALIASES.map(alias => rooms.find(r => r.name === alias)).find(
+          (r): r is NonNullable<typeof r> => r !== undefined
+        );
         if (wcRoom) {
           setWcRoomId(wcRoom.id);
-          logger.info('Found WC room', { id: wcRoom.id, name: wcRoom.name });
+          logger.info('Found toilet room', { id: wcRoom.id, name: wcRoom.name });
         } else {
-          logger.warn('No WC room found - Toilette button will not work');
+          logger.warn('No WC/Toilette room found - Toilette button will not work');
         }
       } catch (error) {
         logger.error('Failed to fetch Schulhof room', { error: serializeError(error) });

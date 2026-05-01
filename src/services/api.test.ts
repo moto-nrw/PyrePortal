@@ -4,9 +4,11 @@ import {
   ApiError,
   formatRoomName,
   isNetworkRelatedError,
+  isWCRoomAlias,
   mapApiErrorToGerman,
   mapServerErrorToGerman,
   setNetworkStatusCallback,
+  WC_ROOM_ALIASES,
 } from './api';
 
 // ====================================================================
@@ -474,10 +476,59 @@ describe('formatRoomName', () => {
     expect(formatRoomName('WC')).toBe('Toilette');
   });
 
+  it('maps Toilette alias to Toilette (idempotent on the canonical UI label)', () => {
+    expect(formatRoomName('Toilette')).toBe('Toilette');
+  });
+
   it('keeps other names unchanged', () => {
     expect(formatRoomName('Turnhalle')).toBe('Turnhalle');
     expect(formatRoomName('Raum 101')).toBe('Raum 101');
     expect(formatRoomName('Schulhof')).toBe('Schulhof');
+  });
+
+  it('does not match case variants — exact-case mirror of backend IsWCRoomName', () => {
+    // Backend `IsWCRoomName` is exact-case; the kiosk must mirror that so the
+    // toilet button only lights up for rooms the backend actually treats as
+    // toilet special rooms. A lowercase "wc" lookup is intentionally NOT
+    // remapped here.
+    expect(formatRoomName('wc')).toBe('wc');
+    expect(formatRoomName('toilette')).toBe('toilette');
+  });
+});
+
+// ====================================================================
+// isWCRoomAlias / WC_ROOM_ALIASES
+// ====================================================================
+
+describe('WC_ROOM_ALIASES', () => {
+  it('lists canonical name first, alias second', () => {
+    // Order is load-bearing: ActivityScanningPage picks the first matching
+    // alias when both rooms exist on the same kiosk, so the device sends
+    // check-ins to the canonical "WC" room rather than the manually-created
+    // "Toilette" alias.
+    expect(WC_ROOM_ALIASES).toEqual(['WC', 'Toilette']);
+  });
+});
+
+describe('isWCRoomAlias', () => {
+  it('returns true for canonical WC', () => {
+    expect(isWCRoomAlias('WC')).toBe(true);
+  });
+
+  it('returns true for Toilette alias', () => {
+    expect(isWCRoomAlias('Toilette')).toBe(true);
+  });
+
+  it('returns false for case variants', () => {
+    expect(isWCRoomAlias('wc')).toBe(false);
+    expect(isWCRoomAlias('Wc')).toBe(false);
+    expect(isWCRoomAlias('toilette')).toBe(false);
+  });
+
+  it('returns false for unrelated names', () => {
+    expect(isWCRoomAlias('Schulhof')).toBe(false);
+    expect(isWCRoomAlias('Raum 101')).toBe(false);
+    expect(isWCRoomAlias('')).toBe(false);
   });
 });
 
