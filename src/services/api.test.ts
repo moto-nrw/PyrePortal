@@ -4,9 +4,11 @@ import {
   ApiError,
   formatRoomName,
   isNetworkRelatedError,
+  isWCRoomAlias,
   mapApiErrorToGerman,
   mapServerErrorToGerman,
   setNetworkStatusCallback,
+  WC_ROOM_ALIASES,
 } from './api';
 
 // ====================================================================
@@ -114,6 +116,21 @@ describe('mapServerErrorToGerman', () => {
   it('maps room capacity exceeded', () => {
     expect(mapServerErrorToGerman('ROOM_CAPACITY_EXCEEDED')).toBe(
       'Raum ist voll. Kein Platz mehr verfügbar.'
+    );
+  });
+
+  // Issue #844 — duplicate active visit (409). Substring + code variants
+  // are both registered so degraded paths or older response shapes still
+  // resolve to the friendly German copy instead of the generic 409 fallback.
+  it('maps STUDENT_ALREADY_ACTIVE code', () => {
+    expect(mapServerErrorToGerman('STUDENT_ALREADY_ACTIVE')).toBe(
+      'Schüler*in ist bereits angemeldet.'
+    );
+  });
+
+  it('maps "student already has an active visit" message', () => {
+    expect(mapServerErrorToGerman('student already has an active visit')).toBe(
+      'Schüler*in ist bereits angemeldet.'
     );
   });
 
@@ -404,6 +421,50 @@ describe('mapApiErrorToGerman', () => {
     });
     expect(mapApiErrorToGerman(error)).toBe('Raum 5 ist voll (10/10 Plätze belegt).');
   });
+
+  // Issue #844: STUDENT_ALREADY_ACTIVE 409 surfaces the existing visit's
+  // room_name so the kiosk can tell the user where the student actually is.
+  it('formats STUDENT_ALREADY_ACTIVE with room_name from details', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      {
+        student_id: 231,
+        existing_visit_id: 9001,
+        room_id: 42,
+        room_name: 'Raum 1A',
+        entry_time: '2026-04-29T12:30:00Z',
+      }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet in Raum 1A.');
+  });
+
+  // The internal "WC" room name is a backend implementation detail; the UI
+  // shows it as "Toilette" everywhere else (formatRoomName) — duplicate
+  // visit copy must follow the same convention.
+  it('translates internal WC room name to Toilette in STUDENT_ALREADY_ACTIVE copy', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      { student_id: 231, room_name: 'WC' }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet in Toilette.');
+  });
+
+  // Degraded path: backend's best-effort lookup of the existing visit
+  // failed (race window) so room_name is missing — fall back to generic
+  // German wording rather than emit a half-formed sentence.
+  it('falls back to generic copy when STUDENT_ALREADY_ACTIVE lacks room_name', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      { student_id: 231 }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet.');
+  });
 });
 
 // ====================================================================
@@ -415,10 +476,59 @@ describe('formatRoomName', () => {
     expect(formatRoomName('WC')).toBe('Toilette');
   });
 
+  it('maps Toilette alias to Toilette (idempotent on the canonical UI label)', () => {
+    expect(formatRoomName('Toilette')).toBe('Toilette');
+  });
+
   it('keeps other names unchanged', () => {
     expect(formatRoomName('Turnhalle')).toBe('Turnhalle');
     expect(formatRoomName('Raum 101')).toBe('Raum 101');
     expect(formatRoomName('Schulhof')).toBe('Schulhof');
+  });
+
+  it('does not match case variants — exact-case mirror of backend IsWCRoomName', () => {
+    // Backend `IsWCRoomName` is exact-case; the kiosk must mirror that so the
+    // toilet button only lights up for rooms the backend actually treats as
+    // toilet special rooms. A lowercase "wc" lookup is intentionally NOT
+    // remapped here.
+    expect(formatRoomName('wc')).toBe('wc');
+    expect(formatRoomName('toilette')).toBe('toilette');
+  });
+});
+
+// ====================================================================
+// isWCRoomAlias / WC_ROOM_ALIASES
+// ====================================================================
+
+describe('WC_ROOM_ALIASES', () => {
+  it('lists canonical name first, alias second', () => {
+    // Order is load-bearing: ActivityScanningPage picks the first matching
+    // alias when both rooms exist on the same kiosk, so the device sends
+    // check-ins to the canonical "WC" room rather than the manually-created
+    // "Toilette" alias.
+    expect(WC_ROOM_ALIASES).toEqual(['WC', 'Toilette']);
+  });
+});
+
+describe('isWCRoomAlias', () => {
+  it('returns true for canonical WC', () => {
+    expect(isWCRoomAlias('WC')).toBe(true);
+  });
+
+  it('returns true for Toilette alias', () => {
+    expect(isWCRoomAlias('Toilette')).toBe(true);
+  });
+
+  it('returns false for case variants', () => {
+    expect(isWCRoomAlias('wc')).toBe(false);
+    expect(isWCRoomAlias('Wc')).toBe(false);
+    expect(isWCRoomAlias('toilette')).toBe(false);
+  });
+
+  it('returns false for unrelated names', () => {
+    expect(isWCRoomAlias('Schulhof')).toBe(false);
+    expect(isWCRoomAlias('Raum 101')).toBe(false);
+    expect(isWCRoomAlias('')).toBe(false);
   });
 });
 

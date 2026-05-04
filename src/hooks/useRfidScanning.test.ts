@@ -40,6 +40,10 @@ vi.mock('../services/api', () => ({
     updateSessionSupervisors: vi.fn(),
   },
   mapApiErrorToGerman: vi.fn(() => 'Ein Fehler ist aufgetreten'),
+  // Mirror the real `formatRoomName` translation table (currently just
+  // WC → Toilette) so the duplicate-active-visit modal renders the
+  // user-facing room name. Keep this in sync with src/services/api.ts.
+  formatRoomName: vi.fn((name: string) => (name === 'WC' ? 'Toilette' : name)),
   ApiError: class ApiError extends Error {
     public readonly code?: string;
     public readonly details?: Record<string, unknown>;
@@ -990,6 +994,173 @@ describe('useRfidScanning', () => {
       expect(state.rfid.currentScan?.student_name).toBe('Bereits eingecheckt');
       expect(state.rfid.currentScan?.action).toBe('already_in');
       expect(state.rfid.currentScan?.isInfo).toBe(true);
+    });
+
+    // Issue #844: backend now returns 409 with code STUDENT_ALREADY_ACTIVE
+    // and details.room_name pointing at the room the student is actually in
+    // (which is often NOT the room being scanned). The modal must surface
+    // that room name so the user knows where to look for the kid.
+    it('shows existing room name from STUDENT_ALREADY_ACTIVE details', async () => {
+      const { ApiError: MockedApiError } = await import('../services/api');
+      const duplicateError = new MockedApiError(
+        'API Error: 409 - Conflict: student already has an active visit',
+        409,
+        'STUDENT_ALREADY_ACTIVE',
+        {
+          student_id: 231,
+          existing_visit_id: 9001,
+          room_id: 42,
+          room_name: 'Raum 1A',
+          entry_time: '2026-04-29T12:30:00Z',
+        }
+      );
+      mockedProcessRfidScan.mockRejectedValue(duplicateError);
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await triggerMockScanAndDrain();
+
+      const state = useUserStore.getState();
+      expect(state.rfid.currentScan?.student_name).toBe('Bereits eingecheckt');
+      expect(state.rfid.currentScan?.action).toBe('already_in');
+      expect(state.rfid.currentScan?.isInfo).toBe(true);
+      expect(state.rfid.currentScan?.message).toBe('Bereits angemeldet in Raum 1A.');
+    });
+
+    // Degraded 409 path: backend lookup of the existing visit failed (race
+    // window in buildStudentAlreadyActiveResponse), so room_name is absent.
+    // The modal must still trigger the friendly "already_in" state and use
+    // the neutral fallback wording. We deliberately do NOT claim "in einem
+    // anderen Raum" here — the lookup failure means we don't actually know
+    // whether it's the same room or a different one, and guessing wrong
+    // sends staff to the wrong place. The copy mirrors
+    // mapApiErrorToGerman()'s generic fallback for the same scenario.
+    it('falls back to generic copy when STUDENT_ALREADY_ACTIVE lacks room_name', async () => {
+      const { ApiError: MockedApiError } = await import('../services/api');
+      const duplicateError = new MockedApiError(
+        'API Error: 409 - Conflict: student already has an active visit',
+        409,
+        'STUDENT_ALREADY_ACTIVE',
+        { student_id: 231 }
+      );
+      mockedProcessRfidScan.mockRejectedValue(duplicateError);
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await triggerMockScanAndDrain();
+
+      const state = useUserStore.getState();
+      expect(state.rfid.currentScan?.action).toBe('already_in');
+      expect(state.rfid.currentScan?.isInfo).toBe(true);
+      expect(state.rfid.currentScan?.message).toBe('Schüler*in ist bereits angemeldet.');
+    });
+
+    // Issue #844 review fix: bracelet-on-reader dedup. When the backend
+    // returns STUDENT_ALREADY_ACTIVE with details.student_id, we must
+    // populate tagToStudentMap and recordTagScan so subsequent scan
+    // events for the same tag don't fire another 409 at the backend.
+    // Without this, a bracelet left on the reader turns one duplicate
+    // visit into a stream of 409 requests instead of one graceful
+    // already_in modal.
+    it('populates tag→student dedup map after STUDENT_ALREADY_ACTIVE 409', async () => {
+      const { ApiError: MockedApiError } = await import('../services/api');
+      const duplicateError = new MockedApiError(
+        'API Error: 409 - Conflict: student already has an active visit',
+        409,
+        'STUDENT_ALREADY_ACTIVE',
+        {
+          student_id: 231,
+          existing_visit_id: 9003,
+          room_id: 5,
+          room_name: 'Raum 1A',
+        }
+      );
+      mockedProcessRfidScan.mockRejectedValue(duplicateError);
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await triggerMockScanAndDrain();
+
+      const state = useUserStore.getState();
+      // tagToStudentMap is the gate canProcessTag inspects on Layer 3.
+      expect(state.rfid.tagToStudentMap.get(MOCK_TAG)).toBe('231');
+      // recentTagScans + studentHistory mirror what the happy path
+      // populates so subsequent scans use the same dedup machinery.
+      expect(state.rfid.recentTagScans.has(MOCK_TAG)).toBe(true);
+      expect(state.rfid.studentHistory.get('231')?.lastAction).toBe('checkin');
+    });
+
+    // When the backend's 409 omits details.student_id (degraded path or
+    // older substring-only build), we have no identity to map. The scan
+    // must still resolve to the friendly already_in modal but we leave
+    // the dedup map untouched — better to allow another attempt than to
+    // map the tag to a wrong/missing student.
+    it('does not populate dedup map when STUDENT_ALREADY_ACTIVE lacks student_id', async () => {
+      const { ApiError: MockedApiError } = await import('../services/api');
+      const duplicateError = new MockedApiError(
+        'API Error: 409 - Conflict: student already has an active visit',
+        409,
+        'STUDENT_ALREADY_ACTIVE',
+        {}
+      );
+      mockedProcessRfidScan.mockRejectedValue(duplicateError);
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await triggerMockScanAndDrain();
+
+      const state = useUserStore.getState();
+      expect(state.rfid.currentScan?.action).toBe('already_in');
+      expect(state.rfid.tagToStudentMap.has(MOCK_TAG)).toBe(false);
+    });
+
+    // Issue #844 review fix: when the backend returns the internal "WC"
+    // room name, the modal must translate it to "Toilette" so the kiosk
+    // copy stays consistent with the rest of the UI (and with
+    // mapApiErrorToGerman, which already does this translation for the
+    // generic German error message).
+    it('translates internal WC room name to Toilette in already_in modal', async () => {
+      const { ApiError: MockedApiError } = await import('../services/api');
+      const duplicateError = new MockedApiError(
+        'API Error: 409 - Conflict: student already has an active visit',
+        409,
+        'STUDENT_ALREADY_ACTIVE',
+        {
+          student_id: 231,
+          existing_visit_id: 9002,
+          room_id: 7,
+          room_name: 'WC',
+        }
+      );
+      mockedProcessRfidScan.mockRejectedValue(duplicateError);
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await triggerMockScanAndDrain();
+
+      const state = useUserStore.getState();
+      expect(state.rfid.currentScan?.action).toBe('already_in');
+      expect(state.rfid.currentScan?.message).toBe('Bereits angemeldet in Toilette.');
     });
 
     it('handles room capacity exceeded error', async () => {

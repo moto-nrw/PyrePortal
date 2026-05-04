@@ -16,6 +16,7 @@ jobs:
     env:
       API_URL: ${{ github.ref == 'refs/heads/main' && vars.GKT_PROD_API_URL || vars.GKT_STAGING_API_URL }}
       DEPLOY_DIR: ${{ github.ref == 'refs/heads/main' && '/var/www/pyreportal' || '/var/www/pyreportal-staging' }}
+      DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -26,7 +27,7 @@ jobs:
           node-version: 22
 
       - name: Install pnpm
-        uses: pnpm/action-setup@v5
+        uses: pnpm/action-setup@v6
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -45,8 +46,35 @@ jobs:
           ssh-keyscan -H ${{ vars.DEPLOY_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy
+        id: deploy
         run: |
+          set +e
           rsync -av --delete \
             -e "ssh -i ~/.ssh/deploy_key" \
             dist/ \
             root@${{ vars.DEPLOY_HOST }}:${{ env.DEPLOY_DIR }}/
+          DEPLOY_EXIT=$?
+          set -e
+
+          echo "deploy_exit=$DEPLOY_EXIT" >> "$GITHUB_OUTPUT"
+
+          if [ "$DEPLOY_EXIT" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Cleanup secrets
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      - name: Notify Slack
+        if: always() && steps.deploy.outcome != 'skipped'
+        uses: ./.github/actions/notify-deploy-slack
+        with:
+          webhook_url: ${{ secrets.SLACK_DEPLOY_WEBHOOK }}
+          job_status: ${{ job.status }}
+          environment: ${{ env.DEPLOY_ENV }}
+          exit_code: ${{ steps.deploy.outputs.deploy_exit }}
+          run_url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          commit_url: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
+          sha: ${{ github.sha }}
+          actor: ${{ github.actor }}
