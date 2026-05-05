@@ -334,7 +334,7 @@ describe('fetchCurrentSession', () => {
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
     });
 
     await useUserStore.getState().fetchCurrentSession();
@@ -551,7 +551,7 @@ describe('logout', () => {
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
       selectedSupervisors: [{ id: 1, name: 'Test' }],
     });
 
@@ -578,7 +578,7 @@ describe('logout', () => {
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
     });
     mockEndSession.mockResolvedValueOnce(undefined);
 
@@ -596,7 +596,7 @@ describe('logout', () => {
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
     });
     mockEndSession.mockRejectedValueOnce(new Error('Network error'));
 
@@ -1040,7 +1040,7 @@ describe('clearOldTagScans', () => {
 describe('Activity management', () => {
   it('sets selected activity', () => {
     const activity = { id: 1, name: 'Fußball AG', category: 'Sport' };
-    useUserStore.getState().setSelectedActivity(activity as ActivityResponse);
+    useUserStore.getState().setSelectedActivity(activity);
     expect(useUserStore.getState().selectedActivity).toEqual(activity);
   });
 
@@ -1870,14 +1870,14 @@ describe('clearSessionState', () => {
   it('clears session-scoped state', () => {
     useUserStore.setState({
       selectedRoom: { id: 1, name: 'Test', is_occupied: false },
-      selectedActivity: { id: 1, name: 'Test', category: 'Test' } as ActivityResponse,
+      selectedActivity: { id: 1, name: 'Test', category: 'Test' },
       currentSession: {
         active_group_id: 1,
         activity_id: 1,
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
     });
 
     useUserStore.getState().clearSessionState();

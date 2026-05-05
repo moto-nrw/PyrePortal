@@ -30,7 +30,7 @@ function mockResponse(
     json: () => Promise.resolve(body),
     headers: new Headers(),
     redirected: false,
-    type: 'basic' as ResponseType,
+    type: 'basic',
     url: '',
     clone: () => mockResponse(body, init),
     body: null,
@@ -415,7 +415,7 @@ describe('mapApiErrorToGerman', () => {
 
   it('handles room capacity with numeric room_name', () => {
     const error = new ApiError('capacity', 409, 'ROOM_CAPACITY_EXCEEDED', {
-      room_name: 'Raum 5' as string,
+      room_name: 'Raum 5',
       current_occupancy: 10,
       max_capacity: 10,
     });
