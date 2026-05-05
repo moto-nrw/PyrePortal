@@ -216,12 +216,12 @@ const getActionName = (args: unknown): string => {
 
   // For redux-style actions with type
   if (args && typeof args === 'object' && 'type' in args) {
-    return String((args as { type: unknown }).type);
+    return String(args.type);
   }
 
   // For plain object updates, summarize the fields being changed
   if (args && typeof args === 'object') {
-    const keys = Object.keys(args as Record<string, unknown>);
+    const keys = Object.keys(args);
     if (keys.length === 1) {
       return `set:${keys[0]}`;
     }

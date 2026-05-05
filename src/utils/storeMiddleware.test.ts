@@ -255,7 +255,7 @@ describe('loggerMiddleware', () => {
 
     it('handles activities with non-array prev (special handler returns null)', () => {
       // Non-array prev → handleActivitiesArrayDiff returns null → no diff for this key
-      const store = buildStore({ activities: 42 as unknown });
+      const store = buildStore({ activities: 42 });
       store.set({ activities: [{ id: 1 }] });
       // Special handler returns null → processKeyDiff returns null → key excluded from diff
       // No other changes → no logging

@@ -1432,7 +1432,7 @@ describe('ActivityScanningPage', () => {
         action: 'already_in',
         message: 'Info message here',
         isInfo: true,
-      } as RfidScanResult,
+      },
       showModal: true,
     };
     renderPage();

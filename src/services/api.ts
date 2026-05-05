@@ -751,7 +751,7 @@ export interface SessionStartRequest {
 /**
  * Supervisor info in session response
  */
-export interface SupervisorInfo {
+interface SupervisorInfo {
   staff_id: number;
   first_name: string;
   last_name: string;
