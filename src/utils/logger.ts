@@ -362,5 +362,5 @@ export const logError = (error: Error, context?: string): void => {
     context,
     stack: error.stack,
     name: error.name,
-  } as Record<string, unknown>);
+  });
 };

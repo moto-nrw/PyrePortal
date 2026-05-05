@@ -80,7 +80,7 @@ describe('useModalTimeout', () => {
     const onTimeout = vi.fn();
     const { rerender } = renderHook(
       ({ resetKey }) => useModalTimeout({ duration: 5000, isActive: true, onTimeout, resetKey }),
-      { initialProps: { resetKey: 'key-1' as string | null } }
+      { initialProps: { resetKey: 'key-1' } }
     );
 
     act(() => vi.advanceTimersByTime(3000));
