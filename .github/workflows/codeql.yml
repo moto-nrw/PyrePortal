@@ -26,7 +26,6 @@ jobs:
       matrix:
         language: ["javascript-typescript"]
         # CodeQL supports: 'c-cpp', 'csharp', 'go', 'java-kotlin', 'javascript-typescript', 'python', 'ruby', 'swift'
-        # Note: Rust is not natively supported by CodeQL, use clippy for Rust analysis
 
     steps:
       - name: Checkout repository

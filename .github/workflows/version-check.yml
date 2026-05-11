@@ -22,29 +22,16 @@ jobs:
         with:
           node-version: 'lts/*'
 
-      - name: Validate version consistency
+      - name: Validate package version
         id: validate
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
 
-          # Read versions from all 3 sources
           NPM_VERSION=$(node -p "require('./package.json').version")
-          CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          TAURI_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).version")
 
           echo "package.json:    $NPM_VERSION"
-          echo "Cargo.toml:      $CARGO_VERSION"
-          echo "tauri.conf.json: $TAURI_VERSION"
-
-          # Check all 3 match
-          if [ "$NPM_VERSION" != "$CARGO_VERSION" ] || [ "$CARGO_VERSION" != "$TAURI_VERSION" ]; then
-            echo "::error::Version mismatch! package.json=$NPM_VERSION Cargo.toml=$CARGO_VERSION tauri.conf.json=$TAURI_VERSION"
-            exit 1
-          fi
-
-          echo "All 3 files match: $NPM_VERSION"
 
           # Check against latest GitHub release
           if ! RELEASE_OUTPUT=$(gh release list --limit 1 --json tagName -q '.[0].tagName' 2>&1); then

@@ -8,16 +8,24 @@ jobs:
     runs-on: blacksmith-2vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v6
-      
-      - name: Setup Tauri environment
-        uses: ./.github/actions/setup-tauri-environment
-      
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Lint frontend code
         run: pnpm run lint
-      
+
       - name: Type check frontend code
         run: pnpm run typecheck
-        
+
       - name: Check formatting
         run: pnpm run format:check
 
