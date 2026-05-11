@@ -11,10 +11,21 @@ inputs:
   environment:
     description: "Target environment (staging, production)"
     required: true
+  app_name:
+    description: "Application name shown in Slack"
+    required: false
+    default: "PyrePortal"
   exit_code:
     description: "Exit code from the deploy command. Empty for non-deploy notifications."
     required: false
     default: ""
+  github_token:
+    description: "GitHub token used to resolve the PR linked to the deployed commit"
+    required: false
+    default: ""
+  repository:
+    description: "GitHub repository in owner/name format"
+    required: true
   run_url:
     description: "Full URL to the GitHub Actions run"
     required: true
@@ -36,7 +47,10 @@ runs:
         WEBHOOK_URL: ${{ inputs.webhook_url }}
         JOB_STATUS: ${{ inputs.job_status }}
         ENV: ${{ inputs.environment }}
+        APP_NAME: ${{ inputs.app_name }}
         EXIT_CODE: ${{ inputs.exit_code }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        REPOSITORY: ${{ inputs.repository }}
         RUN_URL: ${{ inputs.run_url }}
         COMMIT_URL: ${{ inputs.commit_url }}
         INPUT_SHA: ${{ inputs.sha }}
@@ -52,20 +66,47 @@ runs:
         if [ "$ENV" = "production" ]; then
           DISPLAY_ENV="Production"
         else
-          DISPLAY_ENV="$(echo "$ENV" | sed 's/./\U&/')"
+          DISPLAY_ENV="${ENV^}"
+        fi
+
+        LINK_URL="$COMMIT_URL"
+        LINK_LABEL="\`$SHORT_SHA\`"
+
+        AUTH_HEADER=()
+        if [ -n "$GITHUB_TOKEN" ]; then
+          AUTH_HEADER=(-H "Authorization: Bearer $GITHUB_TOKEN")
+        fi
+
+        if PR_JSON=$(curl -fsS \
+          "${AUTH_HEADER[@]}" \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          "https://api.github.com/repos/$REPOSITORY/commits/$INPUT_SHA/pulls" 2>/dev/null); then
+          PR_URL=$(echo "$PR_JSON" | jq -r '.[0].html_url // empty')
+          PR_NUMBER=$(echo "$PR_JSON" | jq -r '.[0].number // empty')
+          if [ -n "$PR_URL" ] && [ -n "$PR_NUMBER" ]; then
+            LINK_URL="$PR_URL"
+            LINK_LABEL="PR #$PR_NUMBER"
+          fi
+        else
+          echo "::warning::Could not resolve PR for commit $SHORT_SHA, linking to commit instead"
         fi
 
         # Map job_status to (emoji, headline). Use Unicode emoji so
         # rendering doesn't depend on Slack's :shortcode: → emoji conversion.
         if [ "$JOB_STATUS" = "success" ]; then
-          EMOJI="✅"
-          HEADLINE="$DISPLAY_ENV deploy succeeded"
+          if [ "$ENV" = "production" ]; then
+            EMOJI="🎉"
+          else
+            EMOJI="✅"
+          fi
+          HEADLINE="$APP_NAME $DISPLAY_ENV Deployed"
         elif [ "$JOB_STATUS" = "cancelled" ]; then
           EMOJI="🚫"
-          HEADLINE="$DISPLAY_ENV deploy cancelled"
+          HEADLINE="$APP_NAME $DISPLAY_ENV Deploy Cancelled"
         else
           EMOJI="❌"
-          HEADLINE="$DISPLAY_ENV deploy failed"
+          HEADLINE="$APP_NAME $DISPLAY_ENV Deploy Failed"
         fi
 
         if [ -n "$EXIT_CODE" ] && [ "$EXIT_CODE" != "0" ]; then
@@ -80,19 +121,19 @@ runs:
         if ! PAYLOAD=$(jq -n \
           --arg emoji "$EMOJI" \
           --arg headline "$HEADLINE" \
-          --arg commit_url "$COMMIT_URL" \
-          --arg sha "$SHORT_SHA" \
+          --arg link_url "$LINK_URL" \
+          --arg link_label "$LINK_LABEL" \
           --arg actor "$ACTOR" \
           --arg detail "$DETAIL" \
           --arg run_url "$RUN_URL" \
           '{
-            text: "\($emoji) \($headline) — commit \($sha)",
+            text: "\($emoji) \($headline)",
             blocks: [
               {
                 type: "section",
                 text: {
                   type: "mrkdwn",
-                  text: "\($emoji) *\($headline)* · <\($commit_url)|`\($sha)`> by *\($actor)*\($detail) · <\($run_url)|Run>"
+                  text: "\($emoji) *\($headline)* · <\($link_url)|\($link_label)> by *\($actor)*\($detail) · <\($run_url)|Run>"
                 }
               }
             ]
