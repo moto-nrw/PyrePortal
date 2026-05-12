@@ -1,63 +1,46 @@
-# Services Layer - Business Logic
+# Services Layer
 
-This directory contains all business logic abstraction layers for PyrePortal.
+This directory contains business logic abstraction layers for PyrePortal.
 
-## Service Files
+## api.ts
 
-### api.ts (947 lines)
+Purpose: all HTTP communication with the Project Phoenix backend.
 
-**Purpose**: All HTTP communication with Project Phoenix backend
+Key exports:
 
-**Key Exports**:
+- `api`: all API methods.
+- request/response type definitions.
+- `initializeApi()`: loads API base URL and device key from the active platform adapter.
 
-- `api` object - All API methods
-- Type definitions for all API requests/responses
-- `initializeApi()` - Load config from Rust backend
-
-**Authentication Pattern**:
+Authentication pattern:
 
 ```typescript
-// Two-level auth on every request
 headers: {
-  'Authorization': `Bearer ${DEVICE_API_KEY}`,  // Device level
-  'X-Staff-PIN': pin,                           // Staff level
-  'X-Staff-ID': staffId.toString()              // Optional
+  'Authorization': `Bearer ${DEVICE_API_KEY}`,
+  'X-Staff-PIN': pin,
+  'X-Staff-ID': staffId.toString()
 }
 ```
 
-**Key Methods**:
+Key methods:
 
-- `getTeachers()` - Fetch teacher list
-- `validateGlobalPIN(pin)` - Validate OGS global PIN
-- `validateTeacherPIN(pin, staffId)` - Validate individual teacher PIN
-- `processRfidScan(...)` - Process RFID check-in/out
-- `getActivities(pin)` - Get teacher's activities
-- `getRooms(pin)` - Get available rooms
-- `startSession(...)` - Start activity session
-- `endSession(pin)` - End current session
-- `updateSessionActivity(pin)` - Prevent session timeout
+- `getTeachers()`
+- `validateGlobalPIN(pin)`
+- `validateTeacherPIN(pin, staffId)`
+- `processRfidScan(...)`
+- `getActivities(pin)`
+- `getRooms(pin)`
+- `startSession(...)`
+- `endSession(pin)`
+- `updateSessionActivity(pin)`
 
-### sessionStorage.ts
+## sessionStorage.ts
 
-**Purpose**: Persist session settings across app restarts via Tauri IPC
+Purpose: persist session settings across app restarts through the active platform adapter.
 
-**Pattern**:
+The implementation should call `adapter.saveSessionSettings`, `adapter.loadSessionSettings`, and `adapter.clearLastSession` instead of reaching into platform-specific APIs directly.
 
-```typescript
-import { safeInvoke } from '../utils/tauriContext';
-
-// Save session
-export async function saveSessionSettings(settings: SessionSettings) {
-  await safeInvoke('save_session_settings', { settings });
-}
-
-// Load session
-export async function loadSessionSettings(): Promise<SessionSettings | null> {
-  return await safeInvoke<SessionSettings>('load_session_settings');
-}
-```
-
-**Data Structure**:
+Data structure:
 
 ```typescript
 interface SessionSettings {
@@ -67,22 +50,23 @@ interface SessionSettings {
 }
 ```
 
-### studentCache.ts (entfernt)
+## Removed Services
 
-Die frühere Offline-Studenten-Cache-Implementierung wurde entfernt. Live-RFID-Scans arbeiten ausschließlich server-first; es gibt keinen lokalen Cache oder Persistenzpfad mehr. Sollte künftig wieder ein Offline-Feature benötigt werden, müsste der Cache neu eingeführt oder serverseitig unterstützt werden.
+### studentCache.ts
 
-### syncQueue.ts (entfernt)
+The former offline student cache was removed. Live RFID scans are server-first and do not use local student data.
 
-Die Offline-Retry-Queue wurde entfernt, da sie nie vollständig implementiert wurde. Der Timer lief, aber `queueFailedScan` wurde nirgends aufgerufen. Sollte ein Offline-Feature benötigt werden, muss es neu implementiert werden.
+### syncQueue.ts
 
-## Service Layer Patterns
+The former offline retry queue was removed because it was never fully wired. If offline mode returns, implement it deliberately with backend support and tests.
+
+## Service Patterns
 
 ### Error Handling
 
-All services throw errors, store layer catches:
+Services throw; store/page layers catch and translate into German UI messages.
 
 ```typescript
-// Service (throw)
 export async function getData(): Promise<Data> {
   const response = await apiCall<ApiResponse<Data>>('/endpoint');
   if (!response.data) {
@@ -90,42 +74,23 @@ export async function getData(): Promise<Data> {
   }
   return response.data;
 }
-
-// Store (catch)
-try {
-  const data = await getData();
-  set({ data });
-} catch (error) {
-  const message = error instanceof Error ? error.message : 'Unknown error';
-  logger.error('Failed to get data', { error: message });
-  set({ error: 'Fehler beim Laden' });
-}
 ```
 
 ### Logging
 
-All services use `createLogger()` - see root `CLAUDE.md` → "Three-Layer Logging System" for details.
-
-### Tauri IPC Wrapper
-
-Always use `safeInvoke` from `tauriContext`:
+Use `createLogger()` and structured data.
 
 ```typescript
-import { safeInvoke } from '../utils/tauriContext';
-
-// ✅ GOOD: Safe invoke with error handling
-const result = await safeInvoke<ReturnType>('command_name', { args });
-
-// ❌ BAD: Direct invoke (breaks in web context)
-const result = await invoke('command_name', { args });
+logger.error('Failed to get data', { error });
 ```
 
-## Adding New Service Method
+### Platform APIs
 
-### API Method Template
+Use `@platform` or higher-level services. Do not import native platform APIs directly from service code.
+
+## Adding a Service Method
 
 ```typescript
-// 1. Add type definitions
 export interface NewDataType {
   id: number;
   name: string;
@@ -136,10 +101,7 @@ interface NewDataResponse {
   data: NewDataType[];
 }
 
-// 2. Add method to api object
 export const api = {
-  // ... existing methods
-
   async getNewData(pin: string, staffId?: number): Promise<NewDataType[]> {
     const response = await apiCall<NewDataResponse>('/api/new-endpoint', {
       headers: {
@@ -153,64 +115,14 @@ export const api = {
 };
 ```
 
-### Tauri IPC Service Template
-
-For Rust command definitions, see `src-tauri/CLAUDE.md`. Frontend services call Rust via `safeInvoke` (see pattern above).
-
 ## Network Quality Tracking
 
-API service tracks call success/failure for quality monitoring:
+API calls report network quality through the callback registered by the app. This feeds the global network indicator.
+
+## Timeout Prevention
+
+Session timeout prevention runs through keepalive calls such as:
 
 ```typescript
-// In api.ts
-let successfulCalls = 0;
-let failedCalls = 0;
-
-export function getNetworkQuality(): 'good' | 'poor' | 'offline' {
-  const total = successfulCalls + failedCalls;
-  if (total === 0) return 'good';
-
-  const successRate = successfulCalls / total;
-  return successRate > 0.8 ? 'good' : 'poor';
-}
-```
-
-Used by `useNetworkStatus` hook for UI indicator.
-
-## Performance Considerations
-
-### Server-First
-
-- No local student cache for RFID scans; API is the source of truth
-- Use the sync queue to retry failed operations when the network recovers
-
-### Deduplication
-
-API service prevents duplicate concurrent fetches:
-
-```typescript
-let fetchPromise: Promise<Data> | null = null;
-
-export async function getData(): Promise<Data> {
-  if (fetchPromise) return fetchPromise;
-
-  fetchPromise = (async () => {
-    try {
-      return await apiCall('/endpoint');
-    } finally {
-      fetchPromise = null;
-    }
-  })();
-
-  return fetchPromise;
-}
-```
-
-### Timeout Prevention
-
-Session timeout prevention via keepalive:
-
-```typescript
-// Send on every RFID scan
 await api.updateSessionActivity(pin);
 ```

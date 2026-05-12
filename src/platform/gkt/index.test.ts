@@ -122,7 +122,45 @@ describe('GKTAdapter', () => {
       // Simulate NFC tap via the registered callback
       nfcCallback!({ uid: 'aa:bb:cc:dd', eventSource: 'NFC', eventNumber: 1 });
 
-      expect(onScan).toHaveBeenCalledWith({ tagId: 'AA:BB:CC:DD', scanId: expect.any(Number) });
+      expect(onScan).toHaveBeenCalledWith({ tagId: 'AA:BB:CC:DD', scanId: 1 });
+    });
+
+    it('uses hardware eventNumber as scanId for duplicate delivery suppression', async () => {
+      let nfcCallback: ((payload: unknown) => void) | undefined;
+      mockRegisterNfc.mockImplementation((cb: (payload: unknown) => void) => {
+        nfcCallback = cb;
+      });
+
+      await adapter.initializeNfc();
+
+      const onScan = vi.fn();
+      await adapter.startScanning(onScan);
+
+      nfcCallback!({ uid: 'aa:bb:cc:dd', eventSource: 'NFC', eventNumber: 99 });
+      nfcCallback!({ uid: 'aa:bb:cc:dd', eventSource: 'NFC', eventNumber: 99 });
+
+      expect(onScan).toHaveBeenNthCalledWith(1, { tagId: 'AA:BB:CC:DD', scanId: 99 });
+      expect(onScan).toHaveBeenNthCalledWith(2, { tagId: 'AA:BB:CC:DD', scanId: 99 });
+    });
+
+    it('falls back to incrementing scan IDs when eventNumber is missing', async () => {
+      let nfcCallback: ((payload: unknown) => void) | undefined;
+      mockRegisterNfc.mockImplementation((cb: (payload: unknown) => void) => {
+        nfcCallback = cb;
+      });
+
+      await adapter.initializeNfc();
+
+      const onScan = vi.fn();
+      await adapter.startScanning(onScan);
+
+      nfcCallback!({ barcode: 'aa:bb:cc:dd', eventSource: 'nfc' });
+      nfcCallback!({ barcode: '11:22:33:44', eventSource: 'nfc' });
+
+      const firstScanId = (onScan.mock.calls[0]?.[0] as { scanId: number }).scanId;
+      const secondScanId = (onScan.mock.calls[1]?.[0] as { scanId: number }).scanId;
+
+      expect(secondScanId).toBe(firstScanId + 1);
     });
 
     it('registered callback ignores invalid payloads', async () => {

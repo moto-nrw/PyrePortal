@@ -1,197 +1,123 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with this repository.
 
 ## Ecosystem
 
 PyrePortal is part of a three-repo system. All repos live side-by-side (`../`):
 
-| Repo                                        | Role                          | Relationship                                                                                                                                 |
-| ------------------------------------------- | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **project-phoenix** (`../project-phoenix/`) | Go backend + Next.js frontend | Provides `/api/iot/*` endpoints — device API key + staff PIN auth. Source of truth for all data.                                             |
-| **moto-balenaOS** (`../moto-balenaOS/`)     | Balena OS deployment layer    | Runs this app on Raspberry Pi 5 in kiosk mode. Env vars (`API_BASE_URL`, `DEVICE_API_KEY`) come from Balena device variables at deploy time. |
+| Repo                                        | Role                          | Relationship                                                                                     |
+| ------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| **project-phoenix** (`../project-phoenix/`) | Go backend + Next.js frontend | Provides `/api/iot/*` endpoints. Source of truth for all students, staff, rooms, sessions, tags. |
+| **moto-balenaOS** (`../moto-balenaOS/`)     | Retired deployment layer      | Legacy Raspberry Pi/Balena target. Do not add new PyrePortal work for this target.               |
 
-**If the backend changes**: Error messages in `src/services/api.ts` are hardcoded mappings from backend error strings to German UI text. Backend error text changes break the mapping silently — users see generic fallback instead of specific messages.
+**If the backend changes**: Error messages in `src/services/api.ts` are hardcoded mappings from backend error strings to German UI text. Backend error text changes break the mapping silently; users see generic fallback messages instead of specific messages.
 
 ## Project Overview
 
-PyrePortal is a **Raspberry Pi kiosk application** for German after-school care (OGS) that uses RFID scanning for student check-in/check-out. Built with Tauri v2, React 18, and TypeScript 5.6 in strict mode.
+PyrePortal is a web kiosk frontend for German after-school care (OGS). Staff use NFC/RFID wristbands for student check-in/check-out, rooms, activities, and attendance.
 
-**Target deployment**: Raspberry Pi 5 (64-bit), fullscreen kiosk mode, physical RFID reader hardware.
+Supported targets:
+
+- **GKT/GKTL**: production target. NFC comes from the GKT `system.js` bridge.
+- **Browser/Mac mock**: local development target. Mock RFID scans are generated in the frontend.
+
+The Raspberry Pi/Tauri/Balena target is retired. Its source can remain during staged cleanup, but it is no longer built, tested, released, or deployed.
 
 ## Development Commands
 
-### Essential Commands
-
 ```bash
-# Development
-pnpm run tauri dev       # Full app (Rust + Frontend) - required for RFID testing
-pnpm run dev            # Frontend only (faster, use when working on UI only)
-
-# Code quality (ALWAYS run before committing)
-pnpm run check          # ESLint + TypeScript - must pass
-pnpm run format         # Auto-format with Prettier
-
-# Production build
-pnpm run tauri build    # Platform-specific installers in src-tauri/target/release/bundle/
-
-# Rust development (in src-tauri/)
-cargo clippy           # Linter (strict)
-cargo fmt             # Format
-cargo test            # Run tests
+pnpm run dev          # Browser/mock development
+pnpm run build:gkt    # Production GKT bundle
+pnpm run build        # Browser/mock production build
+pnpm run check        # ESLint + TypeScript
+pnpm run test         # Vitest
+pnpm run format       # Auto-format with Prettier
 ```
 
-### Running Individual Tests
-
-```bash
-# Frontend tests (when implemented - currently no tests)
-pnpm test -- <test-file-pattern>
-
-# Rust tests
-cd src-tauri && cargo test <test-name>
-cd src-tauri && ./test_rfid.sh  # Test RFID hardware (compiles and runs test binary)
-```
+Do not add new CI, release, or deployment work for the retired Tauri/Raspberry Pi target.
 
 ## Critical Architecture Patterns
 
-### 1. Server-First RFID Scanning (Correctness-Critical)
+### 1. Server-First RFID Scanning
 
-**Location**: `src/hooks/useRfidScanning.ts:118-215`
+**Location**: `src/hooks/useRfidScanning.ts`
 
-**Why**: RFID actions must be authoritative; backend is the source of truth (no local student cache).
-
-**Flow**:
+RFID actions must be authoritative. The backend is the source of truth; there is no local student cache.
 
 ```typescript
-// 1. Call server FIRST (authoritative)
 const serverResult = await api.processRfidScan(...);
 setScanResult(serverResult);
 showScanModal();
 ```
 
-**When modifying**:
+When modifying scanning logic:
 
-- Test rapid scans (<1s apart)
-- Verify offline → online transition
+- Test rapid scans less than one second apart.
+- Verify offline to online transitions.
+- Verify both GKT real-NFC mode and browser mock mode.
 
 ### 2. Multi-Layer Duplicate Prevention
 
-**Location**: `src/store/userStore.ts:1117-1201`
+**Location**: `src/store/userStore.ts`
 
-**Why**: RFID hardware emits multiple events per scan (hardware quirk). Three defensive layers:
+RFID hardware and browser mocks can emit duplicate scan events. The store defends with:
 
-1. **Processing Queue**: Block if tag currently being processed
-2. **Recent Scans**: Block if scanned within 2 seconds
-3. **Student History**: Block opposite action if just performed
+1. Processing queue for tags currently being processed.
+2. Recent tag scan window.
+3. Student history to block opposite actions immediately after a scan.
 
-**Implementation**:
+### 3. Platform Adapter Boundary
 
-```typescript
-canProcessTag(tagId) → checks all 3 layers
-recordTagScan(tagId) → updates layer 2
-mapTagToStudent(tagId, studentId) → enables layer 3
-```
+**Location**: `src/platform/*`
 
-### 3. Zustand Store with Logging Middleware
+`BUILD_TARGET` chooses which adapter Vite bundles:
 
-**Location**: `src/store/userStore.ts:1540-1551`
+- `BUILD_TARGET=gkt`: production GKT adapter.
+- default/browser: browser mock adapter.
+- `tauri`: legacy adapter only. Do not expand this path.
 
-**Pattern**: Single store (not Redux) with custom middleware for complete action/state visibility. See `src/store/CLAUDE.md` for middleware configuration and logging details.
+New platform behavior should go through the adapter interface instead of branching throughout UI code.
 
-### 4. Runtime Configuration via Tauri
+### 4. Logging
 
-**Location**: `src-tauri/src/lib.rs:17-32`, `src/services/api.ts:25-54`
-
-**Why**: API keys must be changeable without rebuilding (different keys per Pi device).
-
-**Flow**:
-
-```
-.env file (runtime)
-  ↓
-Rust reads env vars
-  ↓
-Frontend calls get_api_config()
-  ↓
-API client configured with device-specific credentials
-```
-
-**Never** put API keys in VITE\_\* variables (baked into build).
-
-### 5. Three-Layer Logging System
-
-**Layers** (in order of data flow):
-
-1. **Frontend Logger** (`src/utils/logger.ts`)
-   - Browser console + in-memory buffer
-   - Sends entries to Rust via IPC
-
-2. **Store Logger** (`src/utils/storeMiddleware.ts`)
-   - Automatic Zustand action tracking
-   - Middleware wraps store creation
-
-3. **Rust File Logger** (`src-tauri/src/logging.rs`)
-   - Persists to disk with rotation
-   - Locations:
-     - macOS: `~/Library/Logs/pyreportal/`
-     - Linux: `~/.config/pyreportal/logs/`
-
-**Usage**:
+Use `createLogger('ComponentName')` from `src/utils/logger.ts`.
 
 ```typescript
-const logger = createLogger('ComponentName');
-logger.info('Message', { contextData });
-```
-
-### Logging Convention
-
-**Format**: String message + structured data object. No template literals.
-
-```typescript
-// ✅ Correct
 logger.info('RFID scan completed', { tagId, studentId, action });
-
-// ❌ Wrong
-logger.info(`RFID scan completed for tag ${tagId}`);
 ```
 
-**Levels**:
+Rules:
 
-- `DEBUG` — lifecycle events, internals, verbose diagnostics
-- `INFO` — user actions, operations, API calls
-- `WARN` — recoverable issues (network retry, fallback used)
-- `ERROR` — critical failures requiring attention
+- Log messages must be English.
+- UI-facing strings stay German.
+- Use structured data objects instead of template-literal log messages.
+- Do not add prefixes like `[DEBUG]`; use the proper log level.
 
-**Language**: All `logger.*` messages must be in English. UI-facing strings (`mapServerErrorToGerman`, modal text, error messages shown to users) stay in German.
+## API Integration
 
-**No prefixes**: Use the appropriate log level instead of message prefixes like `[RACE-DEBUG]`.
-
-**Runtime debug override**: In production, set `localStorage.setItem('pyrePortalDebugLogging', 'true')` to enable DEBUG-level logging. Requires page reload to take effect.
-
-## API Integration (Project Phoenix Backend)
-
-### Environment Setup
+### Local Browser Development
 
 ```bash
-# .env (NEVER commit this file)
-API_BASE_URL=http://localhost:8080           # Runtime (Rust reads)
-DEVICE_API_KEY=device_secret_key_here        # Runtime (Rust reads)
-TAURI_FULLSCREEN=false                       # Runtime (Rust reads)
-
-# Development-only (baked into frontend at build time)
-VITE_ENABLE_RFID=false                       # true = real hardware
-VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,... # Mock tags for testing
+VITE_API_BASE_URL=http://localhost:8080
+VITE_DEVICE_API_KEY=dev_device_key
+VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,...
 ```
+
+### GKT Deployment
+
+- `VITE_API_BASE_URL` is set during `pnpm run build:gkt`.
+- The device API key is provided via the kiosk URL query parameter: `?key=...`.
 
 ### Authentication Pattern
 
-**Two-level auth** (all requests):
+All relevant requests use:
 
 ```typescript
 headers: {
-  'Authorization': `Bearer ${DEVICE_API_KEY}`,  // Device level
-  'X-Staff-PIN': pin,                           // Staff level
-  'X-Staff-ID': staffId.toString()              // Optional
+  'Authorization': `Bearer ${DEVICE_API_KEY}`,
+  'X-Staff-PIN': pin,
+  'X-Staff-ID': staffId.toString()
 }
 ```
 
@@ -206,190 +132,88 @@ headers: {
 | `POST /api/iot/session/start`    | Start activity session | Device + PIN            |
 | `POST /api/iot/session/activity` | Prevent timeout        | Device + PIN            |
 
-**Error codes**:
-
-- 401: Invalid PIN
-- 423: Account locked (too many attempts)
-- 404: Not found
-
 ## Releasing
 
-See `.claude/rules/release.md` for the full release checklist. Key rules:
+See `.claude/rules/release.md` for the full release checklist.
 
-- **Before any release**: Run `./scripts/check-version.sh` and verify it passes
-- **Version sync**: `package.json`, `Cargo.toml`, and `tauri.conf.json` must be bumped before building on the Pi
-- **Pre-push hook**: Lefthook `version-sync` command in `lefthook.yml` blocks pushes with mismatched versions automatically
-- **Security**: This repo is public. Never commit secrets, API keys, `.env` files, PINs, or credentials
+Key rules:
+
+- Run `./scripts/check-version.sh` before release work.
+- GKT deploys are the production path.
+- Version source is `package.json`.
+- This repo is public. Never commit secrets, API keys, `.env` files, PINs, or credentials.
 
 ## Adding New Features
 
-### Adding API Endpoint
+### Adding API Endpoints
 
-1. **Define types** in `src/services/api.ts`:
+1. Define types in `src/services/api.ts`.
+2. Add an API method that uses the existing auth/header helpers.
+3. Add store actions in `src/store/userStore.ts` when state is needed.
+4. Use German UI messages for user-facing errors.
+5. Add or update focused tests for the changed behavior.
 
-   ```typescript
-   export interface NewDataType {
-     id: number;
-     name: string;
-   }
-   ```
+### Adding Platform Behavior
 
-2. **Add API method** in `src/services/api.ts`:
+Prefer the platform adapter boundary:
 
-   ```typescript
-   async getNewData(pin: string): Promise<NewDataType[]> {
-     const response = await apiCall<{status: string; data: NewDataType[]}>(
-       '/api/endpoint',
-       { headers: { Authorization: `Bearer ${DEVICE_API_KEY}`, 'X-Staff-PIN': pin } }
-     );
-     return response.data;
-   }
-   ```
-
-3. **Add store action** in `src/store/userStore.ts`:
-
-   ```typescript
-   interface UserState {
-     newData: NewDataType[];
-     fetchNewData: () => Promise<void>;
-   }
-
-   const createUserStore = (set, get) => ({
-     newData: [],
-
-     fetchNewData: async () => {
-       set({ isLoading: true, error: null });
-       try {
-         const data = await api.getNewData(get().authenticatedUser.pin);
-         set({ newData: data, isLoading: false });
-       } catch (error) {
-         logger.error('Failed to fetch data', { error });
-         set({ error: 'User-friendly German message', isLoading: false });
-       }
-     },
-   });
-   ```
-
-### Adding Tauri Command
-
-See `src-tauri/CLAUDE.md` for Rust command patterns and `src/services/CLAUDE.md` for frontend `safeInvoke` usage.
+- GKT-specific native behavior belongs in `src/platform/gkt`.
+- Browser/mock behavior belongs in `src/platform/browser`.
+- Do not add new functionality to the retired Tauri path.
 
 ## Working with RFID
 
-**Development** (no hardware):
+Browser development uses mock scanning:
 
 ```bash
-VITE_ENABLE_RFID=false  # in .env
+VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,...
 ```
 
-- Uses mock scanning (auto-generates scans every 3-5s)
-- Mock tags from `VITE_MOCK_RFID_TAGS`
+GKT production scanning uses `SYSTEM.registerNfc` via `public/system.js`.
 
-**Production** (Raspberry Pi):
-
-```bash
-VITE_ENABLE_RFID=true  # in .env
-```
-
-- Requires MFRC522 reader on SPI
-- Only compiles on ARM/ARM64 Linux with `--features rfid`
-- Test with: `cd src-tauri && ./test_rfid.sh` (compiles and runs automatically)
-
-**Hook usage**:
+Hook usage:
 
 ```typescript
 const { isScanning, startScanning, stopScanning, currentScan, showModal } = useRfidScanning();
 ```
 
-## TypeScript Configuration (Strict Mode)
+## TypeScript Configuration
 
-**tsconfig.json** enforces:
+`tsconfig.json` enforces strict mode:
 
-- `strict: true` (all strict checks)
+- `strict: true`
 - `noUnusedLocals: true`
 - `noUnusedParameters: true`
-- No implicit `any` types
-- Null/undefined must be explicitly handled
+- no implicit `any`
+- explicit null/undefined handling
 
-**ESLint** enforces:
+ESLint enforces import ordering, React hooks rules, security checks, and consistent type imports.
 
-- Consistent type imports: `import { api, type Teacher } from ...`
-- Import order: external → internal → parent → sibling
-- React hooks rules (exhaustive deps)
-- Security rules (no hardcoded paths, no `__dirname`)
+## Performance
 
-## Performance Optimization (Raspberry Pi)
-
-**Critical patterns**:
-
-- Use `React.memo` for expensive components
-- Batch Zustand `set()` calls (see `src/store/CLAUDE.md` for examples)
-- Minimize Tauri IPC calls (batch when possible)
-- Use CSS transforms for animations (GPU-accelerated)
-
-**Expected performance**:
-
-- 64-bit Pi build: 30-45 FPS ✅
-- 32-bit Pi build: 15-25 FPS ❌
+- Use `React.memo` for expensive components.
+- Batch Zustand `set()` calls where possible.
+- Avoid unnecessary native/platform calls.
+- Prefer CSS transforms for animations.
 
 ## Troubleshooting
 
 ### RFID Issues
 
-1. Check `.env`: `VITE_ENABLE_RFID=false` (dev) or `true` (Pi)
-2. Verify mock tags: `VITE_MOCK_RFID_TAGS=04:D6:...`
-3. Console: Look for "RFID service initialized"
-4. Pi hardware: `cd src-tauri && ./test_rfid.sh`
+1. Browser/mock: verify `VITE_MOCK_RFID_TAGS`.
+2. GKT: verify `system.js` is injected in the GKT build.
+3. Console: look for scanner initialization and scan event logs.
 
 ### API Issues
 
-1. Check `.env`: `API_BASE_URL` and `DEVICE_API_KEY` set
-2. Console: Network tab for failed requests
-3. Backend running: `curl http://localhost:8080/health`
+1. Check `VITE_API_BASE_URL` for browser builds or GKT build env.
+2. Check the GKT URL contains `?key=...`.
+3. Backend running: `curl http://localhost:8080/health`.
 
 ### Build Issues
 
 ```bash
-pnpm run clean:target   # Clean Rust artifacts
 rm -rf node_modules dist
 pnpm install
-pnpm run tauri build
+pnpm run build:gkt
 ```
-
-## Current Implementation Status
-
-### ✅ Completed
-
-- Teacher authentication (PIN validation)
-- RFID scanning (server-first, multi-layer duplicate prevention)
-- Session management (start/end with timeout prevention)
-- Offline sync queue
-- Three-layer logging system
-
-### 🔧 In Progress
-
-- Attendance analytics
-- Session timeout UI warnings
-
-### 📋 Planned
-
-- Biometric authentication
-- Advanced reporting dashboard
-
-## Platform-Specific: Raspberry Pi 5
-
-**Recommended**: Native 64-bit build
-
-**Performance gain**: 50-80% vs cross-compiled 32-bit
-
-- Build time: 7-15 min on Pi 5
-- Target: `aarch64-unknown-linux-gnu`
-
-**Deployment**:
-
-```bash
-# On Pi
-DISPLAY=:0 TAURI_FULLSCREEN=true ./pyreportal
-```
-
-**Auto-start**: Create systemd service or desktop autostart entry
