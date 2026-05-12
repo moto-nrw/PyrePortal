@@ -73,7 +73,10 @@ class GKTAdapter implements PlatformAdapter {
       const parsed = normalizeNfcPayload(payload);
       if (!parsed) return;
 
-      this.scanCallback({ tagId: parsed.tagId, scanId: ++this.scanCounter });
+      this.scanCallback({
+        tagId: parsed.tagId,
+        scanId: parsed.eventNumber ?? ++this.scanCounter,
+      });
     });
   }
 

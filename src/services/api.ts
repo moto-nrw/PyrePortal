@@ -1492,6 +1492,7 @@ export const api = {
  * Controls which buttons appear on the checkout screen and whether feedback is shown.
  */
 export interface DeviceConfig {
+  presence_mode: 'detailed' | 'binary';
   checkout: {
     raumwechsel_enabled: boolean;
     schulhof_enabled: boolean;

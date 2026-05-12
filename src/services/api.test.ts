@@ -2287,6 +2287,43 @@ describe('api methods', () => {
   });
 
   // ------------------------------------------------------------------
+  // api.getDeviceConfig
+  // ------------------------------------------------------------------
+
+  describe('api.getDeviceConfig', () => {
+    it('preserves presence_mode from device config response', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      const config = {
+        presence_mode: 'binary' as const,
+        checkout: {
+          raumwechsel_enabled: false,
+          schulhof_enabled: true,
+          wc_enabled: false,
+          daily_checkout_time: null,
+        },
+        feedback: {
+          enabled: true,
+        },
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: config, message: 'ok' })
+      );
+
+      const result = await freshApi.getDeviceConfig();
+
+      expect(result).toEqual(config);
+      expect(result.presence_mode).toBe('binary');
+      expect(mockFetch).toHaveBeenCalledWith('http://test-api.local/api/iot/config', {
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^Bearer /),
+        }),
+      });
+    });
+  });
+
+  // ------------------------------------------------------------------
   // ensureInitialized — auto-initialization on first api call
   // ------------------------------------------------------------------
 
