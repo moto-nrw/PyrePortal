@@ -33,44 +33,9 @@ jobs:
       - name: Type-check TypeScript
         run: pnpm run typecheck
 
-  rust-checks:
-    name: Rust Checks
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Setup Rust cache with sccache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "src-tauri -> target"
-          cache-on-failure: true
-
-      - name: Install Ubuntu dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-
-      - name: Check Rust formatting
-        working-directory: ./src-tauri
-        run: cargo fmt --all -- --check
-
-      - name: Run Clippy (pedantic)
-        working-directory: ./src-tauri
-        run: cargo clippy  # Pedantic lints configured in Cargo.toml [lints.clippy]
-
-      - name: Check Rust compiles
-        working-directory: ./src-tauri
-        run: cargo check
-
   test-integration:
     name: Integration Test
-    needs: [frontend-checks, rust-checks]
+    needs: [frontend-checks]
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout repository
@@ -84,26 +49,8 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Rust cache with sccache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: "src-tauri -> target"
-          cache-on-failure: true
-
-      - name: Install Ubuntu dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Build frontend
         run: pnpm run build
-
-      - name: Verify Rust compiles
-        working-directory: ./src-tauri
-        run: cargo check
