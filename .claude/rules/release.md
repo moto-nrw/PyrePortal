@@ -1,47 +1,33 @@
 # Release Checklist
 
-**IMPORTANT**: When the user asks to release, create a release, bump a version, or prepare a build — you MUST run `./scripts/check-version.sh` FIRST and verify it passes before proceeding with any release step.
+**IMPORTANT**: When the user asks to release, create a release, bump a version, or prepare a build, run `./scripts/check-version.sh` first and verify it passes before proceeding.
 
-## Pre-Release: Version Sync (MANDATORY)
+## Version Source
 
-Before every release, the version in these 3 files **MUST** match the new release tag:
+`package.json` is the release version source for PyrePortal.
 
-| File                        | Field       |
-| --------------------------- | ----------- |
-| `package.json`              | `"version"` |
-| `src-tauri/Cargo.toml`      | `version`   |
-| `src-tauri/tauri.conf.json` | `"version"` |
+The retired Raspberry Pi/Tauri files are not release sources anymore. Do not block GKT releases on `Cargo.toml` or `tauri.conf.json` version values.
 
-### Validation (ALWAYS run before a release)
+## Validation
 
 ```bash
 ./scripts/check-version.sh
 ```
 
-This script checks that all 3 files match and the version is greater than the latest GitHub release tag. **It MUST pass before building.** If it fails, fix the versions first.
-
-### Automated Guard
-
-The `pre-push` hook (Lefthook `version-sync` command in `lefthook.yml`) blocks any push where the 3 version files are out of sync. This catches mistakes automatically but does NOT check against GitHub tags — that requires the manual `check-version.sh` script above.
-
-### Bumping
-
-When releasing e.g. `v1.0.7`:
-
-1. Update all 3 files to `1.0.7` (without `v` prefix)
-2. Commit: `git commit -m "chore: bump version to v1.0.7"`
-3. Push to `development` before building on Pi
+The script checks that `package.json` is greater than the latest GitHub release tag.
 
 ## Release Steps
 
-1. **Bump version and push** (Mac) — update 3 files, commit, push to `development`
-2. **Build on Pi** — `ssh`, `git pull`, `pnpm install`, `pnpm run tauri build -- --features rfid`
-3. **Download binary** (Mac) — `scp` from Pi to `~/Desktop/pyreportal-arm64-vX.Y.Z`
-4. **Create GitHub release** (Mac) — `gh release create vX.Y.Z ...` with binary attached
-5. **Verify Balena update** — Balena pulls new binary on next container start
+1. Bump `package.json` to the new version without the `v` prefix.
+2. Run `./scripts/check-version.sh`.
+3. Commit the version bump.
+4. Push to `development`.
+5. Let the GKT deployment workflow build and deploy the app.
+6. Verify the deployed GKT environment.
 
 ## Rules
 
-- **Never** use `cargo build` alone for releases. Always `pnpm run tauri build` (bundles Frontend + Backend).
-- **Never** commit secrets, API keys, `.env` files, PINs, or credentials. This repo is public.
-- The version is baked into the binary at compile time and displayed on the Landing Page. If you skip the version bump, the app shows the wrong version.
+- GKT/GKTL is the production deployment path.
+- Do not create new Raspberry Pi, Balena, or Tauri release steps.
+- Never commit secrets, API keys, `.env` files, PINs, or credentials. This repo is public.
+- The version is exposed to the frontend via the Vite build and shown in the app UI.

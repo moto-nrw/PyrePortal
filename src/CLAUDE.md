@@ -4,125 +4,85 @@ This directory contains the React/TypeScript frontend for PyrePortal.
 
 ## Directory Structure
 
-- **components/** - React components (UI primitives + feature-specific)
-- **hooks/** - Custom React hooks (RFID scanning, network status)
-- **pages/** - Route-level components (full screen views)
-- **services/** - Business logic layer (API, storage, sync queue)
-- **store/** - Zustand state management (single store pattern)
-- **styles/** - Design system and theme configuration
-- **utils/** - Pure utility functions (logger, error boundary)
+- **components/**: React components.
+- **hooks/**: custom React hooks such as RFID scanning and network status.
+- **pages/**: route-level full-screen views.
+- **services/**: API, storage, and business logic helpers.
+- **store/**: Zustand state management.
+- **styles/**: design system and theme configuration.
+- **utils/**: shared utilities.
+- **platform/**: build-target adapters for GKT and browser/mock.
 
 ## Key Patterns
 
-### State Management (Zustand)
+### State Management
 
-- **Single store**: All app state in `store/userStore.ts`
-- **Logging middleware**: Automatic action tracking via `utils/storeMiddleware.ts`
-- **Batch updates**: Always batch multiple `set()` calls (see `store/CLAUDE.md` for examples)
+- Use the single Zustand store in `store/userStore.ts`.
+- Batch related `set()` calls.
+- Keep logging middleware intact for action/state visibility.
 
-### Component Patterns
+### Platform Boundary
 
-- **UI primitives**: In `components/ui/` (reusable buttons, modals, inputs)
-- **Feature components**: In `components/` root (RFID initializer, session toggle)
-- **Page components**: In `pages/` (route-level, full screens)
+- Use `@platform` for platform-specific behavior.
+- GKT production behavior belongs in `platform/gkt`.
+- Browser/Mac mock behavior belongs in `platform/browser`.
+- The Tauri adapter is legacy only; do not add new behavior there.
 
-### Import Order (ESLint enforced)
+### Import Order
 
 ```typescript
-// 1. External dependencies
 import { useEffect, useState } from 'react';
-import { create } from 'zustand';
 
-// 2. Internal services/store
 import { api, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
-
-// 3. Internal utilities
 import { createLogger } from '../utils/logger';
 ```
 
-### Type Import Style
+Prefer inline type imports:
 
 ```typescript
-// ✅ CORRECT: Inline type imports
 import { api, type Teacher, type Room } from '../services/api';
-
-// ❌ WRONG: Separate imports
-import type { Teacher } from '../services/api';
-import { api } from '../services/api';
 ```
 
 ## Critical Files
 
-### Core Application
+- `App.tsx`: root component with React Router setup.
+- `main.tsx`: app entry point and API initialization.
+- `hooks/useRfidScanning.ts`: server-first RFID scanning flow.
+- `services/api.ts`: Project Phoenix HTTP API.
+- `services/sessionStorage.ts`: session persistence through the active platform adapter.
+- `store/userStore.ts`: authentication, RFID, session, and UI state.
+- `utils/logger.ts`: frontend logging.
 
-- `App.tsx` - Root component with React Router setup
-- `main.tsx` - Entry point, renders App with error boundary
+## Performance Considerations
 
-### Hooks (Performance-Critical)
-
-- `hooks/useRfidScanning.ts` - RFID scanning logic (always server-first, no local cache)
-- `hooks/useNetworkStatus.ts` - Network quality monitoring
-
-### Services (Business Logic)
-
-- `services/api.ts` - All HTTP API calls to Project Phoenix backend
-- (removed) früher: `services/studentCache.ts` für Offline-Cache; Live-Scans sind jetzt ausschließlich server-first
-- (removed) früher: `services/syncQueue.ts` für Offline-Retry-Queue; wurde nie vollständig implementiert
-- `services/sessionStorage.ts` - Session persistence (Tauri IPC)
-
-### State Management
-
-- `store/userStore.ts` - Single Zustand store (1552 lines)
-  - User authentication state
-  - RFID scanning state
-  - Session management
-  - All app actions
-
-### Utilities
-
-- `utils/logger.ts` - Frontend logging (browser console + Rust persistence)
-- `utils/storeMiddleware.ts` - Zustand action logging middleware
-- `utils/tauriContext.ts` - Safe Tauri IPC wrapper (`safeInvoke`)
-- `utils/errorBoundary.tsx` - React error boundary
-
-## Performance Considerations (Raspberry Pi)
-
-### Optimization Patterns
-
-1. **Memoization**: Use `React.memo` for expensive components
-2. **Lazy Loading**: Use `loading="lazy"` for images
-3. **Debouncing**: Debounce search/filter operations
-4. **CSS Transforms**: Use GPU-accelerated animations
-
-### Avoid
-
-- Inline functions in render (creates new function on every render)
-- Large re-renders (batch Zustand updates)
-- Heavy computations in render (use `useMemo`)
+- Use `React.memo` for expensive components.
+- Use `loading="lazy"` for non-critical images.
+- Debounce search/filter operations.
+- Use CSS transforms for animations.
+- Avoid heavy computations during render; use `useMemo` when useful.
 
 ## Common Tasks
 
-### Adding API Endpoint
+### Adding an API Endpoint
 
-See root `CLAUDE.md` → "Adding New Features" for complete workflow.
+See root `CLAUDE.md` -> "Adding New Features".
 
-### Adding New Page
+### Adding a Page
 
-1. Create component in `pages/`
-2. Add route in `App.tsx`
-3. Add navigation from existing page
+1. Create a component in `pages/`.
+2. Add the route in `App.tsx`.
+3. Add navigation from the relevant existing page.
 
-### Adding Custom Hook
+### Adding a Hook
 
-1. Create in `hooks/`
-2. Follow naming: `use[Name].ts`
-3. Return object with clear API
-4. Document usage in file comment
+1. Create it in `hooks/`.
+2. Follow `use[Name].ts` naming.
+3. Return a clear object API.
+4. Add focused tests for behavior and edge cases.
 
-## Testing (When Implemented)
+## Testing
 
-- Test files co-located: `Component.tsx` → `Component.test.tsx`
-- Use React Testing Library for components
-- Mock Zustand store for tests
-- Mock Tauri IPC with `jest.mock('@tauri-apps/api/core')`
+- Co-locate tests: `Component.tsx` -> `Component.test.tsx`.
+- Use React Testing Library for components.
+- Mock Zustand state and platform adapters where needed.

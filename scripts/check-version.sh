@@ -1,6 +1,6 @@
 #!/bin/bash
-# Pre-release version check: ensures package.json, Cargo.toml, tauri.conf.json
-# and the planned git tag are all in sync.
+# Pre-release version check: ensures package.json is newer than the latest
+# GitHub release tag.
 set -e
 
 RED='\033[0;31m'
@@ -10,24 +10,11 @@ NC='\033[0m'
 
 ERRORS=0
 
-# Read versions from all 3 sources
 NPM_VERSION=$(node -p "require('./package.json').version")
-CARGO_VERSION=$(grep '^version' src-tauri/Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-TAURI_VERSION=$(node -p "JSON.parse(require('fs').readFileSync('src-tauri/tauri.conf.json','utf8')).version")
 
 echo "=== PyrePortal Version Check ==="
 echo ""
 echo "  package.json:      ${NPM_VERSION}"
-echo "  Cargo.toml:        ${CARGO_VERSION}"
-echo "  tauri.conf.json:   ${TAURI_VERSION}"
-
-# Check all 3 match
-if [ "$NPM_VERSION" = "$CARGO_VERSION" ] && [ "$CARGO_VERSION" = "$TAURI_VERSION" ]; then
-    echo -e "  Sync:              ${GREEN}All match${NC}"
-else
-    echo -e "  Sync:              ${RED}MISMATCH${NC}"
-    ERRORS=$((ERRORS + 1))
-fi
 
 # Check against latest GitHub release
 echo ""

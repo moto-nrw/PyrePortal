@@ -2,80 +2,76 @@
 
 ![PyrePortal](public/img/moto_transparent_200.png)
 
-[![Tauri](https://img.shields.io/badge/tauri-v2-blue)](https://tauri.app)
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/typescript-5.9-blue)](https://www.typescriptlang.org)
-[![Version](https://img.shields.io/badge/version-0.1.0-green)](package.json)
+[![Version](https://img.shields.io/badge/version-1.3.3-green)](package.json)
 
-A Raspberry Pi kiosk app for German after-school care (OGS). Staff tap RFID wristbands to check students in and out, pick rooms, run activities, and track attendance — all from a single touchscreen.
+PyrePortal is the web kiosk frontend for German after-school care (OGS). Staff use NFC/RFID wristbands to check students in and out, pick rooms, run activities, and track attendance from a kiosk device.
+
+## Supported Targets
+
+- **GKT/GKTL kiosk devices**: production target. NFC is provided by the GKT system bridge via `system.js`.
+- **Browser/Mac mock**: local development target. Mock RFID scans are generated in the frontend.
+
+The old Raspberry Pi/Tauri/Balena target is retired. Its source code may still exist during the staged cleanup, but it is no longer built, tested, released, or deployed.
 
 ## What It Does
 
-- **RFID check-in/check-out** — Scan a wristband, and the server records the student's arrival or departure instantly.
-- **PIN authentication** — Staff unlock the kiosk with a PIN. Supports both a shared OGS PIN and individual teacher PINs.
-- **Room and activity management** — Choose a room, start an activity session, assign supervisors, and see live occupancy.
-- **Attendance tracking** — View student status, toggle check-in/check-out, and submit daily feedback (positive / neutral / negative).
-- **RFID tag assignment** — Pair wristbands to students or staff directly from the device.
-- **Network-aware** — Shows connection quality and gives clear German-language error messages when things go wrong.
-- **Structured logging** — Logs flow from the browser to Rust to disk, with automatic file rotation.
-
-## Target Hardware
-
-**Raspberry Pi 5** (64-bit, `aarch64-unknown-linux-gnu`), fullscreen kiosk mode, MFRC522 RFID reader on SPI.
-
-The app builds on macOS, Windows, and Linux for development, but the RFID reader only works on ARM/ARM64 Linux with the `rfid` feature flag. On other platforms, a mock scanner fills in for testing.
+- **RFID check-in/check-out**: scan a wristband and the server records the student's arrival or departure.
+- **PIN authentication**: staff unlock the kiosk with a shared OGS PIN or individual teacher PIN.
+- **Room and activity management**: choose a room, start an activity session, assign supervisors, and see live occupancy.
+- **Attendance tracking**: view student status, toggle check-in/check-out, and submit daily feedback.
+- **RFID tag assignment**: pair wristbands to students or staff directly from the kiosk UI.
+- **Network-aware UI**: shows connection quality and German-language error messages.
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-    subgraph "PyrePortal (Tauri Desktop App)"
-        UI[React Frontend] -->|Tauri IPC| Backend[Rust Backend]
-        Backend -->|Invoke| UI
-        UI -->|State| Store[Zustand Store]
-        Store --> UI
+    subgraph "PyrePortal Frontend"
+        UI[React UI] --> Store[Zustand Store]
+        UI --> Platform[Platform Adapter]
+        Platform --> GKT[GKT NFC bridge]
+        Platform --> Mock[Browser mock scanner]
     end
 
     subgraph "Project Phoenix"
-        Server[Backend Server] -->|SQL| DB[(Database)]
+        Server[Backend Server] --> DB[(Database)]
     end
 
-    Backend -->|REST API| Server
+    UI -->|REST API| Server
 ```
 
 | Layer              | Role                                               |
 | ------------------ | -------------------------------------------------- |
-| React + TypeScript | UI, routing, state (Zustand), RFID scanning hook   |
-| Rust (Tauri v2)    | Runtime config, file logging, SPI/RFID hardware    |
+| React + TypeScript | UI, routing, state, RFID scanning flow             |
+| Platform adapters  | GKT NFC bridge and browser mock implementations    |
 | Project Phoenix    | Source of truth for students, staff, rooms, visits |
 
 ### Key Design Decisions
 
 1. **Server-first RFID scans.** Every scan hits the backend before the UI reacts. No local student cache.
-2. **Edge-triggered duplicate prevention.** Tauri emits one event per physical tap via Rust-side presence detection; the frontend keeps processing-queue and short fallback guards.
-3. **Runtime config via Rust.** API keys live in `.env` and are read by Rust at startup — never baked into the frontend build.
-4. **Two-level auth on every request.** Device API key (`Authorization: Bearer ...`) plus staff PIN (`X-Staff-PIN` header).
+2. **Platform adapters.** `BUILD_TARGET=gkt` bundles the GKT adapter; plain browser builds use the mock adapter.
+3. **Two-level auth on every request.** Device API key (`Authorization: Bearer ...`) plus staff PIN (`X-Staff-PIN` header).
+4. **Backend-owned data.** Project Phoenix is the source of truth for rooms, sessions, attendance, and tag assignments.
 
 ## Tech Stack
 
-| Component  | Technology   | Version  |
-| ---------- | ------------ | -------- |
-| Framework  | Tauri        | v2       |
-| Frontend   | React        | 19       |
-| Language   | TypeScript   | 5.9      |
-| State      | Zustand      | 5        |
-| Routing    | React Router | 7        |
-| Styling    | TailwindCSS  | 4        |
-| Build Tool | Vite         | 7        |
-| Backend    | Rust         | 2021 ed. |
+| Component  | Technology   | Version |
+| ---------- | ------------ | ------- |
+| Frontend   | React        | 19      |
+| Language   | TypeScript   | 5.9     |
+| State      | Zustand      | 5       |
+| Routing    | React Router | 7       |
+| Styling    | TailwindCSS  | 4       |
+| Build Tool | Vite         | 8       |
 
 ## Getting Started
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18+
-- [Rust](https://www.rust-lang.org/tools/install) (stable)
-- Platform deps for [Tauri v2](https://v2.tauri.app/start/prerequisites/)
+- pnpm 10+
 
 ### Setup
 
@@ -85,35 +81,35 @@ cd PyrePortal
 pnpm install
 ```
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root for local browser development:
 
 ```bash
-API_BASE_URL=http://localhost:8080
-DEVICE_API_KEY=your_device_key
-VITE_ENABLE_RFID=false          # true on Pi with hardware
+VITE_API_BASE_URL=http://localhost:8080
+VITE_DEVICE_API_KEY=your_dev_device_key
 VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80
 ```
+
+GKT deployments pass the device API key through the kiosk URL (`?key=...`) and bake the API base URL into the GKT build.
 
 ### Run
 
 ```bash
-pnpm run tauri dev    # Full app (Rust + React)
-pnpm run dev          # Frontend only (faster, no RFID)
+pnpm run dev
 ```
 
 ### Build
 
 ```bash
-pnpm run tauri build
-# Output: src-tauri/target/release/bundle/
+pnpm run build:gkt    # Production GKT bundle
+pnpm run build        # Browser/mock bundle
 ```
 
 ### Code Quality
 
 ```bash
-pnpm run check        # ESLint + TypeScript (must pass before committing)
+pnpm run check        # ESLint + TypeScript
+pnpm run test         # Vitest
 pnpm run format       # Prettier auto-format
-cd src-tauri && cargo clippy   # Rust linter
 ```
 
 ## API Endpoints
@@ -185,29 +181,28 @@ Start an activity, assign supervisors, and scan students in. At checkout, staff 
 
 ### App won't start
 
-- Check `.env` for `API_BASE_URL` and `DEVICE_API_KEY`
-- Check logs: `~/Library/Logs/pyreportal/` (macOS) or `~/.config/pyreportal/logs/` (Linux)
-- Verify Tauri platform deps are installed
+- Check local `.env` for `VITE_API_BASE_URL` and `VITE_DEVICE_API_KEY`.
+- For GKT, confirm the kiosk URL contains `?key=...`.
+- Confirm the backend is reachable: `curl http://localhost:8080/health`.
 
 ### Build errors
 
 ```bash
-pnpm run clean:target   # Clean Rust artifacts
 rm -rf node_modules dist
 pnpm install
-pnpm run tauri build
+pnpm run build:gkt
 ```
 
-### RFID not working
+### RFID/NFC not working
 
-- Development: set `VITE_ENABLE_RFID=false` in `.env`
-- Pi hardware: run `cd src-tauri && ./test_rfid.sh`
-- Console should show "RFID service initialized"
+- Browser development uses mock scans from `VITE_MOCK_RFID_TAGS`.
+- GKT devices receive NFC scans through the `SYSTEM.registerNfc` bridge.
+- Check browser console logs for scanner initialization and scan events.
 
 ### API connection fails
 
-- Confirm backend is running: `curl http://localhost:8080/health`
-- Check `DEVICE_API_KEY` matches what the server expects
+- Confirm Project Phoenix is running.
+- Check the device API key matches what the server expects.
 
 </details>
 
