@@ -2,6 +2,14 @@
 
 This directory contains the Rust backend for PyrePortal, providing system access, file persistence, and RFID hardware integration.
 
+## Target Scope
+
+This Tauri code is retained for local Mac/mock app usage. Do not add production deployment work here.
+
+- GKT/GKTL is the production deployment path and uses the frontend GKT adapter with `system.js`.
+- Browser and Tauri Mac/mock are local development targets.
+- Raspberry Pi/Balena and Tauri production deployment are retired.
+
 ## File Structure
 
 ### Core Files
@@ -219,7 +227,7 @@ fn load_settings(path: &Path) -> Result<Settings, String> {
 
 ## RFID Hardware Integration
 
-### Production (Raspberry Pi)
+### Retired Raspberry Pi Hardware Path
 
 ```rust
 // rfid.rs - ARM/ARM64 Linux only
@@ -246,7 +254,7 @@ fn init_hardware() -> Result<Mfrc522<...>, String> {
 }
 ```
 
-### Mock (Development)
+### Mock (Local Mac/Development)
 
 ```rust
 // Mock RFID scanning for non-ARM platforms
@@ -369,9 +377,9 @@ cd src-tauri
 
 - `chrono = { version = "0.4", features = ["serde"] }` - Date/time
 - `dotenvy = "0.15"` - .env file loading
-- `rand = "0.8"` - Random number generation
+- `rand = "0.10"` - Random number generation
 
-### Platform-Specific (ARM/ARM64 Linux)
+### Retired Platform-Specific (ARM/ARM64 Linux)
 
 ```toml
 [target.'cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))'.dependencies]

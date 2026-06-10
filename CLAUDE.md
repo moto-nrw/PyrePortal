@@ -20,9 +20,10 @@ PyrePortal is a web kiosk frontend for German after-school care (OGS). Staff use
 Supported targets:
 
 - **GKT/GKTL**: production target. NFC comes from the GKT `system.js` bridge.
-- **Browser/Mac mock**: local development target. Mock RFID scans are generated in the frontend.
+- **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
+- **Tauri Mac/mock app**: local development target for launching the mock frontend as a desktop app.
 
-The Raspberry Pi/Tauri/Balena target is retired. Its source can remain during staged cleanup, but it is no longer built, tested, released, or deployed.
+The Raspberry Pi/Balena deployment path and Tauri production deployment are retired. Tauri is retained only for local Mac/mock app usage and is not a production release target.
 
 ## Development Commands
 
@@ -35,7 +36,7 @@ pnpm run test         # Vitest
 pnpm run format       # Auto-format with Prettier
 ```
 
-Do not add new CI, release, or deployment work for the retired Tauri/Raspberry Pi target.
+Do not add new CI, release, or deployment work for Raspberry Pi, Balena, or Tauri production targets.
 
 ## Critical Architecture Patterns
 
@@ -75,7 +76,7 @@ RFID hardware and browser mocks can emit duplicate scan events. The store defend
 
 - `BUILD_TARGET=gkt`: production GKT adapter.
 - default/browser: browser mock adapter.
-- `tauri`: legacy adapter only. Do not expand this path.
+- `BUILD_TARGET=tauri`: local Mac/mock app adapter. Keep this path limited to local mock-app support.
 
 New platform behavior should go through the adapter interface instead of branching throughout UI code.
 
@@ -159,7 +160,7 @@ Prefer the platform adapter boundary:
 
 - GKT-specific native behavior belongs in `src/platform/gkt`.
 - Browser/mock behavior belongs in `src/platform/browser`.
-- Do not add new functionality to the retired Tauri path.
+- Tauri behavior belongs in `src/platform/tauri` only when it supports local Mac/mock app usage. Do not add Tauri production behavior.
 
 ## Working with RFID
 
