@@ -103,7 +103,6 @@ pub async fn clear_last_session<R: Runtime>(app_handle: AppHandle<R>) -> Result<
 mod tests {
     use super::*;
     use std::sync::Mutex;
-    use tauri::Manager;
 
     /// Serialize tests that use the shared mock-app data directory.
     static APP_DIR_LOCK: Mutex<()> = Mutex::new(());

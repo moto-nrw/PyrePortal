@@ -11,9 +11,10 @@ PyrePortal is the web kiosk frontend for German after-school care (OGS). Staff u
 ## Supported Targets
 
 - **GKT/GKTL kiosk devices**: production target. NFC is provided by the GKT system bridge via `system.js`.
-- **Browser/Mac mock**: local development target. Mock RFID scans are generated in the frontend.
+- **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
+- **Tauri Mac/mock app**: local development target for launching the mock frontend as a desktop app.
 
-The old Raspberry Pi/Tauri/Balena target is retired. Its source code may still exist during the staged cleanup, but it is no longer built, tested, released, or deployed.
+The old Raspberry Pi/Balena deployment path and Tauri production deployment are retired. Tauri is retained only for local Mac/mock app usage and is not a production release target.
 
 ## What It Does
 
@@ -33,6 +34,7 @@ flowchart TB
         UI --> Platform[Platform Adapter]
         Platform --> GKT[GKT NFC bridge]
         Platform --> Mock[Browser mock scanner]
+        Platform --> Tauri[Tauri Mac/mock app]
     end
 
     subgraph "Project Phoenix"
@@ -42,16 +44,16 @@ flowchart TB
     UI -->|REST API| Server
 ```
 
-| Layer              | Role                                               |
-| ------------------ | -------------------------------------------------- |
-| React + TypeScript | UI, routing, state, RFID scanning flow             |
-| Platform adapters  | GKT NFC bridge and browser mock implementations    |
-| Project Phoenix    | Source of truth for students, staff, rooms, visits |
+| Layer              | Role                                                             |
+| ------------------ | ---------------------------------------------------------------- |
+| React + TypeScript | UI, routing, state, RFID scanning flow                           |
+| Platform adapters  | GKT NFC bridge, browser mock, and Tauri Mac/mock implementations |
+| Project Phoenix    | Source of truth for students, staff, rooms, visits               |
 
 ### Key Design Decisions
 
 1. **Server-first RFID scans.** Every scan hits the backend before the UI reacts. No local student cache.
-2. **Platform adapters.** `BUILD_TARGET=gkt` bundles the GKT adapter; plain browser builds use the mock adapter.
+2. **Platform adapters.** `BUILD_TARGET=gkt` bundles the production GKT adapter; plain browser builds use the browser mock adapter; `BUILD_TARGET=tauri` is for the local Mac/mock app.
 3. **Two-level auth on every request.** Device API key (`Authorization: Bearer ...`) plus staff PIN (`X-Staff-PIN` header).
 4. **Backend-owned data.** Project Phoenix is the source of truth for rooms, sessions, attendance, and tag assignments.
 
