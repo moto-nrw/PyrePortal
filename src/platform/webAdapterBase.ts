@@ -118,6 +118,13 @@ export abstract class WebAdapterBase implements Omit<
       if (this.cachedApiKey) {
         return this.cachedApiKey;
       }
+      // Local dev fallback: production builds never set VITE_DEVICE_API_KEY,
+      // so deployments without ?key= still fail loudly.
+      const envKey = import.meta.env.VITE_DEVICE_API_KEY as string | undefined;
+      if (envKey) {
+        this.cachedApiKey = envKey;
+        return envKey;
+      }
       throw new Error('DEVICE_API_KEY not found in URL. Expected ?key=...');
     }
     this.cachedApiKey = key;

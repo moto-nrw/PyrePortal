@@ -134,6 +134,69 @@ describe('WedgeAdapter', () => {
     expect(stopPropagationSpy).toHaveBeenCalled();
   });
 
+  it('swallows separator keystrokes mid-burst so they cannot activate focused controls', async () => {
+    const onScan = vi.fn();
+    await adapter.startScanning(onScan);
+
+    for (const char of 'F0') {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+    }
+
+    const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    const stopPropagationSpy = vi.spyOn(spaceEvent, 'stopPropagation');
+    document.dispatchEvent(spaceEvent);
+
+    expect(spaceEvent.defaultPrevented).toBe(true);
+    expect(stopPropagationSpy).toHaveBeenCalled();
+
+    // The rest of the burst still resolves to a normalized scan
+    typeScan('BC E8 44');
+    expect(onScan).toHaveBeenCalledTimes(1);
+    expect(onScan.mock.calls[0][0]).toMatchObject({ tagId: 'F0:BC:E8:44' });
+  });
+
+  it('does not swallow a space when the buffer is empty', async () => {
+    const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    document.dispatchEvent(spaceEvent);
+
+    expect(spaceEvent.defaultPrevented).toBe(false);
+
+    // Clear buffer residue so it cannot leak into the next test
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+
+  it('does not swallow a space typed after a slow human-typing gap', async () => {
+    const nowSpy = vi.spyOn(performance, 'now');
+
+    nowSpy.mockReturnValue(0);
+    for (const char of 'F0') {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+    }
+
+    // 500 ms later the buffer has been reset — human typing, not a burst
+    nowSpy.mockReturnValue(500);
+    const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    document.dispatchEvent(spaceEvent);
+
+    expect(spaceEvent.defaultPrevented).toBe(false);
+
+    nowSpy.mockRestore();
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+
+  it('does not swallow a space when the buffer is not a plausible UID prefix', async () => {
+    for (const char of 'zz') {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+    }
+
+    const spaceEvent = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true });
+    document.dispatchEvent(spaceEvent);
+
+    expect(spaceEvent.defaultPrevented).toBe(false);
+
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  });
+
   it('scanSingleTag resolves with the next scanned tag and restores the previous callback', async () => {
     const onScan = vi.fn();
     await adapter.startScanning(onScan);

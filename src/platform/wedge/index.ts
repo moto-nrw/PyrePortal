@@ -24,6 +24,12 @@ const MAX_KEYSTROKE_GAP_MS = 250;
 /** UIDs are 4, 7 or 10 bytes — accept any even-length hex of at least 4 bytes. */
 const MIN_UID_HEX_CHARS = 8;
 
+/** Separator characters some readers type between UID bytes ("F0 BC E8 44"). */
+const SEPARATOR_KEYS = new Set([' ', ':', '-', '.']);
+
+/** A buffer that starts with a hex byte pair and continues as hex/separators. */
+const UID_PREFIX_RE = /^[0-9A-Fa-f]{2}[0-9A-Fa-f\s:.-]*$/;
+
 /**
  * Normalize raw wedge output into the GKT tag ID format.
  *
@@ -67,6 +73,12 @@ class WedgeAdapter extends WebAdapterBase implements PlatformAdapter {
 
     // Only single printable characters extend the buffer (ignores Shift, Tab, …)
     if (event.key.length === 1) {
+      // Swallow separators mid-burst so a space in "F0 BC E8 44" can't
+      // activate a focused button before the scan resolves.
+      if (SEPARATOR_KEYS.has(event.key) && UID_PREFIX_RE.test(this.buffer)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
       this.buffer += event.key;
     }
   };
