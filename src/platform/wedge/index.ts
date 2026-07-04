@@ -56,11 +56,11 @@ class WedgeAdapter extends WebAdapterBase implements PlatformAdapter {
     if (event.key === 'Enter') {
       const tagId = normalizeWedgeUid(this.buffer);
       this.buffer = '';
-      if (tagId && this.scanCallback) {
+      if (tagId) {
         // Swallow the Enter so it doesn't activate a focused button.
         event.preventDefault();
         event.stopPropagation();
-        this.scanCallback({ tagId, scanId: ++this.scanCounter });
+        this.scanCallback?.({ tagId, scanId: ++this.scanCounter });
       }
       return;
     }

@@ -358,6 +358,37 @@ describe('GKTAdapter', () => {
 
       vi.useRealTimers();
     });
+
+    it('replaces a pending single scan without restoring stale callbacks', async () => {
+      vi.useFakeTimers();
+
+      let nfcCallback: ((payload: unknown) => void) | undefined;
+      mockRegisterNfc.mockImplementation((cb: (payload: unknown) => void) => {
+        nfcCallback = cb;
+      });
+
+      await adapter.initializeNfc();
+
+      const originalCallback = vi.fn();
+      await adapter.startScanning(originalCallback);
+
+      const firstScan = adapter.scanSingleTag(20_000);
+      const secondScan = adapter.scanSingleTag(20_000);
+
+      await expect(firstScan).resolves.toEqual({ success: false, error: 'Scan canceled' });
+
+      nfcCallback!({ uid: 'aa:bb:cc:dd' });
+      await expect(secondScan).resolves.toEqual({ success: true, tag_id: 'AA:BB:CC:DD' });
+
+      vi.advanceTimersByTime(20_000);
+
+      nfcCallback!({ uid: '11:22:33:44' });
+      expect(originalCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ tagId: '11:22:33:44' })
+      );
+
+      vi.useRealTimers();
+    });
   });
 
   describe('recoverScanner', () => {

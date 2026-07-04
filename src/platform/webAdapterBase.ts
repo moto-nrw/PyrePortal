@@ -12,20 +12,41 @@ import type { SessionSettings } from '../services/sessionStorage';
 
 import type { NfcScanEvent, PlatformAdapter } from './adapter';
 
+type ScanCallback = (event: NfcScanEvent) => void;
+type SingleScanResult = { success: boolean; tag_id?: string; error?: string };
+
+interface PendingSingleScan {
+  timer: ReturnType<typeof setTimeout>;
+  callback: ScanCallback;
+  previousCallback: ScanCallback | null;
+  resolve: (result: SingleScanResult) => void;
+}
+
 export abstract class WebAdapterBase implements Omit<
   PlatformAdapter,
   'platform' | 'initializeNfc' | 'persistLog' | 'getDeviceInfo'
 > {
-  protected scanCallback: ((event: NfcScanEvent) => void) | null = null;
+  protected scanCallback: ScanCallback | null = null;
   protected cachedApiKey: string | null = null;
   protected scanCounter = 0;
-  private singleScanTimer: ReturnType<typeof setTimeout> | null = null;
+  private pendingSingleScan: PendingSingleScan | null = null;
 
   protected cancelPendingSingleScan(): void {
-    if (this.singleScanTimer) {
-      clearTimeout(this.singleScanTimer);
-      this.singleScanTimer = null;
+    this.settlePendingSingleScan({ success: false, error: 'Scan canceled' });
+  }
+
+  private settlePendingSingleScan(result: SingleScanResult): void {
+    const pending = this.pendingSingleScan;
+    if (!pending) return;
+
+    this.pendingSingleScan = null;
+    clearTimeout(pending.timer);
+
+    if (this.scanCallback === pending.callback) {
+      this.scanCallback = pending.previousCallback;
     }
+
+    pending.resolve(result);
   }
 
   async startScanning(onScan: (event: NfcScanEvent) => void): Promise<void> {
@@ -44,33 +65,28 @@ export abstract class WebAdapterBase implements Omit<
     return { is_running: this.scanCallback !== null };
   }
 
-  async scanSingleTag(
-    timeoutMs: number
-  ): Promise<{ success: boolean; tag_id?: string; error?: string }> {
+  async scanSingleTag(timeoutMs: number): Promise<SingleScanResult> {
     // There is no blocking single-scan API — simulate by capturing the next
     // scan callback and resolving the promise with it.
+    this.cancelPendingSingleScan();
     const previousCallback = this.scanCallback;
     return new Promise(resolve => {
       const oneShotCallback = (event: NfcScanEvent) => {
-        this.singleScanTimer = null;
-        clearTimeout(timer);
-        // Only restore if we're still the active callback
-        if (this.scanCallback === oneShotCallback) {
-          this.scanCallback = previousCallback;
-        }
-        resolve({ success: true, tag_id: event.tagId });
+        if (this.pendingSingleScan?.callback !== oneShotCallback) return;
+        this.settlePendingSingleScan({ success: true, tag_id: event.tagId });
       };
 
       const timer = setTimeout(() => {
-        this.singleScanTimer = null;
-        // Only restore if we're still the active callback
-        if (this.scanCallback === oneShotCallback) {
-          this.scanCallback = previousCallback;
-        }
-        resolve({ success: false, error: 'Scan timed out' });
+        if (this.pendingSingleScan?.callback !== oneShotCallback) return;
+        this.settlePendingSingleScan({ success: false, error: 'Scan timed out' });
       }, timeoutMs);
 
-      this.singleScanTimer = timer;
+      this.pendingSingleScan = {
+        timer,
+        callback: oneShotCallback,
+        previousCallback,
+        resolve,
+      };
       this.scanCallback = oneShotCallback;
     });
   }

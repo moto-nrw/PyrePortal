@@ -14,11 +14,13 @@ vi.mock('@platform', () => ({
   adapter: {
     platform: 'browser',
     scanSingleTag: vi.fn(),
+    stopScanning: vi.fn(),
   },
 }));
 
 const { adapter } = await import('@platform');
 const mockScanSingleTag = vi.mocked(adapter.scanSingleTag);
+const mockStopScanning = vi.mocked(adapter.stopScanning);
 
 // ---------------------------------------------------------------------------
 // Mock react-router-dom navigate
@@ -95,6 +97,9 @@ describe('TagAssignmentPage', () => {
     useUserStore.setState({
       authenticatedUser: baseUser,
     });
+    mockScanSingleTag.mockReset();
+    mockStopScanning.mockReset();
+    mockStopScanning.mockResolvedValue(undefined);
     mockNavigate.mockReset();
   });
 
@@ -1181,6 +1186,66 @@ describe('TagAssignmentPage', () => {
       });
 
       expect(screen.getByText('Scan starten')).toBeInTheDocument();
+    });
+
+    it('cancelling a real RFID scan stops the adapter one-shot', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      (adapter as unknown as Record<string, unknown>).platform = 'gkt';
+      mockScanSingleTag.mockImplementation(
+        () =>
+          new Promise(() => {
+            // Keep the scan pending until cancel.
+          })
+      );
+
+      renderPage();
+      await user.click(screen.getByText('Scan starten'));
+
+      const cancelButtons = screen.getAllByText('Abbrechen');
+      await user.click(cancelButtons[0]);
+
+      expect(mockStopScanning).toHaveBeenCalledTimes(1);
+    });
+
+    it('cancel then retry ignores the first real RFID result and processes the retry', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      (adapter as unknown as Record<string, unknown>).platform = 'gkt';
+
+      let resolveFirst!: (value: { success: boolean; tag_id?: string; error?: string }) => void;
+      let resolveSecond!: (value: { success: boolean; tag_id?: string; error?: string }) => void;
+      mockScanSingleTag
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveFirst = resolve;
+            })
+        )
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveSecond = resolve;
+            })
+        );
+
+      const checkSpy = vi.spyOn(api, 'checkTagAssignment').mockResolvedValue(unassignedTag);
+
+      renderPage();
+      await user.click(screen.getByText('Scan starten'));
+
+      const cancelButtons = screen.getAllByText('Abbrechen');
+      await user.click(cancelButtons[0]);
+
+      await user.click(screen.getByText('Scan starten'));
+
+      await act(async () => {
+        resolveFirst({ success: true, tag_id: '04:AA:AA:AA:AA:AA:AA' });
+        resolveSecond({ success: true, tag_id: '04:BB:BB:BB:BB:BB:BB' });
+      });
+
+      await waitFor(() => {
+        expect(checkSpy).toHaveBeenCalledTimes(1);
+      });
+      expect(checkSpy).toHaveBeenCalledWith('1234', '04:BB:BB:BB:BB:BB:BB');
     });
   });
 

@@ -114,6 +114,26 @@ describe('WedgeAdapter', () => {
     expect(onScan).not.toHaveBeenCalled();
   });
 
+  it('swallows valid scanner Enter events even when scanning is stopped', async () => {
+    await adapter.stopScanning();
+
+    for (const char of 'f0bce844') {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: char, bubbles: true }));
+    }
+
+    const enterEvent = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+    });
+    const stopPropagationSpy = vi.spyOn(enterEvent, 'stopPropagation');
+
+    document.dispatchEvent(enterEvent);
+
+    expect(enterEvent.defaultPrevented).toBe(true);
+    expect(stopPropagationSpy).toHaveBeenCalled();
+  });
+
   it('scanSingleTag resolves with the next scanned tag and restores the previous callback', async () => {
     const onScan = vi.fn();
     await adapter.startScanning(onScan);
@@ -134,6 +154,31 @@ describe('WedgeAdapter', () => {
     vi.advanceTimersByTime(1001);
 
     await expect(singleScan).resolves.toEqual({ success: false, error: 'Scan timed out' });
+  });
+
+  it('scanSingleTag cancels a pending one-shot before starting another one', async () => {
+    const onScan = vi.fn();
+    await adapter.startScanning(onScan);
+
+    const firstScan = adapter.scanSingleTag(5000);
+    const secondScan = adapter.scanSingleTag(5000);
+
+    await expect(firstScan).resolves.toEqual({ success: false, error: 'Scan canceled' });
+
+    typeScan('f0bce844');
+    await expect(secondScan).resolves.toEqual({ success: true, tag_id: 'F0:BC:E8:44' });
+
+    typeScan('04d69482976a80');
+    expect(onScan).toHaveBeenCalledTimes(1);
+    expect(onScan.mock.calls[0][0]).toMatchObject({ tagId: '04:D6:94:82:97:6A:80' });
+  });
+
+  it('stopScanning settles a pending one-shot as cancelled', async () => {
+    const singleScan = adapter.scanSingleTag(5000);
+
+    await adapter.stopScanning();
+
+    await expect(singleScan).resolves.toEqual({ success: false, error: 'Scan canceled' });
   });
 
   it('resets the buffer after a slow human-typing gap', async () => {
