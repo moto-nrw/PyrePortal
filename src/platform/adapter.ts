@@ -7,7 +7,7 @@
 
 import type { SessionSettings } from '../services/sessionStorage';
 
-type Platform = 'tauri' | 'gkt' | 'browser';
+type Platform = 'tauri' | 'gkt' | 'browser' | 'wedge';
 
 export interface NfcScanEvent {
   tagId: string;

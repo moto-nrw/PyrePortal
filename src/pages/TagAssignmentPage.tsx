@@ -1,9 +1,9 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { adapter } from '@platform';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-import { adapter } from '@platform';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
@@ -23,9 +23,11 @@ const logger = createLogger('TagAssignmentPage');
 
 /**
  * True when the current platform uses real NFC/RFID hardware.
- * GKT always uses real NFC via system.js, Tauri depends on VITE_ENABLE_RFID.
+ * GKT always uses real NFC via system.js, wedge uses a USB keyboard-emulation
+ * reader, Tauri depends on VITE_ENABLE_RFID.
  */
-const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt' || isRfidEnabled();
+const isRealScanningEnabled = (): boolean =>
+  adapter.platform === 'gkt' || adapter.platform === 'wedge' || isRfidEnabled();
 
 /**
  * Helper to get assigned person from TagAssignmentCheck

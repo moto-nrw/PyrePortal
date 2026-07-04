@@ -1,6 +1,6 @@
+import { adapter } from '@platform';
 import { useEffect, useRef, useCallback } from 'react';
 
-import { adapter } from '@platform';
 
 import type { NfcScanEvent } from '../platform/adapter';
 import { api, mapApiErrorToGerman, ApiError, formatRoomName } from '../services/api';
@@ -13,12 +13,13 @@ import { isRfidEnabled } from '../utils/tauriContext';
 /**
  * True when the current platform uses real NFC/RFID hardware (not mock).
  * - GKT: always real (NFC via system.js)
+ * - Wedge: always real (USB reader in keyboard-emulation mode)
  * - Tauri + VITE_ENABLE_RFID=true: real (MFRC522 hardware)
  * - Tauri + VITE_ENABLE_RFID=false: mock
  * - Browser: mock
  */
 const isRealScanningEnabled = (): boolean => {
-  return adapter.platform === 'gkt' || isRfidEnabled();
+  return adapter.platform === 'gkt' || adapter.platform === 'wedge' || isRfidEnabled();
 };
 
 // Mock scanning interval for development

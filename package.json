@@ -8,6 +8,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "build:gkt": "BUILD_TARGET=gkt VITE_API_BASE_URL=https://api.moto-app.de tsc && BUILD_TARGET=gkt VITE_API_BASE_URL=https://api.moto-app.de vite build",
+    "build:wedge": "BUILD_TARGET=wedge VITE_API_BASE_URL=https://api.moto-app.de tsc && BUILD_TARGET=wedge VITE_API_BASE_URL=https://api.moto-app.de vite build",
+    "dev:wedge": "BUILD_TARGET=wedge vite",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
