@@ -155,4 +155,30 @@ describe('WedgeAdapter', () => {
     expect(onScan).toHaveBeenCalledTimes(1);
     expect(onScan.mock.calls[0][0]).toMatchObject({ tagId: 'F0:BC:E8:44' });
   });
+
+  it('initializeNfc attaches the keydown listener only once', async () => {
+    const addListenerSpy = vi.spyOn(document, 'addEventListener');
+
+    await adapter.initializeNfc();
+    await adapter.initializeNfc();
+
+    expect(addListenerSpy).not.toHaveBeenCalled();
+    addListenerSpy.mockRestore();
+  });
+
+  it('persistLog writes to console', async () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await adapter.persistLog('test entry');
+
+    expect(consoleSpy).toHaveBeenCalledWith('[PyrePortal]', 'test entry');
+    consoleSpy.mockRestore();
+  });
+
+  it('getDeviceInfo returns wedge platform with version', () => {
+    const info = adapter.getDeviceInfo();
+
+    expect(info.platform).toBe('wedge');
+    expect(typeof info.version).toBe('string');
+  });
 });

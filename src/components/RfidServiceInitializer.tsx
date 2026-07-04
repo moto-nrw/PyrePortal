@@ -1,7 +1,6 @@
 import { adapter } from '@platform';
 import { useEffect } from 'react';
 
-
 import { createLogger, serializeError } from '../utils/logger';
 import { isRfidEnabled } from '../utils/tauriContext';
 
