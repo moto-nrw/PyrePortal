@@ -9,7 +9,6 @@ import {
   type CurrentSession,
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { isRfidEnabled } from '../utils/tauriContext';
 
 import { useRfidScanning, __resetModuleStateForTesting } from './useRfidScanning';
 
@@ -71,7 +70,15 @@ vi.mock('../utils/crypto', () => ({
 // Helpers
 // ====================================================================
 
-const mockedIsRfidEnabled = vi.mocked(isRfidEnabled);
+// Real scanning is platform-driven: adapter.platform === 'gkt' → real NFC,
+// anything else → mock scanning. Tests toggle the mocked adapter's platform.
+const setRealScanning = () => {
+  (adapter as unknown as Record<string, unknown>).platform = 'gkt';
+};
+const setMockScanning = () => {
+  (adapter as unknown as Record<string, unknown>).platform = undefined;
+};
+
 const mockedProcessRfidScan = vi.mocked(api.processRfidScan);
 const mockedQueryPickupInfo = vi.mocked(api.queryPickupInfo);
 const mockedUpdateSessionActivity = vi.mocked(api.updateSessionActivity);
@@ -239,7 +246,7 @@ describe('useRfidScanning', () => {
 
     vi.useFakeTimers();
     resetStore();
-    mockedIsRfidEnabled.mockReturnValue(false);
+    setMockScanning();
     mockAdapterInitializeNfc.mockResolvedValue(undefined);
     mockAdapterStartScanning.mockResolvedValue(undefined);
     mockAdapterStopScanning.mockResolvedValue(undefined);
@@ -289,13 +296,13 @@ describe('useRfidScanning', () => {
     });
 
     it('does not call initializeNfc when RFID is disabled', () => {
-      mockedIsRfidEnabled.mockReturnValue(false);
+      setMockScanning();
       renderHook(() => useRfidScanning());
       expect(mockAdapterInitializeNfc).not.toHaveBeenCalled();
     });
 
     it('calls initializeNfc when RFID is enabled', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterInitializeNfc.mockResolvedValue(undefined);
 
       await act(async () => {
@@ -306,7 +313,7 @@ describe('useRfidScanning', () => {
     });
 
     it('shows system error when initialization fails', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterInitializeNfc.mockRejectedValue(new Error('Init failed'));
       // syncServiceState will also call getServiceStatus - let it fail
       // so it doesn't overwrite the error modal via stopRfidScanning
@@ -322,7 +329,7 @@ describe('useRfidScanning', () => {
     });
 
     it('syncs service state when RFID is enabled and service is running', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       await act(async () => {
@@ -334,7 +341,7 @@ describe('useRfidScanning', () => {
     });
 
     it('syncs service state to stopped when backend reports not running', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterGetServiceStatus.mockResolvedValue({ is_running: false });
 
       // Pre-set scanning to true to verify it gets turned off
@@ -351,7 +358,7 @@ describe('useRfidScanning', () => {
     });
 
     it('handles syncServiceState error gracefully', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterGetServiceStatus.mockRejectedValue(new Error('status fail'));
 
       // Should not throw
@@ -460,7 +467,7 @@ describe('useRfidScanning', () => {
 
   describe('real RFID scanning', () => {
     beforeEach(() => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
     });
 
     it('starts real RFID service', async () => {
@@ -1326,7 +1333,7 @@ describe('useRfidScanning', () => {
     });
 
     it('stops service on unmount when started', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result, unmount } = renderHook(() => useRfidScanning());
@@ -1392,12 +1399,12 @@ describe('useRfidScanning', () => {
 
   describe('waitForBackendServiceState', () => {
     it('returns expected state when RFID disabled', async () => {
-      mockedIsRfidEnabled.mockReturnValue(false);
+      setMockScanning();
 
       const { result } = renderHook(() => useRfidScanning());
 
       // In mock mode, startScanning doesn't call waitForBackendServiceState
-      // because isRfidEnabled returns false
+      // because real scanning is not enabled (non-GKT platform)
       await act(async () => {
         await result.current.startScanning();
       });
@@ -1409,7 +1416,7 @@ describe('useRfidScanning', () => {
       // Use real timers for this test — fake timers and async polling loops
       // don't interleave reliably across test suite runs
       vi.useRealTimers();
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
 
       let pollCount = 0;
       mockAdapterGetServiceStatus.mockImplementation(async () => {
@@ -1435,7 +1442,7 @@ describe('useRfidScanning', () => {
     it('handles poll errors and continues polling', async () => {
       // Use real timers — same reason as above
       vi.useRealTimers();
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
 
       let pollCount = 0;
       mockAdapterGetServiceStatus.mockImplementation(async () => {
@@ -1527,7 +1534,7 @@ describe('useRfidScanning', () => {
 
   describe('RFID event processing', () => {
     it('processes scans from adapter callback', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       setAuthenticated();
       setRoom();
       setSession();
@@ -1562,7 +1569,7 @@ describe('useRfidScanning', () => {
     });
 
     it('ignores duplicate delivery of the same scanId', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       setAuthenticated();
       setRoom();
       setSession();
@@ -1598,7 +1605,7 @@ describe('useRfidScanning', () => {
 
   describe('stop scanning edge cases', () => {
     it('warns when backend does not confirm stop within timeout', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
 
       const { result } = renderHook(() => useRfidScanning());
@@ -1652,7 +1659,7 @@ describe('useRfidScanning', () => {
     });
 
     it('mock scanning works when RFID is disabled', async () => {
-      mockedIsRfidEnabled.mockReturnValue(false);
+      setMockScanning();
       setAuthenticated();
       setRoom();
       setSession();
@@ -1675,7 +1682,7 @@ describe('useRfidScanning', () => {
     });
 
     it('stopScanning cleans up even when adapter.stopScanning fails', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
       mockAdapterStopScanning.mockRejectedValue(new Error('stop failed'));
 
@@ -1696,7 +1703,7 @@ describe('useRfidScanning', () => {
     });
 
     it('onScan callback is captured on startScanning for real RFID', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
 
       let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
       mockAdapterStartScanning.mockImplementation(async onScan => {
@@ -1722,7 +1729,7 @@ describe('useRfidScanning', () => {
 
   describe('pickup query mode', () => {
     beforeEach(() => {
-      mockedIsRfidEnabled.mockReturnValue(true);
+      setRealScanning();
       mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
     });
 
@@ -2005,20 +2012,18 @@ describe('useRfidScanning', () => {
   });
 
   // ------------------------------------------------------------------
-  // GKT platform: real NFC even though isRfidEnabled() returns false
+  // GKT platform: real NFC via adapter.platform === 'gkt'
   // ------------------------------------------------------------------
 
   describe('GKT platform scanning (adapter.platform === "gkt")', () => {
     beforeEach(() => {
-      // GKT build: isRfidEnabled() is false (no VITE_ENABLE_RFID, no Tauri),
-      // but adapter.platform is 'gkt' → must use real NFC, not mock.
-      mockedIsRfidEnabled.mockReturnValue(false);
-      (adapter as unknown as Record<string, unknown>).platform = 'gkt';
+      // GKT build: adapter.platform is 'gkt' → must use real NFC, not mock.
+      setRealScanning();
     });
 
     afterEach(() => {
       // Restore undefined so other tests aren't affected
-      (adapter as unknown as Record<string, unknown>).platform = undefined;
+      setMockScanning();
     });
 
     it('calls initializeNfc on mount', async () => {

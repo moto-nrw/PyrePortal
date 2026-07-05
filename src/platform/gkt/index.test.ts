@@ -360,19 +360,6 @@ describe('GKTAdapter', () => {
     });
   });
 
-  describe('recoverScanner', () => {
-    it('resolves without error', async () => {
-      await expect(adapter.recoverScanner()).resolves.toBeUndefined();
-    });
-  });
-
-  describe('getScannerStatus', () => {
-    it('returns always available', async () => {
-      const status = await adapter.getScannerStatus();
-      expect(status).toEqual({ is_available: true });
-    });
-  });
-
   describe('loadConfig', () => {
     it('resolves without error', async () => {
       await expect(adapter.loadConfig()).resolves.toBeUndefined();

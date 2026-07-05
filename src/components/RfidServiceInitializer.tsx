@@ -2,15 +2,14 @@ import { adapter } from '@platform';
 import { useEffect } from 'react';
 
 import { createLogger, serializeError } from '../utils/logger';
-import { isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('RfidServiceInitializer');
 
 /**
  * True when real NFC/RFID hardware should be initialized.
- * GKT always uses real NFC via system.js, Tauri depends on VITE_ENABLE_RFID.
+ * GKT always uses real NFC via system.js; browser and Tauri Mac/mock use mock scanning.
  */
-const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt' || isRfidEnabled();
+const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt';
 
 export const RfidServiceInitializer = () => {
   useEffect(() => {

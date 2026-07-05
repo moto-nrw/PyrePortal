@@ -12,7 +12,6 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
-import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
@@ -1888,13 +1887,6 @@ const ActivityScanningPage: React.FC = () => {
           {/* Content area for message or button */}
           {renderModalContent()}
         </ModalBase>
-      )}
-
-      {__BUILD_TARGET__ !== 'gkt' && (
-        <ScannerRestartButton
-          onBeforeRecover={() => stopScanning()}
-          onAfterRecover={() => startScanning()}
-        />
       )}
 
       {/* Keyframes for center RFID processing spinner */}

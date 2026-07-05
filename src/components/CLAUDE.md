@@ -15,7 +15,6 @@
 - `PaginationControls.tsx` - Shared previous/next controls for paged selection lists.
 - `LoadingSpinner.tsx` - Shared loading indicator used by selection layouts.
 - `NetworkStatus.tsx` - Network quality indicator.
-- `ScannerRestartButton.tsx` - Tauri/browser scanner recovery control.
 - `RfidProcessingIndicator.tsx` - RFID processing indicator for tag assignment.
 
 ### Feature Components (Root)

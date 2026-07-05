@@ -7,17 +7,14 @@ import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, serializeError } from '../utils/logger';
-import { isRfidEnabled } from '../utils/tauriContext';
 
 /**
  * True when the current platform uses real NFC/RFID hardware (not mock).
  * - GKT: always real (NFC via system.js)
- * - Tauri + VITE_ENABLE_RFID=true: real (retired Pi/MFRC522 path; flag kept for legacy Tauri builds)
- * - Tauri + VITE_ENABLE_RFID=false: mock
- * - Browser: mock
+ * - Browser and Tauri Mac/mock app: mock
  */
 const isRealScanningEnabled = (): boolean => {
-  return adapter.platform === 'gkt' || isRfidEnabled();
+  return adapter.platform === 'gkt';
 };
 
 // Mock scanning interval for development

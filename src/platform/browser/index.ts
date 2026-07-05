@@ -38,17 +38,6 @@ class BrowserAdapter implements PlatformAdapter {
     });
   }
 
-  async recoverScanner(): Promise<void> {
-    // No-op in browser
-  }
-
-  async getScannerStatus(): Promise<{
-    is_available: boolean;
-    last_error?: string;
-  }> {
-    return { is_available: true };
-  }
-
   async loadConfig(): Promise<void> {
     // No-op: browser reads config synchronously from env vars
   }

@@ -115,13 +115,7 @@ async fn start_rfid_service() -> Result<String, String>
 async fn stop_rfid_service() -> Result<String, String>
 
 #[tauri::command]
-async fn recover_rfid_scanner() -> Result<String, String>
-
-#[tauri::command]
 async fn get_rfid_service_status() -> Result<RfidServiceState, String>
-
-#[tauri::command]
-async fn get_rfid_scanner_status() -> Result<RfidScannerStatus, String>
 
 #[tauri::command]
 async fn scan_rfid_single() -> Result<RfidScanResult, String>
@@ -131,7 +125,7 @@ async fn scan_rfid_single() -> Result<RfidScanResult, String>
 
 **Scanning Modes:**
 
-- **Current (local Mac/mock app)**: Mock scanning with `VITE_ENABLE_RFID=false`
+- **Current (local Mac/mock app)**: Mock scanning
 - **Retired**: MFRC522 reader via SPI, kept behind ARM/ARM64 Linux cfg gates (see "Retired Raspberry Pi Hardware Path" below)
 
 ### Session Storage (session_storage.rs)

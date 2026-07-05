@@ -12,13 +12,6 @@ pub struct RfidScanResult {
     pub error: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct RfidScannerStatus {
-    pub is_available: bool,
-    pub platform: String,
-    pub last_error: Option<String>,
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RfidScanEvent {
     pub tag_id: String,
@@ -752,11 +745,6 @@ mod raspberry_pi {
         Ok(())
     }
 
-    pub fn recover_rfid_hardware() -> Result<(), String> {
-        println!("RFID: performing hardware recovery reset");
-        reset_mfrc522_hardware()
-    }
-
     // ========== Helper functions for reduced cognitive complexity ==========
 
     /// Format UID bytes as colon-separated hex string
@@ -911,69 +899,12 @@ mod raspberry_pi {
         .map_err(|e| format!("RFID one-shot scan task failed: {e}"))?
     }
 
-    /// Probe the MFRC522 chip by actually communicating over SPI.
-    /// Returns is_available=true only if the chip responds with a valid version.
-    pub fn check_rfid_hardware() -> RfidScannerStatus {
-        match probe_mfrc522_chip() {
-            Ok(version) => RfidScannerStatus {
-                is_available: true,
-                platform: format!("Raspberry Pi (ARM64) - MFRC522 v0x{version:02X}"),
-                last_error: None,
-            },
-            Err(e) => {
-                println!("RFID hardware probe failed: {e}");
-                RfidScannerStatus {
-                    is_available: false,
-                    platform: "Raspberry Pi (ARM64)".to_string(),
-                    last_error: Some(e),
-                }
-            }
-        }
-    }
-
-    /// Attempt real SPI communication with MFRC522: open device, init chip, read version.
-    /// Returns the chip version byte on success, or a descriptive error.
-    fn probe_mfrc522_chip() -> Result<u8, String> {
-        if !std::path::Path::new("/dev/spidev0.0").exists() {
-            return Err("SPI device /dev/spidev0.0 not found".to_string());
-        }
-
-        let mut spi =
-            Spidev::open("/dev/spidev0.0").map_err(|e| format!("SPI open failed: {e:?}"))?;
-
-        let options = SpidevOptions::new()
-            .bits_per_word(8)
-            .max_speed_hz(1_000_000)
-            .mode(SpiModeFlags::SPI_MODE_0)
-            .build();
-        spi.configure(&options)
-            .map_err(|e| format!("SPI configure failed: {e:?}"))?;
-
-        reset_mfrc522_hardware()?;
-
-        let spi_interface = SpiInterface::new(spi);
-        let mut mfrc522 = Mfrc522::new(spi_interface)
-            .init()
-            .map_err(|e| format!("MFRC522 init failed: {e:?}"))?;
-
-        let version = mfrc522
-            .version()
-            .map_err(|e| format!("MFRC522 version read failed: {e:?}"))?;
-
-        if version == 0x00 || version == 0xFF {
-            return Err(format!(
-                "MFRC522 version 0x{version:02X} indicates SPI communication failure"
-            ));
-        }
-
-        Ok(version)
-    }
 }
 
 // Mock implementation for development platforms (MacBook, etc.)
 #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
 mod mock_platform {
-    use super::{Duration, RfidScannerStatus};
+    use super::Duration;
     use std::sync::Mutex;
 
     // Track recent mock scans so local development still simulates a tag being held in place.
@@ -1034,19 +965,6 @@ mod mock_platform {
         *LAST_SCAN.lock().unwrap() = None;
     }
 
-    pub fn check_rfid_hardware() -> RfidScannerStatus {
-        // Log that we're using mock implementation
-        println!("[RFID] Using mock implementation with hardware format (XX:XX:XX:XX:XX:XX:XX)");
-
-        RfidScannerStatus {
-            is_available: true, // Mock is always "available"
-            platform: format!(
-                "Development Platform ({}) - MOCK Hardware Format",
-                std::env::consts::ARCH
-            ),
-            last_error: None,
-        }
-    }
 }
 
 /// Send a command to a given service instance (testable without global state).
@@ -1162,103 +1080,6 @@ pub async fn get_rfid_service_status() -> Result<RfidServiceState, String> {
     }
 }
 
-#[tauri::command]
-pub async fn recover_rfid_scanner() -> Result<String, String> {
-    // Best-effort stop request first.
-    if let Err(stop_error) = send_service_command(ServiceCommand::Stop) {
-        println!("RFID recover: stop command warning: {stop_error}");
-    }
-
-    // Force GPIO reset immediately. This must not depend on SPI mutex acquisition.
-    // In the hung case, reset should help unblock in-flight SPI calls.
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    {
-        raspberry_pi::recover_rfid_hardware()?;
-    }
-
-    // Wait for scanner worker to observe stop signal after reset.
-    if let Err(wait_error) = wait_for_service_running(false, Duration::from_secs(4)).await {
-        println!("RFID recover: stop wait warning after reset: {wait_error}");
-    }
-
-    // Confirm we can take exclusive hardware access now.
-    let spi_mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
-    let _guard = tokio::time::timeout(Duration::from_secs(3), spi_mutex.lock())
-        .await
-        .map_err(|_| {
-            "Scanner reset was triggered, but hardware is still busy. Please retry recovery."
-                .to_string()
-        })?;
-
-    // Verify the scanner actually responds after reset.
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    {
-        let status = tokio::task::spawn_blocking(raspberry_pi::check_rfid_hardware)
-            .await
-            .map_err(|e| format!("Hardware verification task failed: {e}"))?;
-
-        if !status.is_available {
-            let err_detail = status.last_error.unwrap_or_else(|| "unknown".to_string());
-            return Err(format!(
-                "Scanner-Hardware antwortet nach Reset nicht: {err_detail}"
-            ));
-        }
-    }
-
-    // Reset service-visible error state so UI can recover without app restart.
-    if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        if let Ok(service) = service_arc.lock() {
-            if let Ok(mut state_guard) = service.state.lock() {
-                state_guard.error_count = 0;
-                state_guard.last_error = None;
-                state_guard.is_running = false;
-                state_guard.should_run = false;
-            }
-        }
-    }
-
-    Ok("RFID scanner recovered".to_string())
-}
-
-#[tauri::command]
-pub async fn get_rfid_scanner_status() -> Result<RfidScannerStatus, String> {
-    // When the background scanner is running it holds the SPI mutex, so we cannot
-    // probe the chip directly.  Use the service's live state instead.
-    if let Some(service_arc) = RfidBackgroundService::get_instance() {
-        if let Ok(service) = service_arc.lock() {
-            if let Ok(state) = service.state.lock() {
-                if state.is_running {
-                    let is_healthy = state.error_count == 0 && state.last_error.is_none();
-                    return Ok(RfidScannerStatus {
-                        is_available: is_healthy,
-                        platform: "Raspberry Pi (ARM64) - service running".to_string(),
-                        last_error: state.last_error.clone(),
-                    });
-                }
-            }
-        }
-    }
-
-    // Service is not running — do a real hardware probe.
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    {
-        let spi_mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
-        let _guard = tokio::time::timeout(Duration::from_secs(3), spi_mutex.lock())
-            .await
-            .map_err(|_| "Hardware busy — SPI mutex timeout during status check".to_string())?;
-
-        return tokio::task::spawn_blocking(raspberry_pi::check_rfid_hardware)
-            .await
-            .map_err(|e| format!("Hardware probe task failed: {e}"))
-            .map(Ok)?;
-    }
-
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
-    {
-        Ok(mock_platform::check_rfid_hardware())
-    }
-}
-
 // Initialize the service when app starts
 #[tauri::command]
 pub async fn initialize_rfid_service(app_handle: tauri::AppHandle) -> Result<String, String> {
@@ -1355,32 +1176,6 @@ mod tests {
         assert!(!d.success);
         assert!(d.tag_id.is_none());
         assert!(d.error.unwrap().contains("timeout"));
-    }
-
-    #[test]
-    fn rfid_scanner_status_serialization() {
-        let status = RfidScannerStatus {
-            is_available: true,
-            platform: "Dev".to_string(),
-            last_error: None,
-        };
-        let d: RfidScannerStatus =
-            serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
-        assert!(d.is_available);
-        assert!(!d.platform.is_empty());
-    }
-
-    #[test]
-    fn rfid_scanner_status_with_error() {
-        let status = RfidScannerStatus {
-            is_available: false,
-            platform: "Pi".to_string(),
-            last_error: Some("SPI fail".to_string()),
-        };
-        let d: RfidScannerStatus =
-            serde_json::from_str(&serde_json::to_string(&status).unwrap()).unwrap();
-        assert!(!d.is_available);
-        assert_eq!(d.last_error.as_deref(), Some("SPI fail"));
     }
 
     #[test]
@@ -1863,14 +1658,6 @@ mod tests {
     #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     mod mock_tests {
         use super::*;
-
-        #[test]
-        fn mock_check_hardware_is_always_available() {
-            let status = mock_platform::check_rfid_hardware();
-            assert!(status.is_available);
-            assert!(status.platform.contains("MOCK"));
-            assert!(status.last_error.is_none());
-        }
 
         #[tokio::test]
         async fn mock_scan_returns_valid_tag_format() {

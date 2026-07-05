@@ -28,13 +28,6 @@ export interface PlatformAdapter {
   // --- Single Tag Scan (admin tag assignment UI) ---
   scanSingleTag(timeoutMs: number): Promise<{ success: boolean; tag_id?: string; error?: string }>;
 
-  // --- Scanner Health (Tauri: hardware recovery, GKT: no-op) ---
-  recoverScanner(): Promise<void>;
-  getScannerStatus(): Promise<{
-    is_available: boolean;
-    last_error?: string;
-  }>;
-
   // --- Configuration ---
   /** Async config init (Tauri: loads from Rust backend, others: no-op) */
   loadConfig(): Promise<void>;

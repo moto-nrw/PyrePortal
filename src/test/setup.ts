@@ -24,7 +24,6 @@ vi.mock('@tauri-apps/api/event', () => ({
 
 vi.mock('../utils/tauriContext', () => ({
   safeInvoke: vi.fn(() => Promise.reject(new Error('Tauri context not available in tests'))),
-  isRfidEnabled: vi.fn(() => false),
 }));
 
 // ---------------------------------------------------------------------------
