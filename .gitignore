@@ -48,3 +48,6 @@ screenshots/test-results/
 
 # Devbox
 .devbox/
+
+# Local agent state
+.serena/
