@@ -83,10 +83,6 @@ class BrowserAdapter implements PlatformAdapter {
   async restartApp(): Promise<void> {
     window.location.reload();
   }
-
-  getDeviceInfo(): { platform: 'browser'; version: string } {
-    return { platform: this.platform, version: 'dev' };
-  }
 }
 
 export const adapter: PlatformAdapter = new BrowserAdapter();

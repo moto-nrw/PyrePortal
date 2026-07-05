@@ -121,10 +121,6 @@ class TauriAdapter implements PlatformAdapter {
   async restartApp(): Promise<void> {
     await safeInvoke('restart_app');
   }
-
-  getDeviceInfo(): { platform: 'tauri'; version: string } {
-    return { platform: this.platform, version: __APP_VERSION__ };
-  }
 }
 
 export const adapter: PlatformAdapter = new TauriAdapter();

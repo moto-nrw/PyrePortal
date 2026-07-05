@@ -197,10 +197,6 @@ class GKTAdapter implements PlatformAdapter {
       window.location.reload();
     }
   }
-
-  getDeviceInfo(): { platform: 'gkt'; version: string } {
-    return { platform: this.platform, version: __APP_VERSION__ };
-  }
 }
 
 export const adapter: PlatformAdapter = new GKTAdapter();

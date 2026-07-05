@@ -469,12 +469,4 @@ describe('GKTAdapter', () => {
       await expect(adapter.restartApp()).resolves.toBeUndefined();
     });
   });
-
-  describe('getDeviceInfo', () => {
-    it('returns gkt platform with version', () => {
-      const info = adapter.getDeviceInfo();
-      expect(info.platform).toBe('gkt');
-      expect(typeof info.version).toBe('string');
-    });
-  });
 });

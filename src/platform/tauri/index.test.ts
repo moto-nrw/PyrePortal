@@ -227,12 +227,4 @@ describe('TauriAdapter', () => {
       expect(mockSafeInvoke).toHaveBeenCalledWith('restart_app');
     });
   });
-
-  describe('getDeviceInfo', () => {
-    it('returns platform and version', () => {
-      const info = adapter.getDeviceInfo();
-      expect(info.platform).toBe('tauri');
-      expect(typeof info.version).toBe('string');
-    });
-  });
 });

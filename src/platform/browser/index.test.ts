@@ -150,11 +150,4 @@ describe('BrowserAdapter', () => {
       await expect(adapter.restartApp()).resolves.toBeUndefined();
     });
   });
-
-  describe('getDeviceInfo', () => {
-    it('returns browser platform with dev version', () => {
-      const info = adapter.getDeviceInfo();
-      expect(info).toEqual({ platform: 'browser', version: 'dev' });
-    });
-  });
 });

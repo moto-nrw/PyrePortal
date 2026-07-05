@@ -51,7 +51,4 @@ export interface PlatformAdapter {
 
   // --- App Lifecycle ---
   restartApp(): Promise<void>;
-
-  // --- Device Info ---
-  getDeviceInfo(): { platform: Platform; version: string };
 }
