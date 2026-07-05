@@ -18,13 +18,14 @@ import {
   api,
   formatRoomName,
   mapServerErrorToGerman,
+  isNetworkRelatedError,
   WC_ROOM_ALIASES,
   type RfidScanResult,
   type DailyFeedbackRating,
   type DeviceConfig,
   type Room,
 } from '../services/api';
-import { useUserStore, isNetworkRelatedError } from '../store/userStore';
+import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');

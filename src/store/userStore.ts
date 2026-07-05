@@ -34,9 +34,6 @@ const toActivitySummary = (a: ActivityResponse) => ({
   category: a.category_name,
 });
 
-// Re-export isNetworkRelatedError for backward compatibility
-export { isNetworkRelatedError } from '../services/api';
-
 const mapSessionValidationError = (error: unknown): string => {
   const rawMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
 
