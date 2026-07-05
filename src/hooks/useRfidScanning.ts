@@ -12,7 +12,7 @@ import { isRfidEnabled } from '../utils/tauriContext';
 /**
  * True when the current platform uses real NFC/RFID hardware (not mock).
  * - GKT: always real (NFC via system.js)
- * - Tauri + VITE_ENABLE_RFID=true: real (MFRC522 hardware)
+ * - Tauri + VITE_ENABLE_RFID=true: real (retired Pi/MFRC522 path; flag kept for legacy Tauri builds)
  * - Tauri + VITE_ENABLE_RFID=false: mock
  * - Browser: mock
  */

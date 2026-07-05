@@ -1,6 +1,6 @@
-# Rust Backend - Tauri Commands & Hardware Integration
+# Rust Backend - Tauri Commands
 
-This directory contains the Rust backend for PyrePortal, providing system access, file persistence, and RFID hardware integration.
+This directory contains the Rust backend for the local Mac/mock PyrePortal app, providing system access, file persistence, and mock RFID scanning.
 
 ## Target Scope
 
@@ -106,19 +106,33 @@ fn write_log(entry: String) -> Result<(), String>
 
 ```rust
 #[tauri::command]
-fn initialize_rfid_service() -> Result<(), String>
+async fn initialize_rfid_service(app_handle: tauri::AppHandle) -> Result<String, String>
 
 #[tauri::command]
-fn scan_rfid() -> Result<Option<String>, String>
+async fn start_rfid_service() -> Result<String, String>
 
 #[tauri::command]
-fn stop_rfid_scanning() -> Result<(), String>
+async fn stop_rfid_service() -> Result<String, String>
+
+#[tauri::command]
+async fn recover_rfid_scanner() -> Result<String, String>
+
+#[tauri::command]
+async fn get_rfid_service_status() -> Result<RfidServiceState, String>
+
+#[tauri::command]
+async fn get_rfid_scanner_status() -> Result<RfidScannerStatus, String>
+
+#[tauri::command]
+async fn scan_rfid_single() -> Result<RfidScanResult, String>
 ```
 
-**Hardware Support:**
+`lib.rs` also registers the top-level `restart_app` command (exits the process; the local app simply quits).
 
-- **Production**: MFRC522 reader via SPI (ARM/ARM64 Linux only)
-- **Development**: Mock scanning with `VITE_ENABLE_RFID=false`
+**Scanning Modes:**
+
+- **Current (local Mac/mock app)**: Mock scanning with `VITE_ENABLE_RFID=false`
+- **Retired**: MFRC522 reader via SPI, kept behind ARM/ARM64 Linux cfg gates (see "Retired Raspberry Pi Hardware Path" below)
 
 ### Session Storage (session_storage.rs)
 
@@ -130,7 +144,7 @@ fn save_session_settings(settings: SessionSettings) -> Result<(), String>
 fn load_session_settings() -> Result<Option<SessionSettings>, String>
 
 #[tauri::command]
-fn clear_session() -> Result<(), String>
+fn clear_last_session() -> Result<(), String>
 ```
 
 ## Error Handling
@@ -397,7 +411,7 @@ cargo fmt
 
 # Build
 cargo build                 # Debug
-cargo build --release      # Production
+cargo build --release      # Release (local only, no production Tauri builds)
 
 # Run RFID test binaries (compile on-demand, not bundled)
 ./test_rfid.sh              # Single scan test

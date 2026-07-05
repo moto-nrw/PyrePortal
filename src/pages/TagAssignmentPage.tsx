@@ -403,9 +403,9 @@ function TagAssignmentPage() {
           </h1>
 
           {/* Scanner Modal Overlay
-              Budget: backend stop (3s) + SPI mutex (3s) + hardware scan (10s) = 16s worst-case.
-              Modal timeout (18s) exceeds that to avoid false "unresponsive" closures.
-              See scan_rfid_single() in src-tauri/src/rfid.rs for backend path. */}
+              The 18s modal timeout was sized for the retired Tauri/Pi hardware path
+              (backend stop 3s + SPI mutex 3s + hardware scan 10s = 16s worst-case)
+              and is kept as a generous upper bound for GKT/mock scanning. */}
           <ModalBase
             isOpen={showScanner}
             onClose={cancelScan}

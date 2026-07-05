@@ -20,7 +20,7 @@ const isTauriContext = (): boolean => {
     }
   }
 
-  // Secondary check: Check if we're in production build (likely Tauri)
+  // Secondary check: legacy heuristic from the Tauri production era; also true for GKT web builds
   if (import.meta.env.PROD) {
     return true;
   }

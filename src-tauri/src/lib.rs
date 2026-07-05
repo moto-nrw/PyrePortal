@@ -40,8 +40,8 @@ fn parse_fullscreen_env() -> bool {
 
 #[tauri::command]
 fn restart_app() {
-    // Exit with code 0 - Balena's restart: always policy will restart the container
-    // On macOS/dev mode, the app simply exits
+    // Exit with code 0 - the local Mac/mock app simply exits
+    // (the retired Balena deployment relied on a container restart policy here)
     std::process::exit(0);
 }
 
