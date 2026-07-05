@@ -364,10 +364,7 @@ export function isNetworkRelatedError(error: unknown): boolean {
  * This function first tries to match specific backend messages via
  * mapServerErrorToGerman, then falls back to context-specific generic messages.
  */
-function mapAttendanceErrorToGerman(
-  errorMessage: string,
-  context: 'status' | 'toggle' | 'feedback'
-): string {
+function mapAttendanceErrorToGerman(errorMessage: string, context: 'toggle' | 'feedback'): string {
   // Network errors - use consolidated handler
   if (isNetworkRelatedError(errorMessage)) {
     return 'Netzwerkfehler. Bitte Verbindung prüfen.';
@@ -405,8 +402,6 @@ function mapAttendanceErrorToGerman(
     errorMessage.includes('Not Found')
   ) {
     switch (context) {
-      case 'status':
-        return 'Schüler nicht gefunden oder keine Anwesenheitsdaten für heute verfügbar.';
       case 'toggle':
         return 'Schüler nicht gefunden. RFID-Tag möglicherweise nicht zugewiesen.';
       case 'feedback':
@@ -417,8 +412,6 @@ function mapAttendanceErrorToGerman(
   // 403 errors - permission denied
   if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
     switch (context) {
-      case 'status':
-        return 'Keine Berechtigung für Anwesenheitsstatus dieses Schülers.';
       case 'toggle':
         return 'Keine Berechtigung für An-/Abmeldung dieses Schülers.';
       case 'feedback':
@@ -952,20 +945,6 @@ export const api = {
   },
 
   /**
-   * Device health ping (authenticated)
-   * Endpoint: POST /api/iot/ping
-   */
-  async pingDevice(pin: string): Promise<void> {
-    await apiCall('/api/iot/ping', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${DEVICE_API_KEY}`,
-        'X-Staff-PIN': pin,
-      },
-    });
-  },
-
-  /**
    * Get available rooms (device authenticated)
    * Endpoint: GET /api/iot/rooms/available
    */
@@ -1387,29 +1366,6 @@ export const api = {
   },
 
   /**
-   * Get student attendance status
-   * Endpoint: GET /api/iot/attendance/status/{rfid}
-   */
-  async getAttendanceStatus(pin: string, rfid: string): Promise<AttendanceStatusResponse> {
-    try {
-      const response = await apiCall<AttendanceStatusResponse>(
-        `/api/iot/attendance/status/${rfid}`,
-        {
-          headers: {
-            Authorization: `Bearer ${DEVICE_API_KEY}`,
-            'X-Staff-PIN': pin,
-          },
-        }
-      );
-
-      return response;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'status'));
-    }
-  },
-
-  /**
    * Toggle student attendance (check-in/check-out)
    * Endpoint: POST /api/iot/attendance/toggle
    */
@@ -1581,33 +1537,6 @@ export interface RfidScanResult {
   scannedTagId?: string;
   /** Authoritative count of active students in the room's session (from server) */
   active_students?: number;
-}
-
-/**
- * Attendance status response from GET /api/iot/attendance/status/{rfid}
- */
-interface AttendanceStatusResponse {
-  status: string;
-  data: {
-    student: {
-      id: number;
-      first_name: string;
-      last_name: string;
-      group: {
-        id: number;
-        name: string;
-      };
-    };
-    attendance: {
-      status: 'checked_in' | 'checked_out' | 'not_checked_in';
-      date: string;
-      check_in_time: string | null;
-      check_out_time: string | null;
-      checked_in_by: string;
-      checked_out_by: string;
-    };
-  };
-  message: string;
 }
 
 /**

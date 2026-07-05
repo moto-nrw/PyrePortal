@@ -118,26 +118,25 @@ pnpm run format       # Prettier auto-format
 
 PyrePortal talks to the Project Phoenix backend over REST. All requests carry device and staff credentials.
 
-| Endpoint                           | Method | Purpose                   |
-| ---------------------------------- | ------ | ------------------------- |
-| `/api/iot/teachers`                | GET    | Fetch staff list          |
-| `/api/iot/ping`                    | POST   | Validate global PIN       |
-| `/api/iot/status`                  | GET    | Validate teacher PIN      |
-| `/api/iot/activities`              | GET    | Today's activities        |
-| `/api/iot/rooms/available`         | GET    | Available rooms           |
-| `/api/iot/checkin`                 | POST   | RFID check-in/check-out   |
-| `/api/iot/session/start`           | POST   | Start activity session    |
-| `/api/iot/session/end`             | POST   | End session               |
-| `/api/iot/session/current`         | GET    | Current session info      |
-| `/api/iot/session/activity`        | POST   | Prevent session timeout   |
-| `/api/iot/students`                | GET    | Students by teacher       |
-| `/api/iot/rfid/:tagId`             | GET    | Check tag assignment      |
-| `/api/students/:id/rfid`           | POST   | Assign tag to student     |
-| `/api/iot/staff/:id/rfid`          | POST   | Assign tag to staff       |
-| `/api/iot/attendance/status/:rfid` | GET    | Student attendance status |
-| `/api/iot/attendance/toggle`       | POST   | Toggle check-in/check-out |
-| `/api/iot/feedback`                | POST   | Submit daily feedback     |
-| `/health`                          | GET    | Server health check       |
+| Endpoint                     | Method | Purpose                   |
+| ---------------------------- | ------ | ------------------------- |
+| `/api/iot/teachers`          | GET    | Fetch staff list          |
+| `/api/iot/ping`              | POST   | Validate global PIN       |
+| `/api/iot/status`            | GET    | Validate teacher PIN      |
+| `/api/iot/activities`        | GET    | Today's activities        |
+| `/api/iot/rooms/available`   | GET    | Available rooms           |
+| `/api/iot/checkin`           | POST   | RFID check-in/check-out   |
+| `/api/iot/session/start`     | POST   | Start activity session    |
+| `/api/iot/session/end`       | POST   | End session               |
+| `/api/iot/session/current`   | GET    | Current session info      |
+| `/api/iot/session/activity`  | POST   | Prevent session timeout   |
+| `/api/iot/students`          | GET    | Students by teacher       |
+| `/api/iot/rfid/:tagId`       | GET    | Check tag assignment      |
+| `/api/students/:id/rfid`     | POST   | Assign tag to student     |
+| `/api/iot/staff/:id/rfid`    | POST   | Assign tag to staff       |
+| `/api/iot/attendance/toggle` | POST   | Toggle check-in/check-out |
+| `/api/iot/feedback`          | POST   | Submit daily feedback     |
+| `/health`                    | GET    | Server health check       |
 
 ## Usage
 
