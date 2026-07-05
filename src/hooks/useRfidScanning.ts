@@ -1,6 +1,5 @@
-import { useEffect, useRef, useCallback } from 'react';
-
 import { adapter } from '@platform';
+import { useEffect, useRef, useCallback } from 'react';
 
 import type { NfcScanEvent } from '../platform/adapter';
 import { api, mapApiErrorToGerman, ApiError, formatRoomName } from '../services/api';

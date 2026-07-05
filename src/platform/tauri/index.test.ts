@@ -50,8 +50,7 @@ describe('TauriAdapter', () => {
 
     it('dispatches scan events through onScan callback', async () => {
       let capturedCallback:
-        | ((event: { payload: { tag_id: string; scan_id: number } }) => void)
-        | null = null;
+        ((event: { payload: { tag_id: string; scan_id: number } }) => void) | null = null;
       mockListen.mockImplementation((_event: unknown, cb: unknown) => {
         capturedCallback = cb as typeof capturedCallback;
         return Promise.resolve(vi.fn());
