@@ -29,7 +29,6 @@
     "@fortawesome/react-fontawesome": "^3.3.1",
     "@moto-nrw/design-system": "^0.5.2",
     "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/plugin-opener": "^2.5.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
@@ -84,7 +83,6 @@
       "src/platform/*/index.ts"
     ],
     "ignoreDependencies": [
-      "@tauri-apps/plugin-opener",
       "@moto-nrw/design-system",
       "lint-staged"
     ],
