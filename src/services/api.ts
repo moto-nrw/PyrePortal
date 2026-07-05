@@ -1277,47 +1277,6 @@ export const api = {
   },
 
   /**
-   * Get current session information including active student count
-   * Endpoint: GET /api/iot/session/current
-   */
-  async getCurrentSessionInfo(
-    pin: string
-  ): Promise<{ activity_name: string; room_name: string; active_students: number } | null> {
-    try {
-      const response = await apiCall<{
-        status: string;
-        data: CurrentSession | { device_id: number; is_active: false };
-        message: string;
-      }>('/api/iot/session/current', {
-        headers: {
-          Authorization: `Bearer ${DEVICE_API_KEY}`,
-          'X-Staff-PIN': pin,
-        },
-      });
-
-      // Check if we have an active session
-      if ('is_active' in response.data && response.data.is_active === false) {
-        return null;
-      }
-
-      // Map the CurrentSession to the simplified format expected by the UI
-      const session = response.data;
-      return {
-        activity_name: session.activity_name ?? 'Unknown Activity',
-        room_name: session.room_name ?? 'Unknown Room',
-        active_students: session.active_students ?? 0,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      // 404 means no current session
-      if (errorMessage.includes('404')) {
-        return null;
-      }
-      throw error;
-    }
-  },
-
-  /**
    * Toggle student attendance (check-in/check-out)
    * Endpoint: POST /api/iot/attendance/toggle
    */

@@ -1,8 +1,13 @@
 # PN5180 RFID Driver MVP Design
 
 **Date:** 2026-01-07
-**Status:** Approved
+**Status:** Superseded / not active
 **Author:** Claude + User
+
+> This plan is retained as historical context only. The current project scope
+> treats GKT/GKTL as the production target and browser/Tauri Mac as local mock
+> development targets. Raspberry Pi/Balena and Tauri production deployment paths
+> are retired, so do not use this document as active implementation guidance.
 
 ## Overview
 

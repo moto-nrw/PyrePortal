@@ -2,7 +2,7 @@ import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
-import { api, type RfidScanResult } from '../services/api';
+import { api, type CurrentSession, type RfidScanResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
 import ActivityScanningPage from './ActivityScanningPage';
@@ -35,7 +35,7 @@ vi.mock('../services/api', async () => {
   return {
     ...actual,
     api: {
-      getCurrentSessionInfo: vi.fn().mockResolvedValue(null),
+      getCurrentSession: vi.fn().mockResolvedValue(null),
       getRooms: vi.fn().mockResolvedValue([]),
       processRfidScan: vi.fn().mockResolvedValue({}),
       queryPickupInfo: vi.fn().mockResolvedValue({}),
@@ -45,6 +45,19 @@ vi.mock('../services/api', async () => {
 });
 
 const mockedApi = vi.mocked(api);
+
+const makeCurrentSession = (overrides: Partial<CurrentSession> = {}): CurrentSession => ({
+  active_group_id: 100,
+  activity_id: 1,
+  activity_name: 'Test Activity',
+  room_id: 1,
+  room_name: 'Raum A',
+  device_id: 1,
+  start_time: '2024-01-01T00:00:00Z',
+  duration: '1h',
+  is_active: true,
+  ...overrides,
+});
 
 // ---- defaults ----
 const defaultRfidState = {
@@ -1518,11 +1531,11 @@ describe('ActivityScanningPage', () => {
   // =======================================================================
 
   it('fetches session info and updates student count', async () => {
-    mockedApi.getCurrentSessionInfo.mockResolvedValueOnce({
-      active_students: 15,
-      activity_name: 'Test Activity',
-      room_name: 'Raum A',
-    });
+    mockedApi.getCurrentSession.mockResolvedValueOnce(
+      makeCurrentSession({
+        active_students: 15,
+      })
+    );
 
     await act(async () => {
       renderPage();
@@ -1534,7 +1547,7 @@ describe('ActivityScanningPage', () => {
   });
 
   it('sets student count to 0 when session info returns null', async () => {
-    mockedApi.getCurrentSessionInfo.mockResolvedValueOnce(null);
+    mockedApi.getCurrentSession.mockResolvedValueOnce(null);
 
     await act(async () => {
       renderPage();
@@ -1545,7 +1558,7 @@ describe('ActivityScanningPage', () => {
   });
 
   it('handles session info fetch error gracefully', async () => {
-    mockedApi.getCurrentSessionInfo.mockRejectedValueOnce(new Error('Network error'));
+    mockedApi.getCurrentSession.mockRejectedValueOnce(new Error('Network error'));
 
     await act(async () => {
       renderPage();
@@ -1559,13 +1572,14 @@ describe('ActivityScanningPage', () => {
     useUserStore.setState({
       authenticatedUser: { ...defaultStoreState.authenticatedUser, pin: '' },
     });
+    const initialCallCount = mockedApi.getCurrentSession.mock.calls.length;
 
     await act(async () => {
       renderPage();
     });
 
-    // getCurrentSessionInfo should not have been called (pin is falsy)
-    // The guard clause would have redirected before this point
+    // getCurrentSession should not have been called (pin is falsy)
+    expect(mockedApi.getCurrentSession.mock.calls.length).toBe(initialCallCount);
     expect(screen.getByText('0')).toBeInTheDocument();
   });
 
@@ -1623,11 +1637,11 @@ describe('ActivityScanningPage', () => {
 
   it('uses optimistic delta for checkout when no authoritative count', () => {
     // First set count to something > 0 via session info
-    mockedApi.getCurrentSessionInfo.mockResolvedValueOnce({
-      active_students: 5,
-      activity_name: 'Test Activity',
-      room_name: 'Raum A',
-    });
+    mockedApi.getCurrentSession.mockResolvedValueOnce(
+      makeCurrentSession({
+        active_students: 5,
+      })
+    );
 
     mockRfidHookReturn = {
       ...mockRfidHookReturn,
@@ -1945,24 +1959,24 @@ describe('ActivityScanningPage', () => {
   // =======================================================================
 
   it('periodically fetches session info every 15 seconds', async () => {
-    mockedApi.getCurrentSessionInfo.mockResolvedValue({
-      active_students: 3,
-      activity_name: 'Test Activity',
-      room_name: 'Raum A',
-    });
+    mockedApi.getCurrentSession.mockResolvedValue(
+      makeCurrentSession({
+        active_students: 3,
+      })
+    );
 
     await act(async () => {
       renderPage();
     });
 
-    const initialCallCount = mockedApi.getCurrentSessionInfo.mock.calls.length;
+    const initialCallCount = mockedApi.getCurrentSession.mock.calls.length;
 
     // Advance timer by 15 seconds
     await act(async () => {
       vi.advanceTimersByTime(15000);
     });
 
-    expect(mockedApi.getCurrentSessionInfo.mock.calls.length).toBeGreaterThan(initialCallCount);
+    expect(mockedApi.getCurrentSession.mock.calls.length).toBeGreaterThan(initialCallCount);
   });
 
   // =======================================================================
@@ -2265,11 +2279,11 @@ describe('ActivityScanningPage', () => {
   // =======================================================================
 
   it('sets student count from session info active_students', async () => {
-    mockedApi.getCurrentSessionInfo.mockResolvedValueOnce({
-      active_students: 25,
-      activity_name: 'Test Activity',
-      room_name: 'Raum A',
-    });
+    mockedApi.getCurrentSession.mockResolvedValueOnce(
+      makeCurrentSession({
+        active_students: 25,
+      })
+    );
 
     await act(async () => {
       renderPage();

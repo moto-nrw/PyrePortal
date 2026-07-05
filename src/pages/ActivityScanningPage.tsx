@@ -546,11 +546,11 @@ const ActivityScanningPage: React.FC = () => {
     if (!authenticatedUser?.pin) return;
 
     try {
-      const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
-      logger.debug('Session info received', sessionInfo ?? {});
+      const session = await api.getCurrentSession(authenticatedUser.pin);
+      logger.debug('Session info received', { session });
 
-      if (sessionInfo) {
-        const count = sessionInfo.active_students ?? 0;
+      if (session) {
+        const count = session.active_students ?? 0;
         logger.info('Setting student count', { count });
         setStudentCount(count);
       } else {
