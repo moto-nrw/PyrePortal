@@ -157,13 +157,11 @@ const syncSupervisorsWithBackend = async (
 };
 
 /**
- * Processes successful student scan - updates bookkeeping and cache.
+ * Processes successful student scan - updates the short-lived result cache.
  */
 interface StudentBookkeepingParams {
   result: RfidScanResult;
   tagId: string;
-  mapTagToStudent: (tagId: string, studentId: string) => void;
-  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
   recordTagScan: (
     tagId: string,
     data: { timestamp: number; studentId?: string; result?: RfidScanResult }
@@ -171,19 +169,15 @@ interface StudentBookkeepingParams {
 }
 
 const processStudentBookkeeping = (params: StudentBookkeepingParams): void => {
-  const { result, tagId, mapTagToStudent, updateStudentHistory, recordTagScan } = params;
+  const { result, tagId, recordTagScan } = params;
 
   if (!result.student_id) {
     return;
   }
 
   const studentId = result.student_id.toString();
-  const action = result.action === 'checked_in' ? 'checkin' : 'checkout';
 
-  mapTagToStudent(tagId, studentId);
-  updateStudentHistory(studentId, action);
-
-  // Short-lived duplicate prevention cache (in-memory only)
+  // Short-lived result cache (in-memory only)
   recordTagScan(tagId, {
     timestamp: Date.now(),
     studentId,
@@ -295,14 +289,12 @@ export const useRfidScanning = () => {
     setScanResult,
     showScanModal,
     // Note: hideScanModal removed - modal timeout now handled exclusively by page components
-    updateStudentHistory,
     addToProcessingQueue,
     removeFromProcessingQueue,
     lockPickupQueryTag,
     // Enhanced duplicate prevention
     canProcessTag,
     recordTagScan,
-    mapTagToStudent,
     clearOldTagScans,
     // Supervisor RFID actions
     addSupervisorFromRfid,
@@ -471,7 +463,7 @@ export const useRfidScanning = () => {
 
       logger.info('Processing RFID scan', { tagId });
 
-      // Handle duplicate prevention (Layer 1: processing queue, Layer 3: student history)
+      // Handle duplicate prevention (Layer 1: processing queue)
       if (!canProcessTag(tagId)) {
         logger.debug('Tag blocked by duplicate prevention', { tagId });
         return;
@@ -527,8 +519,6 @@ export const useRfidScanning = () => {
         processStudentBookkeeping({
           result,
           tagId,
-          mapTagToStudent,
-          updateStudentHistory,
           recordTagScan,
         });
 
@@ -548,20 +538,11 @@ export const useRfidScanning = () => {
         setScanResult(errorResult);
         showScanModal();
 
-        // For STUDENT_ALREADY_ACTIVE the backend tells us exactly which
-        // student is on the reader. If we leave the bracelet sitting
-        // there, every subsequent scan event will fire another 409 at
-        // the backend unless we populate the dedup map ourselves —
-        // canProcessTag() only inspects tagToStudentMap once it's been
-        // written. Mirror what processStudentBookkeeping() does on the
-        // happy path so the second tap is suppressed locally instead of
-        // turning issue #844 into a 409 retry storm. Treat it as a
-        // checkin for history purposes — the student IS checked in,
-        // just not via this scan.
+        // For STUDENT_ALREADY_ACTIVE (issue #844) the backend tells us
+        // exactly which student is on the reader. Cache the result like
+        // the happy path does so pages reading recentTagScans see it.
         if (errorResult.action === 'already_in' && errorResult.student_id !== null) {
           const studentId = errorResult.student_id.toString();
-          mapTagToStudent(tagId, studentId);
-          updateStudentHistory(studentId, 'checkin');
           recordTagScan(tagId, {
             timestamp: Date.now(),
             studentId,
@@ -577,13 +558,11 @@ export const useRfidScanning = () => {
     [
       setScanResult,
       showScanModal,
-      updateStudentHistory,
       addToProcessingQueue,
       removeFromProcessingQueue,
       lockPickupQueryTag,
       canProcessTag,
       recordTagScan,
-      mapTagToStudent,
       addSupervisorFromRfid,
       addActiveSupervisorTag,
       isActiveSupervisor,

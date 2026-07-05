@@ -74,10 +74,8 @@ function resetStore() {
       scanMode: 'checkin' as const,
       scanContextId: 0,
       pickupQueryTagId: null,
-      studentHistory: new Map(),
       processingQueue: new Set(),
       recentTagScans: new Map(),
-      tagToStudentMap: new Map(),
     },
   });
 }
@@ -685,7 +683,7 @@ describe('RFID scanning state', () => {
 });
 
 // ====================================================================
-// Duplicate prevention — canProcessTag (3-layer)
+// Duplicate prevention — canProcessTag
 // ====================================================================
 
 describe('canProcessTag (duplicate prevention)', () => {
@@ -708,117 +706,18 @@ describe('canProcessTag (duplicate prevention)', () => {
     useUserStore.getState().recordTagScan('04:AA:BB', { timestamp: Date.now() });
     expect(useUserStore.getState().canProcessTag('04:AA:BB')).toBe(true);
   });
-
-  it('checks student history when tag is mapped (Layer 3)', () => {
-    // Map tag to student and set student as processing with opposite action
-    // canProcessTag calls isValidStudentScan with 'checkin', so we set lastAction to 'checkout'
-    // to simulate an opposite action that should be blocked when processing
-    useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-1');
-    useUserStore.setState(state => ({
-      rfid: {
-        ...state.rfid,
-        studentHistory: new Map([
-          [
-            'student-1',
-            {
-              studentId: 'student-1',
-              lastAction: 'checkout' as const,
-              timestamp: Date.now(),
-              isProcessing: true,
-            },
-          ],
-        ]),
-      },
-    }));
-
-    // Should block because student is processing with opposite action (checkout vs checkin)
-    expect(useUserStore.getState().canProcessTag('04:AA:BB')).toBe(false);
-  });
 });
 
 // ====================================================================
-// Tag-to-student mapping
+// Recent tag scan cache
 // ====================================================================
 
-describe('Tag-to-student mapping', () => {
-  it('maps and retrieves tag to student', () => {
-    useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-123');
-    expect(useUserStore.getState().rfid.tagToStudentMap.get('04:AA:BB')).toBe('student-123');
-  });
-
-  it('returns undefined for unmapped tag', () => {
-    expect(useUserStore.getState().rfid.tagToStudentMap.get('04:XX:YY')).toBeUndefined();
-  });
-
-  it('clearTagScan removes scan, mapping, and student history', () => {
+describe('Recent tag scan cache', () => {
+  it('clearTagScan removes the cached scan', () => {
     useUserStore.getState().recordTagScan('04:AA:BB', { timestamp: Date.now() });
-    useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-123');
-    useUserStore.getState().updateStudentHistory('student-123', 'checkin');
 
     useUserStore.getState().clearTagScan('04:AA:BB');
-    expect(useUserStore.getState().rfid.tagToStudentMap.get('04:AA:BB')).toBeUndefined();
     expect(useUserStore.getState().rfid.recentTagScans.has('04:AA:BB')).toBe(false);
-    expect(useUserStore.getState().rfid.studentHistory.has('student-123')).toBe(false);
-  });
-});
-
-// ====================================================================
-// Student history and scan validation
-// ====================================================================
-
-describe('Student scan validation (Layer 3)', () => {
-  it('allows first scan for a student', () => {
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkin')).toBe(true);
-  });
-
-  it('allows same action when not processing (idempotent)', () => {
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkin')).toBe(true);
-  });
-
-  it('blocks opposite action when processing', () => {
-    useUserStore.setState(state => ({
-      rfid: {
-        ...state.rfid,
-        studentHistory: new Map([
-          [
-            'student-1',
-            {
-              studentId: 'student-1',
-              lastAction: 'checkin' as const,
-              timestamp: Date.now(),
-              isProcessing: true,
-            },
-          ],
-        ]),
-      },
-    }));
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkout')).toBe(false);
-  });
-
-  it('allows opposite action when not processing', () => {
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkout')).toBe(true);
-  });
-
-  it('allows opposite action when processing but expired (>10s)', () => {
-    useUserStore.setState(state => ({
-      rfid: {
-        ...state.rfid,
-        studentHistory: new Map([
-          [
-            'student-1',
-            {
-              studentId: 'student-1',
-              lastAction: 'checkin' as const,
-              timestamp: Date.now() - 15000, // 15s ago
-              isProcessing: true,
-            },
-          ],
-        ]),
-      },
-    }));
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkout')).toBe(true);
   });
 });
 
@@ -1372,21 +1271,15 @@ describe('clearSessionState', () => {
     expect(state.currentSession).toBeNull();
   });
 
-  it('clears RFID session state but preserves tagToStudentMap', () => {
-    useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-1');
+  it('clears RFID session state', () => {
     useUserStore.getState().addToProcessingQueue('04:CC:DD');
     useUserStore.getState().recordTagScan('04:EE:FF', { timestamp: Date.now() });
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
 
     useUserStore.getState().clearSessionState();
 
     const rfid = useUserStore.getState().rfid;
-    // Should preserve
-    expect(rfid.tagToStudentMap.has('04:AA:BB')).toBe(true);
-    // Should clear
     expect(rfid.processingQueue.size).toBe(0);
     expect(rfid.recentTagScans.size).toBe(0);
-    expect(rfid.studentHistory.size).toBe(0);
   });
 
   it('clears activeSupervisorTags', () => {

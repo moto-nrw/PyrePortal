@@ -71,8 +71,6 @@ const defaultRfidState = {
   pickupQueryTagId: null,
   processingQueue: new Set<string>(),
   recentTagScans: new Map(),
-  tagToStudentMap: new Map(),
-  studentHistory: new Map(),
 };
 
 const defaultStoreState = {

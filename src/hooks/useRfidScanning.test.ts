@@ -114,10 +114,8 @@ function resetStore() {
       scanMode: 'checkin' as const,
       scanContextId: 0,
       pickupQueryTagId: null,
-      studentHistory: new Map(),
       processingQueue: new Set(),
       recentTagScans: new Map(),
-      tagToStudentMap: new Map(),
     },
   });
 }
@@ -1041,14 +1039,10 @@ describe('useRfidScanning', () => {
       expect(state.rfid.currentScan?.message).toBe('Schüler*in ist bereits angemeldet.');
     });
 
-    // Issue #844 review fix: bracelet-on-reader dedup. When the backend
-    // returns STUDENT_ALREADY_ACTIVE with details.student_id, we must
-    // populate tagToStudentMap and recordTagScan so subsequent scan
-    // events for the same tag don't fire another 409 at the backend.
-    // Without this, a bracelet left on the reader turns one duplicate
-    // visit into a stream of 409 requests instead of one graceful
-    // already_in modal.
-    it('populates tag→student dedup map after STUDENT_ALREADY_ACTIVE 409', async () => {
+    // Issue #844: when the backend returns STUDENT_ALREADY_ACTIVE with
+    // details.student_id, the result is cached in recentTagScans like a
+    // successful scan so pages reading the cache see the identity.
+    it('caches the scan result after STUDENT_ALREADY_ACTIVE 409', async () => {
       const { ApiError: MockedApiError } = await import('../services/api');
       const duplicateError = new MockedApiError(
         'API Error: 409 - Conflict: student already has an active visit',
@@ -1072,20 +1066,17 @@ describe('useRfidScanning', () => {
       await triggerMockScanAndDrain();
 
       const state = useUserStore.getState();
-      // tagToStudentMap is the gate canProcessTag inspects on Layer 3.
-      expect(state.rfid.tagToStudentMap.get(MOCK_TAG)).toBe('231');
-      // recentTagScans + studentHistory mirror what the happy path
-      // populates so subsequent scans use the same dedup machinery.
+      // The already_in result is cached like a happy-path scan result.
       expect(state.rfid.recentTagScans.has(MOCK_TAG)).toBe(true);
-      expect(state.rfid.studentHistory.get('231')?.lastAction).toBe('checkin');
+      expect(state.rfid.recentTagScans.get(MOCK_TAG)?.studentId).toBe('231');
     });
 
     // When the backend's 409 omits details.student_id (degraded path or
-    // older substring-only build), we have no identity to map. The scan
+    // older substring-only build), we have no identity to cache. The scan
     // must still resolve to the friendly already_in modal but we leave
-    // the dedup map untouched — better to allow another attempt than to
-    // map the tag to a wrong/missing student.
-    it('does not populate dedup map when STUDENT_ALREADY_ACTIVE lacks student_id', async () => {
+    // the result cache untouched — better to allow another attempt than
+    // to cache a wrong/missing student.
+    it('does not cache the result when STUDENT_ALREADY_ACTIVE lacks student_id', async () => {
       const { ApiError: MockedApiError } = await import('../services/api');
       const duplicateError = new MockedApiError(
         'API Error: 409 - Conflict: student already has an active visit',
@@ -1105,7 +1096,7 @@ describe('useRfidScanning', () => {
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.action).toBe('already_in');
-      expect(state.rfid.tagToStudentMap.has(MOCK_TAG)).toBe(false);
+      expect(state.rfid.recentTagScans.get(MOCK_TAG)?.studentId).toBeUndefined();
     });
 
     // Issue #844 review fix: when the backend returns the internal "WC"
@@ -1477,7 +1468,7 @@ describe('useRfidScanning', () => {
       setSession();
     });
 
-    it('maps tag to student on successful checkin', async () => {
+    it('caches the scan result on successful checkin', async () => {
       mockedProcessRfidScan.mockResolvedValue(makeCheckinResult({ student_id: 42 }));
 
       const { result } = renderHook(() => useRfidScanning());
@@ -1488,9 +1479,9 @@ describe('useRfidScanning', () => {
 
       await triggerMockScanAndDrain();
 
-      // The tag should be mapped to student
-      const cachedId = useUserStore.getState().rfid.tagToStudentMap.get(MOCK_TAG);
-      expect(cachedId).toBe('42');
+      const cached = useUserStore.getState().rfid.recentTagScans.get(MOCK_TAG);
+      expect(cached?.studentId).toBe('42');
+      expect(cached?.result?.action).toBe('checked_in');
     });
 
     it('skips bookkeeping when student_id is null', async () => {
@@ -1504,27 +1495,10 @@ describe('useRfidScanning', () => {
 
       await triggerMockScanAndDrain();
 
-      // No mapping should exist
-      const cachedId = useUserStore.getState().rfid.tagToStudentMap.get(MOCK_TAG);
-      expect(cachedId).toBeUndefined();
-    });
-
-    it('updates student history on checkout', async () => {
-      mockedProcessRfidScan.mockResolvedValue(
-        makeCheckinResult({ student_id: 42, action: 'checked_out' })
-      );
-
-      const { result } = renderHook(() => useRfidScanning());
-
-      await act(async () => {
-        await result.current.startScanning();
-      });
-
-      await triggerMockScanAndDrain();
-
-      const state = useUserStore.getState();
-      const history = state.rfid.studentHistory.get('42');
-      expect(history?.lastAction).toBe('checkout');
+      // Only the pre-scan timestamp entry exists — no student/result attached
+      const cached = useUserStore.getState().rfid.recentTagScans.get(MOCK_TAG);
+      expect(cached?.studentId).toBeUndefined();
+      expect(cached?.result).toBeUndefined();
     });
   });
 

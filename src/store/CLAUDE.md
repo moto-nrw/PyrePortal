@@ -31,8 +31,6 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts`) for all appli
    - `scanMode`, `scanContextId`, `pickupQueryTagId` - Pickup query flow
    - `processingQueue` - Tags currently being processed
    - `recentTagScans` - Short-lived result cache (see `RECENT_SCAN_CACHE_TTL_MS`), NOT a dedup gate
-   - `tagToStudentMap` - Tag → student mapping (survives session changes)
-   - `studentHistory` - Last action per student
 
 4. **Network**
    - `networkStatus` - Online/offline quality and response time
@@ -110,8 +108,6 @@ RFID hardware and browser mocks can deliver duplicate scan events. Defense in de
 **Layer 1: Processing queue** — `canProcessTag` rejects tags already in `rfid.processingQueue`.
 
 **Layer 2: scanId dedup** — handled in `useRfidScanning`'s `onAdapterScan` before the store is consulted: each adapter scan event carries a `scanId`, and already-processed ids are skipped. `recentTagScans` is NOT part of this — it is only a short-lived cache for result replay and background-sync promises.
-
-**Layer 3: Student history** — `isValidStudentScan(studentId, action)` consults `rfid.studentHistory` to block an opposite action (checkin vs checkout) while a recent scan for the same student is still processing. `canProcessTag` applies it when `tagToStudentMap` already knows the student.
 
 ### 4. Deduplication Pattern (API Calls)
 

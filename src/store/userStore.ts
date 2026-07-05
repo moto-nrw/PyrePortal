@@ -220,14 +220,6 @@ interface AuthenticatedUser {
   pin: string; // Store PIN for subsequent API calls
 }
 
-// Student action history for smart duplicate prevention
-interface StudentActionHistory {
-  studentId: string;
-  lastAction: 'checkin' | 'checkout';
-  timestamp: number;
-  isProcessing: boolean;
-}
-
 // Recent tag scan tracking
 interface RecentTagScan {
   timestamp: number;
@@ -239,7 +231,7 @@ interface RecentTagScan {
 type RfidScanMode = 'checkin' | 'pickupQuery';
 
 // Cache TTL for recentTagScans. This is NOT a dedup window — dedup is handled by
-// scanId (adapter-level) + processingQueue (Layer 1) + studentHistory (Layer 3).
+// scanId (adapter-level) + processingQueue (Layer 1).
 // recentTagScans only exists as a short-lived cache for result replay and syncPromise.
 export const RECENT_SCAN_CACHE_TTL_MS = 10_000;
 
@@ -255,12 +247,8 @@ interface RfidState {
   pickupQueryTagId: string | null;
 
   // Duplicate prevention state
-  studentHistory: Map<string, StudentActionHistory>;
   processingQueue: Set<string>; // Currently processing tag IDs
-
-  // New additions for proper duplicate prevention
-  recentTagScans: Map<string, RecentTagScan>; // Track recent scans by tagId
-  tagToStudentMap: Map<string, string>; // Cache tagId -> studentId mappings
+  recentTagScans: Map<string, RecentTagScan>; // Short-lived result cache by tagId
 }
 
 // Define the store state interface
@@ -323,7 +311,6 @@ interface UserState {
   resetScanMode: () => void;
 
   // Duplicate prevention bookkeeping actions
-  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
   addToProcessingQueue: (tagId: string) => void;
   removeFromProcessingQueue: (tagId: string) => void;
 
@@ -331,9 +318,7 @@ interface UserState {
   canProcessTag: (tagId: string) => boolean;
   recordTagScan: (tagId: string, scan: RecentTagScan) => void;
   clearTagScan: (tagId: string) => void;
-  mapTagToStudent: (tagId: string, studentId: string) => void;
   clearOldTagScans: () => void;
-  isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
 
   // Session settings actions
   loadSessionSettings: () => Promise<void>;
@@ -371,11 +356,8 @@ const SESSION_INITIAL_STATE = {
 };
 
 // RFID state that should be cleared on session change
-// Note: tagToStudentMap is NOT cleared on session change (useful across sessions),
-// but IS cleared per-tag via clearTagScan() on tag reassignment
 const RFID_SESSION_INITIAL_STATE = {
   recentTagScans: new Map<string, RecentTagScan>(),
-  studentHistory: new Map<string, StudentActionHistory>(),
   processingQueue: new Set<string>(),
   scanMode: 'checkin' as RfidScanMode,
   scanContextId: 0,
@@ -409,12 +391,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     pickupQueryTagId: null,
 
     // Duplicate prevention state
-    studentHistory: new Map<string, StudentActionHistory>(),
     processingQueue: new Set<string>(),
-
-    // New duplicate prevention state
     recentTagScans: new Map<string, RecentTagScan>(),
-    tagToStudentMap: new Map<string, string>(),
   },
 
   // Session settings initial state
@@ -829,21 +807,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   // Duplicate prevention bookkeeping actions
-  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => {
-    set(state => {
-      const newHistory = new Map(state.rfid.studentHistory);
-      newHistory.set(studentId, {
-        studentId,
-        lastAction: action,
-        timestamp: Date.now(),
-        isProcessing: false,
-      });
-      return {
-        rfid: { ...state.rfid, studentHistory: newHistory },
-      };
-    });
-  },
-
   addToProcessingQueue: (tagId: string) => {
     set(state => {
       const newQueue = new Set(state.rfid.processingQueue);
@@ -876,12 +839,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     // Layer 2 (scanId-based) is handled in onAdapterScan before this function is called.
     // recentTagScans is a cache, not a dedup gate.
 
-    // Layer 3: If we know the studentId, check student history
-    const studentId = rfid.tagToStudentMap.get(tagId);
-    if (studentId) {
-      return get().isValidStudentScan(studentId, 'checkin');
-    }
-
     return true;
   },
 
@@ -900,32 +857,8 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const newScans = new Map(state.rfid.recentTagScans);
       newScans.delete(tagId);
 
-      const newTagMap = new Map(state.rfid.tagToStudentMap);
-      const oldStudentId = newTagMap.get(tagId);
-      newTagMap.delete(tagId);
-
-      const newHistory = new Map(state.rfid.studentHistory);
-      if (oldStudentId) {
-        newHistory.delete(oldStudentId);
-      }
-
       return {
-        rfid: {
-          ...state.rfid,
-          recentTagScans: newScans,
-          tagToStudentMap: newTagMap,
-          studentHistory: newHistory,
-        },
-      };
-    });
-  },
-
-  mapTagToStudent: (tagId: string, studentId: string) => {
-    set(state => {
-      const newMap = new Map(state.rfid.tagToStudentMap);
-      newMap.set(tagId, studentId);
-      return {
-        rfid: { ...state.rfid, tagToStudentMap: newMap },
+        rfid: { ...state.rfid, recentTagScans: newScans },
       };
     });
   },
@@ -946,24 +879,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         rfid: { ...state.rfid, recentTagScans: newScans },
       };
     });
-  },
-
-  isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => {
-    const { rfid } = get();
-    const history = rfid.studentHistory.get(studentId);
-
-    // Allow if no previous action
-    if (!history) return true;
-
-    // Allow same action (idempotent)
-    if (history.lastAction === action) return true;
-
-    // Block opposite action only if recent (10s) and still processing
-    if (history.isProcessing && Date.now() - history.timestamp < 10000) {
-      return false;
-    }
-
-    return true;
   },
 
   // Network status actions
@@ -1174,7 +1089,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       rfid: {
         ...state.rfid,
         ...RFID_SESSION_INITIAL_STATE,
-        // Preserve tagToStudentMap - useful across sessions for tag-to-student lookups
       },
     }));
   },
