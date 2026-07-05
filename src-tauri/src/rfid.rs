@@ -46,8 +46,8 @@ pub struct RfidBackgroundService {
 static RFID_SERVICE: OnceLock<Arc<Mutex<RfidBackgroundService>>> = OnceLock::new();
 static SCAN_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-// Global SPI guard used by BOTH continuous background scanning and one-shot scans.
-// This avoids concurrent access/reset races on /dev/spidev0.0 and MFRC522 state corruption.
+// Global scanner guard used by BOTH continuous background scanning and one-shot scans.
+// Serializes scanner access so a one-shot scan never overlaps the background loop.
 static SPI_ACCESS_MUTEX: OnceLock<TokioMutex<()>> = OnceLock::new();
 
 #[derive(Debug, Clone)]
@@ -197,17 +197,6 @@ impl RfidBackgroundService {
 
     fn next_scan_id() -> u64 {
         SCAN_COUNTER.fetch_add(1, Ordering::Relaxed) + 1
-    }
-
-    /// Handle scanner initialization failure
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    fn handle_scanner_init_failure(state: &Arc<Mutex<RfidServiceState>>, error: &str) {
-        println!("Failed to initialize RFID scanner: {}", error);
-        if let Ok(mut guard) = state.lock() {
-            guard.last_error = Some(format!("Scanner initialization failed: {}", error));
-            guard.is_running = false;
-            guard.should_run = false;
-        }
     }
 
     const STOP_JOIN_TIMEOUT: Duration = Duration::from_secs(3);
@@ -408,148 +397,14 @@ impl RfidBackgroundService {
         state: Arc<Mutex<RfidServiceState>>,
         app_handle: Option<AppHandle>,
     ) {
-        // Platform-specific scanning implementation
-        #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-        {
-            let scan_state = Arc::clone(&state);
-            let scan_app_handle = app_handle.clone();
-            let join_result = tokio::task::spawn_blocking(move || {
-                Self::run_hardware_scan_worker(scan_state, scan_app_handle);
-            })
-            .await;
-
-            if let Err(join_error) = join_result {
-                let message = format!("RFID hardware worker task crashed: {join_error}");
-                println!("{message}");
-                if let Ok(mut guard) = state.lock() {
-                    guard.last_error = Some(message);
-                }
-            }
-        }
-
-        // Mock platform implementation
-        #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
-        {
-            Self::run_mock_scan_loop(&state, app_handle.as_ref()).await;
-        }
+        Self::run_mock_scan_loop(&state, app_handle.as_ref()).await;
 
         // Ensure state reflects actual task lifecycle (prevents zombie "running" states).
         Self::set_should_run(&state, false);
         Self::set_running_state(&state, false);
     }
 
-    /// Run blocking RFID scan worker on a dedicated blocking thread.
-    /// This keeps SPI operations completely off Tokio worker threads.
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    fn run_hardware_scan_worker(
-        state: Arc<Mutex<RfidServiceState>>,
-        app_handle: Option<AppHandle>,
-    ) {
-        // Serialize all SPI access across background and one-shot modes.
-        let spi_mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
-        let _spi_guard = spi_mutex.blocking_lock();
-
-        const MAX_INIT_RETRIES: u32 = 3;
-        let mut init_attempts: u32 = 0;
-
-        loop {
-            if !Self::should_continue_scanning(&state) {
-                break;
-            }
-
-            match raspberry_pi::initialize_persistent_scanner() {
-                Ok(mut scanner) => {
-                    println!("RFID scanner initialized for persistent scanning");
-                    init_attempts = 0;
-
-                    let needs_reinit =
-                        Self::run_hardware_scan_loop_sync(&state, &app_handle, &mut scanner);
-
-                    if !needs_reinit || !Self::should_continue_scanning(&state) {
-                        break;
-                    }
-
-                    // Scanner gets dropped here (PersistentRfidScanner::drop calls hlta())
-                    println!("RFID: Reinitializing scanner after consecutive errors...");
-                    std::thread::sleep(Duration::from_secs(1));
-                }
-                Err(e) => {
-                    init_attempts += 1;
-                    if init_attempts >= MAX_INIT_RETRIES {
-                        Self::handle_scanner_init_failure(
-                            &state,
-                            &format!("{} (after {} attempts)", e, init_attempts),
-                        );
-                        break;
-                    }
-                    println!(
-                        "RFID: Init attempt {}/{} failed: {}, retrying...",
-                        init_attempts, MAX_INIT_RETRIES, e
-                    );
-                    // Exponential backoff: 1s, 2s, 3s
-                    std::thread::sleep(Duration::from_secs(u64::from(init_attempts)));
-                }
-            }
-        }
-    }
-
-    /// Run the hardware scan loop for Raspberry Pi platform.
-    /// Returns `true` if the scanner should be re-initialized (consecutive hardware errors),
-    /// `false` if scanning was stopped normally.
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    fn run_hardware_scan_loop_sync(
-        state: &Arc<Mutex<RfidServiceState>>,
-        app_handle: &Option<AppHandle>,
-        scanner: &mut raspberry_pi::PersistentRfidScanner,
-    ) -> bool {
-        let mut consecutive_errors: u32 = 0;
-        let mut presence_state = ScanPresenceState::new();
-        const MAX_CONSECUTIVE_ERRORS: u32 = 15;
-
-        loop {
-            if !Self::should_continue_scanning(state) {
-                println!("Continuous scan loop stopping - scanner will be cleaned up");
-                return false;
-            }
-
-            match raspberry_pi::scan_with_persistent_scanner_sync(scanner) {
-                Ok(tag_id) => {
-                    consecutive_errors = 0;
-                    if presence_state.register_success(&tag_id) {
-                        Self::handle_successful_scan(
-                            state,
-                            app_handle.as_ref(),
-                            &tag_id,
-                            Self::next_scan_id(),
-                        );
-                    }
-                    // Wait after successful scan to prevent duplicate reads
-                    std::thread::sleep(Duration::from_millis(200));
-                }
-                Err(error) => {
-                    Self::handle_scan_error(state, &error);
-                    if Self::is_normal_poll_error(&error) {
-                        presence_state.register_absence(Instant::now());
-                    }
-
-                    // Track consecutive real errors (not "no card" which is normal polling)
-                    if !Self::is_normal_poll_error(&error) {
-                        consecutive_errors += 1;
-                        if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
-                            println!(
-                                "RFID: {} consecutive hardware errors, requesting scanner re-initialization",
-                                consecutive_errors
-                            );
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     /// Run the mock scan loop for development platforms
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     async fn run_mock_scan_loop(
         state: &Arc<Mutex<RfidServiceState>>,
         app_handle: Option<&AppHandle>,
@@ -583,23 +438,12 @@ impl RfidBackgroundService {
         }
     }
 
-    // Only compiled for non-ARM platforms (mock scanning)
-    // ARM Linux uses persistent scanner directly in continuous_scan_loop
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     async fn perform_platform_scan() -> Result<String, String> {
         mock_platform::scan_rfid_hardware().await
     }
 
     fn get_platform_name() -> String {
-        #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-        {
-            "Raspberry Pi (ARM64)".to_string()
-        }
-
-        #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
-        {
-            format!("Development Platform ({})", std::env::consts::ARCH)
-        }
+        format!("Development Platform ({})", std::env::consts::ARCH)
     }
 
     pub fn get_state(&self) -> Result<RfidServiceState, String> {
@@ -610,299 +454,7 @@ impl RfidBackgroundService {
     }
 }
 
-// Platform-specific RFID implementation for Raspberry Pi
-#[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-mod raspberry_pi {
-    use super::*;
-    use linux_embedded_hal::{
-        spidev::{SpiModeFlags, SpidevOptions},
-        Spidev,
-    };
-    use mfrc522::{
-        comm::eh02::spi::{DummyDelay, DummyNSS, SpiInterface},
-        Mfrc522, RxGain,
-    };
-    use rppal::gpio::Gpio;
-    use std::thread;
-
-    // Type alias for the complete MFRC522 type with SpiInterface
-    type Mfrc522Scanner = Mfrc522<SpiInterface<Spidev, DummyNSS, DummyDelay>, mfrc522::Initialized>;
-
-    // Persistent scanner struct that holds the MFRC522 instance
-    pub struct PersistentRfidScanner {
-        mfrc522: Mfrc522Scanner,
-    }
-
-    impl Drop for PersistentRfidScanner {
-        fn drop(&mut self) {
-            // Best-effort cleanup: put MFRC522 into halted state
-            // This prevents the chip from being in an inconsistent state
-            // when the next scanner instance tries to initialize
-            let _ = self.mfrc522.hlta();
-            println!("PersistentRfidScanner dropped - MFRC522 halted");
-        }
-    }
-
-    use std::sync::{Mutex, OnceLock};
-
-    // Track initialization state to prevent repeated setup
-    static HARDWARE_INITIALIZED: OnceLock<bool> = OnceLock::new();
-    static INITIALIZATION_MUTEX: OnceLock<Mutex<()>> = OnceLock::new();
-
-    fn ensure_hardware_ready() -> Result<(), String> {
-        // Get or create the mutex
-        let mutex = INITIALIZATION_MUTEX.get_or_init(|| Mutex::new(()));
-        let _lock = mutex
-            .lock()
-            .map_err(|e| format!("Failed to acquire lock: {}", e))?;
-
-        // Check if already initialized
-        if HARDWARE_INITIALIZED.get().is_some() {
-            return Ok(());
-        }
-
-        // Perform one-time hardware check/setup if needed
-        println!("Performing one-time RFID hardware validation...");
-
-        // Mark as initialized
-        HARDWARE_INITIALIZED
-            .set(true)
-            .map_err(|_| "Already initialized")?;
-        println!("RFID hardware validation complete");
-
-        Ok(())
-    }
-
-    // Initialize a persistent RFID scanner instance
-    pub fn initialize_persistent_scanner() -> Result<PersistentRfidScanner, String> {
-        println!("Initializing persistent RFID scanner...");
-
-        // Initialize SPI device
-        let mut spi = Spidev::open("/dev/spidev0.0")
-            .map_err(|e| format!("Failed to open SPI device 0.0: {:?}", e))?;
-        println!("✓ SPI opened");
-
-        // SPI configuration - 1MHz for maximum detection range
-        let options = SpidevOptions::new()
-            .bits_per_word(8)
-            .max_speed_hz(1_000_000) // 1MHz - matches test_rfid_persistent
-            .mode(SpiModeFlags::SPI_MODE_0)
-            .build();
-        spi.configure(&options)
-            .map_err(|e| format!("Failed to configure SPI: {:?}", e))?;
-        println!("✓ SPI configured at 1MHz");
-
-        // Hardware reset via GPIO 22
-        reset_mfrc522_hardware()?;
-        println!("✓ Hardware reset");
-
-        // Create MFRC522 instance
-        let spi_interface = SpiInterface::new(spi);
-        let mfrc522 = Mfrc522::new(spi_interface);
-        let mut mfrc522 = mfrc522
-            .init()
-            .map_err(|e| format!("Failed to initialize MFRC522: {:?}", e))?;
-        println!("✓ MFRC522 initialized");
-
-        // Verify version - 0x00/0xFF indicate SPI bus failure
-        let version = mfrc522
-            .version()
-            .map_err(|e| format!("Failed to read MFRC522 version: {:?}", e))?;
-        if version == 0x00 || version == 0xFF {
-            return Err(format!(
-                "MFRC522 version 0x{:02X} indicates SPI communication failure",
-                version
-            ));
-        }
-        println!("✓ Version: 0x{:02X}", version);
-
-        // Set antenna gain to maximum
-        mfrc522
-            .set_antenna_gain(RxGain::DB48)
-            .map_err(|e| format!("Failed to set antenna gain: {:?}", e))?;
-        println!("✓ Antenna gain: DB48 (maximum)");
-
-        Ok(PersistentRfidScanner { mfrc522 })
-    }
-
-    // ========== Shared hardware helpers ==========
-
-    /// Perform hardware reset of MFRC522 via GPIO 22.
-    /// Uses 100ms delays for reliable reset (some MFRC522 clones need >50ms).
-    fn reset_mfrc522_hardware() -> Result<(), String> {
-        let gpio = Gpio::new().map_err(|e| format!("Failed to initialize GPIO: {:?}", e))?;
-        let mut reset_pin = gpio
-            .get(22)
-            .map_err(|e| format!("Failed to setup reset pin on GPIO 22: {:?}", e))?
-            .into_output();
-
-        reset_pin.set_high();
-        reset_pin.set_low();
-        thread::sleep(Duration::from_millis(100));
-        reset_pin.set_high();
-        thread::sleep(Duration::from_millis(100));
-
-        Ok(())
-    }
-
-    // ========== Helper functions for reduced cognitive complexity ==========
-
-    /// Format UID bytes as colon-separated hex string
-    fn format_uid(bytes: &[u8]) -> String {
-        bytes
-            .iter()
-            .map(|b| format!("{:02X}", b))
-            .collect::<Vec<_>>()
-            .join(":")
-    }
-
-    /// Attempt to select a card with retry logic for IncompleteFrame errors
-    fn select_card_with_retry(
-        mfrc522: &mut Mfrc522Scanner,
-        atqa: &mfrc522::AtqA,
-    ) -> Result<String, String> {
-        const MAX_RETRIES: u32 = 5;
-        const RETRY_DELAY_MS: u64 = 10;
-
-        let mut last_error = String::new();
-
-        for attempt in 0..=MAX_RETRIES {
-            match mfrc522.select(atqa) {
-                Ok(uid) => {
-                    let _ = mfrc522.hlta();
-                    return Ok(format_uid(uid.as_bytes()));
-                }
-                Err(e) => {
-                    last_error = format!("{:?}", e);
-
-                    // Only retry on IncompleteFrame errors
-                    if !last_error.contains("IncompleteFrame") || attempt == MAX_RETRIES {
-                        let _ = mfrc522.hlta();
-                        return Err(format!("Select failed: {}", last_error));
-                    }
-
-                    thread::sleep(Duration::from_millis(RETRY_DELAY_MS));
-                }
-            }
-        }
-
-        Err(format!(
-            "Failed after {} retries: {}",
-            MAX_RETRIES, last_error
-        ))
-    }
-
-    // ========== Refactored main function ==========
-
-    /// Scan using the persistent scanner instance (synchronous version)
-    pub fn scan_with_persistent_scanner_sync(
-        scanner: &mut PersistentRfidScanner,
-    ) -> Result<String, String> {
-        const SCAN_INTERVAL_MS: u64 = 20;
-
-        // Try WUPA first, fall back to REQA for maximum card compatibility.
-        // WUPA wakes all cards including halted ones; REQA detects cards in IDLE state.
-        match scanner.mfrc522.wupa().or_else(|_| scanner.mfrc522.reqa()) {
-            Ok(atqa) => select_card_with_retry(&mut scanner.mfrc522, &atqa),
-            Err(_) => {
-                thread::sleep(Duration::from_millis(SCAN_INTERVAL_MS));
-                Err("No card detected".to_string())
-            }
-        }
-    }
-
-    /// Single RFID scan with timeout for tag assignment flow.
-    /// Frontend budget: modal 18s, invoke 20s (covers stop + mutex + this 10s scan).
-    pub async fn scan_rfid_hardware_single() -> Result<String, String> {
-        scan_rfid_hardware_with_timeout(Duration::from_secs(10)).await
-    }
-
-    /// Initialize MFRC522 scanner with SPI and GPIO setup for one-shot scanning
-    fn initialize_mfrc522_oneshot() -> Result<Mfrc522Scanner, String> {
-        ensure_hardware_ready()?;
-
-        // Initialize SPI
-        let mut spi = Spidev::open("/dev/spidev0.0")
-            .map_err(|e| format!("Failed to open SPI device: {:?}", e))?;
-
-        let options = SpidevOptions::new()
-            .bits_per_word(8)
-            .max_speed_hz(1_000_000)
-            .mode(SpiModeFlags::SPI_MODE_0)
-            .build();
-        spi.configure(&options)
-            .map_err(|e| format!("Failed to configure SPI: {:?}", e))?;
-
-        // Hardware reset via GPIO 22
-        reset_mfrc522_hardware()?;
-
-        // Initialize MFRC522
-        println!("Attempting to initialize MFRC522...");
-        let mut mfrc522 = Mfrc522::new(SpiInterface::new(spi))
-            .init()
-            .map_err(|e| format!("Failed to initialize MFRC522: {:?}", e))?;
-        println!("MFRC522 initialized successfully");
-
-        // Verify communication
-        let _version = mfrc522
-            .version()
-            .map_err(|e| format!("Failed to read MFRC522 version: {:?}", e))?;
-        println!("MFRC522 version: {:?}", _version);
-
-        // Set antenna gain (non-fatal if it fails)
-        println!("Setting antenna gain to maximum (48dB) for improved range...");
-        if mfrc522.set_antenna_gain(RxGain::DB48).is_ok() {
-            println!("Successfully configured antenna gain to 48dB maximum");
-        } else {
-            println!("Warning: Failed to set antenna gain, continuing with defaults");
-        }
-
-        Ok(mfrc522)
-    }
-
-    /// Run scan loop with timeout
-    fn run_scan_loop_with_timeout(
-        mfrc522: &mut Mfrc522Scanner,
-        timeout: Duration,
-    ) -> Result<String, String> {
-        let start_time = std::time::Instant::now();
-
-        loop {
-            if start_time.elapsed() > timeout {
-                return Err("Scan timeout - no card detected".to_string());
-            }
-
-            // Try both WUPA and REQA for maximum compatibility
-            if let Ok(atqa) = mfrc522.wupa().or_else(|_| mfrc522.reqa()) {
-                match mfrc522.select(&atqa) {
-                    Ok(uid) => {
-                        let _ = mfrc522.hlta();
-                        return Ok(format_uid(uid.as_bytes()));
-                    }
-                    Err(_) => {
-                        let _ = mfrc522.hlta();
-                        thread::sleep(Duration::from_millis(50));
-                    }
-                }
-            } else {
-                thread::sleep(Duration::from_millis(20));
-            }
-        }
-    }
-
-    async fn scan_rfid_hardware_with_timeout(timeout: Duration) -> Result<String, String> {
-        tokio::task::spawn_blocking(move || {
-            let mut mfrc522 = initialize_mfrc522_oneshot()?;
-            run_scan_loop_with_timeout(&mut mfrc522, timeout)
-        })
-        .await
-        .map_err(|e| format!("RFID one-shot scan task failed: {e}"))?
-    }
-
-}
-
 // Mock implementation for development platforms (MacBook, etc.)
-#[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
 mod mock_platform {
     use super::Duration;
     use std::sync::Mutex;
@@ -964,7 +516,6 @@ mod mock_platform {
     pub(crate) fn reset_last_scan() {
         *LAST_SCAN.lock().unwrap() = None;
     }
-
 }
 
 /// Send a command to a given service instance (testable without global state).
@@ -1098,36 +649,17 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
         .await
         .map_err(|_| "Timed out waiting for exclusive scanner access".to_string())?;
 
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    {
-        match raspberry_pi::scan_rfid_hardware_single().await {
-            Ok(tag_id) => Ok(RfidScanResult {
-                success: true,
-                tag_id: Some(tag_id),
-                error: None,
-            }),
-            Err(error) => Ok(RfidScanResult {
-                success: false,
-                tag_id: None,
-                error: Some(error),
-            }),
-        }
-    }
-
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
-    {
-        match mock_platform::scan_rfid_hardware_single().await {
-            Ok(tag_id) => Ok(RfidScanResult {
-                success: true,
-                tag_id: Some(tag_id),
-                error: None,
-            }),
-            Err(error) => Ok(RfidScanResult {
-                success: false,
-                tag_id: None,
-                error: Some(error),
-            }),
-        }
+    match mock_platform::scan_rfid_hardware_single().await {
+        Ok(tag_id) => Ok(RfidScanResult {
+            success: true,
+            tag_id: Some(tag_id),
+            error: None,
+        }),
+        Err(error) => Ok(RfidScanResult {
+            success: false,
+            tag_id: None,
+            error: Some(error),
+        }),
     }
 }
 
@@ -1275,7 +807,6 @@ mod tests {
     fn get_platform_name_returns_nonempty_string() {
         let name = RfidBackgroundService::get_platform_name();
         assert!(!name.is_empty());
-        #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
         assert!(name.contains("Development Platform"));
     }
 
@@ -1652,10 +1183,9 @@ mod tests {
     }
 
     // ====================================================================
-    // Mock platform tests (only on non-ARM)
+    // Mock platform tests
     // ====================================================================
 
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
     mod mock_tests {
         use super::*;
 
