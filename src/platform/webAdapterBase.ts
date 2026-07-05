@@ -3,7 +3,7 @@
  *
  * Contains everything that does not depend on the NFC input source:
  * scan-callback management, the one-shot single-tag capture, config from
- * env vars / the `?key=` URL param, localStorage session persistence and
+ * env vars, the `?key=` device key, localStorage session persistence and
  * the key-preserving restart. Subclasses provide `platform`,
  * `initializeNfc`, `persistLog` and `getDeviceInfo`.
  */
@@ -104,7 +104,7 @@ export abstract class WebAdapterBase implements Omit<
   }
 
   async loadConfig(): Promise<void> {
-    // No-op: config is read synchronously from env vars / URL params
+    // No-op: API base URL and device key are read synchronously.
   }
 
   getApiBaseUrl(): string {
@@ -114,21 +114,14 @@ export abstract class WebAdapterBase implements Omit<
   getDeviceApiKey(): string {
     const params = new URLSearchParams(window.location.search);
     const key = params.get('key');
-    if (!key) {
-      if (this.cachedApiKey) {
-        return this.cachedApiKey;
-      }
-      // Local dev fallback: production builds never set VITE_DEVICE_API_KEY,
-      // so deployments without ?key= still fail loudly.
-      const envKey = import.meta.env.VITE_DEVICE_API_KEY as string | undefined;
-      if (envKey) {
-        this.cachedApiKey = envKey;
-        return envKey;
-      }
-      throw new Error('DEVICE_API_KEY not found in URL. Expected ?key=...');
+    if (key) {
+      this.cachedApiKey = key;
+      return key;
     }
-    this.cachedApiKey = key;
-    return key;
+    if (this.cachedApiKey) {
+      return this.cachedApiKey;
+    }
+    throw new Error('DEVICE_API_KEY not found in URL. Expected ?key=...');
   }
 
   async saveSessionSettings(settings: SessionSettings): Promise<void> {
