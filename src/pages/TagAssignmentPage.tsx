@@ -311,14 +311,17 @@ function TagAssignmentPage() {
     void handleStartScanning();
   };
 
-  // Handle unassigning a tag from a student
+  // Handle unassigning a tag from a student or staff member
   const handleUnassignTag = async () => {
     const assignedPerson = getAssignedPerson(tagAssignment);
     if (!authenticatedUser?.pin || !assignedPerson || !scannedTag) return;
 
     setIsUnassigning(true);
     try {
-      const result = await api.unassignStudentTag(authenticatedUser.pin, assignedPerson.id);
+      const result =
+        tagAssignment?.person_type === 'staff'
+          ? await api.unassignStaffTag(authenticatedUser.pin, assignedPerson.id)
+          : await api.unassignStudentTag(authenticatedUser.pin, assignedPerson.id);
 
       if (!result.success) {
         setShowUnassignConfirm(false);
@@ -782,8 +785,8 @@ function TagAssignmentPage() {
                     </button>
                   </div>
 
-                  {/* Unassign button - only for student assignments */}
-                  {tagAssignment.assigned && tagAssignment.person_type === 'student' && (
+                  {/* Unassign button */}
+                  {tagAssignment.assigned && (
                     <button
                       onClick={() => setShowUnassignConfirm(true)}
                       style={{

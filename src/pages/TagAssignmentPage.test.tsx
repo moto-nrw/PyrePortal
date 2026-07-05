@@ -668,7 +668,7 @@ describe('TagAssignmentPage', () => {
     expect(screen.getByText('Armband freigeben')).toBeInTheDocument();
   });
 
-  it('does not show "Armband freigeben" button for staff-assigned tags', () => {
+  it('shows "Armband freigeben" button for staff-assigned tags', () => {
     renderPage({
       initialEntries: [
         {
@@ -681,7 +681,7 @@ describe('TagAssignmentPage', () => {
       ],
     });
 
-    expect(screen.queryByText('Armband freigeben')).not.toBeInTheDocument();
+    expect(screen.getByText('Armband freigeben')).toBeInTheDocument();
   });
 
   it('does not show "Armband freigeben" button for unassigned tags', () => {
@@ -757,6 +757,47 @@ describe('TagAssignmentPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Armband wurde von Max Mustermann entfernt/)).toBeInTheDocument();
+    });
+  });
+
+  it('confirming staff unassign calls api.unassignStaffTag and shows success', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const clearTagScanSpy = vi.fn();
+    useUserStore.setState({
+      authenticatedUser: baseUser,
+      clearTagScan: clearTagScanSpy,
+    });
+
+    const unassignStudentSpy = vi.spyOn(api, 'unassignStudentTag');
+    vi.spyOn(api, 'unassignStaffTag').mockResolvedValue({
+      success: true,
+      message: 'Staff tag removed',
+    });
+
+    renderPage({
+      initialEntries: [
+        {
+          pathname: '/tag-assignment',
+          state: {
+            scannedTag: '04:D6:94:82:97:6A:80',
+            tagAssignment: assignedStaffTag,
+          },
+        },
+      ],
+    });
+
+    await user.click(screen.getByText('Armband freigeben'));
+    await user.click(screen.getByText('Ja, freigeben'));
+
+    await waitFor(() => {
+      expect(api.unassignStaffTag).toHaveBeenCalledWith('1234', 5);
+    });
+
+    expect(unassignStudentSpy).not.toHaveBeenCalled();
+    expect(clearTagScanSpy).toHaveBeenCalledWith('04:D6:94:82:97:6A:80');
+
+    await waitFor(() => {
+      expect(screen.getByText(/Armband wurde von Frau Mueller entfernt/)).toBeInTheDocument();
     });
   });
 

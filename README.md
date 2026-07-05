@@ -122,7 +122,6 @@ PyrePortal talks to the Project Phoenix backend over REST. All requests carry de
 | ---------------------------- | ------ | ------------------------- |
 | `/api/iot/teachers`          | GET    | Fetch staff list          |
 | `/api/iot/ping`              | POST   | Validate global PIN       |
-| `/api/iot/status`            | GET    | Validate teacher PIN      |
 | `/api/iot/activities`        | GET    | Today's activities        |
 | `/api/iot/rooms/available`   | GET    | Available rooms           |
 | `/api/iot/checkin`           | POST   | RFID check-in/check-out   |

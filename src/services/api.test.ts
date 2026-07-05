@@ -1048,137 +1048,6 @@ describe('api methods', () => {
   });
 
   // ------------------------------------------------------------------
-  // api.validateTeacherPin
-  // ------------------------------------------------------------------
-
-  describe('api.validateTeacherPin', () => {
-    it('returns success result with staff data', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: 'Pi-1', status: 'active' },
-            staff: { id: 5, person_id: 50 },
-            person: { first_name: 'Anna', last_name: 'Schmidt' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(true);
-      expect(result.userData?.staffName).toBe('Anna Schmidt');
-      expect(result.userData?.staffId).toBe(5);
-      expect(result.userData?.deviceName).toBe('Pi-1');
-    });
-
-    it('returns failure with isLocked when account is locked', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'staff account is locked due to failed PIN attempts' },
-          { status: 423, statusText: 'Locked', ok: false }
-        )
-      );
-
-      const result = await freshApi.validateTeacherPin('wrong', 5);
-      expect(result.success).toBe(false);
-      expect(result.isLocked).toBe(true);
-    });
-
-    it('handles unexpected response structure', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            // Missing device, person, staff
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Unerwartete Server-Antwort');
-    });
-
-    it('handles error with 423 status code in message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'API Error: 423 - locked' },
-          { status: 423, statusText: 'Locked', ok: false }
-        )
-      );
-
-      const result = await freshApi.validateTeacherPin('wrong', 5);
-      expect(result.success).toBe(false);
-      expect(result.isLocked).toBe(true);
-    });
-
-    it('handles network error in validateTeacherPin', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-    });
-
-    it('handles missing device name and person names', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: '', status: 'active' },
-            staff: { id: 5, person_id: 50 },
-            person: { first_name: '', last_name: '' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(true);
-      expect(result.userData?.staffName).toBe('');
-      expect(result.userData?.deviceName).toBe('Unknown Device');
-    });
-
-    it('sends X-Staff-ID header', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: 'Pi-1', status: 'active' },
-            staff: { id: 42, person_id: 50 },
-            person: { first_name: 'Max', last_name: 'Müller' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      await freshApi.validateTeacherPin('1234', 42);
-
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('42');
-    });
-  });
-
-  // ------------------------------------------------------------------
   // api.getActivities
   // ------------------------------------------------------------------
 
@@ -1667,17 +1536,38 @@ describe('api methods', () => {
   // ------------------------------------------------------------------
 
   describe('api.unassignStaffTag', () => {
-    it('sends DELETE request', async () => {
+    it('sends DELETE request and returns result', async () => {
       const { api: freshApi } = await getFreshApi();
 
-      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', message: 'ok' }));
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({
+          status: 'success',
+          data: {
+            success: true,
+            student_id: 5,
+            student_name: 'Frau Mueller',
+            rfid_tag: 'AA:BB:CC',
+            previous_tag: 'AA:BB:CC',
+            message: 'Staff tag removed',
+          },
+          message: 'ok',
+        })
+      );
 
-      await freshApi.unassignStaffTag('1234', 5);
+      const result = await freshApi.unassignStaffTag('1234', 5);
 
       const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('http://test-api.local/api/iot/staff/5/rfid');
       expect(options.method).toBe('DELETE');
       expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('5');
+      expect(result).toEqual({
+        success: true,
+        message: 'Staff tag removed',
+        student_id: 5,
+        student_name: 'Frau Mueller',
+        rfid_tag: 'AA:BB:CC',
+        previous_tag: 'AA:BB:CC',
+      });
     });
   });
 

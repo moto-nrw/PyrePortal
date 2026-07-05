@@ -676,7 +676,6 @@ export interface PinValidationResult {
     staffId: number;
   };
   error?: string;
-  isLocked?: boolean;
 }
 
 /**
@@ -842,73 +841,6 @@ export const api = {
       return {
         success: false,
         error: userMessage,
-      };
-    }
-  },
-
-  /**
-   * Validate teacher PIN with enhanced error handling
-   * Endpoint: GET /api/iot/status
-   */
-  async validateTeacherPin(pin: string, staffId: number): Promise<PinValidationResult> {
-    try {
-      logger.debug('Starting PIN validation');
-
-      const response = await apiCall<{
-        status: string;
-        data: {
-          device: { id: number; device_id: string; name: string; status: string };
-          staff: { id: number; person_id: number };
-          person: { first_name: string; last_name: string };
-          authenticated_at: string;
-        };
-        message: string;
-      }>('/api/iot/status', {
-        headers: {
-          Authorization: `Bearer ${DEVICE_API_KEY}`,
-          'X-Staff-PIN': pin,
-          'X-Staff-ID': staffId.toString(),
-        },
-      });
-
-      logger.info('PIN validation successful');
-
-      // Check if response has the expected structure
-      if (!response.data?.device || !response.data.person || !response.data.staff) {
-        logger.error('Unexpected response structure', { response });
-        return {
-          success: false,
-          error: 'Unerwartete Server-Antwort. Bitte versuchen Sie es erneut.',
-        };
-      }
-
-      const { device, person, staff } = response.data;
-
-      return {
-        success: true,
-        userData: {
-          deviceName: device.name || 'Unknown Device',
-          staffName: `${person.first_name || ''} ${person.last_name || ''}`.trim(),
-          staffId: staff.id,
-        },
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      logger.error('PIN validation failed', {
-        error: errorMessage,
-      });
-
-      // Use the error mapping function for user-friendly messages
-      const userMessage = mapServerErrorToGerman(errorMessage);
-
-      // Check if account is locked (423 status)
-      const isLocked = errorMessage.includes('423') || errorMessage.includes('locked');
-
-      return {
-        success: false,
-        error: userMessage,
-        isLocked,
       };
     }
   },
@@ -1199,8 +1131,19 @@ export const api = {
    * Remove RFID tag from staff member
    * Endpoint: DELETE /api/iot/staff/{staffId}/rfid
    */
-  async unassignStaffTag(pin: string, staffId: number): Promise<void> {
-    await apiCall(`/api/iot/staff/${staffId}/rfid`, {
+  async unassignStaffTag(pin: string, staffId: number): Promise<TagAssignmentResult> {
+    const response = await apiCall<{
+      status: string;
+      data?: {
+        success: boolean;
+        student_id: number;
+        student_name: string;
+        rfid_tag: string;
+        previous_tag?: string;
+        message?: string;
+      };
+      message?: string;
+    }>(`/api/iot/staff/${staffId}/rfid`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
@@ -1208,6 +1151,15 @@ export const api = {
         'X-Staff-ID': staffId.toString(),
       },
     });
+
+    return {
+      success: response.data?.success ?? response.status === 'success',
+      message: response.data?.message ?? response.message,
+      student_id: response.data?.student_id,
+      student_name: response.data?.student_name,
+      rfid_tag: response.data?.rfid_tag,
+      previous_tag: response.data?.previous_tag,
+    };
   },
 
   /**
