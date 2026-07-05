@@ -1,21 +1,13 @@
 import { adapter } from '@platform';
 import { useEffect, useRef, useCallback } from 'react';
 
+import { isRealScanningEnabled } from '../platform/adapter';
 import type { NfcScanEvent } from '../platform/adapter';
 import { api, mapApiErrorToGerman, ApiError, formatRoomName } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, serializeError } from '../utils/logger';
-
-/**
- * True when the current platform uses real NFC/RFID hardware (not mock).
- * - GKT: always real (NFC via system.js)
- * - Browser and Tauri Mac/mock app: mock
- */
-const isRealScanningEnabled = (): boolean => {
-  return adapter.platform === 'gkt';
-};
 
 // Mock scanning interval for development
 let mockScanInterval: ReturnType<typeof setInterval> | null = null;

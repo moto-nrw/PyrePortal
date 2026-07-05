@@ -8,6 +8,7 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
+import { isRealScanningEnabled } from '../platform/adapter';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -17,12 +18,6 @@ import { logNavigation, logUserAction, logError, createLogger } from '../utils/l
 import { pressHandlers } from '../utils/pressHandlers';
 
 const logger = createLogger('TagAssignmentPage');
-
-/**
- * True when the current platform uses real NFC/RFID hardware.
- * GKT always uses real NFC via system.js; browser and Tauri Mac/mock use mock scanning.
- */
-const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt';
 
 /**
  * Helper to get assigned person from TagAssignmentCheck

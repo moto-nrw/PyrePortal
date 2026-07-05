@@ -237,7 +237,10 @@ function isStringOrNumber(value: unknown): value is string | number {
  */
 export const WC_ROOM_ALIASES = ['WC', 'Toilette'] as const;
 
-/** Returns true when the given room name is one of the toilet aliases. */
+/**
+ * Returns true when the given room name is one of the toilet aliases.
+ * Only used internally; exported as a test seam for api.test.ts.
+ */
 export function isWCRoomAlias(name: string): boolean {
   return (WC_ROOM_ALIASES as readonly string[]).includes(name);
 }
