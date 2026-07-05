@@ -73,7 +73,6 @@ const defaultRfidState = {
   recentTagScans: new Map(),
   tagToStudentMap: new Map(),
   studentHistory: new Map(),
-  blockedTags: new Map(),
   optimisticScans: [],
 };
 
@@ -82,7 +81,6 @@ const defaultStoreState = {
     staffId: 1,
     staffName: 'Test User',
     deviceName: 'Test Device',
-    authenticatedAt: new Date(),
     pin: '1234',
   },
   selectedActivity: {

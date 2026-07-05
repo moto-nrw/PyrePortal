@@ -323,7 +323,6 @@ export const useRfidScanning = () => {
     startRfidScanning,
     stopRfidScanning,
     setScanResult,
-    isTagBlocked,
     showScanModal,
     // Note: hideScanModal removed - modal timeout now handled exclusively by page components
     // New optimistic actions
@@ -646,7 +645,7 @@ export const useRfidScanning = () => {
     ]
   );
 
-  // Create onScan callback for the adapter (checks blocked tags + processes scan)
+  // Create onScan callback for the adapter (dedups by scanId + processes scan)
   const onAdapterScan = useCallback(
     (event: NfcScanEvent) => {
       const { tagId, scanId } = event;
@@ -670,13 +669,9 @@ export const useRfidScanning = () => {
       processedScanIds.set(scanId, now);
 
       logger.info('RFID scan event received', { tagId, scanId });
-      if (isTagBlocked(tagId)) {
-        logger.debug('Tag blocked, skipping', { tagId, scanId });
-      } else {
-        void processScan(tagId);
-      }
+      void processScan(tagId);
     },
-    [isTagBlocked, processScan]
+    [processScan]
   );
 
   const waitForBackendServiceState = useCallback(
@@ -765,12 +760,7 @@ export const useRfidScanning = () => {
               platform: 'Development Mock',
             });
 
-            // Check if tag is blocked before processing
-            if (isTagBlocked(mockTagId)) {
-              logger.debug('Mock tag blocked, skipping', { tagId: mockTagId });
-            } else {
-              onAdapterScan({ tagId: mockTagId, scanId });
-            }
+            onAdapterScan({ tagId: mockTagId, scanId });
           },
           5000 + getSecureRandomInt(5000)
         ); // Random interval between 5-10 seconds
@@ -809,7 +799,7 @@ export const useRfidScanning = () => {
         'Das RFID-Lesegerät konnte nicht gestartet werden. Bitte Gerät prüfen.'
       );
     }
-  }, [startRfidScanning, isTagBlocked, showSystemError, waitForBackendServiceState, onAdapterScan]);
+  }, [startRfidScanning, showSystemError, waitForBackendServiceState, onAdapterScan]);
 
   const stopScanning = useCallback(async () => {
     const callTimestamp = Date.now();

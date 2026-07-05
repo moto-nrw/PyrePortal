@@ -364,7 +364,6 @@ interface AuthenticatedUser {
   staffId: number;
   staffName: string;
   deviceName: string;
-  authenticatedAt: Date;
   pin: string; // Store PIN for subsequent API calls
 }
 
@@ -409,7 +408,6 @@ export const RECENT_SCAN_CACHE_TTL_MS = 10_000;
 interface RfidState {
   isScanning: boolean;
   currentScan: RfidScanResult | null;
-  blockedTags: Map<string, number>; // tagId -> blockUntilTimestamp
   scanTimeout: number; // 3 seconds default
   modalDisplayTime: number; // 1.5 seconds default
   showModal: boolean;
@@ -443,7 +441,6 @@ interface UserState {
   currentActivity: Partial<Activity> | null;
   isLoading: boolean;
   error: string | null;
-  nfcScanActive: boolean;
   selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
   activeSupervisorTags: Set<string>; // Locally tracked supervisor tagIds for instant re-entry
 
@@ -482,15 +479,11 @@ interface UserState {
   // Supervisor selection actions
   setSelectedSupervisors: (supervisors: User[]) => void;
   toggleSupervisor: (user: User) => void;
-  clearSelectedSupervisors: () => void;
   addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
   addActiveSupervisorTag: (tagId: string) => void;
   isActiveSupervisor: (tagId: string) => boolean;
-  clearActiveSupervisorTags: () => void;
 
   // Check-in/check-out actions
-  startNfcScan: () => void;
-  stopNfcScan: () => void;
   checkInStudent: (
     activityId: number,
     student: Omit<Student, 'checkInTime' | 'isCheckedIn'>
@@ -502,9 +495,6 @@ interface UserState {
   startRfidScanning: () => void;
   stopRfidScanning: () => void;
   setScanResult: (result: RfidScanResult | null) => void;
-  blockTag: (tagId: string, duration: number) => void;
-  isTagBlocked: (tagId: string) => boolean;
-  clearBlockedTag: (tagId: string) => void;
   showScanModal: () => void;
   hideScanModal: () => void;
   startPickupQueryMode: () => void;
@@ -516,7 +506,6 @@ interface UserState {
   updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => void;
   removeOptimisticScan: (id: string) => void;
   updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
-  isValidScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
   addToProcessingQueue: (tagId: string) => void;
   removeFromProcessingQueue: (tagId: string) => void;
 
@@ -525,7 +514,6 @@ interface UserState {
   recordTagScan: (tagId: string, scan: RecentTagScan) => void;
   clearTagScan: (tagId: string) => void;
   mapTagToStudent: (tagId: string, studentId: string) => void;
-  getCachedStudentId: (tagId: string) => string | undefined;
   clearOldTagScans: () => void;
   isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
 
@@ -534,7 +522,6 @@ interface UserState {
   toggleUseLastSession: (enabled: boolean) => Promise<void>;
   saveLastSessionData: () => Promise<void>;
   validateAndRecreateSession: () => Promise<boolean>;
-  clearSessionSettings: () => Promise<void>;
 
   // Network status actions
   setNetworkStatus: (status: NetworkStatusData) => void;
@@ -609,7 +596,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   currentActivity: null,
   isLoading: false,
   error: null,
-  nfcScanActive: false,
   selectedSupervisors: [] as User[], // New state for multi-supervisor selection
   activeSupervisorTags: new Set<string>(),
 
@@ -617,7 +603,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   rfid: {
     isScanning: false,
     currentScan: null,
-    blockedTags: new Map<string, number>(),
     scanTimeout: 3000, // 3 seconds
     modalDisplayTime: 1500, // 1.5 seconds - fast turnover for kiosk queues
     showModal: false,
@@ -663,7 +648,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         staffName: userData.staffName,
         deviceName: userData.deviceName,
         pin: userData.pin,
-        authenticatedAt: new Date(),
       },
     });
   },
@@ -887,9 +871,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
   },
 
-  clearSelectedSupervisors: () =>
-    set({ selectedSupervisors: [], activeSupervisorTags: new Set<string>() }),
-
   addSupervisorFromRfid: (staffId: number, staffName: string) => {
     const { selectedSupervisors } = get();
     const isAlreadySelected = selectedSupervisors.some(s => s.id === staffId);
@@ -928,11 +909,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
 
   isActiveSupervisor: (tagId: string) => {
     return get().activeSupervisorTags.has(tagId);
-  },
-
-  clearActiveSupervisorTags: () => {
-    set({ activeSupervisorTags: new Set<string>() });
-    storeLogger.debug('Active supervisor tags cleared');
   },
 
   // Activity-related actions
@@ -1116,59 +1092,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     };
   })(),
 
-  // Check-in/check-out related actions with deep safeguards to prevent infinite loops
-  startNfcScan: (() => {
-    // Closure-based guard variable to prevent repeat state changes
-    let isStarting = false;
-
-    // Using IIFE to create a stable reference that doesn't change on re-renders
-    const fn = () => {
-      // Skip if already in the process of starting
-      if (isStarting) return;
-
-      isStarting = true;
-      try {
-        const { nfcScanActive } = get();
-        // Only set if not already active to prevent unnecessary updates
-        if (!nfcScanActive) {
-          set({ nfcScanActive: true });
-        }
-      } finally {
-        // Always reset the lock flag to prevent deadlocks
-        setTimeout(() => {
-          isStarting = false;
-        }, 0);
-      }
-    };
-    return fn;
-  })(),
-
-  stopNfcScan: (() => {
-    // Closure-based guard variable to prevent repeat state changes
-    let isStopping = false;
-
-    // Using IIFE to create a stable reference that doesn't change on re-renders
-    const fn = () => {
-      // Skip if already in the process of stopping
-      if (isStopping) return;
-
-      isStopping = true;
-      try {
-        const { nfcScanActive } = get();
-        // Only set if active to prevent unnecessary updates
-        if (nfcScanActive) {
-          set({ nfcScanActive: false });
-        }
-      } finally {
-        // Always reset the lock flag to prevent deadlocks
-        setTimeout(() => {
-          isStopping = false;
-        }, 0);
-      }
-    };
-    return fn;
-  })(),
-
   checkInStudent: async (
     activityId: number,
     student: Omit<Student, 'checkInTime' | 'isCheckedIn'>
@@ -1347,40 +1270,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }));
   },
 
-  blockTag: (tagId: string, duration: number) => {
-    const blockUntil = Date.now() + duration;
-    set(state => {
-      const newBlockedTags = new Map(state.rfid.blockedTags);
-      newBlockedTags.set(tagId, blockUntil);
-      return {
-        rfid: { ...state.rfid, blockedTags: newBlockedTags },
-      };
-    });
-  },
-
-  isTagBlocked: (tagId: string) => {
-    const { rfid } = get();
-    const blockUntil = rfid.blockedTags.get(tagId);
-    if (!blockUntil) return false;
-
-    const isBlocked = Date.now() < blockUntil;
-    if (!isBlocked) {
-      // Clean up expired block
-      get().clearBlockedTag(tagId);
-    }
-    return isBlocked;
-  },
-
-  clearBlockedTag: (tagId: string) => {
-    set(state => {
-      const newBlockedTags = new Map(state.rfid.blockedTags);
-      newBlockedTags.delete(tagId);
-      return {
-        rfid: { ...state.rfid, blockedTags: newBlockedTags },
-      };
-    });
-  },
-
   showScanModal: () => {
     set(state => ({
       rfid: { ...state.rfid, showModal: true },
@@ -1469,24 +1358,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     });
   },
 
-  isValidScan: (studentId: string, action: 'checkin' | 'checkout') => {
-    const { rfid } = get();
-    const history = rfid.studentHistory.get(studentId);
-
-    // Allow if no previous action
-    if (!history) return true;
-
-    // Allow same action (idempotent)
-    if (history.lastAction === action) return true;
-
-    // Block opposite action only if recent (10s) and still processing
-    if (history.isProcessing && Date.now() - history.timestamp < 10000) {
-      return false;
-    }
-
-    return true;
-  },
-
   addToProcessingQueue: (tagId: string) => {
     set(state => {
       const newQueue = new Set(state.rfid.processingQueue);
@@ -1573,11 +1444,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     });
   },
 
-  getCachedStudentId: (tagId: string) => {
-    const { rfid } = get();
-    return rfid.tagToStudentMap.get(tagId);
-  },
-
   clearOldTagScans: () => {
     set(state => {
       const now = Date.now();
@@ -1596,7 +1462,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     });
   },
 
-  // Rename isValidScan to isValidStudentScan for clarity
   isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => {
     const { rfid } = get();
     const history = rfid.studentHistory.get(studentId);
@@ -1778,22 +1643,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       });
 
       return false;
-    }
-  },
-
-  clearSessionSettings: async () => {
-    try {
-      await clearLastSession();
-      const { sessionSettings } = get();
-      set({
-        sessionSettings: sessionSettings
-          ? { ...sessionSettings, last_session: null, use_last_session: false }
-          : null,
-        activeSupervisorTags: new Set<string>(),
-      });
-      storeLogger.info('Session settings cleared');
-    } catch (error) {
-      storeLogger.error('Failed to clear session settings', { error });
     }
   },
 

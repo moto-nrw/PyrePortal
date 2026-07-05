@@ -92,7 +92,6 @@ function resetStore() {
     currentActivity: null,
     isLoading: false,
     error: null,
-    nfcScanActive: false,
     selectedSupervisors: [],
     activeSupervisorTags: new Set<string>(),
     sessionSettings: null,
@@ -106,7 +105,6 @@ function resetStore() {
     rfid: {
       isScanning: false,
       currentScan: null,
-      blockedTags: new Map(),
       showModal: false,
       scanTimeout: 3000,
       modalDisplayTime: 1500,
@@ -458,28 +456,6 @@ describe('useRfidScanning', () => {
 
       // Even without env var, default tags are used
       expect(mockedProcessRfidScan).toHaveBeenCalled();
-    });
-
-    it('skips blocked tags in mock mode', async () => {
-      setAuthenticated();
-      setRoom();
-      setSession();
-
-      // Block the first default tag (getSecureRandomInt returns 0)
-      useUserStore.getState().blockTag('04:D6:94:82:97:6A:80', 60000);
-
-      const { result } = renderHook(() => useRfidScanning());
-
-      await act(async () => {
-        await result.current.startScanning();
-      });
-
-      await act(async () => {
-        vi.advanceTimersByTime(5100);
-      });
-
-      // Should not call processRfidScan because tag is blocked
-      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
     });
   });
 
@@ -1511,7 +1487,7 @@ describe('useRfidScanning', () => {
       await triggerMockScanAndDrain();
 
       // The tag should be mapped to student
-      const cachedId = useUserStore.getState().getCachedStudentId(MOCK_TAG);
+      const cachedId = useUserStore.getState().rfid.tagToStudentMap.get(MOCK_TAG);
       expect(cachedId).toBe('42');
     });
 
@@ -1527,7 +1503,7 @@ describe('useRfidScanning', () => {
       await triggerMockScanAndDrain();
 
       // No mapping should exist
-      const cachedId = useUserStore.getState().getCachedStudentId(MOCK_TAG);
+      const cachedId = useUserStore.getState().rfid.tagToStudentMap.get(MOCK_TAG);
       expect(cachedId).toBeUndefined();
     });
 
@@ -1588,37 +1564,6 @@ describe('useRfidScanning', () => {
         expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
         '1234'
       );
-    });
-
-    it('skips blocked tags from adapter callback', async () => {
-      mockedIsRfidEnabled.mockReturnValue(true);
-      setAuthenticated();
-      setRoom();
-
-      let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
-      mockAdapterStartScanning.mockImplementation(async onScan => {
-        capturedOnScan = onScan;
-      });
-      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
-
-      const { result } = renderHook(() => useRfidScanning());
-
-      await act(async () => {
-        await result.current.startScanning();
-      });
-
-      // Block the tag
-      useUserStore.getState().blockTag('04:AA:BB:CC:DD:EE:FF', 60000);
-
-      await act(async () => {
-        capturedOnScan!({ tagId: '04:AA:BB:CC:DD:EE:FF', scanId: 202 });
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
-
-      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
     });
 
     it('ignores duplicate delivery of the same scanId', async () => {

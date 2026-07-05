@@ -59,7 +59,6 @@ function resetStore() {
     currentActivity: null,
     isLoading: false,
     error: null,
-    nfcScanActive: false,
     selectedSupervisors: [],
     activeSupervisorTags: new Set<string>(),
     sessionSettings: null,
@@ -73,7 +72,6 @@ function resetStore() {
     rfid: {
       isScanning: false,
       currentScan: null,
-      blockedTags: new Map(),
       showModal: false,
       scanTimeout: 3000,
       modalDisplayTime: 1500,
@@ -167,7 +165,6 @@ describe('Authentication', () => {
     expect(auth!.staffId).toBe(1);
     expect(auth!.staffName).toBe('Frau Schmidt');
     expect(auth!.pin).toBe('1234');
-    expect(auth!.authenticatedAt).toBeDefined();
   });
 });
 
@@ -646,12 +643,6 @@ describe('Supervisor selection', () => {
     expect(useUserStore.getState().selectedSupervisors).toHaveLength(2);
   });
 
-  it('clears supervisors', () => {
-    useUserStore.getState().setSelectedSupervisors([user1]);
-    useUserStore.getState().clearSelectedSupervisors();
-    expect(useUserStore.getState().selectedSupervisors).toHaveLength(0);
-  });
-
   it('addSupervisorFromRfid adds new supervisor', () => {
     useUserStore.setState({ users: [{ id: 10, name: 'Max Müller' }] });
     const alreadyPresent = useUserStore.getState().addSupervisorFromRfid(10, 'Max Müller');
@@ -669,9 +660,6 @@ describe('Supervisor selection', () => {
     useUserStore.getState().addActiveSupervisorTag('04:AA:BB:CC');
     expect(useUserStore.getState().isActiveSupervisor('04:AA:BB:CC')).toBe(true);
     expect(useUserStore.getState().isActiveSupervisor('04:XX:YY:ZZ')).toBe(false);
-
-    useUserStore.getState().clearActiveSupervisorTags();
-    expect(useUserStore.getState().isActiveSupervisor('04:AA:BB:CC')).toBe(false);
   });
 });
 
@@ -709,35 +697,6 @@ describe('RFID scanning state', () => {
     useUserStore.getState().hideScanModal();
     expect(useUserStore.getState().rfid.showModal).toBe(false);
     expect(useUserStore.getState().rfid.currentScan).toBeNull();
-  });
-});
-
-// ====================================================================
-// Tag blocking
-// ====================================================================
-
-describe('Tag blocking', () => {
-  it('blocks a tag for given duration', () => {
-    useUserStore.getState().blockTag('04:AA:BB', 5000);
-    expect(useUserStore.getState().isTagBlocked('04:AA:BB')).toBe(true);
-  });
-
-  it('returns false for unblocked tag', () => {
-    expect(useUserStore.getState().isTagBlocked('04:XX:YY')).toBe(false);
-  });
-
-  it('clears a blocked tag', () => {
-    useUserStore.getState().blockTag('04:AA:BB', 5000);
-    useUserStore.getState().clearBlockedTag('04:AA:BB');
-    expect(useUserStore.getState().isTagBlocked('04:AA:BB')).toBe(false);
-  });
-
-  it('auto-clears expired block on check', () => {
-    // Block with 0 duration (immediately expired)
-    useUserStore.getState().blockTag('04:AA:BB', -1);
-    expect(useUserStore.getState().isTagBlocked('04:AA:BB')).toBe(false);
-    // Should have been cleaned up
-    expect(useUserStore.getState().rfid.blockedTags.has('04:AA:BB')).toBe(false);
   });
 });
 
@@ -800,11 +759,11 @@ describe('canProcessTag (duplicate prevention)', () => {
 describe('Tag-to-student mapping', () => {
   it('maps and retrieves tag to student', () => {
     useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-123');
-    expect(useUserStore.getState().getCachedStudentId('04:AA:BB')).toBe('student-123');
+    expect(useUserStore.getState().rfid.tagToStudentMap.get('04:AA:BB')).toBe('student-123');
   });
 
   it('returns undefined for unmapped tag', () => {
-    expect(useUserStore.getState().getCachedStudentId('04:XX:YY')).toBeUndefined();
+    expect(useUserStore.getState().rfid.tagToStudentMap.get('04:XX:YY')).toBeUndefined();
   });
 
   it('clearTagScan removes scan, mapping, and student history', () => {
@@ -813,7 +772,7 @@ describe('Tag-to-student mapping', () => {
     useUserStore.getState().updateStudentHistory('student-123', 'checkin');
 
     useUserStore.getState().clearTagScan('04:AA:BB');
-    expect(useUserStore.getState().getCachedStudentId('04:AA:BB')).toBeUndefined();
+    expect(useUserStore.getState().rfid.tagToStudentMap.get('04:AA:BB')).toBeUndefined();
     expect(useUserStore.getState().rfid.recentTagScans.has('04:AA:BB')).toBe(false);
     expect(useUserStore.getState().rfid.studentHistory.has('student-123')).toBe(false);
   });
@@ -876,46 +835,6 @@ describe('Student scan validation (Layer 3)', () => {
       },
     }));
     expect(useUserStore.getState().isValidStudentScan('student-1', 'checkout')).toBe(true);
-  });
-});
-
-// ====================================================================
-// isValidScan (alias for isValidStudentScan)
-// ====================================================================
-
-describe('isValidScan', () => {
-  it('allows first scan', () => {
-    expect(useUserStore.getState().isValidScan('student-1', 'checkin')).toBe(true);
-  });
-
-  it('allows same action (idempotent)', () => {
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
-    expect(useUserStore.getState().isValidScan('student-1', 'checkin')).toBe(true);
-  });
-
-  it('blocks opposite action when processing and recent', () => {
-    useUserStore.setState(state => ({
-      rfid: {
-        ...state.rfid,
-        studentHistory: new Map([
-          [
-            'student-1',
-            {
-              studentId: 'student-1',
-              lastAction: 'checkin' as const,
-              timestamp: Date.now(),
-              isProcessing: true,
-            },
-          ],
-        ]),
-      },
-    }));
-    expect(useUserStore.getState().isValidScan('student-1', 'checkout')).toBe(false);
-  });
-
-  it('allows opposite action when not processing', () => {
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
-    expect(useUserStore.getState().isValidScan('student-1', 'checkout')).toBe(true);
   });
 });
 
@@ -996,24 +915,6 @@ describe('Network status', () => {
     });
     expect(useUserStore.getState().networkStatus.quality).toBe('offline');
   });
-});
-
-// ====================================================================
-// NFC scan control
-// ====================================================================
-
-describe('NFC scan', () => {
-  it('starts and stops NFC scan', () => {
-    useUserStore.getState().startNfcScan();
-    expect(useUserStore.getState().nfcScanActive).toBe(true);
-
-    useUserStore.getState().stopNfcScan();
-    expect(useUserStore.getState().nfcScanActive).toBe(false);
-  });
-
-  // Note: startNfcScan and stopNfcScan use closure-based guards with setTimeout(0)
-  // to prevent re-entrant calls. Testing the guard behavior requires waiting for
-  // the setTimeout to fire between calls, which is done in the start/stop test above.
 });
 
 // ====================================================================
@@ -1163,7 +1064,6 @@ describe('fetchActivities', () => {
         staffName: 'Test',
         deviceName: 'Pi-5',
         pin: '',
-        authenticatedAt: new Date(),
       },
     });
 
@@ -1773,54 +1673,6 @@ describe('validateAndRecreateSession', () => {
     const settings = useUserStore.getState().sessionSettings;
     expect(settings!.last_session).toBeNull();
     expect(settings!.use_last_session).toBe(false);
-  });
-});
-
-// ====================================================================
-// clearSessionSettings
-// ====================================================================
-
-describe('clearSessionSettings', () => {
-  it('clears session settings', async () => {
-    useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: {
-          activity_id: 1,
-          room_id: 1,
-          supervisor_ids: [1],
-          saved_at: 'now',
-          activity_name: 'a',
-          room_name: 'r',
-          supervisor_names: ['s'],
-        },
-      },
-    });
-    mockClearLastSession.mockResolvedValueOnce(undefined);
-
-    await useUserStore.getState().clearSessionSettings();
-
-    const settings = useUserStore.getState().sessionSettings;
-    expect(settings!.last_session).toBeNull();
-    expect(settings!.use_last_session).toBe(false);
-    expect(mockClearLastSession).toHaveBeenCalled();
-  });
-
-  it('handles null sessionSettings', async () => {
-    mockClearLastSession.mockResolvedValueOnce(undefined);
-
-    await useUserStore.getState().clearSessionSettings();
-
-    expect(useUserStore.getState().sessionSettings).toBeNull();
-  });
-
-  it('handles error gracefully', async () => {
-    mockClearLastSession.mockRejectedValueOnce(new Error('Clear failed'));
-
-    await useUserStore.getState().clearSessionSettings();
-
-    // Should not throw
   });
 });
 
