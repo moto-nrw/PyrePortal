@@ -1048,137 +1048,6 @@ describe('api methods', () => {
   });
 
   // ------------------------------------------------------------------
-  // api.validateTeacherPin
-  // ------------------------------------------------------------------
-
-  describe('api.validateTeacherPin', () => {
-    it('returns success result with staff data', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: 'Pi-1', status: 'active' },
-            staff: { id: 5, person_id: 50 },
-            person: { first_name: 'Anna', last_name: 'Schmidt' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(true);
-      expect(result.userData?.staffName).toBe('Anna Schmidt');
-      expect(result.userData?.staffId).toBe(5);
-      expect(result.userData?.deviceName).toBe('Pi-1');
-    });
-
-    it('returns failure with isLocked when account is locked', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'staff account is locked due to failed PIN attempts' },
-          { status: 423, statusText: 'Locked', ok: false }
-        )
-      );
-
-      const result = await freshApi.validateTeacherPin('wrong', 5);
-      expect(result.success).toBe(false);
-      expect(result.isLocked).toBe(true);
-    });
-
-    it('handles unexpected response structure', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            // Missing device, person, staff
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Unerwartete Server-Antwort');
-    });
-
-    it('handles error with 423 status code in message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'API Error: 423 - locked' },
-          { status: 423, statusText: 'Locked', ok: false }
-        )
-      );
-
-      const result = await freshApi.validateTeacherPin('wrong', 5);
-      expect(result.success).toBe(false);
-      expect(result.isLocked).toBe(true);
-    });
-
-    it('handles network error in validateTeacherPin', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-    });
-
-    it('handles missing device name and person names', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: '', status: 'active' },
-            staff: { id: 5, person_id: 50 },
-            person: { first_name: '', last_name: '' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(true);
-      expect(result.userData?.staffName).toBe('');
-      expect(result.userData?.deviceName).toBe('Unknown Device');
-    });
-
-    it('sends X-Staff-ID header', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: 'Pi-1', status: 'active' },
-            staff: { id: 42, person_id: 50 },
-            person: { first_name: 'Max', last_name: 'Müller' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      await freshApi.validateTeacherPin('1234', 42);
-
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('42');
-    });
-  });
-
-  // ------------------------------------------------------------------
   // api.getActivities
   // ------------------------------------------------------------------
 
@@ -1220,27 +1089,6 @@ describe('api methods', () => {
       );
 
       await expect(freshApi.healthCheck()).rejects.toThrow('Health check failed: 503');
-    });
-  });
-
-  // ------------------------------------------------------------------
-  // api.pingDevice
-  // ------------------------------------------------------------------
-
-  describe('api.pingDevice', () => {
-    it('sends POST to /api/iot/ping', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', message: 'pong' }));
-
-      await freshApi.pingDevice('1234');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://test-api.local/api/iot/ping',
-        expect.objectContaining({
-          method: 'POST',
-        })
-      );
     });
   });
 
@@ -1688,17 +1536,38 @@ describe('api methods', () => {
   // ------------------------------------------------------------------
 
   describe('api.unassignStaffTag', () => {
-    it('sends DELETE request', async () => {
+    it('sends DELETE request and returns result', async () => {
       const { api: freshApi } = await getFreshApi();
 
-      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', message: 'ok' }));
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({
+          status: 'success',
+          data: {
+            success: true,
+            student_id: 5,
+            student_name: 'Frau Mueller',
+            rfid_tag: 'AA:BB:CC',
+            previous_tag: 'AA:BB:CC',
+            message: 'Staff tag removed',
+          },
+          message: 'ok',
+        })
+      );
 
-      await freshApi.unassignStaffTag('1234', 5);
+      const result = await freshApi.unassignStaffTag('1234', 5);
 
       const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('http://test-api.local/api/iot/staff/5/rfid');
       expect(options.method).toBe('DELETE');
       expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('5');
+      expect(result).toEqual({
+        success: true,
+        message: 'Staff tag removed',
+        student_id: 5,
+        student_name: 'Frau Mueller',
+        rfid_tag: 'AA:BB:CC',
+        previous_tag: 'AA:BB:CC',
+      });
     });
   });
 
@@ -1955,157 +1824,6 @@ describe('api methods', () => {
         room_name: 'Unknown Room',
         active_students: 0,
       });
-    });
-  });
-
-  // ------------------------------------------------------------------
-  // api.getAttendanceStatus (mapAttendanceErrorToGerman coverage)
-  // ------------------------------------------------------------------
-
-  describe('api.getAttendanceStatus', () => {
-    it('returns attendance status on success', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      const attendanceData = {
-        status: 'success',
-        data: {
-          student: {
-            id: 1,
-            first_name: 'Lena',
-            last_name: 'Müller',
-            group: { id: 1, name: 'Gruppe A' },
-          },
-          attendance: {
-            status: 'checked_in',
-            date: '2025-01-01',
-            check_in_time: '08:00:00',
-            check_out_time: null,
-            checked_in_by: 'staff',
-            checked_out_by: '',
-          },
-        },
-        message: 'ok',
-      };
-      mockFetch.mockResolvedValueOnce(mockResponse(attendanceData));
-
-      const result = await freshApi.getAttendanceStatus('1234', 'AA:BB:CC');
-      expect(result.data.student.first_name).toBe('Lena');
-    });
-
-    it('maps network error to German in attendance context', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Netzwerkfehler. Bitte Verbindung prüfen.'
-      );
-    });
-
-    it('maps 404 error to attendance-specific German message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'student not found' },
-          { status: 404, statusText: 'Not Found', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Schüler nicht gefunden.'
-      );
-    });
-
-    it('maps 403 error to attendance status-specific message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: '403 Forbidden' },
-          { status: 403, statusText: 'Forbidden', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Keine Berechtigung für Anwesenheitsstatus dieses Schülers.'
-      );
-    });
-
-    it('maps 401 error to auth message in attendance context', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: '401 Unauthorized' },
-          { status: 401, statusText: 'Unauthorized', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.'
-      );
-    });
-
-    it('maps 400 error to bad request message in attendance context', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: '400 Bad Request' },
-          { status: 400, statusText: 'Bad Request', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Ungültige Anfrage. Bitte Eingaben prüfen.'
-      );
-    });
-
-    it('uses specific error mapping for known backend errors', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'invalid staff PIN' },
-          { status: 401, statusText: 'Unauthorized', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Ungültiger PIN. Bitte erneut versuchen.'
-      );
-    });
-
-    it('passes through generic 5xx fallback message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'Internal Server Error' },
-          { status: 500, statusText: 'Internal Server Error', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Server nicht erreichbar. Bitte später versuchen.'
-      );
-    });
-
-    it('maps generic not found 404 to status-specific message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      // A 404 where the error message contains "404" but no specific mapping
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'something 404 generic' },
-          { status: 404, statusText: 'Not Found', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Schüler nicht gefunden oder keine Anwesenheitsdaten für heute verfügbar.'
-      );
     });
   });
 

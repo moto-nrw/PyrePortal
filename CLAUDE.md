@@ -124,14 +124,13 @@ headers: {
 
 ### Key Endpoints
 
-| Endpoint                         | Purpose                | Auth                    |
-| -------------------------------- | ---------------------- | ----------------------- |
-| `GET /api/iot/teachers`          | Fetch staff list       | Device only             |
-| `POST /api/iot/ping`             | Validate global PIN    | Device + PIN            |
-| `GET /api/iot/status`            | Validate teacher PIN   | Device + PIN + Staff ID |
-| `POST /api/iot/checkin`          | Process RFID scan      | Device + PIN            |
-| `POST /api/iot/session/start`    | Start activity session | Device + PIN            |
-| `POST /api/iot/session/activity` | Prevent timeout        | Device + PIN            |
+| Endpoint                         | Purpose                | Auth         |
+| -------------------------------- | ---------------------- | ------------ |
+| `GET /api/iot/teachers`          | Fetch staff list       | Device only  |
+| `POST /api/iot/ping`             | Validate global PIN    | Device + PIN |
+| `POST /api/iot/checkin`          | Process RFID scan      | Device + PIN |
+| `POST /api/iot/session/start`    | Start activity session | Device + PIN |
+| `POST /api/iot/session/activity` | Prevent timeout        | Device + PIN |
 
 ## Releasing
 
