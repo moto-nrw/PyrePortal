@@ -1,6 +1,5 @@
-import { useState } from 'react';
-
 import { adapter } from '@platform';
+import { useState } from 'react';
 
 import { createLogger, serializeError } from '../../utils/logger';
 import { isRfidEnabled } from '../../utils/tauriContext';
