@@ -74,7 +74,6 @@ function resetStore() {
       scanMode: 'checkin' as const,
       scanContextId: 0,
       pickupQueryTagId: null,
-      optimisticScans: [],
       studentHistory: new Map(),
       processingQueue: new Set(),
       recentTagScans: new Map(),
@@ -824,40 +823,6 @@ describe('Student scan validation (Layer 3)', () => {
 });
 
 // ====================================================================
-// Optimistic scans
-// ====================================================================
-
-describe('Optimistic scans', () => {
-  it('adds and removes optimistic scan', () => {
-    useUserStore.getState().addOptimisticScan({
-      id: 'scan-1',
-      tagId: '04:AA:BB',
-      status: 'pending',
-      optimisticAction: 'checkin',
-      optimisticStudentCount: 5,
-      timestamp: Date.now(),
-    });
-    expect(useUserStore.getState().rfid.optimisticScans).toHaveLength(1);
-
-    useUserStore.getState().removeOptimisticScan('scan-1');
-    expect(useUserStore.getState().rfid.optimisticScans).toHaveLength(0);
-  });
-
-  it('updates optimistic scan status', () => {
-    useUserStore.getState().addOptimisticScan({
-      id: 'scan-1',
-      tagId: '04:AA:BB',
-      status: 'pending',
-      optimisticAction: 'checkin',
-      optimisticStudentCount: 5,
-      timestamp: Date.now(),
-    });
-    useUserStore.getState().updateOptimisticScan('scan-1', 'success');
-    expect(useUserStore.getState().rfid.optimisticScans[0].status).toBe('success');
-  });
-});
-
-// ====================================================================
 // Processing queue
 // ====================================================================
 
@@ -1422,7 +1387,6 @@ describe('clearSessionState', () => {
     expect(rfid.processingQueue.size).toBe(0);
     expect(rfid.recentTagScans.size).toBe(0);
     expect(rfid.studentHistory.size).toBe(0);
-    expect(rfid.optimisticScans).toHaveLength(0);
   });
 
   it('clears activeSupervisorTags', () => {

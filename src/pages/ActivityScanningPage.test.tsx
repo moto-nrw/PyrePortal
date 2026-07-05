@@ -73,7 +73,6 @@ const defaultRfidState = {
   recentTagScans: new Map(),
   tagToStudentMap: new Map(),
   studentHistory: new Map(),
-  optimisticScans: [],
 };
 
 const defaultStoreState = {

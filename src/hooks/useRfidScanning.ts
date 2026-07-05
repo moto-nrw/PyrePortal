@@ -53,35 +53,12 @@ const createSessionExpiredResult = (): RfidScanResult & { navigateOnClose: strin
 });
 
 /**
- * Creates the initial optimistic scan object for UI feedback.
- */
-const createOptimisticScan = (scanId: string, tagId: string) => ({
-  id: scanId,
-  tagId,
-  status: 'pending' as const,
-  optimisticAction: 'checkin' as const,
-  optimisticStudentCount: 0,
-  timestamp: Date.now(),
-  studentInfo: {
-    name: 'Processing...',
-    id: 0,
-  },
-});
-
-/**
- * Generates a unique scan ID for tracking optimistic updates.
- * Uses crypto.randomUUID() for cryptographically secure random values.
- */
-const generateScanId = (): string => `scan_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-
-/**
  * Handles supervisor authentication from RFID scan.
  * Returns true if supervisor was handled (caller should return early).
  */
 interface SupervisorHandlerParams {
   result: RfidScanResult;
   tagId: string;
-  scanId: string;
   currentSession: CurrentSession | null;
   pin: string;
   scannedSupervisorsRef: { current: Set<number> };
@@ -89,9 +66,8 @@ interface SupervisorHandlerParams {
   addActiveSupervisorTag: (tagId: string) => void;
   isActiveSupervisor: (tagId: string) => boolean;
   setScanResult: (result: RfidScanResult) => void;
-  removeOptimisticScan: (scanId: string) => void;
   showScanModal: () => void;
-  showSupervisorRedirect: (scanId?: string) => void;
+  showSupervisorRedirect: () => void;
 }
 
 const handleSupervisorAuthentication = async (
@@ -100,7 +76,6 @@ const handleSupervisorAuthentication = async (
   const {
     result,
     tagId,
-    scanId,
     currentSession,
     pin,
     scannedSupervisorsRef,
@@ -108,7 +83,6 @@ const handleSupervisorAuthentication = async (
     addActiveSupervisorTag,
     isActiveSupervisor,
     setScanResult,
-    removeOptimisticScan,
     showScanModal,
     showSupervisorRedirect,
   } = params;
@@ -147,7 +121,7 @@ const handleSupervisorAuthentication = async (
 
   // Show redirect for repeat supervisors
   if (isRepeatSupervisor) {
-    showSupervisorRedirect(scanId);
+    showSupervisorRedirect();
     return true;
   }
 
@@ -158,7 +132,6 @@ const handleSupervisorAuthentication = async (
     message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
   };
   setScanResult(firstScanResult);
-  removeOptimisticScan(scanId);
   showScanModal();
   return true;
 };
@@ -325,10 +298,6 @@ export const useRfidScanning = () => {
     setScanResult,
     showScanModal,
     // Note: hideScanModal removed - modal timeout now handled exclusively by page components
-    // New optimistic actions
-    addOptimisticScan,
-    updateOptimisticScan,
-    removeOptimisticScan,
     updateStudentHistory,
     addToProcessingQueue,
     removeFromProcessingQueue,
@@ -349,26 +318,20 @@ export const useRfidScanning = () => {
   const scannedSupervisorsRef = useRef<Set<number>>(new Set());
   const processedScanIdsRef = useRef<Map<number, number>>(new Map());
 
-  const showSupervisorRedirect = useCallback(
-    (scanId?: string) => {
-      const redirectResult: RfidScanResult = {
-        student_name: 'Betreuer erkannt',
-        student_id: null,
-        action: 'supervisor_authenticated',
-        message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
-        isInfo: true,
-        // Flag to indicate navigation should happen on modal close
-        navigateOnClose: '/home',
-      } as RfidScanResult & { navigateOnClose: string };
-      setScanResult(redirectResult);
-      if (scanId) {
-        removeOptimisticScan(scanId);
-      }
-      showScanModal();
-      // Modal timeout and navigation handled by ActivityScanningPage via useModalTimeout
-    },
-    [removeOptimisticScan, setScanResult, showScanModal]
-  );
+  const showSupervisorRedirect = useCallback(() => {
+    const redirectResult: RfidScanResult = {
+      student_name: 'Betreuer erkannt',
+      student_id: null,
+      action: 'supervisor_authenticated',
+      message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
+      isInfo: true,
+      // Flag to indicate navigation should happen on modal close
+      navigateOnClose: '/home',
+    } as RfidScanResult & { navigateOnClose: string };
+    setScanResult(redirectResult);
+    showScanModal();
+    // Modal timeout and navigation handled by ActivityScanningPage via useModalTimeout
+  }, [setScanResult, showScanModal]);
 
   // Helper to show system error modal
   // Note: Modal timeout handled by page component via useModalTimeout hook
@@ -518,7 +481,6 @@ export const useRfidScanning = () => {
       }
 
       let isInProcessingQueue = false;
-      const scanId = generateScanId();
       const startTime = Date.now();
 
       try {
@@ -527,10 +489,7 @@ export const useRfidScanning = () => {
         isInProcessingQueue = true;
         recordTagScan(tagId, { timestamp: Date.now() });
 
-        // Track optimistic scan state (no modal yet - wait for API response)
-        addOptimisticScan(createOptimisticScan(scanId, tagId));
         logger.info('Starting network scan (cache disabled)');
-        updateOptimisticScan(scanId, 'processing');
 
         // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
@@ -544,7 +503,6 @@ export const useRfidScanning = () => {
           responseTime: Date.now() - startTime,
         });
 
-        updateOptimisticScan(scanId, 'success');
         // Include scannedTagId so ActivityScanningPage can use it directly
         // instead of looking it up from recentTagScans (fixes race condition)
         setScanResult({ ...result, scannedTagId: tagId });
@@ -553,7 +511,6 @@ export const useRfidScanning = () => {
         const supervisorHandled = await handleSupervisorAuthentication({
           result,
           tagId,
-          scanId,
           currentSession: freshSession,
           pin: freshUser.pin,
           scannedSupervisorsRef,
@@ -561,7 +518,6 @@ export const useRfidScanning = () => {
           addActiveSupervisorTag,
           isActiveSupervisor,
           setScanResult,
-          removeOptimisticScan,
           showScanModal,
           showSupervisorRedirect,
         });
@@ -579,7 +535,7 @@ export const useRfidScanning = () => {
           recordTagScan,
         });
 
-        // Show result modal now that we have real data (not optimistic)
+        // Show result modal now that we have real data from the server
         showScanModal();
 
         // Update session activity (fire-and-forget)
@@ -589,14 +545,10 @@ export const useRfidScanning = () => {
         } catch (activityError) {
           logger.warn('Failed to update session activity', { error: activityError });
         }
-
-        removeOptimisticScan(scanId);
       } catch (error) {
         logger.error('Failed to process RFID scan', { error: serializeError(error) });
-        updateOptimisticScan(scanId, 'failed');
         const errorResult = createScanErrorResult(error);
         setScanResult(errorResult);
-        removeOptimisticScan(scanId);
         showScanModal();
 
         // For STUDENT_ALREADY_ACTIVE the backend tells us exactly which
@@ -628,9 +580,6 @@ export const useRfidScanning = () => {
     [
       setScanResult,
       showScanModal,
-      addOptimisticScan,
-      updateOptimisticScan,
-      removeOptimisticScan,
       updateStudentHistory,
       addToProcessingQueue,
       removeFromProcessingQueue,

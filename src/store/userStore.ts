@@ -220,20 +220,6 @@ interface AuthenticatedUser {
   pin: string; // Store PIN for subsequent API calls
 }
 
-// Optimistic scan state for immediate UI feedback
-interface OptimisticScanState {
-  id: string;
-  tagId: string;
-  status: 'pending' | 'processing' | 'success' | 'failed';
-  optimisticAction: 'checkin' | 'checkout';
-  optimisticStudentCount: number;
-  timestamp: number;
-  studentInfo?: {
-    name: string;
-    id: number;
-  };
-}
-
 // Student action history for smart duplicate prevention
 interface StudentActionHistory {
   studentId: string;
@@ -268,8 +254,7 @@ interface RfidState {
   scanContextId: number;
   pickupQueryTagId: string | null;
 
-  // New optimistic state management
-  optimisticScans: OptimisticScanState[];
+  // Duplicate prevention state
   studentHistory: Map<string, StudentActionHistory>;
   processingQueue: Set<string>; // Currently processing tag IDs
 
@@ -337,10 +322,7 @@ interface UserState {
   lockPickupQueryTag: (tagId: string) => void;
   resetScanMode: () => void;
 
-  // New optimistic RFID actions
-  addOptimisticScan: (scan: OptimisticScanState) => void;
-  updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => void;
-  removeOptimisticScan: (id: string) => void;
+  // Duplicate prevention bookkeeping actions
   updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
   addToProcessingQueue: (tagId: string) => void;
   removeFromProcessingQueue: (tagId: string) => void;
@@ -395,7 +377,6 @@ const RFID_SESSION_INITIAL_STATE = {
   recentTagScans: new Map<string, RecentTagScan>(),
   studentHistory: new Map<string, StudentActionHistory>(),
   processingQueue: new Set<string>(),
-  optimisticScans: [] as OptimisticScanState[],
   scanMode: 'checkin' as RfidScanMode,
   scanContextId: 0,
   pickupQueryTagId: null as string | null,
@@ -427,8 +408,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     scanContextId: 0,
     pickupQueryTagId: null,
 
-    // New optimistic state
-    optimisticScans: [],
+    // Duplicate prevention state
     studentHistory: new Map<string, StudentActionHistory>(),
     processingQueue: new Set<string>(),
 
@@ -848,36 +828,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }));
   },
 
-  // New optimistic RFID actions
-  addOptimisticScan: (scan: OptimisticScanState) => {
-    set(state => ({
-      rfid: {
-        ...state.rfid,
-        optimisticScans: [...state.rfid.optimisticScans, scan],
-      },
-    }));
-  },
-
-  updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => {
-    set(state => ({
-      rfid: {
-        ...state.rfid,
-        optimisticScans: state.rfid.optimisticScans.map(scan =>
-          scan.id === id ? { ...scan, status } : scan
-        ),
-      },
-    }));
-  },
-
-  removeOptimisticScan: (id: string) => {
-    set(state => ({
-      rfid: {
-        ...state.rfid,
-        optimisticScans: state.rfid.optimisticScans.filter(scan => scan.id !== id),
-      },
-    }));
-  },
-
+  // Duplicate prevention bookkeeping actions
   updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => {
     set(state => {
       const newHistory = new Map(state.rfid.studentHistory);
