@@ -1,8 +1,8 @@
 /**
  * Zustand store logging middleware for PyrePortal
  *
- * This middleware provides detailed logging for Zustand store state changes,
- * with special attention to activity name tracking and state transitions.
+ * This middleware provides detailed logging for Zustand store state changes
+ * and state transitions.
  */
 import type { StoreApi } from 'zustand';
 
@@ -10,99 +10,6 @@ import { createLogger, LogLevel } from './logger';
 
 // Counter for unique action IDs
 let actionCounter = 0;
-
-/**
- * Fields of interest when tracking activity changes
- */
-const ACTIVITY_TRACKED_FIELDS = ['id', 'name', 'category', 'roomId', 'supervisorId'] as const;
-
-/**
- * Compare two activity objects and return the diff of tracked fields
- */
-const getActivityDiff = (
-  prevActivity: Record<string, unknown>,
-  nextActivity: Record<string, unknown>
-): Record<string, unknown> | null => {
-  const activityDiff: Record<string, unknown> = {};
-
-  for (const field of ACTIVITY_TRACKED_FIELDS) {
-    if (prevActivity[field] !== nextActivity[field]) {
-      activityDiff[field] = {
-        prev: prevActivity[field],
-        next: nextActivity[field],
-      };
-    }
-  }
-
-  return Object.keys(activityDiff).length > 0 ? activityDiff : null;
-};
-
-/**
- * Extract safe info from a newly added activity
- */
-const extractAddedActivityInfo = (activity: unknown): { id: unknown; name: unknown } | null => {
-  if (!activity || typeof activity !== 'object') {
-    return null;
-  }
-  const activityRecord = activity as Record<string, unknown>;
-  return {
-    id: 'id' in activityRecord ? activityRecord.id : undefined,
-    name: 'name' in activityRecord ? activityRecord.name : undefined,
-  };
-};
-
-/**
- * Handle diff for currentActivity state changes
- */
-const handleCurrentActivityDiff = (
-  prevValue: unknown,
-  nextValue: unknown
-): Record<string, unknown> | null => {
-  const prevActivity = (prevValue ?? {}) as Record<string, unknown>;
-  const nextActivity = (nextValue ?? {}) as Record<string, unknown>;
-
-  if (prevActivity === nextActivity) {
-    return null;
-  }
-
-  return getActivityDiff(prevActivity, nextActivity);
-};
-
-/**
- * Handle diff for activities array state changes
- */
-const handleActivitiesArrayDiff = (
-  prevValue: unknown,
-  nextValue: unknown
-): Record<string, unknown> | null => {
-  const prevActivities = prevValue ?? [];
-  const nextActivities = nextValue ?? [];
-
-  if (!Array.isArray(prevActivities) || !Array.isArray(nextActivities)) {
-    return null;
-  }
-
-  if (prevActivities.length === nextActivities.length) {
-    return null;
-  }
-
-  const result: Record<string, unknown> = {
-    count: {
-      prev: prevActivities.length,
-      next: nextActivities.length,
-    },
-  };
-
-  // If activities were added, show the new one
-  if (nextActivities.length > prevActivities.length) {
-    const addedInfo = extractAddedActivityInfo(nextActivities[nextActivities.length - 1]);
-    if (addedInfo) {
-      result.added = addedInfo;
-    }
-  }
-
-  return result;
-};
 
 /**
  * Handle diff for regular array state changes
@@ -134,17 +41,6 @@ const shouldSkipValue = (prevValue: unknown, nextValue: unknown): boolean => {
 };
 
 /**
- * Handler map for special state keys
- */
-const SPECIAL_KEY_HANDLERS: Record<
-  string,
-  (prev: unknown, next: unknown) => Record<string, unknown> | null
-> = {
-  currentActivity: handleCurrentActivityDiff,
-  activities: handleActivitiesArrayDiff,
-};
-
-/**
  * Process a single key and return its diff entry, or null if no change
  */
 const processKeyDiff = <T extends Record<string, unknown>>(
@@ -167,12 +63,6 @@ const processKeyDiff = <T extends Record<string, unknown>>(
   // Handle removed keys
   if (!(key in nextState)) {
     return { removed: true, value: prevValue };
-  }
-
-  // Handle special keys with dedicated handlers
-  const specialHandler = SPECIAL_KEY_HANDLERS[key];
-  if (specialHandler) {
-    return specialHandler(prevValue, nextValue);
   }
 
   // Handle regular arrays
@@ -315,9 +205,6 @@ interface LoggerMiddlewareOptions {
   // Log level to use for regular state changes
   logLevel?: LogLevel;
 
-  // Special logging for activity name changes
-  activityTracking?: boolean;
-
   // Log all state changes
   stateChanges?: boolean;
 
@@ -344,7 +231,6 @@ const defaultOptions: LoggerMiddlewareOptions = {
   name: 'store',
   enabled: true,
   logLevel: LogLevel.DEBUG,
-  activityTracking: true,
   stateChanges: true,
   actionSource: true,
   includedActions: [],
@@ -371,7 +257,6 @@ export const loggerMiddleware =
       name,
       enabled,
       logLevel,
-      activityTracking,
       stateChanges,
       actionSource,
       includedActions,
@@ -388,66 +273,17 @@ export const loggerMiddleware =
     // Create a dedicated logger for this store
     const storeLogger = createLogger(name ?? 'store');
 
-    // Pre-compute whether each log level would actually be emitted.
+    // Pre-compute whether the log level would actually be emitted.
     // This avoids expensive diff/stack-trace work when the logger would discard the message.
     const stateChangeLevel = logLevel ?? LogLevel.DEBUG;
     const wouldLogStateChanges = stateChanges && storeLogger.wouldLog(stateChangeLevel);
-    const wouldLogActivity = activityTracking && storeLogger.wouldLog(LogLevel.WARN);
 
     // Enhance the state setter function
     return config(
       args => {
-        // Fast path: if nothing would be logged at any level, just apply the update
-        if (!wouldLogStateChanges && !wouldLogActivity) {
+        // Fast path: if nothing would be logged, just apply the update
+        if (!wouldLogStateChanges) {
           set(args);
-          return;
-        }
-
-        // Activity-only fast path: when only activity tracking is active (typical production),
-        // do a cheap reference check on currentActivity instead of full diff + stack trace.
-        // Falls through to the full path if stateFilter is set (needs full prev/next state).
-        if (!wouldLogStateChanges && wouldLogActivity && !stateFilter) {
-          // Respect action filtering (same contract as full path)
-          const actionName = getActionName(args);
-          const shouldLog =
-            (includedActions?.length === 0 || includedActions?.includes(actionName)) &&
-            !excludedActions?.includes(actionName) &&
-            (!actionFilter || actionFilter(actionName));
-
-          if (!shouldLog) {
-            set(args);
-            return;
-          }
-
-          const prevActivity = (get() as Record<string, unknown>).currentActivity;
-          set(args);
-          const nextActivity = (get() as Record<string, unknown>).currentActivity;
-
-          // No activity change — nothing to log
-          if (prevActivity === nextActivity) {
-            return;
-          }
-
-          // Activity reference changed — check if name specifically changed
-          const prevName = prevActivity
-            ? (prevActivity as Record<string, unknown>).name
-            : undefined;
-          const nextName = nextActivity
-            ? (nextActivity as Record<string, unknown>).name
-            : undefined;
-
-          if (prevName === nextName) {
-            return;
-          }
-
-          const actionId = ++actionCounter;
-          storeLogger.warn('Activity name changed', {
-            actionId,
-            actionName,
-            prev: prevName,
-            next: nextName,
-            timestamp: new Date().toISOString(),
-          });
           return;
         }
 
@@ -504,54 +340,29 @@ export const loggerMiddleware =
         }
 
         // Standard state change logging
-        if (wouldLogStateChanges) {
-          const logPayload = {
-            actionId,
-            actionName,
-            changes,
-            timestamp: timestamp.toISOString(),
-            ...(callerInfo ? { source: callerInfo } : {}),
-          };
-          const logMessage = 'State updated';
+        const logPayload = {
+          actionId,
+          actionName,
+          changes,
+          timestamp: timestamp.toISOString(),
+          ...(callerInfo ? { source: callerInfo } : {}),
+        };
+        const logMessage = 'State updated';
 
-          // Use the appropriate public logging method based on level
-          switch (stateChangeLevel) {
-            case LogLevel.INFO:
-              storeLogger.info(logMessage, logPayload);
-              break;
-            case LogLevel.WARN:
-              storeLogger.warn(logMessage, logPayload);
-              break;
-            case LogLevel.ERROR:
-              storeLogger.error(logMessage, logPayload);
-              break;
-            case LogLevel.DEBUG:
-            default:
-              storeLogger.debug(logMessage, logPayload);
-          }
-        }
-
-        // Special handling for activity name changes
-        if (
-          wouldLogActivity &&
-          changes.currentActivity &&
-          typeof changes.currentActivity === 'object' &&
-          changes.currentActivity !== null &&
-          'name' in changes.currentActivity
-        ) {
-          const activityChanges = changes.currentActivity as Record<string, unknown>;
-          const nameChanges = activityChanges.name as { prev: unknown; next: unknown } | undefined;
-
-          if (nameChanges) {
-            storeLogger.warn('Activity name changed', {
-              actionId,
-              actionName,
-              prev: nameChanges.prev,
-              next: nameChanges.next,
-              source: callerInfo,
-              timestamp: timestamp.toISOString(),
-            });
-          }
+        // Use the appropriate public logging method based on level
+        switch (stateChangeLevel) {
+          case LogLevel.INFO:
+            storeLogger.info(logMessage, logPayload);
+            break;
+          case LogLevel.WARN:
+            storeLogger.warn(logMessage, logPayload);
+            break;
+          case LogLevel.ERROR:
+            storeLogger.error(logMessage, logPayload);
+            break;
+          case LogLevel.DEBUG:
+          default:
+            storeLogger.debug(logMessage, logPayload);
         }
       },
       get,

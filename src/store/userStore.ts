@@ -18,7 +18,6 @@ import {
   loadSessionSettings,
   clearLastSession,
 } from '../services/sessionStorage';
-import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -55,120 +54,6 @@ const mapSessionValidationError = (error: unknown): string => {
     default:
       return mapServerErrorToGerman(rawMessage);
   }
-};
-
-/**
- * Error types for activity check-in/check-out operations
- */
-type ActivityErrorType =
-  | 'activity_not_found'
-  | 'student_already_checked_in'
-  | 'no_students_checked_in'
-  | 'student_not_checked_in'
-  | 'checkin_failed'
-  | 'checkout_failed';
-
-interface ActivityErrorContext {
-  activityName?: string;
-  studentName?: string;
-  activityId?: number;
-  studentId?: number;
-}
-
-/**
- * Builds network error message for check-in/check-out failures
- */
-const buildNetworkErrorMessage = (
-  errorType: 'checkin_failed' | 'checkout_failed',
-  studentName?: string
-): string => {
-  const action = errorType === 'checkin_failed' ? 'Einchecken' : 'Auschecken';
-  const name = studentName ? ` von ${studentName}` : '';
-  return `Netzwerkfehler beim ${action}${name}. Bitte Verbindung prüfen und erneut scannen.`;
-};
-
-/**
- * Error message handlers for each activity error type (reduces switch complexity)
- */
-const activityErrorMessages: Record<ActivityErrorType, (context: ActivityErrorContext) => string> =
-  {
-    activity_not_found: ({ activityName, activityId }) =>
-      activityName
-        ? `Aktivität '${activityName}' nicht gefunden. Bitte Seite neu laden.`
-        : `Aktivität (ID: ${activityId}) nicht gefunden. Bitte Seite neu laden.`,
-
-    student_already_checked_in: ({ studentName, activityName }) =>
-      studentName && activityName
-        ? `${studentName} ist bereits in '${activityName}' eingecheckt.`
-        : 'Schüler/in ist bereits eingecheckt.',
-
-    no_students_checked_in: ({ activityName }) =>
-      activityName
-        ? `In '${activityName}' sind keine Schüler/innen eingecheckt.`
-        : 'Keine Schüler/innen eingecheckt.',
-
-    student_not_checked_in: ({ studentName, activityName }) => {
-      if (studentName && activityName) {
-        return `${studentName} ist in '${activityName}' nicht eingecheckt.`;
-      }
-      return activityName
-        ? `Schüler/in ist in '${activityName}' nicht eingecheckt.`
-        : 'Schüler/in ist nicht eingecheckt.';
-    },
-
-    checkin_failed: ({ studentName }) =>
-      studentName ? `Fehler beim Einchecken von ${studentName}.` : 'Fehler beim Einchecken.',
-
-    checkout_failed: ({ studentName }) =>
-      studentName ? `Fehler beim Auschecken von ${studentName}.` : 'Fehler beim Auschecken.',
-  };
-
-/**
- * Handles network-related errors for check-in/check-out operations.
- * Returns error message if network error, null otherwise.
- */
-const handleCheckinCheckoutNetworkError = (
-  errorType: ActivityErrorType,
-  context: ActivityErrorContext,
-  originalError?: unknown
-): string | null => {
-  if (errorType !== 'checkin_failed' && errorType !== 'checkout_failed') {
-    return null;
-  }
-
-  if (isNetworkRelatedError(originalError)) {
-    return buildNetworkErrorMessage(errorType, context.studentName);
-  }
-
-  const rawMessage = originalError instanceof Error ? originalError.message : '';
-  if (rawMessage) {
-    return mapServerErrorToGerman(rawMessage);
-  }
-
-  return null;
-};
-
-/**
- * Maps activity-related errors to user-friendly German messages with context
- */
-const mapActivityError = (
-  errorType: ActivityErrorType,
-  context: ActivityErrorContext = {},
-  originalError?: unknown
-): string => {
-  // Handle network errors for checkin/checkout first
-  const networkError = handleCheckinCheckoutNetworkError(errorType, context, originalError);
-  if (networkError) {
-    return networkError;
-  }
-
-  // Use message handler lookup instead of switch
-  const messageHandler = activityErrorMessages[errorType];
-  if (messageHandler) {
-    return messageHandler(context);
-  }
-
-  return 'Ein unbekannter Fehler ist aufgetreten.';
 };
 
 /**
@@ -311,38 +196,6 @@ const resolveSupervisorsForSession = async (
   return supervisors;
 };
 
-// Define the ActivityCategory enum
-enum ActivityCategory {
-  SPORT = 'Sport',
-  SCIENCE = 'Wissenschaft',
-  ART = 'Kunst',
-  MUSIC = 'Musik',
-  LITERATURE = 'Literatur',
-  GAMES = 'Spiele',
-  OTHER = 'Sonstiges',
-}
-
-// Define the Activity interface
-interface Activity {
-  id: number;
-  name: string;
-  category: ActivityCategory;
-  roomId: number;
-  supervisorId: number;
-  maxParticipants?: number;
-  createdBy: string;
-  createdAt: Date;
-  checkedInStudents?: Student[];
-}
-
-interface Student {
-  id: number;
-  name: string;
-  checkInTime?: Date;
-  checkOutTime?: Date;
-  isCheckedIn: boolean;
-}
-
 // Room interface imported from API service
 
 // Define the User interface
@@ -429,16 +282,12 @@ interface RfidState {
 interface UserState {
   // State
   users: User[];
-  selectedUser: string;
-  selectedUserId: number | null;
   authenticatedUser: AuthenticatedUser | null;
   rooms: Room[];
   selectedRoom: Room | null;
   _roomSelectedAt: number | null; // Timestamp of last manual room selection (race condition guard)
   selectedActivity: ActivityResponse | null;
   currentSession: CurrentSession | null;
-  activities: Activity[];
-  currentActivity: Partial<Activity> | null;
   isLoading: boolean;
   error: string | null;
   selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
@@ -455,7 +304,6 @@ interface UserState {
   networkStatus: NetworkStatusData;
 
   // Actions
-  setSelectedUser: (userName: string, userId: number | null) => void;
   setAuthenticatedUser: (userData: {
     staffId: number;
     staffName: string;
@@ -470,11 +318,7 @@ interface UserState {
   logout: () => Promise<void>;
 
   // Activity-related actions
-  initializeActivity: (roomId: number) => void;
-  updateActivityField: <K extends keyof Activity>(field: K, value: Activity[K]) => void;
-  createActivity: () => Promise<boolean>;
   fetchActivities: () => Promise<ActivityResponse[] | null>;
-  cancelActivityCreation: () => void;
 
   // Supervisor selection actions
   setSelectedSupervisors: (supervisors: User[]) => void;
@@ -482,14 +326,6 @@ interface UserState {
   addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
   addActiveSupervisorTag: (tagId: string) => void;
   isActiveSupervisor: (tagId: string) => boolean;
-
-  // Check-in/check-out actions
-  checkInStudent: (
-    activityId: number,
-    student: Omit<Student, 'checkInTime' | 'isCheckedIn'>
-  ) => Promise<boolean>;
-  checkOutStudent: (activityId: number, studentId: number) => Promise<boolean>;
-  getActivityStudents: (activityId: number) => Student[];
 
   // RFID actions
   startRfidScanning: () => void;
@@ -565,35 +401,16 @@ const RFID_SESSION_INITIAL_STATE = {
   pickupQueryTagId: null as string | null,
 };
 
-// Generate a unique id for new activities using unbiased secure randomness
-const generateId = (): number => {
-  return getSecureRandomInt(10000);
-};
-
-// Create mock student data
-const mockStudents: Student[] = [
-  { id: 1, name: 'Max Mustermann', isCheckedIn: false },
-  { id: 2, name: 'Anna Schmidt', isCheckedIn: false },
-  { id: 3, name: 'Leon Weber', isCheckedIn: false },
-  { id: 4, name: 'Sophie Fischer', isCheckedIn: false },
-  { id: 5, name: 'Tim Becker', isCheckedIn: false },
-  { id: 6, name: 'Lena Hoffmann', isCheckedIn: false },
-];
-
 // Define base store without logging middleware
 const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => ({
   // Initial state
   users: [] as User[],
-  selectedUser: '',
-  selectedUserId: null,
   authenticatedUser: null,
   rooms: [] as Room[],
   selectedRoom: null,
   _roomSelectedAt: null,
   selectedActivity: null,
   currentSession: null,
-  activities: [] as Activity[],
-  currentActivity: null,
   isLoading: false,
   error: null,
   selectedSupervisors: [] as User[], // New state for multi-supervisor selection
@@ -633,9 +450,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   // Actions
-  setSelectedUser: (userName: string, userId: number | null) =>
-    set({ selectedUser: userName, selectedUserId: userId }),
-
   setAuthenticatedUser: (userData: {
     staffId: number;
     staffName: string;
@@ -827,24 +641,12 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
 
     set({
-      selectedUser: '',
-      selectedUserId: null,
       authenticatedUser: null,
       selectedRoom: null,
       selectedActivity: null,
       currentSession: null,
-      currentActivity: null,
       selectedSupervisors: [],
       activeSupervisorTags: new Set<string>(),
-    });
-  },
-
-  // Cancel activity creation and clear selected room and supervisors
-  cancelActivityCreation: () => {
-    set({
-      currentActivity: null,
-      selectedRoom: null,
-      selectedSupervisors: [],
     });
   },
 
@@ -912,114 +714,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   // Activity-related actions
-  initializeActivity: (roomId: number) => {
-    const { selectedUser, users } = get();
-    // Find the user's ID
-    const creator = users.find(u => u.name === selectedUser);
-
-    set({
-      currentActivity: {
-        name: '', // Initialize with empty name to ensure the field exists
-        roomId,
-        createdBy: selectedUser,
-        category: ActivityCategory.OTHER,
-        createdAt: new Date(),
-        supervisorId: creator?.id ?? -1, // default to the current user as supervisor
-      },
-    });
-
-    storeLogger.debug('Activity initialized', { roomId });
-  },
-
-  updateActivityField: <K extends keyof Activity>(field: K, value: Activity[K]) => {
-    const { currentActivity } = get();
-    if (currentActivity) {
-      set({
-        currentActivity: {
-          ...currentActivity,
-          [field]: value,
-        },
-      });
-
-      // Special logging for name field to help track the issue
-      if (field === 'name') {
-        storeLogger.info('Activity name updated', {
-          prev: currentActivity.name,
-          next: value,
-          activityDetails: {
-            roomId: currentActivity.roomId,
-            category: currentActivity.category,
-          },
-        });
-      }
-    }
-  },
-
-  createActivity: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const { currentActivity, activities, selectedRoom } = get();
-
-      // Validate required fields
-      if (
-        !currentActivity?.name ||
-        !currentActivity.supervisorId ||
-        !currentActivity.category ||
-        !currentActivity.roomId ||
-        !selectedRoom
-      ) {
-        set({
-          error: 'Bitte fülle alle Pflichtfelder aus',
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Create the new activity with all required fields
-      const newActivity: Activity = {
-        ...(currentActivity as Activity),
-        id: generateId(),
-        createdAt: new Date(),
-      };
-
-      // Log the activity creation with all fields for debugging
-      storeLogger.info('Creating new activity', {
-        id: newActivity.id,
-        name: newActivity.name,
-        category: newActivity.category,
-        roomId: newActivity.roomId,
-        supervisorId: newActivity.supervisorId,
-      });
-
-      // Add to activities array and clear current activity
-      set({
-        activities: [...activities, newActivity],
-        currentActivity: null,
-        isLoading: false,
-      });
-
-      return true;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      storeLogger.error('Failed to create activity', {
-        message: error.message,
-        stack: error.stack,
-      });
-
-      const errorMsg = isNetworkRelatedError(err)
-        ? 'Netzwerkfehler beim Erstellen der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
-        : mapServerErrorToGerman(error.message);
-      set({
-        error: errorMsg,
-        isLoading: false,
-      });
-      return false;
-    }
-  },
-
   fetchActivities: (() => {
     let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
 
@@ -1091,165 +785,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       return fetchPromise;
     };
   })(),
-
-  checkInStudent: async (
-    activityId: number,
-    student: Omit<Student, 'checkInTime' | 'isCheckedIn'>
-  ) => {
-    set({ isLoading: true, error: null });
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const { activities } = get();
-      const activityIndex = activities.findIndex(a => a.id === activityId);
-
-      if (activityIndex === -1) {
-        set({
-          error: mapActivityError('activity_not_found', { activityId }),
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Create a copy of the activities array
-      const updatedActivities = [...activities];
-      const activity = updatedActivities[activityIndex];
-
-      // Initialize checkedInStudents array if it doesn't exist
-      activity.checkedInStudents ??= [];
-
-      // Check if student is already checked in
-      const existingStudentIndex = activity.checkedInStudents.findIndex(s => s.id === student.id);
-
-      if (existingStudentIndex === -1) {
-        // Add new student to checked in list
-        activity.checkedInStudents.push({
-          ...student,
-          checkInTime: new Date(),
-          isCheckedIn: true,
-        });
-      } else if (activity.checkedInStudents[existingStudentIndex].isCheckedIn) {
-        // Student is already checked in - show error
-        set({
-          error: mapActivityError('student_already_checked_in', {
-            studentName: student.name,
-            activityName: activity.name,
-          }),
-          isLoading: false,
-        });
-        return false;
-      } else {
-        // Student was checked out - re-check them in
-        activity.checkedInStudents[existingStudentIndex] = {
-          ...activity.checkedInStudents[existingStudentIndex],
-          checkInTime: new Date(),
-          checkOutTime: undefined,
-          isCheckedIn: true,
-        };
-      }
-
-      // Update activities array
-      set({ activities: updatedActivities, isLoading: false });
-      return true;
-    } catch (error) {
-      storeLogger.error('Check-in failed', {
-        activityId,
-        studentId: student.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      set({
-        error: mapActivityError('checkin_failed', { studentName: student.name }, error),
-        isLoading: false,
-      });
-      return false;
-    }
-  },
-
-  checkOutStudent: async (activityId: number, studentId: number) => {
-    set({ isLoading: true, error: null });
-
-    // Get student name early for error context (before try block)
-    const { activities } = get();
-    const activity = activities.find(a => a.id === activityId);
-    const student = activity?.checkedInStudents?.find(s => s.id === studentId);
-    const studentName = student?.name;
-
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const activityIndex = activities.findIndex(a => a.id === activityId);
-
-      if (activityIndex === -1) {
-        set({
-          error: mapActivityError('activity_not_found', { activityId }),
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Create a copy of the activities array
-      const updatedActivities = [...activities];
-      const activity = updatedActivities[activityIndex];
-
-      // Check if there are any checked in students
-      if (!activity.checkedInStudents || activity.checkedInStudents.length === 0) {
-        set({
-          error: mapActivityError('no_students_checked_in', { activityName: activity.name }),
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Find the student to check out
-      const studentIndex = activity.checkedInStudents.findIndex(
-        s => s.id === studentId && s.isCheckedIn
-      );
-
-      if (studentIndex === -1) {
-        set({
-          error: mapActivityError('student_not_checked_in', { activityName: activity.name }),
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Update student's check-out time and status
-      activity.checkedInStudents[studentIndex] = {
-        ...activity.checkedInStudents[studentIndex],
-        checkOutTime: new Date(),
-        isCheckedIn: false,
-      };
-
-      // Update activities array
-      set({ activities: updatedActivities, isLoading: false });
-      return true;
-    } catch (error) {
-      storeLogger.error('Check-out failed', {
-        activityId,
-        studentId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      set({
-        error: mapActivityError('checkout_failed', { studentName }, error),
-        isLoading: false,
-      });
-      return false;
-    }
-  },
-
-  getActivityStudents: (activityId: number) => {
-    const { activities } = get();
-    const activity = activities.find(a => a.id === activityId);
-
-    if (!activity?.checkedInStudents) {
-      // For demo purposes, return mock students if no real ones exist
-      return mockStudents;
-    }
-
-    return activity.checkedInStudents;
-  },
 
   // RFID actions
   startRfidScanning: () => {
@@ -1699,7 +1234,6 @@ export const useUserStore = create<UserState>(
   loggerMiddleware(createUserStore, {
     name: 'UserStore',
     logLevel: LogLevel.DEBUG,
-    activityTracking: true,
     stateChanges: true,
     actionSource: true,
     // Exclude certain high-frequency actions to reduce noise

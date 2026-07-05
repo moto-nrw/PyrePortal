@@ -80,16 +80,12 @@ const mockedUpdateSessionSupervisors = vi.mocked(api.updateSessionSupervisors);
 function resetStore() {
   useUserStore.setState({
     users: [],
-    selectedUser: '',
-    selectedUserId: null,
     authenticatedUser: null,
     rooms: [],
     selectedRoom: null,
     _roomSelectedAt: null,
     currentSession: null,
-    activities: [],
     selectedActivity: null,
-    currentActivity: null,
     isLoading: false,
     error: null,
     selectedSupervisors: [],

@@ -47,16 +47,12 @@ function resetStore() {
   const store = useUserStore;
   store.setState({
     users: [],
-    selectedUser: '',
-    selectedUserId: null,
     authenticatedUser: null,
     rooms: [],
     selectedRoom: null,
     _roomSelectedAt: null,
     currentSession: null,
-    activities: [],
     selectedActivity: null,
-    currentActivity: null,
     isLoading: false,
     error: null,
     selectedSupervisors: [],
@@ -146,13 +142,6 @@ beforeEach(() => {
 // ====================================================================
 
 describe('Authentication', () => {
-  it('sets selected user', () => {
-    useUserStore.getState().setSelectedUser('Herr Müller', 42);
-    const state = useUserStore.getState();
-    expect(state.selectedUser).toBe('Herr Müller');
-    expect(state.selectedUserId).toBe(42);
-  });
-
   it('sets authenticated user', () => {
     useUserStore.getState().setAuthenticatedUser({
       staffId: 1,
@@ -538,8 +527,6 @@ describe('logout', () => {
   it('clears all auth and session state', async () => {
     setAuthenticated();
     useUserStore.setState({
-      selectedUser: 'Herr Müller',
-      selectedUserId: 1,
       selectedRoom: mockRoom(),
       selectedActivity: mockActivity(),
       currentSession: {
@@ -558,8 +545,6 @@ describe('logout', () => {
 
     const state = useUserStore.getState();
     expect(state.authenticatedUser).toBeNull();
-    expect(state.selectedUser).toBe('');
-    expect(state.selectedUserId).toBeNull();
     expect(state.selectedRoom).toBeNull();
     expect(state.selectedActivity).toBeNull();
     expect(state.currentSession).toBeNull();
@@ -944,94 +929,6 @@ describe('Activity management', () => {
     useUserStore.getState().setSelectedActivity(activity);
     expect(useUserStore.getState().selectedActivity).toEqual(activity);
   });
-
-  it('initializes activity with room ID', () => {
-    useUserStore.getState().initializeActivity(5);
-    const current = useUserStore.getState().currentActivity;
-    expect(current).not.toBeNull();
-    expect(current!.roomId).toBe(5);
-  });
-
-  it('initializes activity with creator from selectedUser', () => {
-    useUserStore.setState({
-      selectedUser: 'Herr Müller',
-      users: [{ id: 42, name: 'Herr Müller' }],
-    });
-    useUserStore.getState().initializeActivity(5);
-    const current = useUserStore.getState().currentActivity;
-    expect(current!.supervisorId).toBe(42);
-    expect(current!.createdBy).toBe('Herr Müller');
-  });
-
-  it('cancels activity creation', () => {
-    useUserStore.getState().initializeActivity(5);
-    useUserStore.getState().cancelActivityCreation();
-    expect(useUserStore.getState().currentActivity).toBeNull();
-    expect(useUserStore.getState().selectedRoom).toBeNull();
-    expect(useUserStore.getState().selectedSupervisors).toHaveLength(0);
-  });
-
-  it('updates activity field', () => {
-    useUserStore.getState().initializeActivity(5);
-    useUserStore.getState().updateActivityField('name', 'Test Activity');
-    expect(useUserStore.getState().currentActivity!.name).toBe('Test Activity');
-  });
-
-  it('logs specially when updating name field', () => {
-    useUserStore.getState().initializeActivity(5);
-    useUserStore.getState().updateActivityField('name', 'New Name');
-    expect(useUserStore.getState().currentActivity!.name).toBe('New Name');
-  });
-
-  it('does nothing when updating field without current activity', () => {
-    useUserStore.getState().updateActivityField('name', 'Test');
-    expect(useUserStore.getState().currentActivity).toBeNull();
-  });
-});
-
-// ====================================================================
-// createActivity
-// ====================================================================
-
-describe('createActivity', () => {
-  it('creates activity with valid fields', async () => {
-    useUserStore.setState({
-      selectedUser: 'Herr Müller',
-      users: [{ id: 1, name: 'Herr Müller' }],
-      selectedRoom: mockRoom(),
-    });
-    useUserStore.getState().initializeActivity(1);
-    useUserStore.getState().updateActivityField('name', 'Test AG');
-
-    const result = await useUserStore.getState().createActivity();
-
-    expect(result).toBe(true);
-    expect(useUserStore.getState().activities.length).toBeGreaterThan(0);
-    expect(useUserStore.getState().currentActivity).toBeNull();
-    expect(useUserStore.getState().isLoading).toBe(false);
-  });
-
-  it('returns false when required fields are missing', async () => {
-    // No currentActivity set
-    const result = await useUserStore.getState().createActivity();
-
-    expect(result).toBe(false);
-    expect(useUserStore.getState().error).toBeTruthy();
-    expect(useUserStore.getState().isLoading).toBe(false);
-  });
-
-  it('returns false when name is missing', async () => {
-    useUserStore.setState({
-      selectedRoom: mockRoom(),
-    });
-    useUserStore.getState().initializeActivity(1);
-    // Don't set a name (it's initialized as empty string)
-
-    const result = await useUserStore.getState().createActivity();
-
-    expect(result).toBe(false);
-    expect(useUserStore.getState().error).toBe('Bitte fülle alle Pflichtfelder aus');
-  });
 });
 
 // ====================================================================
@@ -1099,236 +996,6 @@ describe('fetchActivities', () => {
     // Both should resolve (second may return deduped promise)
     expect(r1).toEqual(activities);
     expect(r2).toEqual(activities);
-  });
-});
-
-// ====================================================================
-// checkInStudent
-// ====================================================================
-
-describe('checkInStudent', () => {
-  it('checks in a student to an activity', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkInStudent(1, {
-      id: 10,
-      name: 'Max Mustermann',
-      checkOutTime: undefined,
-    });
-
-    expect(result).toBe(true);
-    const activity = useUserStore.getState().activities[0];
-    expect(activity.checkedInStudents).toHaveLength(1);
-    expect(activity.checkedInStudents![0].isCheckedIn).toBe(true);
-  });
-
-  it('returns false when activity not found', async () => {
-    const result = await useUserStore.getState().checkInStudent(999, {
-      id: 10,
-      name: 'Max',
-      checkOutTime: undefined,
-    });
-
-    expect(result).toBe(false);
-    expect(useUserStore.getState().error).toBeTruthy();
-  });
-
-  it('returns false when student already checked in', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [{ id: 10, name: 'Max', isCheckedIn: true }],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkInStudent(1, {
-      id: 10,
-      name: 'Max',
-      checkOutTime: undefined,
-    });
-
-    expect(result).toBe(false);
-  });
-
-  it('re-checks in a previously checked-out student', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [
-            { id: 10, name: 'Max', isCheckedIn: false, checkOutTime: new Date() },
-          ],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkInStudent(1, {
-      id: 10,
-      name: 'Max',
-      checkOutTime: undefined,
-    });
-
-    expect(result).toBe(true);
-    const student = useUserStore.getState().activities[0].checkedInStudents![0];
-    expect(student.isCheckedIn).toBe(true);
-    expect(student.checkOutTime).toBeUndefined();
-  });
-});
-
-// ====================================================================
-// checkOutStudent
-// ====================================================================
-
-describe('checkOutStudent', () => {
-  it('checks out a student from an activity', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [{ id: 10, name: 'Max', isCheckedIn: true }],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkOutStudent(1, 10);
-
-    expect(result).toBe(true);
-    const student = useUserStore.getState().activities[0].checkedInStudents![0];
-    expect(student.isCheckedIn).toBe(false);
-    expect(student.checkOutTime).toBeDefined();
-  });
-
-  it('returns false when activity not found', async () => {
-    const result = await useUserStore.getState().checkOutStudent(999, 10);
-
-    expect(result).toBe(false);
-    expect(useUserStore.getState().error).toBeTruthy();
-  });
-
-  it('returns false when no students are checked in', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkOutStudent(1, 10);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns false when student not checked in', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [{ id: 10, name: 'Max', isCheckedIn: false }],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkOutStudent(1, 10);
-
-    expect(result).toBe(false);
-  });
-});
-
-// ====================================================================
-// getActivityStudents
-// ====================================================================
-
-describe('getActivityStudents', () => {
-  it('returns checked-in students for an activity', () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [{ id: 10, name: 'Max', isCheckedIn: true }],
-        },
-      ],
-    });
-
-    const students = useUserStore.getState().getActivityStudents(1);
-    expect(students).toHaveLength(1);
-    expect(students[0].name).toBe('Max');
-  });
-
-  it('returns mock students when activity has no checkedInStudents', () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-        },
-      ],
-    });
-
-    const students = useUserStore.getState().getActivityStudents(1);
-    // Should return mock students
-    expect(students.length).toBeGreaterThan(0);
-  });
-
-  it('returns mock students when activity not found', () => {
-    const students = useUserStore.getState().getActivityStudents(999);
-    expect(students.length).toBeGreaterThan(0);
   });
 });
 
