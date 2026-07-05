@@ -94,12 +94,6 @@ fn get_api_config() -> Result<ApiConfig, String> {
 ```rust
 #[tauri::command]
 fn write_log(entry: String) -> Result<(), String>
-
-#[tauri::command]
-fn get_log_files() -> Result<Vec<String>, String>
-
-#[tauri::command]
-fn cleanup_old_logs(max_age_days: u64) -> Result<(), String>
 ```
 
 **Log File Locations:**

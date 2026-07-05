@@ -829,12 +829,6 @@ mod raspberry_pi {
         scan_rfid_hardware_with_timeout(Duration::from_secs(10)).await
     }
 
-    pub async fn scan_rfid_hardware_with_custom_timeout(
-        timeout: Duration,
-    ) -> Result<String, String> {
-        scan_rfid_hardware_with_timeout(timeout).await
-    }
-
     /// Initialize MFRC522 scanner with SPI and GPIO setup for one-shot scanning
     fn initialize_mfrc522_oneshot() -> Result<Mfrc522Scanner, String> {
         ensure_hardware_ready()?;
@@ -1313,46 +1307,6 @@ pub async fn scan_rfid_single() -> Result<RfidScanResult, String> {
                 error: Some(error),
             }),
         }
-    }
-}
-
-#[tauri::command]
-pub async fn scan_rfid_with_timeout(timeout_seconds: u64) -> Result<RfidScanResult, String> {
-    // Ensure background scanner is stopped before one-shot access.
-    stop_service_for_exclusive_hardware_access().await;
-
-    let mutex = SPI_ACCESS_MUTEX.get_or_init(|| TokioMutex::new(()));
-    let _guard = tokio::time::timeout(Duration::from_secs(3), mutex.lock())
-        .await
-        .map_err(|_| "Timed out waiting for exclusive scanner access".to_string())?;
-
-    // For future implementation - continuous scanning with custom timeout
-    #[cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))]
-    {
-        raspberry_pi::scan_rfid_hardware_with_custom_timeout(Duration::from_secs(timeout_seconds))
-            .await
-            .map(|tag_id| RfidScanResult {
-                success: true,
-                tag_id: Some(tag_id),
-                error: None,
-            })
-            .or_else(|error| {
-                Ok(RfidScanResult {
-                    success: false,
-                    tag_id: None,
-                    error: Some(error),
-                })
-            })
-    }
-
-    #[cfg(not(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux")))]
-    {
-        tokio::time::sleep(Duration::from_secs(std::cmp::min(timeout_seconds, 5))).await;
-        Ok(RfidScanResult {
-            success: true,
-            tag_id: Some(format!("MOCK:TIMEOUT:{timeout_seconds}:SEC")),
-            error: None,
-        })
     }
 }
 

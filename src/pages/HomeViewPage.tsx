@@ -337,9 +337,6 @@ function HomeViewPage() {
     return null; // Will redirect via useEffect
   }
 
-  // Extract first name from full name (unused for now)
-  // const firstName = authenticatedUser.staffName.split(' ')[0];
-
   return (
     <BackgroundWrapper>
       <div className="h-screen w-screen overflow-auto p-8">

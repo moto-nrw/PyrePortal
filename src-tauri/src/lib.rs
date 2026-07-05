@@ -64,10 +64,6 @@ pub fn run() {
             get_api_config,
             restart_app,
             logging::write_log,
-            logging::get_log_files,
-            logging::read_log_file,
-            logging::clear_log_file,
-            logging::cleanup_old_logs,
             rfid::initialize_rfid_service,
             rfid::start_rfid_service,
             rfid::stop_rfid_service,
@@ -75,7 +71,6 @@ pub fn run() {
             rfid::get_rfid_service_status,
             rfid::get_rfid_scanner_status,
             rfid::scan_rfid_single,
-            rfid::scan_rfid_with_timeout,
             session_storage::save_session_settings,
             session_storage::load_session_settings,
             session_storage::clear_last_session
