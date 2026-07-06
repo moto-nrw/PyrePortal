@@ -282,11 +282,4 @@ describe('WedgeAdapter', () => {
     expect(consoleSpy).toHaveBeenCalledWith('[PyrePortal]', 'test entry');
     consoleSpy.mockRestore();
   });
-
-  it('getDeviceInfo returns wedge platform with version', () => {
-    const info = adapter.getDeviceInfo();
-
-    expect(info.platform).toBe('wedge');
-    expect(typeof info.version).toBe('string');
-  });
 });

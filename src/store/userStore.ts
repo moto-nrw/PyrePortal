@@ -18,7 +18,6 @@ import {
   loadSessionSettings,
   clearLastSession,
 } from '../services/sessionStorage';
-import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
@@ -33,9 +32,6 @@ const toActivitySummary = (a: ActivityResponse) => ({
   name: a.name,
   category: a.category_name,
 });
-
-// Re-export isNetworkRelatedError for backward compatibility
-export { isNetworkRelatedError } from '../services/api';
 
 const mapSessionValidationError = (error: unknown): string => {
   const rawMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
@@ -58,120 +54,6 @@ const mapSessionValidationError = (error: unknown): string => {
     default:
       return mapServerErrorToGerman(rawMessage);
   }
-};
-
-/**
- * Error types for activity check-in/check-out operations
- */
-type ActivityErrorType =
-  | 'activity_not_found'
-  | 'student_already_checked_in'
-  | 'no_students_checked_in'
-  | 'student_not_checked_in'
-  | 'checkin_failed'
-  | 'checkout_failed';
-
-interface ActivityErrorContext {
-  activityName?: string;
-  studentName?: string;
-  activityId?: number;
-  studentId?: number;
-}
-
-/**
- * Builds network error message for check-in/check-out failures
- */
-const buildNetworkErrorMessage = (
-  errorType: 'checkin_failed' | 'checkout_failed',
-  studentName?: string
-): string => {
-  const action = errorType === 'checkin_failed' ? 'Einchecken' : 'Auschecken';
-  const name = studentName ? ` von ${studentName}` : '';
-  return `Netzwerkfehler beim ${action}${name}. Bitte Verbindung prüfen und erneut scannen.`;
-};
-
-/**
- * Error message handlers for each activity error type (reduces switch complexity)
- */
-const activityErrorMessages: Record<ActivityErrorType, (context: ActivityErrorContext) => string> =
-  {
-    activity_not_found: ({ activityName, activityId }) =>
-      activityName
-        ? `Aktivität '${activityName}' nicht gefunden. Bitte Seite neu laden.`
-        : `Aktivität (ID: ${activityId}) nicht gefunden. Bitte Seite neu laden.`,
-
-    student_already_checked_in: ({ studentName, activityName }) =>
-      studentName && activityName
-        ? `${studentName} ist bereits in '${activityName}' eingecheckt.`
-        : 'Schüler/in ist bereits eingecheckt.',
-
-    no_students_checked_in: ({ activityName }) =>
-      activityName
-        ? `In '${activityName}' sind keine Schüler/innen eingecheckt.`
-        : 'Keine Schüler/innen eingecheckt.',
-
-    student_not_checked_in: ({ studentName, activityName }) => {
-      if (studentName && activityName) {
-        return `${studentName} ist in '${activityName}' nicht eingecheckt.`;
-      }
-      return activityName
-        ? `Schüler/in ist in '${activityName}' nicht eingecheckt.`
-        : 'Schüler/in ist nicht eingecheckt.';
-    },
-
-    checkin_failed: ({ studentName }) =>
-      studentName ? `Fehler beim Einchecken von ${studentName}.` : 'Fehler beim Einchecken.',
-
-    checkout_failed: ({ studentName }) =>
-      studentName ? `Fehler beim Auschecken von ${studentName}.` : 'Fehler beim Auschecken.',
-  };
-
-/**
- * Handles network-related errors for check-in/check-out operations.
- * Returns error message if network error, null otherwise.
- */
-const handleCheckinCheckoutNetworkError = (
-  errorType: ActivityErrorType,
-  context: ActivityErrorContext,
-  originalError?: unknown
-): string | null => {
-  if (errorType !== 'checkin_failed' && errorType !== 'checkout_failed') {
-    return null;
-  }
-
-  if (isNetworkRelatedError(originalError)) {
-    return buildNetworkErrorMessage(errorType, context.studentName);
-  }
-
-  const rawMessage = originalError instanceof Error ? originalError.message : '';
-  if (rawMessage) {
-    return mapServerErrorToGerman(rawMessage);
-  }
-
-  return null;
-};
-
-/**
- * Maps activity-related errors to user-friendly German messages with context
- */
-const mapActivityError = (
-  errorType: ActivityErrorType,
-  context: ActivityErrorContext = {},
-  originalError?: unknown
-): string => {
-  // Handle network errors for checkin/checkout first
-  const networkError = handleCheckinCheckoutNetworkError(errorType, context, originalError);
-  if (networkError) {
-    return networkError;
-  }
-
-  // Use message handler lookup instead of switch
-  const messageHandler = activityErrorMessages[errorType];
-  if (messageHandler) {
-    return messageHandler(context);
-  }
-
-  return 'Ein unbekannter Fehler ist aufgetreten.';
 };
 
 /**
@@ -314,38 +196,6 @@ const resolveSupervisorsForSession = async (
   return supervisors;
 };
 
-// Define the ActivityCategory enum
-enum ActivityCategory {
-  SPORT = 'Sport',
-  SCIENCE = 'Wissenschaft',
-  ART = 'Kunst',
-  MUSIC = 'Musik',
-  LITERATURE = 'Literatur',
-  GAMES = 'Spiele',
-  OTHER = 'Sonstiges',
-}
-
-// Define the Activity interface
-interface Activity {
-  id: number;
-  name: string;
-  category: ActivityCategory;
-  roomId: number;
-  supervisorId: number;
-  maxParticipants?: number;
-  createdBy: string;
-  createdAt: Date;
-  checkedInStudents?: Student[];
-}
-
-interface Student {
-  id: number;
-  name: string;
-  checkInTime?: Date;
-  checkOutTime?: Date;
-  isCheckedIn: boolean;
-}
-
 // Room interface imported from API service
 
 // Define the User interface
@@ -367,30 +217,7 @@ interface AuthenticatedUser {
   staffId: number;
   staffName: string;
   deviceName: string;
-  authenticatedAt: Date;
   pin: string; // Store PIN for subsequent API calls
-}
-
-// Optimistic scan state for immediate UI feedback
-interface OptimisticScanState {
-  id: string;
-  tagId: string;
-  status: 'pending' | 'processing' | 'success' | 'failed';
-  optimisticAction: 'checkin' | 'checkout';
-  optimisticStudentCount: number;
-  timestamp: number;
-  studentInfo?: {
-    name: string;
-    id: number;
-  };
-}
-
-// Student action history for smart duplicate prevention
-interface StudentActionHistory {
-  studentId: string;
-  lastAction: 'checkin' | 'checkout';
-  timestamp: number;
-  isProcessing: boolean;
 }
 
 // Recent tag scan tracking
@@ -404,7 +231,7 @@ interface RecentTagScan {
 type RfidScanMode = 'checkin' | 'pickupQuery';
 
 // Cache TTL for recentTagScans. This is NOT a dedup window — dedup is handled by
-// scanId (adapter-level) + processingQueue (Layer 1) + studentHistory (Layer 3).
+// scanId (adapter-level) + processingQueue (Layer 1).
 // recentTagScans only exists as a short-lived cache for result replay and syncPromise.
 export const RECENT_SCAN_CACHE_TTL_MS = 10_000;
 
@@ -412,7 +239,6 @@ export const RECENT_SCAN_CACHE_TTL_MS = 10_000;
 interface RfidState {
   isScanning: boolean;
   currentScan: RfidScanResult | null;
-  blockedTags: Map<string, number>; // tagId -> blockUntilTimestamp
   scanTimeout: number; // 3 seconds default
   modalDisplayTime: number; // 1.5 seconds default
   showModal: boolean;
@@ -420,33 +246,23 @@ interface RfidState {
   scanContextId: number;
   pickupQueryTagId: string | null;
 
-  // New optimistic state management
-  optimisticScans: OptimisticScanState[];
-  studentHistory: Map<string, StudentActionHistory>;
+  // Duplicate prevention state
   processingQueue: Set<string>; // Currently processing tag IDs
-
-  // New additions for proper duplicate prevention
-  recentTagScans: Map<string, RecentTagScan>; // Track recent scans by tagId
-  tagToStudentMap: Map<string, string>; // Cache tagId -> studentId mappings
+  recentTagScans: Map<string, RecentTagScan>; // Short-lived result cache by tagId
 }
 
 // Define the store state interface
 interface UserState {
   // State
   users: User[];
-  selectedUser: string;
-  selectedUserId: number | null;
   authenticatedUser: AuthenticatedUser | null;
   rooms: Room[];
   selectedRoom: Room | null;
   _roomSelectedAt: number | null; // Timestamp of last manual room selection (race condition guard)
   selectedActivity: ActivityResponse | null;
   currentSession: CurrentSession | null;
-  activities: Activity[];
-  currentActivity: Partial<Activity> | null;
   isLoading: boolean;
   error: string | null;
-  nfcScanActive: boolean;
   selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
   activeSupervisorTags: Set<string>; // Locally tracked supervisor tagIds for instant re-entry
 
@@ -461,7 +277,6 @@ interface UserState {
   networkStatus: NetworkStatusData;
 
   // Actions
-  setSelectedUser: (userName: string, userId: number | null) => void;
   setAuthenticatedUser: (userData: {
     staffId: number;
     staffName: string;
@@ -476,50 +291,26 @@ interface UserState {
   logout: () => Promise<void>;
 
   // Activity-related actions
-  initializeActivity: (roomId: number) => void;
-  updateActivityField: <K extends keyof Activity>(field: K, value: Activity[K]) => void;
-  createActivity: () => Promise<boolean>;
   fetchActivities: () => Promise<ActivityResponse[] | null>;
-  cancelActivityCreation: () => void;
 
   // Supervisor selection actions
   setSelectedSupervisors: (supervisors: User[]) => void;
   toggleSupervisor: (user: User) => void;
-  clearSelectedSupervisors: () => void;
   addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
   addActiveSupervisorTag: (tagId: string) => void;
   isActiveSupervisor: (tagId: string) => boolean;
-  clearActiveSupervisorTags: () => void;
-
-  // Check-in/check-out actions
-  startNfcScan: () => void;
-  stopNfcScan: () => void;
-  checkInStudent: (
-    activityId: number,
-    student: Omit<Student, 'checkInTime' | 'isCheckedIn'>
-  ) => Promise<boolean>;
-  checkOutStudent: (activityId: number, studentId: number) => Promise<boolean>;
-  getActivityStudents: (activityId: number) => Student[];
 
   // RFID actions
   startRfidScanning: () => void;
   stopRfidScanning: () => void;
   setScanResult: (result: RfidScanResult | null) => void;
-  blockTag: (tagId: string, duration: number) => void;
-  isTagBlocked: (tagId: string) => boolean;
-  clearBlockedTag: (tagId: string) => void;
   showScanModal: () => void;
   hideScanModal: () => void;
   startPickupQueryMode: () => void;
   lockPickupQueryTag: (tagId: string) => void;
   resetScanMode: () => void;
 
-  // New optimistic RFID actions
-  addOptimisticScan: (scan: OptimisticScanState) => void;
-  updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => void;
-  removeOptimisticScan: (id: string) => void;
-  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
-  isValidScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
+  // Duplicate prevention bookkeeping actions
   addToProcessingQueue: (tagId: string) => void;
   removeFromProcessingQueue: (tagId: string) => void;
 
@@ -527,17 +318,13 @@ interface UserState {
   canProcessTag: (tagId: string) => boolean;
   recordTagScan: (tagId: string, scan: RecentTagScan) => void;
   clearTagScan: (tagId: string) => void;
-  mapTagToStudent: (tagId: string, studentId: string) => void;
-  getCachedStudentId: (tagId: string) => string | undefined;
   clearOldTagScans: () => void;
-  isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => boolean;
 
   // Session settings actions
   loadSessionSettings: () => Promise<void>;
   toggleUseLastSession: (enabled: boolean) => Promise<void>;
   saveLastSessionData: () => Promise<void>;
   validateAndRecreateSession: () => Promise<boolean>;
-  clearSessionSettings: () => Promise<void>;
 
   // Network status actions
   setNetworkStatus: (status: NetworkStatusData) => void;
@@ -569,50 +356,26 @@ const SESSION_INITIAL_STATE = {
 };
 
 // RFID state that should be cleared on session change
-// Note: tagToStudentMap is NOT cleared on session change (useful across sessions),
-// but IS cleared per-tag via clearTagScan() on tag reassignment
 const RFID_SESSION_INITIAL_STATE = {
   recentTagScans: new Map<string, RecentTagScan>(),
-  studentHistory: new Map<string, StudentActionHistory>(),
   processingQueue: new Set<string>(),
-  optimisticScans: [] as OptimisticScanState[],
   scanMode: 'checkin' as RfidScanMode,
   scanContextId: 0,
   pickupQueryTagId: null as string | null,
 };
 
-// Generate a unique id for new activities using unbiased secure randomness
-const generateId = (): number => {
-  return getSecureRandomInt(10000);
-};
-
-// Create mock student data
-const mockStudents: Student[] = [
-  { id: 1, name: 'Max Mustermann', isCheckedIn: false },
-  { id: 2, name: 'Anna Schmidt', isCheckedIn: false },
-  { id: 3, name: 'Leon Weber', isCheckedIn: false },
-  { id: 4, name: 'Sophie Fischer', isCheckedIn: false },
-  { id: 5, name: 'Tim Becker', isCheckedIn: false },
-  { id: 6, name: 'Lena Hoffmann', isCheckedIn: false },
-];
-
 // Define base store without logging middleware
 const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => ({
   // Initial state
   users: [] as User[],
-  selectedUser: '',
-  selectedUserId: null,
   authenticatedUser: null,
   rooms: [] as Room[],
   selectedRoom: null,
   _roomSelectedAt: null,
   selectedActivity: null,
   currentSession: null,
-  activities: [] as Activity[],
-  currentActivity: null,
   isLoading: false,
   error: null,
-  nfcScanActive: false,
   selectedSupervisors: [] as User[], // New state for multi-supervisor selection
   activeSupervisorTags: new Set<string>(),
 
@@ -620,7 +383,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   rfid: {
     isScanning: false,
     currentScan: null,
-    blockedTags: new Map<string, number>(),
     scanTimeout: 3000, // 3 seconds
     modalDisplayTime: 1500, // 1.5 seconds - fast turnover for kiosk queues
     showModal: false,
@@ -628,14 +390,9 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     scanContextId: 0,
     pickupQueryTagId: null,
 
-    // New optimistic state
-    optimisticScans: [],
-    studentHistory: new Map<string, StudentActionHistory>(),
+    // Duplicate prevention state
     processingQueue: new Set<string>(),
-
-    // New duplicate prevention state
     recentTagScans: new Map<string, RecentTagScan>(),
-    tagToStudentMap: new Map<string, string>(),
   },
 
   // Session settings initial state
@@ -651,9 +408,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   },
 
   // Actions
-  setSelectedUser: (userName: string, userId: number | null) =>
-    set({ selectedUser: userName, selectedUserId: userId }),
-
   setAuthenticatedUser: (userData: {
     staffId: number;
     staffName: string;
@@ -666,7 +420,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         staffName: userData.staffName,
         deviceName: userData.deviceName,
         pin: userData.pin,
-        authenticatedAt: new Date(),
       },
     });
   },
@@ -846,24 +599,12 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
 
     set({
-      selectedUser: '',
-      selectedUserId: null,
       authenticatedUser: null,
       selectedRoom: null,
       selectedActivity: null,
       currentSession: null,
-      currentActivity: null,
       selectedSupervisors: [],
       activeSupervisorTags: new Set<string>(),
-    });
-  },
-
-  // Cancel activity creation and clear selected room and supervisors
-  cancelActivityCreation: () => {
-    set({
-      currentActivity: null,
-      selectedRoom: null,
-      selectedSupervisors: [],
     });
   },
 
@@ -889,9 +630,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       });
     }
   },
-
-  clearSelectedSupervisors: () =>
-    set({ selectedSupervisors: [], activeSupervisorTags: new Set<string>() }),
 
   addSupervisorFromRfid: (staffId: number, staffName: string) => {
     const { selectedSupervisors } = get();
@@ -933,120 +671,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     return get().activeSupervisorTags.has(tagId);
   },
 
-  clearActiveSupervisorTags: () => {
-    set({ activeSupervisorTags: new Set<string>() });
-    storeLogger.debug('Active supervisor tags cleared');
-  },
-
   // Activity-related actions
-  initializeActivity: (roomId: number) => {
-    const { selectedUser, users } = get();
-    // Find the user's ID
-    const creator = users.find(u => u.name === selectedUser);
-
-    set({
-      currentActivity: {
-        name: '', // Initialize with empty name to ensure the field exists
-        roomId,
-        createdBy: selectedUser,
-        category: ActivityCategory.OTHER,
-        createdAt: new Date(),
-        supervisorId: creator?.id ?? -1, // default to the current user as supervisor
-      },
-    });
-
-    storeLogger.debug('Activity initialized', { roomId });
-  },
-
-  updateActivityField: <K extends keyof Activity>(field: K, value: Activity[K]) => {
-    const { currentActivity } = get();
-    if (currentActivity) {
-      set({
-        currentActivity: {
-          ...currentActivity,
-          [field]: value,
-        },
-      });
-
-      // Special logging for name field to help track the issue
-      if (field === 'name') {
-        storeLogger.info('Activity name updated', {
-          prev: currentActivity.name,
-          next: value,
-          activityDetails: {
-            roomId: currentActivity.roomId,
-            category: currentActivity.category,
-          },
-        });
-      }
-    }
-  },
-
-  createActivity: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const { currentActivity, activities, selectedRoom } = get();
-
-      // Validate required fields
-      if (
-        !currentActivity?.name ||
-        !currentActivity.supervisorId ||
-        !currentActivity.category ||
-        !currentActivity.roomId ||
-        !selectedRoom
-      ) {
-        set({
-          error: 'Bitte fülle alle Pflichtfelder aus',
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Create the new activity with all required fields
-      const newActivity: Activity = {
-        ...(currentActivity as Activity),
-        id: generateId(),
-        createdAt: new Date(),
-      };
-
-      // Log the activity creation with all fields for debugging
-      storeLogger.info('Creating new activity', {
-        id: newActivity.id,
-        name: newActivity.name,
-        category: newActivity.category,
-        roomId: newActivity.roomId,
-        supervisorId: newActivity.supervisorId,
-      });
-
-      // Add to activities array and clear current activity
-      set({
-        activities: [...activities, newActivity],
-        currentActivity: null,
-        isLoading: false,
-      });
-
-      return true;
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      storeLogger.error('Failed to create activity', {
-        message: error.message,
-        stack: error.stack,
-      });
-
-      const errorMsg = isNetworkRelatedError(err)
-        ? 'Netzwerkfehler beim Erstellen der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
-        : mapServerErrorToGerman(error.message);
-      set({
-        error: errorMsg,
-        isLoading: false,
-      });
-      return false;
-    }
-  },
-
   fetchActivities: (() => {
     let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
 
@@ -1119,218 +744,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     };
   })(),
 
-  // Check-in/check-out related actions with deep safeguards to prevent infinite loops
-  startNfcScan: (() => {
-    // Closure-based guard variable to prevent repeat state changes
-    let isStarting = false;
-
-    // Using IIFE to create a stable reference that doesn't change on re-renders
-    const fn = () => {
-      // Skip if already in the process of starting
-      if (isStarting) return;
-
-      isStarting = true;
-      try {
-        const { nfcScanActive } = get();
-        // Only set if not already active to prevent unnecessary updates
-        if (!nfcScanActive) {
-          set({ nfcScanActive: true });
-        }
-      } finally {
-        // Always reset the lock flag to prevent deadlocks
-        setTimeout(() => {
-          isStarting = false;
-        }, 0);
-      }
-    };
-    return fn;
-  })(),
-
-  stopNfcScan: (() => {
-    // Closure-based guard variable to prevent repeat state changes
-    let isStopping = false;
-
-    // Using IIFE to create a stable reference that doesn't change on re-renders
-    const fn = () => {
-      // Skip if already in the process of stopping
-      if (isStopping) return;
-
-      isStopping = true;
-      try {
-        const { nfcScanActive } = get();
-        // Only set if active to prevent unnecessary updates
-        if (nfcScanActive) {
-          set({ nfcScanActive: false });
-        }
-      } finally {
-        // Always reset the lock flag to prevent deadlocks
-        setTimeout(() => {
-          isStopping = false;
-        }, 0);
-      }
-    };
-    return fn;
-  })(),
-
-  checkInStudent: async (
-    activityId: number,
-    student: Omit<Student, 'checkInTime' | 'isCheckedIn'>
-  ) => {
-    set({ isLoading: true, error: null });
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const { activities } = get();
-      const activityIndex = activities.findIndex(a => a.id === activityId);
-
-      if (activityIndex === -1) {
-        set({
-          error: mapActivityError('activity_not_found', { activityId }),
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Create a copy of the activities array
-      const updatedActivities = [...activities];
-      const activity = updatedActivities[activityIndex];
-
-      // Initialize checkedInStudents array if it doesn't exist
-      activity.checkedInStudents ??= [];
-
-      // Check if student is already checked in
-      const existingStudentIndex = activity.checkedInStudents.findIndex(s => s.id === student.id);
-
-      if (existingStudentIndex === -1) {
-        // Add new student to checked in list
-        activity.checkedInStudents.push({
-          ...student,
-          checkInTime: new Date(),
-          isCheckedIn: true,
-        });
-      } else if (activity.checkedInStudents[existingStudentIndex].isCheckedIn) {
-        // Student is already checked in - show error
-        set({
-          error: mapActivityError('student_already_checked_in', {
-            studentName: student.name,
-            activityName: activity.name,
-          }),
-          isLoading: false,
-        });
-        return false;
-      } else {
-        // Student was checked out - re-check them in
-        activity.checkedInStudents[existingStudentIndex] = {
-          ...activity.checkedInStudents[existingStudentIndex],
-          checkInTime: new Date(),
-          checkOutTime: undefined,
-          isCheckedIn: true,
-        };
-      }
-
-      // Update activities array
-      set({ activities: updatedActivities, isLoading: false });
-      return true;
-    } catch (error) {
-      storeLogger.error('Check-in failed', {
-        activityId,
-        studentId: student.id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      set({
-        error: mapActivityError('checkin_failed', { studentName: student.name }, error),
-        isLoading: false,
-      });
-      return false;
-    }
-  },
-
-  checkOutStudent: async (activityId: number, studentId: number) => {
-    set({ isLoading: true, error: null });
-
-    // Get student name early for error context (before try block)
-    const { activities } = get();
-    const activity = activities.find(a => a.id === activityId);
-    const student = activity?.checkedInStudents?.find(s => s.id === studentId);
-    const studentName = student?.name;
-
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      const activityIndex = activities.findIndex(a => a.id === activityId);
-
-      if (activityIndex === -1) {
-        set({
-          error: mapActivityError('activity_not_found', { activityId }),
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Create a copy of the activities array
-      const updatedActivities = [...activities];
-      const activity = updatedActivities[activityIndex];
-
-      // Check if there are any checked in students
-      if (!activity.checkedInStudents || activity.checkedInStudents.length === 0) {
-        set({
-          error: mapActivityError('no_students_checked_in', { activityName: activity.name }),
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Find the student to check out
-      const studentIndex = activity.checkedInStudents.findIndex(
-        s => s.id === studentId && s.isCheckedIn
-      );
-
-      if (studentIndex === -1) {
-        set({
-          error: mapActivityError('student_not_checked_in', { activityName: activity.name }),
-          isLoading: false,
-        });
-        return false;
-      }
-
-      // Update student's check-out time and status
-      activity.checkedInStudents[studentIndex] = {
-        ...activity.checkedInStudents[studentIndex],
-        checkOutTime: new Date(),
-        isCheckedIn: false,
-      };
-
-      // Update activities array
-      set({ activities: updatedActivities, isLoading: false });
-      return true;
-    } catch (error) {
-      storeLogger.error('Check-out failed', {
-        activityId,
-        studentId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      set({
-        error: mapActivityError('checkout_failed', { studentName }, error),
-        isLoading: false,
-      });
-      return false;
-    }
-  },
-
-  getActivityStudents: (activityId: number) => {
-    const { activities } = get();
-    const activity = activities.find(a => a.id === activityId);
-
-    if (!activity?.checkedInStudents) {
-      // For demo purposes, return mock students if no real ones exist
-      return mockStudents;
-    }
-
-    return activity.checkedInStudents;
-  },
-
   // RFID actions
   startRfidScanning: () => {
     set(state => ({
@@ -1348,40 +761,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     set(state => ({
       rfid: { ...state.rfid, currentScan: result },
     }));
-  },
-
-  blockTag: (tagId: string, duration: number) => {
-    const blockUntil = Date.now() + duration;
-    set(state => {
-      const newBlockedTags = new Map(state.rfid.blockedTags);
-      newBlockedTags.set(tagId, blockUntil);
-      return {
-        rfid: { ...state.rfid, blockedTags: newBlockedTags },
-      };
-    });
-  },
-
-  isTagBlocked: (tagId: string) => {
-    const { rfid } = get();
-    const blockUntil = rfid.blockedTags.get(tagId);
-    if (!blockUntil) return false;
-
-    const isBlocked = Date.now() < blockUntil;
-    if (!isBlocked) {
-      // Clean up expired block
-      get().clearBlockedTag(tagId);
-    }
-    return isBlocked;
-  },
-
-  clearBlockedTag: (tagId: string) => {
-    set(state => {
-      const newBlockedTags = new Map(state.rfid.blockedTags);
-      newBlockedTags.delete(tagId);
-      return {
-        rfid: { ...state.rfid, blockedTags: newBlockedTags },
-      };
-    });
   },
 
   showScanModal: () => {
@@ -1427,69 +806,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }));
   },
 
-  // New optimistic RFID actions
-  addOptimisticScan: (scan: OptimisticScanState) => {
-    set(state => ({
-      rfid: {
-        ...state.rfid,
-        optimisticScans: [...state.rfid.optimisticScans, scan],
-      },
-    }));
-  },
-
-  updateOptimisticScan: (id: string, status: OptimisticScanState['status']) => {
-    set(state => ({
-      rfid: {
-        ...state.rfid,
-        optimisticScans: state.rfid.optimisticScans.map(scan =>
-          scan.id === id ? { ...scan, status } : scan
-        ),
-      },
-    }));
-  },
-
-  removeOptimisticScan: (id: string) => {
-    set(state => ({
-      rfid: {
-        ...state.rfid,
-        optimisticScans: state.rfid.optimisticScans.filter(scan => scan.id !== id),
-      },
-    }));
-  },
-
-  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => {
-    set(state => {
-      const newHistory = new Map(state.rfid.studentHistory);
-      newHistory.set(studentId, {
-        studentId,
-        lastAction: action,
-        timestamp: Date.now(),
-        isProcessing: false,
-      });
-      return {
-        rfid: { ...state.rfid, studentHistory: newHistory },
-      };
-    });
-  },
-
-  isValidScan: (studentId: string, action: 'checkin' | 'checkout') => {
-    const { rfid } = get();
-    const history = rfid.studentHistory.get(studentId);
-
-    // Allow if no previous action
-    if (!history) return true;
-
-    // Allow same action (idempotent)
-    if (history.lastAction === action) return true;
-
-    // Block opposite action only if recent (10s) and still processing
-    if (history.isProcessing && Date.now() - history.timestamp < 10000) {
-      return false;
-    }
-
-    return true;
-  },
-
+  // Duplicate prevention bookkeeping actions
   addToProcessingQueue: (tagId: string) => {
     set(state => {
       const newQueue = new Set(state.rfid.processingQueue);
@@ -1522,12 +839,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     // Layer 2 (scanId-based) is handled in onAdapterScan before this function is called.
     // recentTagScans is a cache, not a dedup gate.
 
-    // Layer 3: If we know the studentId, check student history
-    const studentId = rfid.tagToStudentMap.get(tagId);
-    if (studentId) {
-      return get().isValidStudentScan(studentId, 'checkin');
-    }
-
     return true;
   },
 
@@ -1546,39 +857,10 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       const newScans = new Map(state.rfid.recentTagScans);
       newScans.delete(tagId);
 
-      const newTagMap = new Map(state.rfid.tagToStudentMap);
-      const oldStudentId = newTagMap.get(tagId);
-      newTagMap.delete(tagId);
-
-      const newHistory = new Map(state.rfid.studentHistory);
-      if (oldStudentId) {
-        newHistory.delete(oldStudentId);
-      }
-
       return {
-        rfid: {
-          ...state.rfid,
-          recentTagScans: newScans,
-          tagToStudentMap: newTagMap,
-          studentHistory: newHistory,
-        },
+        rfid: { ...state.rfid, recentTagScans: newScans },
       };
     });
-  },
-
-  mapTagToStudent: (tagId: string, studentId: string) => {
-    set(state => {
-      const newMap = new Map(state.rfid.tagToStudentMap);
-      newMap.set(tagId, studentId);
-      return {
-        rfid: { ...state.rfid, tagToStudentMap: newMap },
-      };
-    });
-  },
-
-  getCachedStudentId: (tagId: string) => {
-    const { rfid } = get();
-    return rfid.tagToStudentMap.get(tagId);
   },
 
   clearOldTagScans: () => {
@@ -1597,25 +879,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
         rfid: { ...state.rfid, recentTagScans: newScans },
       };
     });
-  },
-
-  // Rename isValidScan to isValidStudentScan for clarity
-  isValidStudentScan: (studentId: string, action: 'checkin' | 'checkout') => {
-    const { rfid } = get();
-    const history = rfid.studentHistory.get(studentId);
-
-    // Allow if no previous action
-    if (!history) return true;
-
-    // Allow same action (idempotent)
-    if (history.lastAction === action) return true;
-
-    // Block opposite action only if recent (10s) and still processing
-    if (history.isProcessing && Date.now() - history.timestamp < 10000) {
-      return false;
-    }
-
-    return true;
   },
 
   // Network status actions
@@ -1784,22 +1047,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
     }
   },
 
-  clearSessionSettings: async () => {
-    try {
-      await clearLastSession();
-      const { sessionSettings } = get();
-      set({
-        sessionSettings: sessionSettings
-          ? { ...sessionSettings, last_session: null, use_last_session: false }
-          : null,
-        activeSupervisorTags: new Set<string>(),
-      });
-      storeLogger.info('Session settings cleared');
-    } catch (error) {
-      storeLogger.error('Failed to clear session settings', { error });
-    }
-  },
-
   // Submit daily feedback
   submitDailyFeedback: async (studentId: number, rating: DailyFeedbackRating): Promise<boolean> => {
     const { authenticatedUser } = get();
@@ -1842,7 +1089,6 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
       rfid: {
         ...state.rfid,
         ...RFID_SESSION_INITIAL_STATE,
-        // Preserve tagToStudentMap - useful across sessions for tag-to-student lookups
       },
     }));
   },
@@ -1853,7 +1099,6 @@ export const useUserStore = create<UserState>(
   loggerMiddleware(createUserStore, {
     name: 'UserStore',
     logLevel: LogLevel.DEBUG,
-    activityTracking: true,
     stateChanges: true,
     actionSource: true,
     // Exclude certain high-frequency actions to reduce noise

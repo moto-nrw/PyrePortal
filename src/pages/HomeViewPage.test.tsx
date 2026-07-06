@@ -56,7 +56,6 @@ const baseUser = {
   staffId: 1,
   staffName: 'Test User',
   deviceName: 'Test Device',
-  authenticatedAt: new Date(),
   pin: '1234',
 };
 

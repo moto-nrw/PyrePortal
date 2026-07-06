@@ -73,19 +73,6 @@ class TauriAdapter implements PlatformAdapter {
     );
   }
 
-  async recoverScanner(): Promise<void> {
-    await safeInvoke('recover_rfid_scanner');
-  }
-
-  async getScannerStatus(): Promise<{
-    is_available: boolean;
-    last_error?: string;
-  }> {
-    return await safeInvoke<{ is_available: boolean; last_error?: string }>(
-      'get_rfid_scanner_status'
-    );
-  }
-
   async loadConfig(): Promise<void> {
     this.config = await safeInvoke<{ api_base_url: string; device_api_key: string }>(
       'get_api_config'
@@ -120,10 +107,6 @@ class TauriAdapter implements PlatformAdapter {
 
   async restartApp(): Promise<void> {
     await safeInvoke('restart_app');
-  }
-
-  getDeviceInfo(): { platform: 'tauri'; version: string } {
-    return { platform: this.platform, version: __APP_VERSION__ };
   }
 }
 

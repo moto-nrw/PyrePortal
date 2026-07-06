@@ -50,8 +50,7 @@ describe('TauriAdapter', () => {
 
     it('dispatches scan events through onScan callback', async () => {
       let capturedCallback:
-        | ((event: { payload: { tag_id: string; scan_id: number } }) => void)
-        | null = null;
+        ((event: { payload: { tag_id: string; scan_id: number } }) => void) | null = null;
       mockListen.mockImplementation((_event: unknown, cb: unknown) => {
         capturedCallback = cb as typeof capturedCallback;
         return Promise.resolve(vi.fn());
@@ -124,23 +123,6 @@ describe('TauriAdapter', () => {
       const result = await adapter.scanSingleTag(5000);
       expect(result).toEqual({ success: true, tag_id: 'AA:BB' });
       expect(mockSafeInvoke).toHaveBeenCalledWith('scan_rfid_single', { timeout_ms: 5000 });
-    });
-  });
-
-  describe('recoverScanner', () => {
-    it('calls safeInvoke with recover_rfid_scanner', async () => {
-      mockSafeInvoke.mockResolvedValueOnce(undefined);
-      await adapter.recoverScanner();
-      expect(mockSafeInvoke).toHaveBeenCalledWith('recover_rfid_scanner');
-    });
-  });
-
-  describe('getScannerStatus', () => {
-    it('returns scanner status', async () => {
-      mockSafeInvoke.mockResolvedValueOnce({ is_available: true });
-      const result = await adapter.getScannerStatus();
-      expect(result).toEqual({ is_available: true });
-      expect(mockSafeInvoke).toHaveBeenCalledWith('get_rfid_scanner_status');
     });
   });
 
@@ -226,14 +208,6 @@ describe('TauriAdapter', () => {
       mockSafeInvoke.mockResolvedValueOnce(undefined);
       await adapter.restartApp();
       expect(mockSafeInvoke).toHaveBeenCalledWith('restart_app');
-    });
-  });
-
-  describe('getDeviceInfo', () => {
-    it('returns platform and version', () => {
-      const info = adapter.getDeviceInfo();
-      expect(info.platform).toBe('tauri');
-      expect(typeof info.version).toBe('string');
     });
   });
 });

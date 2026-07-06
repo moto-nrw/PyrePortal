@@ -55,7 +55,6 @@ function App() {
 
   // Conditions for protected routes with additional requirements
   // Note: Authentication is handled by ProtectedRoute component
-  const hasSelectedRoom = !!selectedRoom;
   const hasActiveSession = !!selectedActivity && !!selectedRoom;
 
   return (
@@ -146,14 +145,6 @@ function App() {
               element={
                 <ProtectedRoute condition={hasActiveSession}>
                   <ActivityScanningPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/create-activity"
-              element={
-                <ProtectedRoute condition={hasSelectedRoom}>
-                  <CreateActivityPage />
                 </ProtectedRoute>
               }
             />

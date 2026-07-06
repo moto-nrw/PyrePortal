@@ -84,10 +84,6 @@ class GKTAdapter extends WebAdapterBase implements PlatformAdapter {
       console.log(entry);
     }
   }
-
-  getDeviceInfo(): { platform: 'gkt'; version: string } {
-    return { platform: this.platform, version: __APP_VERSION__ };
-  }
 }
 
 export const adapter: PlatformAdapter = new GKTAdapter();

@@ -4,8 +4,8 @@
  * Contains everything that does not depend on the NFC input source:
  * scan-callback management, the one-shot single-tag capture, config from
  * env vars, the `?key=` device key, localStorage session persistence and
- * the key-preserving restart. Subclasses provide `platform`,
- * `initializeNfc`, `persistLog` and `getDeviceInfo`.
+ * the key-preserving restart. Subclasses provide `platform`, `initializeNfc`
+ * and `persistLog`.
  */
 
 import type { SessionSettings } from '../services/sessionStorage';
@@ -24,7 +24,7 @@ interface PendingSingleScan {
 
 export abstract class WebAdapterBase implements Omit<
   PlatformAdapter,
-  'platform' | 'initializeNfc' | 'persistLog' | 'getDeviceInfo'
+  'platform' | 'initializeNfc' | 'persistLog'
 > {
   protected scanCallback: ScanCallback | null = null;
   protected cachedApiKey: string | null = null;
@@ -89,18 +89,6 @@ export abstract class WebAdapterBase implements Omit<
       };
       this.scanCallback = oneShotCallback;
     });
-  }
-
-  async recoverScanner(): Promise<void> {
-    // No scanner recovery — NFC input is managed outside the page
-  }
-
-  async getScannerStatus(): Promise<{
-    is_available: boolean;
-    last_error?: string;
-  }> {
-    // The page cannot probe the reader — assume available
-    return { is_available: true };
   }
 
   async loadConfig(): Promise<void> {

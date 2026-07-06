@@ -1,25 +1,13 @@
 import { adapter } from '@platform';
 import { useEffect, useRef, useCallback } from 'react';
 
+import { isRealScanningEnabled } from '../platform/adapter';
 import type { NfcScanEvent } from '../platform/adapter';
 import { api, mapApiErrorToGerman, ApiError, formatRoomName } from '../services/api';
 import type { RfidScanResult, CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, serializeError } from '../utils/logger';
-import { isRfidEnabled } from '../utils/tauriContext';
-
-/**
- * True when the current platform uses real NFC/RFID hardware (not mock).
- * - GKT: always real (NFC via system.js)
- * - Wedge: always real (USB reader in keyboard-emulation mode)
- * - Tauri + VITE_ENABLE_RFID=true: real (MFRC522 hardware)
- * - Tauri + VITE_ENABLE_RFID=false: mock
- * - Browser: mock
- */
-const isRealScanningEnabled = (): boolean => {
-  return adapter.platform === 'gkt' || adapter.platform === 'wedge' || isRfidEnabled();
-};
 
 // Mock scanning interval for development
 let mockScanInterval: ReturnType<typeof setInterval> | null = null;
@@ -54,35 +42,12 @@ const createSessionExpiredResult = (): RfidScanResult & { navigateOnClose: strin
 });
 
 /**
- * Creates the initial optimistic scan object for UI feedback.
- */
-const createOptimisticScan = (scanId: string, tagId: string) => ({
-  id: scanId,
-  tagId,
-  status: 'pending' as const,
-  optimisticAction: 'checkin' as const,
-  optimisticStudentCount: 0,
-  timestamp: Date.now(),
-  studentInfo: {
-    name: 'Processing...',
-    id: 0,
-  },
-});
-
-/**
- * Generates a unique scan ID for tracking optimistic updates.
- * Uses crypto.randomUUID() for cryptographically secure random values.
- */
-const generateScanId = (): string => `scan_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-
-/**
  * Handles supervisor authentication from RFID scan.
  * Returns true if supervisor was handled (caller should return early).
  */
 interface SupervisorHandlerParams {
   result: RfidScanResult;
   tagId: string;
-  scanId: string;
   currentSession: CurrentSession | null;
   pin: string;
   scannedSupervisorsRef: { current: Set<number> };
@@ -90,9 +55,8 @@ interface SupervisorHandlerParams {
   addActiveSupervisorTag: (tagId: string) => void;
   isActiveSupervisor: (tagId: string) => boolean;
   setScanResult: (result: RfidScanResult) => void;
-  removeOptimisticScan: (scanId: string) => void;
   showScanModal: () => void;
-  showSupervisorRedirect: (scanId?: string) => void;
+  showSupervisorRedirect: () => void;
 }
 
 const handleSupervisorAuthentication = async (
@@ -101,7 +65,6 @@ const handleSupervisorAuthentication = async (
   const {
     result,
     tagId,
-    scanId,
     currentSession,
     pin,
     scannedSupervisorsRef,
@@ -109,7 +72,6 @@ const handleSupervisorAuthentication = async (
     addActiveSupervisorTag,
     isActiveSupervisor,
     setScanResult,
-    removeOptimisticScan,
     showScanModal,
     showSupervisorRedirect,
   } = params;
@@ -148,7 +110,7 @@ const handleSupervisorAuthentication = async (
 
   // Show redirect for repeat supervisors
   if (isRepeatSupervisor) {
-    showSupervisorRedirect(scanId);
+    showSupervisorRedirect();
     return true;
   }
 
@@ -159,7 +121,6 @@ const handleSupervisorAuthentication = async (
     message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
   };
   setScanResult(firstScanResult);
-  removeOptimisticScan(scanId);
   showScanModal();
   return true;
 };
@@ -188,13 +149,11 @@ const syncSupervisorsWithBackend = async (
 };
 
 /**
- * Processes successful student scan - updates bookkeeping and cache.
+ * Processes successful student scan - updates the short-lived result cache.
  */
 interface StudentBookkeepingParams {
   result: RfidScanResult;
   tagId: string;
-  mapTagToStudent: (tagId: string, studentId: string) => void;
-  updateStudentHistory: (studentId: string, action: 'checkin' | 'checkout') => void;
   recordTagScan: (
     tagId: string,
     data: { timestamp: number; studentId?: string; result?: RfidScanResult }
@@ -202,19 +161,15 @@ interface StudentBookkeepingParams {
 }
 
 const processStudentBookkeeping = (params: StudentBookkeepingParams): void => {
-  const { result, tagId, mapTagToStudent, updateStudentHistory, recordTagScan } = params;
+  const { result, tagId, recordTagScan } = params;
 
   if (!result.student_id) {
     return;
   }
 
   const studentId = result.student_id.toString();
-  const action = result.action === 'checked_in' ? 'checkin' : 'checkout';
 
-  mapTagToStudent(tagId, studentId);
-  updateStudentHistory(studentId, action);
-
-  // Short-lived duplicate prevention cache (in-memory only)
+  // Short-lived result cache (in-memory only)
   recordTagScan(tagId, {
     timestamp: Date.now(),
     studentId,
@@ -324,21 +279,14 @@ export const useRfidScanning = () => {
     startRfidScanning,
     stopRfidScanning,
     setScanResult,
-    isTagBlocked,
     showScanModal,
     // Note: hideScanModal removed - modal timeout now handled exclusively by page components
-    // New optimistic actions
-    addOptimisticScan,
-    updateOptimisticScan,
-    removeOptimisticScan,
-    updateStudentHistory,
     addToProcessingQueue,
     removeFromProcessingQueue,
     lockPickupQueryTag,
     // Enhanced duplicate prevention
     canProcessTag,
     recordTagScan,
-    mapTagToStudent,
     clearOldTagScans,
     // Supervisor RFID actions
     addSupervisorFromRfid,
@@ -351,26 +299,20 @@ export const useRfidScanning = () => {
   const scannedSupervisorsRef = useRef<Set<number>>(new Set());
   const processedScanIdsRef = useRef<Map<number, number>>(new Map());
 
-  const showSupervisorRedirect = useCallback(
-    (scanId?: string) => {
-      const redirectResult: RfidScanResult = {
-        student_name: 'Betreuer erkannt',
-        student_id: null,
-        action: 'supervisor_authenticated',
-        message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
-        isInfo: true,
-        // Flag to indicate navigation should happen on modal close
-        navigateOnClose: '/home',
-      } as RfidScanResult & { navigateOnClose: string };
-      setScanResult(redirectResult);
-      if (scanId) {
-        removeOptimisticScan(scanId);
-      }
-      showScanModal();
-      // Modal timeout and navigation handled by ActivityScanningPage via useModalTimeout
-    },
-    [removeOptimisticScan, setScanResult, showScanModal]
-  );
+  const showSupervisorRedirect = useCallback(() => {
+    const redirectResult: RfidScanResult = {
+      student_name: 'Betreuer erkannt',
+      student_id: null,
+      action: 'supervisor_authenticated',
+      message: 'Betreuer wird zum Home-Bildschirm weitergeleitet.',
+      isInfo: true,
+      // Flag to indicate navigation should happen on modal close
+      navigateOnClose: '/home',
+    } as RfidScanResult & { navigateOnClose: string };
+    setScanResult(redirectResult);
+    showScanModal();
+    // Modal timeout and navigation handled by ActivityScanningPage via useModalTimeout
+  }, [setScanResult, showScanModal]);
 
   // Helper to show system error modal
   // Note: Modal timeout handled by page component via useModalTimeout hook
@@ -513,14 +455,13 @@ export const useRfidScanning = () => {
 
       logger.info('Processing RFID scan', { tagId });
 
-      // Handle duplicate prevention (Layer 1: processing queue, Layer 3: student history)
+      // Handle duplicate prevention (Layer 1: processing queue)
       if (!canProcessTag(tagId)) {
         logger.debug('Tag blocked by duplicate prevention', { tagId });
         return;
       }
 
       let isInProcessingQueue = false;
-      const scanId = generateScanId();
       const startTime = Date.now();
 
       try {
@@ -529,10 +470,7 @@ export const useRfidScanning = () => {
         isInProcessingQueue = true;
         recordTagScan(tagId, { timestamp: Date.now() });
 
-        // Track optimistic scan state (no modal yet - wait for API response)
-        addOptimisticScan(createOptimisticScan(scanId, tagId));
         logger.info('Starting network scan (cache disabled)');
-        updateOptimisticScan(scanId, 'processing');
 
         // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
@@ -546,7 +484,6 @@ export const useRfidScanning = () => {
           responseTime: Date.now() - startTime,
         });
 
-        updateOptimisticScan(scanId, 'success');
         // Include scannedTagId so ActivityScanningPage can use it directly
         // instead of looking it up from recentTagScans (fixes race condition)
         setScanResult({ ...result, scannedTagId: tagId });
@@ -555,7 +492,6 @@ export const useRfidScanning = () => {
         const supervisorHandled = await handleSupervisorAuthentication({
           result,
           tagId,
-          scanId,
           currentSession: freshSession,
           pin: freshUser.pin,
           scannedSupervisorsRef,
@@ -563,7 +499,6 @@ export const useRfidScanning = () => {
           addActiveSupervisorTag,
           isActiveSupervisor,
           setScanResult,
-          removeOptimisticScan,
           showScanModal,
           showSupervisorRedirect,
         });
@@ -576,12 +511,10 @@ export const useRfidScanning = () => {
         processStudentBookkeeping({
           result,
           tagId,
-          mapTagToStudent,
-          updateStudentHistory,
           recordTagScan,
         });
 
-        // Show result modal now that we have real data (not optimistic)
+        // Show result modal now that we have real data from the server
         showScanModal();
 
         // Update session activity (fire-and-forget)
@@ -591,30 +524,17 @@ export const useRfidScanning = () => {
         } catch (activityError) {
           logger.warn('Failed to update session activity', { error: activityError });
         }
-
-        removeOptimisticScan(scanId);
       } catch (error) {
         logger.error('Failed to process RFID scan', { error: serializeError(error) });
-        updateOptimisticScan(scanId, 'failed');
         const errorResult = createScanErrorResult(error);
         setScanResult(errorResult);
-        removeOptimisticScan(scanId);
         showScanModal();
 
-        // For STUDENT_ALREADY_ACTIVE the backend tells us exactly which
-        // student is on the reader. If we leave the bracelet sitting
-        // there, every subsequent scan event will fire another 409 at
-        // the backend unless we populate the dedup map ourselves —
-        // canProcessTag() only inspects tagToStudentMap once it's been
-        // written. Mirror what processStudentBookkeeping() does on the
-        // happy path so the second tap is suppressed locally instead of
-        // turning issue #844 into a 409 retry storm. Treat it as a
-        // checkin for history purposes — the student IS checked in,
-        // just not via this scan.
+        // For STUDENT_ALREADY_ACTIVE (issue #844) the backend tells us
+        // exactly which student is on the reader. Cache the result like
+        // the happy path does so pages reading recentTagScans see it.
         if (errorResult.action === 'already_in' && errorResult.student_id !== null) {
           const studentId = errorResult.student_id.toString();
-          mapTagToStudent(tagId, studentId);
-          updateStudentHistory(studentId, 'checkin');
           recordTagScan(tagId, {
             timestamp: Date.now(),
             studentId,
@@ -630,16 +550,11 @@ export const useRfidScanning = () => {
     [
       setScanResult,
       showScanModal,
-      addOptimisticScan,
-      updateOptimisticScan,
-      removeOptimisticScan,
-      updateStudentHistory,
       addToProcessingQueue,
       removeFromProcessingQueue,
       lockPickupQueryTag,
       canProcessTag,
       recordTagScan,
-      mapTagToStudent,
       addSupervisorFromRfid,
       addActiveSupervisorTag,
       isActiveSupervisor,
@@ -647,7 +562,7 @@ export const useRfidScanning = () => {
     ]
   );
 
-  // Create onScan callback for the adapter (checks blocked tags + processes scan)
+  // Create onScan callback for the adapter (dedups by scanId + processes scan)
   const onAdapterScan = useCallback(
     (event: NfcScanEvent) => {
       const { tagId, scanId } = event;
@@ -671,13 +586,9 @@ export const useRfidScanning = () => {
       processedScanIds.set(scanId, now);
 
       logger.info('RFID scan event received', { tagId, scanId });
-      if (isTagBlocked(tagId)) {
-        logger.debug('Tag blocked, skipping', { tagId, scanId });
-      } else {
-        void processScan(tagId);
-      }
+      void processScan(tagId);
     },
-    [isTagBlocked, processScan]
+    [processScan]
   );
 
   const waitForBackendServiceState = useCallback(
@@ -766,12 +677,7 @@ export const useRfidScanning = () => {
               platform: 'Development Mock',
             });
 
-            // Check if tag is blocked before processing
-            if (isTagBlocked(mockTagId)) {
-              logger.debug('Mock tag blocked, skipping', { tagId: mockTagId });
-            } else {
-              onAdapterScan({ tagId: mockTagId, scanId });
-            }
+            onAdapterScan({ tagId: mockTagId, scanId });
           },
           5000 + getSecureRandomInt(5000)
         ); // Random interval between 5-10 seconds
@@ -810,7 +716,7 @@ export const useRfidScanning = () => {
         'Das RFID-Lesegerät konnte nicht gestartet werden. Bitte Gerät prüfen.'
       );
     }
-  }, [startRfidScanning, isTagBlocked, showSystemError, waitForBackendServiceState, onAdapterScan]);
+  }, [startRfidScanning, showSystemError, waitForBackendServiceState, onAdapterScan]);
 
   const stopScanning = useCallback(async () => {
     const callTimestamp = Date.now();

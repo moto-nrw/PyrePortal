@@ -18,20 +18,12 @@ vi.mock('@tauri-apps/api/event', () => ({
   once: vi.fn(() => Promise.resolve(() => {})),
 }));
 
-// Mock @tauri-apps/plugin-opener (real exports: openUrl, openPath, revealItemInDir)
-vi.mock('@tauri-apps/plugin-opener', () => ({
-  openUrl: vi.fn(() => Promise.resolve()),
-  openPath: vi.fn(() => Promise.resolve()),
-  revealItemInDir: vi.fn(() => Promise.resolve()),
-}));
-
 // ---------------------------------------------------------------------------
 // 2. tauriContext mock — safeInvoke should be mockable per-test
 // ---------------------------------------------------------------------------
 
 vi.mock('../utils/tauriContext', () => ({
   safeInvoke: vi.fn(() => Promise.reject(new Error('Tauri context not available in tests'))),
-  isRfidEnabled: vi.fn(() => false),
 }));
 
 // ---------------------------------------------------------------------------

@@ -94,10 +94,6 @@ class WedgeAdapter extends WebAdapterBase implements PlatformAdapter {
     // eslint-disable-next-line no-console
     console.log('[PyrePortal]', entry);
   }
-
-  getDeviceInfo(): { platform: 'wedge'; version: string } {
-    return { platform: this.platform, version: __APP_VERSION__ };
-  }
 }
 
 export const adapter: PlatformAdapter = new WedgeAdapter();

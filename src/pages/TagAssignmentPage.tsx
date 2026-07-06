@@ -8,7 +8,7 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
-import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
+import { isRealScanningEnabled } from '../platform/adapter';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -16,20 +16,8 @@ import theme from '../styles/theme';
 import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { pressHandlers } from '../utils/pressHandlers';
-import { isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
-
-/**
- * True when the current platform uses real NFC/RFID hardware.
- * GKT always uses real NFC via system.js, wedge uses a USB keyboard-emulation
- * reader, Tauri depends on VITE_ENABLE_RFID.
- */
-const isRealScanningEnabled = (): boolean =>
-  adapter.platform === 'gkt' || adapter.platform === 'wedge' || isRfidEnabled();
-
-const canCancelAdapterSingleScan = (): boolean =>
-  adapter.platform === 'gkt' || adapter.platform === 'wedge';
 
 /**
  * Helper to get assigned person from TagAssignmentCheck
@@ -118,7 +106,7 @@ function TagAssignmentPage() {
       mockScanTimeoutRef.current = null;
     }
 
-    if (canCancelAdapterSingleScan()) {
+    if (isRealScanningEnabled()) {
       void adapter.stopScanning().catch(err => {
         const error = err instanceof Error ? err : new Error(String(err));
         logError(error, 'Failed to cancel RFID scanner');
@@ -143,7 +131,7 @@ function TagAssignmentPage() {
       if (mockScanTimeoutRef.current) {
         clearTimeout(mockScanTimeoutRef.current);
       }
-      if (canCancelAdapterSingleScan()) {
+      if (isRealScanningEnabled()) {
         void adapter.stopScanning().catch(err => {
           const error = err instanceof Error ? err : new Error(String(err));
           logError(error, 'Failed to stop RFID scanner during cleanup');
@@ -350,14 +338,17 @@ function TagAssignmentPage() {
     void handleStartScanning();
   };
 
-  // Handle unassigning a tag from a student
+  // Handle unassigning a tag from a student or staff member
   const handleUnassignTag = async () => {
     const assignedPerson = getAssignedPerson(tagAssignment);
     if (!authenticatedUser?.pin || !assignedPerson || !scannedTag) return;
 
     setIsUnassigning(true);
     try {
-      const result = await api.unassignStudentTag(authenticatedUser.pin, assignedPerson.id);
+      const result =
+        tagAssignment?.person_type === 'staff'
+          ? await api.unassignStaffTag(authenticatedUser.pin, assignedPerson.id)
+          : await api.unassignStudentTag(authenticatedUser.pin, assignedPerson.id);
 
       if (!result.success) {
         setShowUnassignConfirm(false);
@@ -439,9 +430,9 @@ function TagAssignmentPage() {
           </h1>
 
           {/* Scanner Modal Overlay
-              Budget: backend stop (3s) + SPI mutex (3s) + hardware scan (10s) = 16s worst-case.
-              Modal timeout (18s) exceeds that to avoid false "unresponsive" closures.
-              See scan_rfid_single() in src-tauri/src/rfid.rs for backend path. */}
+              The 18s modal timeout was sized for the retired Tauri/Pi hardware path
+              (backend stop 3s + SPI mutex 3s + hardware scan 10s = 16s worst-case)
+              and is kept as a generous upper bound for GKT/mock scanning. */}
           <ModalBase
             isOpen={showScanner}
             onClose={cancelScan}
@@ -821,8 +812,8 @@ function TagAssignmentPage() {
                     </button>
                   </div>
 
-                  {/* Unassign button - only for student assignments */}
-                  {tagAssignment.assigned && tagAssignment.person_type === 'student' && (
+                  {/* Unassign button */}
+                  {tagAssignment.assigned && (
                     <button
                       onClick={() => setShowUnassignConfirm(true)}
                       style={{
@@ -1069,8 +1060,6 @@ function TagAssignmentPage() {
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />
-
-      {__BUILD_TARGET__ !== 'gkt' && <ScannerRestartButton />}
     </>
   );
 }

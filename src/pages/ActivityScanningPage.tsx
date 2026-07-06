@@ -12,19 +12,19 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
-import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import { useRfidScanning } from '../hooks/useRfidScanning';
 import {
   api,
   formatRoomName,
   mapServerErrorToGerman,
+  isNetworkRelatedError,
   WC_ROOM_ALIASES,
   type RfidScanResult,
   type DailyFeedbackRating,
   type DeviceConfig,
   type Room,
 } from '../services/api';
-import { useUserStore, isNetworkRelatedError } from '../store/userStore';
+import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('ActivityScanningPage');
@@ -545,11 +545,11 @@ const ActivityScanningPage: React.FC = () => {
     if (!authenticatedUser?.pin) return;
 
     try {
-      const sessionInfo = await api.getCurrentSessionInfo(authenticatedUser.pin);
-      logger.debug('Session info received', sessionInfo ?? {});
+      const session = await api.getCurrentSession(authenticatedUser.pin);
+      logger.debug('Session info received', { session });
 
-      if (sessionInfo) {
-        const count = sessionInfo.active_students ?? 0;
+      if (session) {
+        const count = session.active_students ?? 0;
         logger.info('Setting student count', { count });
         setStudentCount(count);
       } else {
@@ -1887,13 +1887,6 @@ const ActivityScanningPage: React.FC = () => {
           {/* Content area for message or button */}
           {renderModalContent()}
         </ModalBase>
-      )}
-
-      {__BUILD_TARGET__ !== 'gkt' && (
-        <ScannerRestartButton
-          onBeforeRecover={() => stopScanning()}
-          onAfterRecover={() => startScanning()}
-        />
       )}
 
       {/* Keyframes for center RFID processing spinner */}

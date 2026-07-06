@@ -9,12 +9,13 @@ import { ErrorModal, ModalBase, ModalActionButtons } from '../components/ui';
 import {
   api,
   formatRoomName,
+  isNetworkRelatedError,
   mapServerErrorToGerman,
   type SessionStartRequest,
   type CurrentSession,
 } from '../services/api';
 import type { SessionSettings } from '../services/sessionStorage';
-import { useUserStore, isNetworkRelatedError } from '../store/userStore';
+import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 
@@ -336,9 +337,6 @@ function HomeViewPage() {
   if (!authenticatedUser) {
     return null; // Will redirect via useEffect
   }
-
-  // Extract first name from full name (unused for now)
-  // const firstName = authenticatedUser.staffName.split(' ')[0];
 
   return (
     <BackgroundWrapper>

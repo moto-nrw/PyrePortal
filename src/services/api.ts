@@ -237,7 +237,10 @@ function isStringOrNumber(value: unknown): value is string | number {
  */
 export const WC_ROOM_ALIASES = ['WC', 'Toilette'] as const;
 
-/** Returns true when the given room name is one of the toilet aliases. */
+/**
+ * Returns true when the given room name is one of the toilet aliases.
+ * Only used internally; exported as a test seam for api.test.ts.
+ */
 export function isWCRoomAlias(name: string): boolean {
   return (WC_ROOM_ALIASES as readonly string[]).includes(name);
 }
@@ -364,10 +367,7 @@ export function isNetworkRelatedError(error: unknown): boolean {
  * This function first tries to match specific backend messages via
  * mapServerErrorToGerman, then falls back to context-specific generic messages.
  */
-function mapAttendanceErrorToGerman(
-  errorMessage: string,
-  context: 'status' | 'toggle' | 'feedback'
-): string {
+function mapAttendanceErrorToGerman(errorMessage: string, context: 'toggle' | 'feedback'): string {
   // Network errors - use consolidated handler
   if (isNetworkRelatedError(errorMessage)) {
     return 'Netzwerkfehler. Bitte Verbindung prüfen.';
@@ -405,8 +405,6 @@ function mapAttendanceErrorToGerman(
     errorMessage.includes('Not Found')
   ) {
     switch (context) {
-      case 'status':
-        return 'Schüler nicht gefunden oder keine Anwesenheitsdaten für heute verfügbar.';
       case 'toggle':
         return 'Schüler nicht gefunden. RFID-Tag möglicherweise nicht zugewiesen.';
       case 'feedback':
@@ -417,8 +415,6 @@ function mapAttendanceErrorToGerman(
   // 403 errors - permission denied
   if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
     switch (context) {
-      case 'status':
-        return 'Keine Berechtigung für Anwesenheitsstatus dieses Schülers.';
       case 'toggle':
         return 'Keine Berechtigung für An-/Abmeldung dieses Schülers.';
       case 'feedback':
@@ -683,7 +679,6 @@ export interface PinValidationResult {
     staffId: number;
   };
   error?: string;
-  isLocked?: boolean;
 }
 
 /**
@@ -854,73 +849,6 @@ export const api = {
   },
 
   /**
-   * Validate teacher PIN with enhanced error handling
-   * Endpoint: GET /api/iot/status
-   */
-  async validateTeacherPin(pin: string, staffId: number): Promise<PinValidationResult> {
-    try {
-      logger.debug('Starting PIN validation');
-
-      const response = await apiCall<{
-        status: string;
-        data: {
-          device: { id: number; device_id: string; name: string; status: string };
-          staff: { id: number; person_id: number };
-          person: { first_name: string; last_name: string };
-          authenticated_at: string;
-        };
-        message: string;
-      }>('/api/iot/status', {
-        headers: {
-          Authorization: `Bearer ${DEVICE_API_KEY}`,
-          'X-Staff-PIN': pin,
-          'X-Staff-ID': staffId.toString(),
-        },
-      });
-
-      logger.info('PIN validation successful');
-
-      // Check if response has the expected structure
-      if (!response.data?.device || !response.data.person || !response.data.staff) {
-        logger.error('Unexpected response structure', { response });
-        return {
-          success: false,
-          error: 'Unerwartete Server-Antwort. Bitte versuchen Sie es erneut.',
-        };
-      }
-
-      const { device, person, staff } = response.data;
-
-      return {
-        success: true,
-        userData: {
-          deviceName: device.name || 'Unknown Device',
-          staffName: `${person.first_name || ''} ${person.last_name || ''}`.trim(),
-          staffId: staff.id,
-        },
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      logger.error('PIN validation failed', {
-        error: errorMessage,
-      });
-
-      // Use the error mapping function for user-friendly messages
-      const userMessage = mapServerErrorToGerman(errorMessage);
-
-      // Check if account is locked (423 status)
-      const isLocked = errorMessage.includes('423') || errorMessage.includes('locked');
-
-      return {
-        success: false,
-        error: userMessage,
-        isLocked,
-      };
-    }
-  },
-
-  /**
    * Get teacher's activities for today
    * Endpoint: GET /api/iot/activities
    */
@@ -949,20 +877,6 @@ export const api = {
       throw new Error(`Health check failed: ${response.status}`);
     }
     // Response is plain text "OK", not JSON - no parsing needed
-  },
-
-  /**
-   * Device health ping (authenticated)
-   * Endpoint: POST /api/iot/ping
-   */
-  async pingDevice(pin: string): Promise<void> {
-    await apiCall('/api/iot/ping', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${DEVICE_API_KEY}`,
-        'X-Staff-PIN': pin,
-      },
-    });
   },
 
   /**
@@ -1220,8 +1134,19 @@ export const api = {
    * Remove RFID tag from staff member
    * Endpoint: DELETE /api/iot/staff/{staffId}/rfid
    */
-  async unassignStaffTag(pin: string, staffId: number): Promise<void> {
-    await apiCall(`/api/iot/staff/${staffId}/rfid`, {
+  async unassignStaffTag(pin: string, staffId: number): Promise<TagAssignmentResult> {
+    const response = await apiCall<{
+      status: string;
+      data?: {
+        success: boolean;
+        student_id: number;
+        student_name: string;
+        rfid_tag: string;
+        previous_tag?: string;
+        message?: string;
+      };
+      message?: string;
+    }>(`/api/iot/staff/${staffId}/rfid`, {
       method: 'DELETE',
       headers: {
         Authorization: `Bearer ${DEVICE_API_KEY}`,
@@ -1229,6 +1154,15 @@ export const api = {
         'X-Staff-ID': staffId.toString(),
       },
     });
+
+    return {
+      success: response.data?.success ?? response.status === 'success',
+      message: response.data?.message ?? response.message,
+      student_id: response.data?.student_id,
+      student_name: response.data?.student_name,
+      rfid_tag: response.data?.rfid_tag,
+      previous_tag: response.data?.previous_tag,
+    };
   },
 
   /**
@@ -1343,70 +1277,6 @@ export const api = {
         timestamp: new Date().toISOString(),
       }),
     });
-  },
-
-  /**
-   * Get current session information including active student count
-   * Endpoint: GET /api/iot/session/current
-   */
-  async getCurrentSessionInfo(
-    pin: string
-  ): Promise<{ activity_name: string; room_name: string; active_students: number } | null> {
-    try {
-      const response = await apiCall<{
-        status: string;
-        data: CurrentSession | { device_id: number; is_active: false };
-        message: string;
-      }>('/api/iot/session/current', {
-        headers: {
-          Authorization: `Bearer ${DEVICE_API_KEY}`,
-          'X-Staff-PIN': pin,
-        },
-      });
-
-      // Check if we have an active session
-      if ('is_active' in response.data && response.data.is_active === false) {
-        return null;
-      }
-
-      // Map the CurrentSession to the simplified format expected by the UI
-      const session = response.data;
-      return {
-        activity_name: session.activity_name ?? 'Unknown Activity',
-        room_name: session.room_name ?? 'Unknown Room',
-        active_students: session.active_students ?? 0,
-      };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      // 404 means no current session
-      if (errorMessage.includes('404')) {
-        return null;
-      }
-      throw error;
-    }
-  },
-
-  /**
-   * Get student attendance status
-   * Endpoint: GET /api/iot/attendance/status/{rfid}
-   */
-  async getAttendanceStatus(pin: string, rfid: string): Promise<AttendanceStatusResponse> {
-    try {
-      const response = await apiCall<AttendanceStatusResponse>(
-        `/api/iot/attendance/status/${rfid}`,
-        {
-          headers: {
-            Authorization: `Bearer ${DEVICE_API_KEY}`,
-            'X-Staff-PIN': pin,
-          },
-        }
-      );
-
-      return response;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'status'));
-    }
   },
 
   /**
@@ -1581,33 +1451,6 @@ export interface RfidScanResult {
   scannedTagId?: string;
   /** Authoritative count of active students in the room's session (from server) */
   active_students?: number;
-}
-
-/**
- * Attendance status response from GET /api/iot/attendance/status/{rfid}
- */
-interface AttendanceStatusResponse {
-  status: string;
-  data: {
-    student: {
-      id: number;
-      first_name: string;
-      last_name: string;
-      group: {
-        id: number;
-        name: string;
-      };
-    };
-    attendance: {
-      status: 'checked_in' | 'checked_out' | 'not_checked_in';
-      date: string;
-      check_in_time: string | null;
-      check_out_time: string | null;
-      checked_in_by: string;
-      checked_out_by: string;
-    };
-  };
-  message: string;
 }
 
 /**

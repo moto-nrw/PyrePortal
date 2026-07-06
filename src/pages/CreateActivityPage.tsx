@@ -2,12 +2,12 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
-  ContinueButton,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
   SelectionPageLayout,
 } from '../components/ui';
+import { PillButton } from '../components/ui/PillButton';
 import { usePagination } from '../hooks/usePagination';
 import type { ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
@@ -285,7 +285,9 @@ function CreateActivityPage() {
           />
 
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-            <ContinueButton onClick={handleContinue} disabled={!selectedActivity} />
+            <PillButton variant="primary" onClick={handleContinue} disabled={!selectedActivity}>
+              Weiter
+            </PillButton>
           </div>
         </>
       )}

@@ -60,13 +60,12 @@ When modifying scanning logic:
 
 ### 2. Multi-Layer Duplicate Prevention
 
-**Location**: `src/store/userStore.ts`
+**Location**: `src/store/userStore.ts` and `src/hooks/useRfidScanning.ts`
 
-RFID hardware and browser mocks can emit duplicate scan events. The store defends with:
+RFID hardware and browser mocks can emit duplicate scan events. Defense in depth:
 
-1. Processing queue for tags currently being processed.
-2. Recent tag scan window.
-3. Student history to block opposite actions immediately after a scan.
+1. Processing queue in the store for tags currently being processed.
+2. Adapter-level scanId dedup in `useRfidScanning`'s `onAdapterScan`.
 
 ### 3. Platform Adapter Boundary
 
@@ -124,14 +123,13 @@ headers: {
 
 ### Key Endpoints
 
-| Endpoint                         | Purpose                | Auth                    |
-| -------------------------------- | ---------------------- | ----------------------- |
-| `GET /api/iot/teachers`          | Fetch staff list       | Device only             |
-| `POST /api/iot/ping`             | Validate global PIN    | Device + PIN            |
-| `GET /api/iot/status`            | Validate teacher PIN   | Device + PIN + Staff ID |
-| `POST /api/iot/checkin`          | Process RFID scan      | Device + PIN            |
-| `POST /api/iot/session/start`    | Start activity session | Device + PIN            |
-| `POST /api/iot/session/activity` | Prevent timeout        | Device + PIN            |
+| Endpoint                         | Purpose                | Auth         |
+| -------------------------------- | ---------------------- | ------------ |
+| `GET /api/iot/teachers`          | Fetch staff list       | Device only  |
+| `POST /api/iot/ping`             | Validate global PIN    | Device + PIN |
+| `POST /api/iot/checkin`          | Process RFID scan      | Device + PIN |
+| `POST /api/iot/session/start`    | Start activity session | Device + PIN |
+| `POST /api/iot/session/activity` | Prevent timeout        | Device + PIN |
 
 ## Releasing
 

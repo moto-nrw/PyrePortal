@@ -9,7 +9,7 @@ type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 /** Size preset configurations matching existing modal dimensions */
 const SIZE_PRESETS = {
-  sm: { maxWidth: '500px', padding: '48px', borderRadius: '20px' }, // ErrorModal, SuccessModal, InfoModal
+  sm: { maxWidth: '500px', padding: '48px', borderRadius: '20px' }, // ErrorModal, SuccessModal
   md: { maxWidth: '600px', padding: '56px', borderRadius: '24px' }, // GroupPicker, TagAssignment scanner
   lg: { maxWidth: '700px', padding: '64px', borderRadius: '32px' }, // ActivityScanningPage (current default)
   xl: { maxWidth: '1060px', padding: '64px', borderRadius: '32px' }, // Wide modals (e.g., 4-button checkout)
