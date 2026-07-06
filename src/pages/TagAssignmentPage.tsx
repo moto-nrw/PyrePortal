@@ -8,7 +8,7 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
-import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
+import { isRealScanningEnabled } from '../platform/adapter';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -16,15 +16,8 @@ import theme from '../styles/theme';
 import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { pressHandlers } from '../utils/pressHandlers';
-import { isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('TagAssignmentPage');
-
-/**
- * True when the current platform uses real NFC/RFID hardware.
- * GKT always uses real NFC via system.js, Tauri depends on VITE_ENABLE_RFID.
- */
-const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt' || isRfidEnabled();
 
 /**
  * Helper to get assigned person from TagAssignmentCheck
@@ -403,9 +396,9 @@ function TagAssignmentPage() {
           </h1>
 
           {/* Scanner Modal Overlay
-              Budget: backend stop (3s) + SPI mutex (3s) + hardware scan (10s) = 16s worst-case.
-              Modal timeout (18s) exceeds that to avoid false "unresponsive" closures.
-              See scan_rfid_single() in src-tauri/src/rfid.rs for backend path. */}
+              The 18s modal timeout was sized for the retired Tauri/Pi hardware path
+              (backend stop 3s + SPI mutex 3s + hardware scan 10s = 16s worst-case)
+              and is kept as a generous upper bound for GKT/mock scanning. */}
           <ModalBase
             isOpen={showScanner}
             onClose={cancelScan}
@@ -1033,8 +1026,6 @@ function TagAssignmentPage() {
 
       {/* Bottom-left spinner: visible between RFID tag detection and API response */}
       <RfidProcessingIndicator isVisible={isLoading && !!scannedTag} />
-
-      {__BUILD_TARGET__ !== 'gkt' && <ScannerRestartButton />}
     </>
   );
 }

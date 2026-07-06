@@ -2,12 +2,12 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
-  ContinueButton,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
   SelectionPageLayout,
 } from '../components/ui';
+import { PillButton } from '../components/ui/PillButton';
 import { usePagination } from '../hooks/usePagination';
 import { useUserStore } from '../store/userStore';
 import { createLogger, logNavigation, logUserAction } from '../utils/logger';
@@ -164,7 +164,13 @@ function StaffSelectionPage() {
       />
 
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-        <ContinueButton onClick={handleContinue} disabled={selectedSupervisors.length === 0} />
+        <PillButton
+          variant="primary"
+          onClick={handleContinue}
+          disabled={selectedSupervisors.length === 0}
+        >
+          Weiter
+        </PillButton>
       </div>
     </SelectionPageLayout>
   );

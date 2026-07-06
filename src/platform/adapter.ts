@@ -5,9 +5,18 @@
  * Vite resolves `@platform` to the correct directory based on BUILD_TARGET.
  */
 
+import { adapter } from '@platform';
+
 import type { SessionSettings } from '../services/sessionStorage';
 
 type Platform = 'tauri' | 'gkt' | 'browser';
+
+/**
+ * True when the current platform uses real NFC/RFID hardware (not mock).
+ * - GKT: always real (NFC via system.js)
+ * - Browser and Tauri Mac/mock app: mock
+ */
+export const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt';
 
 export interface NfcScanEvent {
   tagId: string;
@@ -28,13 +37,6 @@ export interface PlatformAdapter {
   // --- Single Tag Scan (admin tag assignment UI) ---
   scanSingleTag(timeoutMs: number): Promise<{ success: boolean; tag_id?: string; error?: string }>;
 
-  // --- Scanner Health (Tauri: hardware recovery, GKT: no-op) ---
-  recoverScanner(): Promise<void>;
-  getScannerStatus(): Promise<{
-    is_available: boolean;
-    last_error?: string;
-  }>;
-
   // --- Configuration ---
   /** Async config init (Tauri: loads from Rust backend, others: no-op) */
   loadConfig(): Promise<void>;
@@ -51,7 +53,4 @@ export interface PlatformAdapter {
 
   // --- App Lifecycle ---
   restartApp(): Promise<void>;
-
-  // --- Device Info ---
-  getDeviceInfo(): { platform: Platform; version: string };
 }

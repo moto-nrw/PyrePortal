@@ -5,7 +5,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { isRfidEnabled } from '../utils/tauriContext';
 
 import TagAssignmentPage from './TagAssignmentPage';
 
@@ -45,7 +44,6 @@ const baseUser = {
   staffId: 1,
   staffName: 'Test User',
   deviceName: 'Test Device',
-  authenticatedAt: new Date(),
   pin: '1234',
 };
 
@@ -1068,12 +1066,12 @@ describe('TagAssignmentPage', () => {
   });
 
   // =======================================================================
-  // Real RFID path (isRfidEnabled = true)
+  // Real RFID path (GKT platform)
   // =======================================================================
 
-  describe('with RFID enabled', () => {
+  describe('with real scanning enabled', () => {
     beforeEach(() => {
-      vi.mocked(isRfidEnabled).mockReturnValue(true);
+      (adapter as unknown as Record<string, unknown>).platform = 'gkt';
     });
 
     it('successful RFID scan processes the tag', async () => {
@@ -1227,7 +1225,6 @@ describe('TagAssignmentPage', () => {
 
   describe('with GKT platform', () => {
     beforeEach(() => {
-      vi.mocked(isRfidEnabled).mockReturnValue(false);
       (adapter as unknown as Record<string, unknown>).platform = 'gkt';
     });
 

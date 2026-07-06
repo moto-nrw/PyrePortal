@@ -20,12 +20,7 @@ const isTauriContext = (): boolean => {
     }
   }
 
-  // Secondary check: Check if we're in production build (likely Tauri)
-  if (import.meta.env.PROD) {
-    return true;
-  }
-
-  // Tertiary check: Environment variables that indicate Tauri dev mode
+  // Secondary check: Environment variables that indicate Tauri dev mode
   if (import.meta.env.VITE_TAURI_DEV_HOST || import.meta.env.TAURI_DEV_HOST) {
     return true;
   }
@@ -55,12 +50,4 @@ export const safeInvoke = async <T>(
       `Failed to invoke ${command}: ${error instanceof Error ? error.message : String(error)}`
     );
   }
-};
-
-// Check if RFID hardware is enabled
-export const isRfidEnabled = (): boolean => {
-  const rfidEnvEnabled = import.meta.env.VITE_ENABLE_RFID === 'true';
-  const tauriAvailable = isTauriContext();
-
-  return rfidEnvEnabled && tauriAvailable;
 };

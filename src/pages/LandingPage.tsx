@@ -26,7 +26,7 @@ function LandingPage() {
     void navigate('/pin');
   };
 
-  // Handle application restart (Balena will restart the container)
+  // Handle application restart via the platform adapter (the local Tauri app exits the process)
   const handleRestart = () => {
     logger.info('User requested application restart from landing page');
     logUserAction('restart_app');

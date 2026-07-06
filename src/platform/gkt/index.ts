@@ -135,18 +135,6 @@ class GKTAdapter implements PlatformAdapter {
     });
   }
 
-  async recoverScanner(): Promise<void> {
-    // No scanner recovery on GKT — NFC is managed by GKT-Kiosk system
-  }
-
-  async getScannerStatus(): Promise<{
-    is_available: boolean;
-    last_error?: string;
-  }> {
-    // NFC is always available if usbnfc APK is installed
-    return { is_available: true };
-  }
-
   async loadConfig(): Promise<void> {
     // No-op: GKT reads config synchronously from env vars / URL params
   }
@@ -196,10 +184,6 @@ class GKTAdapter implements PlatformAdapter {
     } else {
       window.location.reload();
     }
-  }
-
-  getDeviceInfo(): { platform: 'gkt'; version: string } {
-    return { platform: this.platform, version: __APP_VERSION__ };
   }
 }
 

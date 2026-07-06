@@ -1,6 +1,6 @@
-# Rust Backend - Tauri Commands & Hardware Integration
+# Rust Backend - Tauri Commands
 
-This directory contains the Rust backend for PyrePortal, providing system access, file persistence, and RFID hardware integration.
+This directory contains the Rust backend for the local Mac/mock PyrePortal app, providing system access, file persistence, and mock RFID scanning.
 
 ## Target Scope
 
@@ -20,13 +20,8 @@ This Tauri code is retained for local Mac/mock app usage. Do not add production 
 ### Modules
 
 - `logging.rs` (~200 lines) - File-based logging with rotation
-- `rfid.rs` (~400 lines) - RFID hardware abstraction + mock implementation
+- `rfid.rs` - Mock RFID scanning service (background loop + one-shot scans)
 - `session_storage.rs` (~150 lines) - Session settings persistence
-
-### Test Examples (Not Bundled)
-
-- `examples/rfid_test.rs` - Single RFID scan test (compile manually with test scripts)
-- `examples/rfid_test_persistent.rs` - Continuous RFID scanning (compile manually with test scripts)
 
 ## Tauri Command Pattern
 
@@ -94,12 +89,6 @@ fn get_api_config() -> Result<ApiConfig, String> {
 ```rust
 #[tauri::command]
 fn write_log(entry: String) -> Result<(), String>
-
-#[tauri::command]
-fn get_log_files() -> Result<Vec<String>, String>
-
-#[tauri::command]
-fn cleanup_old_logs(max_age_days: u64) -> Result<(), String>
 ```
 
 **Log File Locations:**
@@ -112,19 +101,24 @@ fn cleanup_old_logs(max_age_days: u64) -> Result<(), String>
 
 ```rust
 #[tauri::command]
-fn initialize_rfid_service() -> Result<(), String>
+async fn initialize_rfid_service(app_handle: tauri::AppHandle) -> Result<String, String>
 
 #[tauri::command]
-fn scan_rfid() -> Result<Option<String>, String>
+async fn start_rfid_service() -> Result<String, String>
 
 #[tauri::command]
-fn stop_rfid_scanning() -> Result<(), String>
+async fn stop_rfid_service() -> Result<String, String>
+
+#[tauri::command]
+async fn get_rfid_service_status() -> Result<RfidServiceState, String>
+
+#[tauri::command]
+async fn scan_rfid_single() -> Result<RfidScanResult, String>
 ```
 
-**Hardware Support:**
+`lib.rs` also registers the top-level `restart_app` command (exits the process; the local app simply quits).
 
-- **Production**: MFRC522 reader via SPI (ARM/ARM64 Linux only)
-- **Development**: Mock scanning with `VITE_ENABLE_RFID=false`
+All scanning is mock scanning (see "RFID Mock Scanning" below). The retired MFRC522/Raspberry Pi hardware path has been removed.
 
 ### Session Storage (session_storage.rs)
 
@@ -136,7 +130,7 @@ fn save_session_settings(settings: SessionSettings) -> Result<(), String>
 fn load_session_settings() -> Result<Option<SessionSettings>, String>
 
 #[tauri::command]
-fn clear_session() -> Result<(), String>
+fn clear_last_session() -> Result<(), String>
 ```
 
 ## Error Handling
@@ -225,57 +219,9 @@ fn load_settings(path: &Path) -> Result<Settings, String> {
 }
 ```
 
-## RFID Hardware Integration
+## RFID Mock Scanning
 
-### Retired Raspberry Pi Hardware Path
-
-```rust
-// rfid.rs - ARM/ARM64 Linux only
-#[cfg(all(
-    any(target_arch = "aarch64", target_arch = "arm"),
-    target_os = "linux"
-))]
-use mfrc522::Mfrc522;
-use rppal::gpio::Gpio;
-use rppal::spi::{Bus, SlaveSelect, Spi};
-
-fn init_hardware() -> Result<Mfrc522<...>, String> {
-    let spi = Spi::new(Bus::Spi0, SlaveSelect::Ss0, 1_000_000, spidev::SpiMode::Mode0)
-        .map_err(|e| format!("SPI init failed: {}", e))?;
-
-    let gpio = Gpio::new()
-        .map_err(|e| format!("GPIO init failed: {}", e))?;
-
-    let pin = gpio.get(25)
-        .map_err(|e| format!("Pin init failed: {}", e))?
-        .into_output();
-
-    Ok(Mfrc522::new(spi).init())
-}
-```
-
-### Mock (Local Mac/Development)
-
-```rust
-// Mock RFID scanning for non-ARM platforms
-#[cfg(not(all(
-    any(target_arch = "aarch64", target_arch = "arm"),
-    target_os = "linux"
-)))]
-fn scan_rfid() -> Result<Option<String>, String> {
-    // Return mock tag from env var
-    let mock_tags = env::var("VITE_MOCK_RFID_TAGS")
-        .unwrap_or_default();
-
-    if !mock_tags.is_empty() {
-        let tags: Vec<&str> = mock_tags.split(',').collect();
-        // Return random tag
-        Ok(Some(tags[0].to_string()))
-    } else {
-        Ok(None)
-    }
-}
-```
+`rfid.rs` simulates a scanner for local development: `mod mock_platform` returns tags from a hardcoded list in realistic hardware format (e.g. `04:D6:94:82:97:6A:80`), simulates variable scan times, a tag being held in place, and a 5% error rate. The background service emits `rfid-scan` events to the frontend.
 
 ## Async Operations
 
@@ -353,17 +299,6 @@ cargo test session      # Specific module
 cargo test -- --nocapture  # Show println! output
 ```
 
-### RFID Hardware Tests
-
-```bash
-# Single scan test
-cd src-tauri
-./test_rfid.sh
-
-# Continuous scanning
-./test_rfid_persistent.sh
-```
-
 ## Dependencies (Cargo.toml)
 
 ### Core
@@ -379,16 +314,6 @@ cd src-tauri
 - `dotenvy = "0.15"` - .env file loading
 - `rand = "0.10"` - Random number generation
 
-### Retired Platform-Specific (ARM/ARM64 Linux)
-
-```toml
-[target.'cfg(all(any(target_arch = "aarch64", target_arch = "arm"), target_os = "linux"))'.dependencies]
-mfrc522 = { version = "0.8.0", features = ["eh02"] }
-rppal = "0.14.1"
-embedded-hal = "0.2.7"
-linux-embedded-hal = "0.3.2"
-```
-
 ## Development Commands
 
 ```bash
@@ -403,11 +328,7 @@ cargo fmt
 
 # Build
 cargo build                 # Debug
-cargo build --release      # Production
-
-# Run RFID test binaries (compile on-demand, not bundled)
-./test_rfid.sh              # Single scan test
-./test_rfid_persistent.sh   # Continuous scanning test
+cargo build --release      # Release (local only, no production Tauri builds)
 ```
 
 ## Adding New Command

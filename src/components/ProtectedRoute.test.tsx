@@ -22,7 +22,6 @@ describe('ProtectedRoute', () => {
         staffName: 'Test',
         deviceName: 'Dev',
         pin: '1234',
-        authenticatedAt: new Date(),
       },
     });
 
@@ -52,7 +51,6 @@ describe('ProtectedRoute', () => {
         staffName: 'Test',
         deviceName: 'Dev',
         pin: '1234',
-        authenticatedAt: new Date(),
       },
     });
 
@@ -72,7 +70,6 @@ describe('ProtectedRoute', () => {
         staffName: 'Test',
         deviceName: 'Dev',
         pin: '1234',
-        authenticatedAt: new Date(),
       },
     });
 

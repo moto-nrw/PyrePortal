@@ -360,19 +360,6 @@ describe('GKTAdapter', () => {
     });
   });
 
-  describe('recoverScanner', () => {
-    it('resolves without error', async () => {
-      await expect(adapter.recoverScanner()).resolves.toBeUndefined();
-    });
-  });
-
-  describe('getScannerStatus', () => {
-    it('returns always available', async () => {
-      const status = await adapter.getScannerStatus();
-      expect(status).toEqual({ is_available: true });
-    });
-  });
-
   describe('loadConfig', () => {
     it('resolves without error', async () => {
       await expect(adapter.loadConfig()).resolves.toBeUndefined();
@@ -467,14 +454,6 @@ describe('GKTAdapter', () => {
       // In test environment, we just verify it doesn't throw
       // (happy-dom may not fully support location mutations)
       await expect(adapter.restartApp()).resolves.toBeUndefined();
-    });
-  });
-
-  describe('getDeviceInfo', () => {
-    it('returns gkt platform with version', () => {
-      const info = adapter.getDeviceInfo();
-      expect(info.platform).toBe('gkt');
-      expect(typeof info.version).toBe('string');
     });
   });
 });

@@ -126,23 +126,6 @@ describe('TauriAdapter', () => {
     });
   });
 
-  describe('recoverScanner', () => {
-    it('calls safeInvoke with recover_rfid_scanner', async () => {
-      mockSafeInvoke.mockResolvedValueOnce(undefined);
-      await adapter.recoverScanner();
-      expect(mockSafeInvoke).toHaveBeenCalledWith('recover_rfid_scanner');
-    });
-  });
-
-  describe('getScannerStatus', () => {
-    it('returns scanner status', async () => {
-      mockSafeInvoke.mockResolvedValueOnce({ is_available: true });
-      const result = await adapter.getScannerStatus();
-      expect(result).toEqual({ is_available: true });
-      expect(mockSafeInvoke).toHaveBeenCalledWith('get_rfid_scanner_status');
-    });
-  });
-
   describe('loadConfig / getApiBaseUrl / getDeviceApiKey', () => {
     it('throws if getApiBaseUrl called before loadConfig on fresh adapter', async () => {
       // Re-import to get a fresh adapter instance with null config
@@ -225,14 +208,6 @@ describe('TauriAdapter', () => {
       mockSafeInvoke.mockResolvedValueOnce(undefined);
       await adapter.restartApp();
       expect(mockSafeInvoke).toHaveBeenCalledWith('restart_app');
-    });
-  });
-
-  describe('getDeviceInfo', () => {
-    it('returns platform and version', () => {
-      const info = adapter.getDeviceInfo();
-      expect(info.platform).toBe('tauri');
-      expect(typeof info.version).toBe('string');
     });
   });
 });
