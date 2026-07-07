@@ -21,7 +21,7 @@ export interface CheckoutDestinationState {
 }
 
 /** Destination rooms a student can check into directly from the checkout modal. */
-export type DestinationRoomKey = 'schulhof' | 'toilette';
+type DestinationRoomKey = 'schulhof' | 'toilette';
 
 interface DestinationRoomConfig {
   /** English label used in log messages */

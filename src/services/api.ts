@@ -23,7 +23,6 @@ export {
   mapApiErrorToGerman,
   mapServerErrorToGerman,
   WC_ROOM_ALIASES,
-  type NetworkErrorContext,
 } from './apiErrors';
 export { initializeApi, setNetworkStatusCallback } from './apiClient';
 export { fetchSchoolName, getSchoolName, onSchoolNameLoaded } from './schoolName';

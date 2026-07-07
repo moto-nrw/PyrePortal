@@ -330,7 +330,7 @@ export function mapApiErrorToGerman(error: unknown): string {
  * Patterns that indicate a network-related error
  * Includes both English (technical) and German (translated) patterns
  */
-export const NETWORK_ERROR_PATTERNS = [
+const NETWORK_ERROR_PATTERNS = [
   'network',
   'netzwerk',
   'failed to fetch',
