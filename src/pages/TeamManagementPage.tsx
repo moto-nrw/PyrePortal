@@ -16,6 +16,17 @@ import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'Team anpassen',
+  noSupervisorSelectedError: 'Bitte wählen Sie mindestens einen Betreuer aus.',
+  updateFailedError: 'Fehler beim Aktualisieren der Betreuer. Bitte versuchen Sie es erneut.',
+  saveButtonSaving: 'Speichern...',
+  saveButton: 'Team speichern',
+  successUpdated: 'Team erfolgreich aktualisiert!',
+  successSaved: 'Team erfolgreich gespeichert!',
+} as const;
+
 function TeamManagementPage() {
   const {
     users,
@@ -108,7 +119,7 @@ function TeamManagementPage() {
   const handleSave = async () => {
     if (selectedSupervisors.length === 0) {
       logger.warn('Attempted to save without selecting supervisors');
-      setErrorMessage('Bitte wählen Sie mindestens einen Betreuer aus.');
+      setErrorMessage(texts.noSupervisorSelectedError);
       setShowErrorModal(true);
       return;
     }
@@ -151,7 +162,7 @@ function TeamManagementPage() {
       setShowSuccessModal(true);
     } catch (error) {
       logger.error('Failed to update supervisors', { error: serializeError(error) });
-      setErrorMessage('Fehler beim Aktualisieren der Betreuer. Bitte versuchen Sie es erneut.');
+      setErrorMessage(texts.updateFailedError);
       setShowErrorModal(true);
     } finally {
       setIsSaving(false);
@@ -184,7 +195,7 @@ function TeamManagementPage() {
 
   return (
     <SelectionPageLayout
-      title="Team anpassen"
+      title={texts.title}
       onBack={handleBack}
       isLoading={isLoading}
       error={error}
@@ -248,7 +259,7 @@ function TeamManagementPage() {
             }
           }}
         >
-          {isSaving ? 'Speichern...' : 'Team speichern'}
+          {isSaving ? texts.saveButtonSaving : texts.saveButton}
         </button>
       </div>
 
@@ -259,9 +270,7 @@ function TeamManagementPage() {
           logNavigation('TeamManagementPage', 'HomeViewPage');
           void navigate('/home');
         }}
-        message={
-          currentSession ? 'Team erfolgreich aktualisiert!' : 'Team erfolgreich gespeichert!'
-        }
+        message={currentSession ? texts.successUpdated : texts.successSaved}
         autoCloseDelay={1000}
       />
 

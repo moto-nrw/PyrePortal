@@ -9,6 +9,7 @@ import { ErrorModal, ModalBase, ModalActionButtons } from '../components/ui';
 import {
   api,
   formatRoomName,
+  getNetworkErrorMessage,
   isNetworkRelatedError,
   mapServerErrorToGerman,
   type CurrentSession,
@@ -20,15 +21,46 @@ import { createLogger, logNavigation, logUserAction, serializeError } from '../u
 
 const logger = createLogger('HomeViewPage');
 
+/** User-facing German UI copy for this page */
+const texts = {
+  recreationErrorFallback: 'Fehler beim Starten der Aktivität',
+  activityFallback: 'Aktivität',
+  repeatSessionHeading: 'Aufsicht wiederholen',
+  startSessionHeading: 'Aufsicht starten',
+  continueSubtitle: 'Fortsetzen',
+  supervisorCountMismatch: (selected: number, saved: number) =>
+    `${selected} Betreuer (gespeichert: ${saved})`,
+  supervisorCount: (count: number) => `${count} Betreuer`,
+  validationFailedFallback:
+    'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.',
+  incompleteSessionDataError:
+    'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.',
+  tagAssignmentButton: 'Armband identifizieren',
+  endSessionButton: 'Aufsicht beenden',
+  logoutButton: 'Abmelden',
+  menuHeading: 'Menü',
+  teamManagementButton: 'Team anpassen',
+  recreationConfirmHeading: 'Aufsicht wiederholen?',
+  roomLabel: 'Raum:',
+  supervisorsLabel: 'Betreuer:',
+  recreationConfirmButton: 'Aufsicht starten',
+  recreationLoadingButton: 'Starte...',
+  endSessionConfirmHeading: 'Aufsicht beenden?',
+  endSessionWarningPrefix: 'Alle Kinder, die in dieser Aufsicht sind, werden auf den Status',
+  endSessionWarningHighlight: 'unterwegs',
+  endSessionWarningSuffix: 'umgestellt.',
+  endSessionConfirmButton: 'Ja, beenden',
+} as const;
+
 // ============================================================================
 // Pure helper functions (moved outside component to reduce cognitive complexity)
 // ============================================================================
 
 /** Format session recreation error message for display */
 function formatRecreationError(error: unknown): string {
-  const rawMessage = error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
+  const rawMessage = error instanceof Error ? error.message : texts.recreationErrorFallback;
   return isNetworkRelatedError(error)
-    ? 'Netzwerkfehler beim Starten der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
+    ? getNetworkErrorMessage('sessionStart')
     : mapServerErrorToGerman(rawMessage);
 }
 
@@ -78,12 +110,12 @@ function getActivityHeading(
   sessionSettings: SessionSettings | null
 ): string {
   if (currentSession) {
-    return currentSession.activity_name ?? 'Aktivität';
+    return currentSession.activity_name ?? texts.activityFallback;
   }
   if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return 'Aufsicht wiederholen';
+    return texts.repeatSessionHeading;
   }
-  return 'Aufsicht starten';
+  return texts.startSessionHeading;
 }
 
 /** Get activity subtitle text based on session state */
@@ -92,7 +124,7 @@ function getActivitySubtitle(
   sessionSettings: SessionSettings | null
 ): string {
   if (currentSession) {
-    return 'Fortsetzen';
+    return texts.continueSubtitle;
   }
   if (sessionSettings?.use_last_session && sessionSettings.last_session) {
     return sessionSettings.last_session.activity_name;
@@ -111,12 +143,12 @@ function getSupervisorCountLabel(
   const savedCount = sessionSettings.last_session.supervisor_names.length;
 
   if (selectedSupervisorsCount > 0 && selectedSupervisorsCount !== savedCount) {
-    return `${selectedSupervisorsCount} Betreuer (gespeichert: ${savedCount})`;
+    return texts.supervisorCountMismatch(selectedSupervisorsCount, savedCount);
   }
   if (selectedSupervisorsCount > 0) {
-    return `${selectedSupervisorsCount} Betreuer`;
+    return texts.supervisorCount(selectedSupervisorsCount);
   }
-  return `${savedCount} Betreuer`;
+  return texts.supervisorCount(savedCount);
 }
 
 // ============================================================================
@@ -204,9 +236,7 @@ function HomeViewPage() {
       return;
     }
 
-    const latestError =
-      useUserStore.getState().error ??
-      'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.';
+    const latestError = useUserStore.getState().error ?? texts.validationFailedFallback;
     setErrorMessage(latestError);
     setShowErrorModal(true);
     setShowConfirmModal(false);
@@ -254,9 +284,7 @@ function HomeViewPage() {
 
     if (outcome.status === 'incomplete') {
       setIsNavigatingToScanning(false);
-      showRecreationError(
-        'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.'
-      );
+      showRecreationError(texts.incompleteSessionDataError);
       return;
     }
 
@@ -352,7 +380,7 @@ function HomeViewPage() {
                 color: '#5080D8',
               }}
             >
-              Armband identifizieren
+              {texts.tagAssignmentButton}
             </span>
           </button>
         </div>
@@ -418,7 +446,9 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              {currentSession && !isNavigatingToScanning ? 'Aufsicht beenden' : 'Abmelden'}
+              {currentSession && !isNavigatingToScanning
+                ? texts.endSessionButton
+                : texts.logoutButton}
             </span>
           </button>
         </div>
@@ -440,7 +470,7 @@ function HomeViewPage() {
               lineHeight: 1.2,
             }}
           >
-            Menü
+            {texts.menuHeading}
           </h1>
         </div>
 
@@ -672,7 +702,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    Team anpassen
+                    {texts.teamManagementButton}
                   </h3>
                 </div>
               </button>
@@ -751,7 +781,7 @@ function HomeViewPage() {
             marginBottom: '12px',
           }}
         >
-          Aufsicht wiederholen?
+          {texts.recreationConfirmHeading}
         </h2>
 
         {/* Activity Details */}
@@ -777,7 +807,7 @@ function HomeViewPage() {
               }}
             >
               <div style={{ marginBottom: '8px' }}>
-                <span style={{ color: '#6B7280', fontSize: '14px' }}>Raum:</span>
+                <span style={{ color: '#6B7280', fontSize: '14px' }}>{texts.roomLabel}</span>
                 <span
                   style={{
                     color: '#1F2937',
@@ -790,7 +820,7 @@ function HomeViewPage() {
                 </span>
               </div>
               <div>
-                <span style={{ color: '#6B7280', fontSize: '14px' }}>Betreuer:</span>
+                <span style={{ color: '#6B7280', fontSize: '14px' }}>{texts.supervisorsLabel}</span>
                 <span
                   style={{
                     color: '#1F2937',
@@ -813,8 +843,8 @@ function HomeViewPage() {
           onCancel={() => setShowConfirmModal(false)}
           onConfirm={handleConfirmRecreation}
           isLoading={isValidatingLastSession}
-          confirmLabel="Aufsicht starten"
-          loadingLabel="Starte..."
+          confirmLabel={texts.recreationConfirmButton}
+          loadingLabel={texts.recreationLoadingButton}
           confirmGradient="linear-gradient(to right, #83CD2D, #70B525)"
         />
       </ModalBase>
@@ -835,7 +865,7 @@ function HomeViewPage() {
             marginBottom: '16px',
           }}
         >
-          Aufsicht beenden?
+          {texts.endSessionConfirmHeading}
         </h2>
 
         {/* Warning Text */}
@@ -847,14 +877,15 @@ function HomeViewPage() {
             lineHeight: 1.5,
           }}
         >
-          Alle Kinder, die in dieser Aufsicht sind, werden auf den Status{' '}
-          <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
+          {texts.endSessionWarningPrefix}{' '}
+          <strong style={{ color: '#D97706' }}>{texts.endSessionWarningHighlight}</strong>{' '}
+          {texts.endSessionWarningSuffix}
         </p>
 
         <ModalActionButtons
           onCancel={() => setShowEndSessionModal(false)}
           onConfirm={handleConfirmEndSession}
-          confirmLabel="Ja, beenden"
+          confirmLabel={texts.endSessionConfirmButton}
           confirmGradient="linear-gradient(to right, #EF4444, #DC2626)"
           confirmShadow="0 4px 14px 0 rgba(239, 68, 68, 0.4)"
         />

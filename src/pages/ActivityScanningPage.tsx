@@ -15,6 +15,39 @@ import BackButton from '../components/ui/BackButton';
 import { useActivityScanningPage } from '../hooks/pages/useActivityScanningPage';
 import { formatRoomName, type DailyFeedbackRating } from '../services/api';
 
+/** User-facing German UI copy for this page */
+const texts = {
+  noActivitySelected: 'Keine Aktivität ausgewählt',
+  backToHomeButton: 'Zurück zur Startseite',
+  pickupTimeLoading: 'Abholzeit wird geladen...',
+  pickupQueryScanPrompt: 'Bitte halte dein Armband an das Lesegerät.',
+  feedbackPositive: 'Gut',
+  feedbackNeutral: 'Okay',
+  feedbackNegative: 'Schlecht',
+  destinationRaumwechsel: 'Raumwechsel',
+  destinationSchulhof: 'Schulhof',
+  destinationToilette: 'Toilette',
+  destinationNachHause: 'nach Hause',
+  pickupTimeToday: 'Abholzeit heute',
+  pickupTimeValue: (time: string) => `${time} Uhr`,
+  noPickupTimeToday: 'Für heute ist keine Abholzeit hinterlegt.',
+  roomFallback: 'diesem Raum',
+  checkedInMessage: (roomName: string) => `Du bist jetzt in ${roomName}`,
+  transferSuccess: 'Raumwechsel erfolgreich',
+  loginButton: 'Anmelden',
+  loginAriaLabel: 'Anmelden - zur PIN-Eingabe',
+  pickupQueryAriaLabel: 'Abholzeit abfragen',
+  unknownRoom: 'Unbekannt',
+  pickupQueryHeading: 'Abholzeit abfragen',
+  feedbackHeading: (firstName: string) => `Wie war dein Tag, ${firstName}?`,
+  farewellHeading: (firstName: string) => `Tschüss, ${firstName}!`,
+  supervisorRoomFallback: 'diesen Raum',
+  supervisorHeading: (name: string, roomName: string) => `${name} betreut jetzt ${roomName}`,
+  pickupInfoHeading: (firstName: string) => `Abholzeit für ${firstName}`,
+  checkinGreeting: (name: string) => `Hallo, ${name}!`,
+  destinationQuestionHeading: (firstName: string) => `Wohin geht ${firstName}?`,
+} as const;
+
 // Feedback button color schemes: green (positive), yellow (neutral), red (negative)
 const FEEDBACK_BUTTON_COLORS = {
   positive: {
@@ -207,9 +240,9 @@ function DestinationButton({
 
 // Button configuration arrays
 const feedbackButtons = [
-  { rating: 'positive' as DailyFeedbackRating, icon: faFaceSmile, label: 'Gut' },
-  { rating: 'neutral' as DailyFeedbackRating, icon: faFaceMeh, label: 'Okay' },
-  { rating: 'negative' as DailyFeedbackRating, icon: faFaceFrown, label: 'Schlecht' },
+  { rating: 'positive' as DailyFeedbackRating, icon: faFaceSmile, label: texts.feedbackPositive },
+  { rating: 'neutral' as DailyFeedbackRating, icon: faFaceMeh, label: texts.feedbackNeutral },
+  { rating: 'negative' as DailyFeedbackRating, icon: faFaceFrown, label: texts.feedbackNegative },
 ];
 
 const ActivityScanningPage: React.FC = () => {
@@ -251,12 +284,12 @@ const ActivityScanningPage: React.FC = () => {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
         <div className="text-center">
-          <p className="text-lg text-gray-600">Keine Aktivität ausgewählt</p>
+          <p className="text-lg text-gray-600">{texts.noActivitySelected}</p>
           <button
             onClick={() => navigate('/home')}
             className="mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
           >
-            Zurück zur Startseite
+            {texts.backToHomeButton}
           </button>
         </div>
       </div>
@@ -278,7 +311,7 @@ const ActivityScanningPage: React.FC = () => {
               textAlign: 'center',
             }}
           >
-            Abholzeit wird geladen...
+            {texts.pickupTimeLoading}
           </div>
         );
       }
@@ -296,7 +329,7 @@ const ActivityScanningPage: React.FC = () => {
             textAlign: 'center',
           }}
         >
-          Bitte halte dein Armband an das Lesegerät.
+          {texts.pickupQueryScanPrompt}
         </div>
       );
     }
@@ -381,7 +414,7 @@ const ActivityScanningPage: React.FC = () => {
           ? [
               {
                 destination: 'raumwechsel' as const,
-                label: 'Raumwechsel',
+                label: texts.destinationRaumwechsel,
                 icon: ICON_RAUMWECHSEL,
                 onClick: () => void handleDestinationSelect('raumwechsel'),
               },
@@ -391,7 +424,7 @@ const ActivityScanningPage: React.FC = () => {
           ? [
               {
                 destination: 'schulhof' as const,
-                label: 'Schulhof',
+                label: texts.destinationSchulhof,
                 colorScheme: 'schulhof' as const,
                 icon: ICON_SCHULHOF,
                 onClick: () => void handleDestinationSelect('schulhof'),
@@ -402,7 +435,7 @@ const ActivityScanningPage: React.FC = () => {
           ? [
               {
                 destination: 'toilette' as const,
-                label: 'Toilette',
+                label: texts.destinationToilette,
                 colorScheme: 'toilette' as const,
                 icon: (
                   <FontAwesomeIcon
@@ -418,7 +451,7 @@ const ActivityScanningPage: React.FC = () => {
           ? [
               {
                 destination: 'nach_hause' as const,
-                label: 'nach Hause',
+                label: texts.destinationNachHause,
                 colorScheme: 'destructive' as const,
                 icon: ICON_NACH_HAUSE,
                 onClick: handleNachHause,
@@ -508,7 +541,7 @@ const ActivityScanningPage: React.FC = () => {
                           fontWeight: 500,
                         }}
                       >
-                        Abholzeit heute
+                        {texts.pickupTimeToday}
                       </div>
                       <div
                         style={{
@@ -517,12 +550,16 @@ const ActivityScanningPage: React.FC = () => {
                           lineHeight: 1.1,
                         }}
                       >
-                        {currentScan.pickup_time} Uhr
+                        {texts.pickupTimeValue(currentScan.pickup_time)}
                       </div>
                     </div>
                   )}
                   <div style={{ fontSize: currentScan.pickup_time ? '22px' : undefined }}>
-                    {`Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`}
+                    {texts.checkedInMessage(
+                      currentScan.room_name
+                        ? formatRoomName(currentScan.room_name)
+                        : texts.roomFallback
+                    )}
                   </div>
                 </>
               );
@@ -544,7 +581,7 @@ const ActivityScanningPage: React.FC = () => {
                           fontWeight: 500,
                         }}
                       >
-                        Abholzeit heute
+                        {texts.pickupTimeToday}
                       </div>
                       <div
                         style={{
@@ -553,13 +590,11 @@ const ActivityScanningPage: React.FC = () => {
                           lineHeight: 1.1,
                         }}
                       >
-                        {currentScan.pickup_time} Uhr
+                        {texts.pickupTimeValue(currentScan.pickup_time)}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center' }}>
-                      Für heute ist keine Abholzeit hinterlegt.
-                    </div>
+                    <div style={{ textAlign: 'center' }}>{texts.noPickupTimeToday}</div>
                   )}
                   {currentScan.pickup_note && (
                     <div
@@ -579,7 +614,7 @@ const ActivityScanningPage: React.FC = () => {
             case 'checked_out':
               return ''; // Checkout shows destination buttons, no extra text needed
             case 'transferred':
-              return 'Raumwechsel erfolgreich';
+              return texts.transferSuccess;
             default:
               return '';
           }
@@ -612,7 +647,7 @@ const ActivityScanningPage: React.FC = () => {
           >
             <BackButton
               onClick={handleAnmelden}
-              text="Anmelden"
+              text={texts.loginButton}
               customIcon={
                 <svg
                   width="28"
@@ -626,7 +661,7 @@ const ActivityScanningPage: React.FC = () => {
                   <circle cx="12" cy="7" r="4" />
                 </svg>
               }
-              ariaLabel="Anmelden - zur PIN-Eingabe"
+              ariaLabel={texts.loginAriaLabel}
             />
           </div>
 
@@ -634,7 +669,7 @@ const ActivityScanningPage: React.FC = () => {
             type="button"
             onClick={handlePickupQueryClick}
             disabled={pickupQueryButtonDisabled}
-            aria-label="Abholzeit abfragen"
+            aria-label={texts.pickupQueryAriaLabel}
             style={{
               position: 'absolute',
               top: '20px',
@@ -708,7 +743,7 @@ const ActivityScanningPage: React.FC = () => {
                   fontWeight: 500,
                 }}
               >
-                {selectedRoom?.name || 'Unbekannt'}
+                {selectedRoom?.name || texts.unknownRoom}
               </p>
             </div>
 
@@ -976,27 +1011,27 @@ const ActivityScanningPage: React.FC = () => {
           >
             {(() => {
               if (isPickupQueryHeadingState) {
-                return 'Abholzeit abfragen';
+                return texts.pickupQueryHeading;
               }
 
               // Feedback prompt
               if (showFeedbackPrompt) {
                 const firstName = checkoutDestinationState?.studentName?.split(' ')[0] ?? '';
-                return `Wie war dein Tag, ${firstName}?`;
+                return texts.feedbackHeading(firstName);
               }
 
               // Farewell state after "nach Hause" feedback
               if (checkoutDestinationState?.showingFarewell) {
                 const firstName = checkoutDestinationState.studentName.split(' ')[0];
-                return `Tschüss, ${firstName}!`;
+                return texts.farewellHeading(firstName);
               }
 
               // Supervisor authentication - prefer custom message (e.g., redirect hint)
               if (currentScan?.action === 'supervisor_authenticated') {
                 if (currentScan.message) return currentScan.message;
 
-                const roomName = selectedRoom?.name ?? 'diesen Raum';
-                return `${currentScan.student_name} betreut jetzt ${roomName}`;
+                const roomName = selectedRoom?.name ?? texts.supervisorRoomFallback;
+                return texts.supervisorHeading(currentScan.student_name, roomName);
               }
 
               // Error/Info states use student_name as the title
@@ -1009,12 +1044,12 @@ const ActivityScanningPage: React.FC = () => {
 
               if (currentScan?.action === 'pickup_info') {
                 const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return `Abholzeit für ${firstName}`;
+                return texts.pickupInfoHeading(firstName);
               }
 
               // Check-in: use backend message if available, otherwise default greeting
               if (currentScan?.action === 'checked_in') {
-                return currentScan.message ?? `Hallo, ${currentScan.student_name}!`;
+                return currentScan.message ?? texts.checkinGreeting(currentScan.student_name);
               }
 
               // Checkout with destination buttons: ask where the student is going
@@ -1024,13 +1059,13 @@ const ActivityScanningPage: React.FC = () => {
                 !checkoutDestinationState.showingFarewell
               ) {
                 const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return `Wohin geht ${firstName}?`;
+                return texts.destinationQuestionHeading(firstName);
               }
 
               // Checkout farewell: after destination selected or no destinations available
               if (currentScan?.action === 'checked_out') {
                 const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return `Tschüss, ${firstName}!`;
+                return texts.farewellHeading(firstName);
               }
 
               // Fallback: use backend message or student name

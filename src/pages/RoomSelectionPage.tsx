@@ -12,6 +12,7 @@ import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { ConflictModal } from '../components/ui/ConflictModal';
 import { usePagination } from '../hooks/usePagination';
 import {
+  getNetworkErrorMessage,
   mapServerErrorToGerman,
   isNetworkRelatedError,
   type Room,
@@ -20,6 +21,16 @@ import {
 import { startSessionWithConflictHandling } from '../services/sessionService';
 import { useUserStore } from '../store/userStore';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'Wo machen wir das?',
+  sessionStartErrorFallback: 'Fehler beim Starten der Aktivität',
+  sessionOverrideErrorFallback: 'Fehler beim Überschreiben der Session',
+  noRoomsHeading: 'Keine Räume verfügbar',
+  noRoomsHint: 'Es sind derzeit keine Räume für die Auswahl verfügbar.',
+  capacityBadge: (capacity: number) => `${capacity} Plätze`,
+} as const;
 
 function RoomSelectionPage() {
   const {
@@ -48,7 +59,7 @@ function RoomSelectionPage() {
   const showError = useCallback((error: unknown, fallbackMessage: string) => {
     const rawMessage = error instanceof Error ? error.message : fallbackMessage;
     const userMessage = isNetworkRelatedError(error)
-      ? 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.'
+      ? getNetworkErrorMessage('retry')
       : mapServerErrorToGerman(rawMessage);
     setErrorMessage(userMessage);
     setShowErrorModal(true);
@@ -210,7 +221,7 @@ function RoomSelectionPage() {
       return;
     }
 
-    showError(error, 'Fehler beim Starten der Aktivität');
+    showError(error, texts.sessionStartErrorFallback);
     setIsStartingSession(false);
     setShowConfirmModal(false);
     setSelectedRoom(null);
@@ -254,7 +265,7 @@ function RoomSelectionPage() {
       activityId: selectedActivity.id,
       roomId: selectedRoom.id,
     });
-    showError(forceError, 'Fehler beim Überschreiben der Session');
+    showError(forceError, texts.sessionOverrideErrorFallback);
     // Clean up modal state only on error
     setIsStartingSession(false);
     setShowConfirmModal(false);
@@ -297,7 +308,7 @@ function RoomSelectionPage() {
   return (
     <>
       <SelectionPageLayout
-        title="Wo machen wir das?"
+        title={texts.title}
         onBack={handleGoBack}
         isLoading={isLoading}
         error={error}
@@ -333,7 +344,7 @@ function RoomSelectionPage() {
                 textAlign: 'center',
               }}
             >
-              Keine Räume verfügbar
+              {texts.noRoomsHeading}
             </div>
             <div
               style={{
@@ -342,7 +353,7 @@ function RoomSelectionPage() {
                 textAlign: 'center',
               }}
             >
-              Es sind derzeit keine Räume für die Auswahl verfügbar.
+              {texts.noRoomsHint}
             </div>
           </div>
         ) : (
@@ -357,7 +368,7 @@ function RoomSelectionPage() {
                   colorType="room"
                   isSelected={selectedRoom?.id === room.id}
                   isDisabled={room.is_occupied}
-                  badge={room.capacity ? `${room.capacity} Plätze` : undefined}
+                  badge={room.capacity ? texts.capacityBadge(room.capacity) : undefined}
                   onClick={() => handleRoomSelect(room)}
                 />
               )}

@@ -1,7 +1,13 @@
 import type { RecentTagScan } from '../store/slices/scanSlice';
 import { createLogger, serializeError } from '../utils/logger';
 
-import { api, isNetworkRelatedError, mapServerErrorToGerman, type RfidScanResult } from './api';
+import {
+  api,
+  getNetworkErrorMessage,
+  isNetworkRelatedError,
+  mapServerErrorToGerman,
+  type RfidScanResult,
+} from './api';
 
 const logger = createLogger('checkoutDestinationService');
 
@@ -40,8 +46,7 @@ const DESTINATION_ROOM_CONFIGS: Record<DestinationRoomKey, DestinationRoomConfig
     resultFlag: 'isSchulhof',
     failTitle: 'Schulhof Check-in fehlgeschlagen',
     fallbackErrorMessage: 'Schulhof Check-in fehlgeschlagen',
-    networkErrorMessage:
-      'Netzwerkfehler bei Schulhof-Anmeldung. Bitte Verbindung prüfen und erneut scannen.',
+    networkErrorMessage: getNetworkErrorMessage('schulhofCheckin'),
   },
   toilette: {
     logLabel: 'WC',
@@ -52,8 +57,7 @@ const DESTINATION_ROOM_CONFIGS: Record<DestinationRoomKey, DestinationRoomConfig
     resultFlag: 'isToilette',
     failTitle: 'Toilette Check-in fehlgeschlagen',
     fallbackErrorMessage: 'Toilette Check-in fehlgeschlagen',
-    networkErrorMessage:
-      'Netzwerkfehler bei Toilette-Anmeldung. Bitte Verbindung prüfen und erneut scannen.',
+    networkErrorMessage: getNetworkErrorMessage('toiletteCheckin'),
   },
 };
 

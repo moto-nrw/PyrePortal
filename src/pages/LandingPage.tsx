@@ -7,6 +7,13 @@ import { useSchoolName } from '../hooks/useSchoolName';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
+/** User-facing German UI copy for this page */
+const texts = {
+  restartButton: 'Neu starten',
+  welcomeHeading: 'Willkommen bei moto!',
+  loginButton: 'Anmelden',
+} as const;
+
 function LandingPage() {
   const navigate = useNavigate();
   const logger = createLogger('LandingPage');
@@ -49,7 +56,12 @@ function LandingPage() {
           zIndex: 50,
         }}
       >
-        <BackButton onClick={handleRestart} text="Neu starten" color="blue" icon="restart" />
+        <BackButton
+          onClick={handleRestart}
+          text={texts.restartButton}
+          color="blue"
+          icon="restart"
+        />
       </div>
 
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -103,7 +115,7 @@ function LandingPage() {
                 lineHeight: 1.2,
               }}
             >
-              Willkommen bei moto!
+              {texts.welcomeHeading}
             </h1>
 
             <p
@@ -157,7 +169,7 @@ function LandingPage() {
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
               }}
             >
-              Anmelden
+              {texts.loginButton}
             </button>
           </div>
         </div>

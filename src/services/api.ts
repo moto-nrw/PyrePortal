@@ -16,12 +16,14 @@ import { isNotFoundError, mapAttendanceErrorToGerman, mapServerErrorToGerman } f
 export {
   ApiError,
   formatRoomName,
+  getNetworkErrorMessage,
   isNetworkRelatedError,
   isNotFoundError,
   isWCRoomAlias,
   mapApiErrorToGerman,
   mapServerErrorToGerman,
   WC_ROOM_ALIASES,
+  type NetworkErrorContext,
 } from './apiErrors';
 export { initializeApi, setNetworkStatusCallback } from './apiClient';
 export { fetchSchoolName, getSchoolName, onSchoolNameLoaded } from './schoolName';

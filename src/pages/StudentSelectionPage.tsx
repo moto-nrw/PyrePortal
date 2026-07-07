@@ -18,6 +18,27 @@ import { createLogger, logUserAction, serializeError } from '../utils/logger';
 
 const ENTITIES_PER_PAGE = 5; // 5x1 grid — filters are primary navigation
 
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'Person auswählen',
+  loadError: (message: string) => `Fehler beim Laden: ${message}`,
+  noPersonSelectedError: 'Bitte wählen Sie eine Person aus.',
+  invalidSelectionError: 'Ungültige Auswahl',
+  assignFailedError: 'Armband konnte nicht zugewiesen werden. Bitte erneut versuchen.',
+  studentBadge: 'Schüler',
+  staffBadge: 'Betreuer',
+  filterAll: 'Alle',
+  filterStaff: 'Betreuer',
+  filterGradeLabel: 'Klasse:',
+  filterGroupLabel: 'OGS-Gruppe:',
+  allGroups: 'Alle Gruppen',
+  noEntitiesHeading: 'Keine Personen gefunden',
+  noEntitiesHint: 'Es sind keine Schüler oder Betreuer verfügbar.',
+  assignButtonSaving: 'Zuweisen...',
+  assignButton: 'Armband zuweisen',
+  groupPickerHeading: 'OGS-Gruppe wählen',
+} as const;
+
 interface LocationState {
   scannedTag: string;
   tagAssignment: {
@@ -111,7 +132,7 @@ function StudentSelectionPage() {
           error: error.message,
           stack: error.stack,
         });
-        setError(`Fehler beim Laden: ${error.message}`);
+        setError(texts.loadError(error.message));
         setShowErrorModal(true);
       } finally {
         setIsLoading(false);
@@ -171,7 +192,7 @@ function StudentSelectionPage() {
   const handleAssignTag = async () => {
     if (!selectedEntityId || !authenticatedUser?.pin || !state?.scannedTag) {
       logger.warn('Invalid assignment attempt');
-      setError('Bitte wählen Sie eine Person aus.');
+      setError(texts.noPersonSelectedError);
       setShowErrorModal(true);
       return;
     }
@@ -186,7 +207,7 @@ function StudentSelectionPage() {
     });
 
     if (!selectedEntity) {
-      setError('Ungültige Auswahl');
+      setError(texts.invalidSelectionError);
       setShowErrorModal(true);
       setIsSaving(false);
       return;
@@ -243,7 +264,7 @@ function StudentSelectionPage() {
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       logger.error('Failed to assign tag', { error: serializeError(error) });
-      setError('Armband konnte nicht zugewiesen werden. Bitte erneut versuchen.');
+      setError(texts.assignFailedError);
       setShowErrorModal(true);
     } finally {
       setIsSaving(false);
@@ -267,13 +288,13 @@ function StudentSelectionPage() {
     if (entity.type === 'student') {
       return {
         name: `${entity.data.first_name} ${entity.data.last_name}`,
-        badge: entity.data.school_class ?? 'Schüler',
+        badge: entity.data.school_class ?? texts.studentBadge,
         badgeColor: 'green' as const,
       };
     }
     return {
       name: entity.data.display_name,
-      badge: 'Betreuer',
+      badge: texts.staffBadge,
       badgeColor: 'blue' as const,
     };
   };
@@ -329,10 +350,10 @@ function StudentSelectionPage() {
         }}
       >
         <button onClick={resetAll} style={chipStyle(noFiltersActive)}>
-          Alle
+          {texts.filterAll}
         </button>
         <button onClick={toggleStaffOnly} style={chipStyle(showStaffOnly)}>
-          Betreuer
+          {texts.filterStaff}
         </button>
 
         {/* Visual separator */}
@@ -346,7 +367,9 @@ function StudentSelectionPage() {
         />
 
         {/* Grade chips */}
-        <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>Klasse:</span>
+        <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>
+          {texts.filterGradeLabel}
+        </span>
         {availableGrades.map(grade => (
           <button
             key={grade}
@@ -375,7 +398,9 @@ function StudentSelectionPage() {
 
       {/* Row 2: OGS Group selector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>OGS-Gruppe:</span>
+        <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>
+          {texts.filterGroupLabel}
+        </span>
         {groupFilter ? (
           <button
             onClick={clearGroupFilter}
@@ -399,7 +424,7 @@ function StudentSelectionPage() {
               gap: '6px',
             }}
           >
-            Alle Gruppen
+            {texts.allGroups}
             <span style={{ fontSize: '12px', lineHeight: 1 }}>&#9662;</span>
           </button>
         )}
@@ -410,7 +435,7 @@ function StudentSelectionPage() {
   return (
     <>
       <SelectionPageLayout
-        title="Person auswählen"
+        title={texts.title}
         onBack={handleBack}
         isLoading={isLoading}
         error={showErrorModal ? null : error}
@@ -440,9 +465,9 @@ function StudentSelectionPage() {
               <line x1="1" y1="1" x2="23" y2="23" />
             </svg>
             <p style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>
-              Keine Personen gefunden
+              {texts.noEntitiesHeading}
             </p>
-            <p style={{ fontSize: '16px' }}>Es sind keine Schüler oder Betreuer verfügbar.</p>
+            <p style={{ fontSize: '16px' }}>{texts.noEntitiesHint}</p>
           </div>
         ) : (
           <>
@@ -502,7 +527,7 @@ function StudentSelectionPage() {
                   opacity: !selectedEntityId || isSaving ? 0.6 : 1,
                 }}
               >
-                {isSaving ? 'Zuweisen...' : 'Armband zuweisen'}
+                {isSaving ? texts.assignButtonSaving : texts.assignButton}
               </button>
             </div>
           </>
@@ -526,7 +551,7 @@ function StudentSelectionPage() {
             marginBottom: '20px',
           }}
         >
-          OGS-Gruppe wählen
+          {texts.groupPickerHeading}
         </h2>
 
         <button
@@ -548,7 +573,7 @@ function StudentSelectionPage() {
             outline: 'none',
           }}
         >
-          Alle Gruppen
+          {texts.allGroups}
         </button>
 
         <div

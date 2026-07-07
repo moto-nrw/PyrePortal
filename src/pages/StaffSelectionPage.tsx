@@ -13,6 +13,12 @@ import { usePagination } from '../hooks/usePagination';
 import { useUserStore } from '../store/userStore';
 import { createLogger, logNavigation, logUserAction } from '../utils/logger';
 
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'Wer ist dabei?',
+  continueButton: 'Weiter',
+} as const;
+
 function StaffSelectionPage() {
   const {
     users,
@@ -113,7 +119,7 @@ function StaffSelectionPage() {
 
   return (
     <SelectionPageLayout
-      title="Wer ist dabei?"
+      title={texts.title}
       onBack={handleBack}
       isLoading={isLoading}
       error={error}
@@ -150,7 +156,7 @@ function StaffSelectionPage() {
           onClick={handleContinue}
           disabled={selectedSupervisors.length === 0}
         >
-          Weiter
+          {texts.continueButton}
         </PillButton>
       </div>
     </SelectionPageLayout>

@@ -19,6 +19,14 @@ import {
   serializeError,
 } from '../utils/logger';
 
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'Was machen wir?',
+  noActivitiesHeading: 'Keine Aktivitäten verfügbar',
+  noActivitiesHint: 'Sie haben derzeit keine zugewiesenen Aktivitäten.',
+  continueButton: 'Weiter',
+} as const;
+
 function CreateActivityPage() {
   const {
     authenticatedUser,
@@ -210,7 +218,7 @@ function CreateActivityPage() {
 
   return (
     <SelectionPageLayout
-      title="Was machen wir?"
+      title={texts.title}
       onBack={handleBack}
       isLoading={isLoading || isFetching}
       error={error}
@@ -247,7 +255,7 @@ function CreateActivityPage() {
               textAlign: 'center',
             }}
           >
-            Keine Aktivitäten verfügbar
+            {texts.noActivitiesHeading}
           </div>
           <div
             style={{
@@ -256,7 +264,7 @@ function CreateActivityPage() {
               textAlign: 'center',
             }}
           >
-            Sie haben derzeit keine zugewiesenen Aktivitäten.
+            {texts.noActivitiesHint}
           </div>
         </div>
       ) : (
@@ -290,7 +298,7 @@ function CreateActivityPage() {
 
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
             <PillButton variant="primary" onClick={handleContinue} disabled={!selectedActivity}>
-              Weiter
+              {texts.continueButton}
             </PillButton>
           </div>
         </>

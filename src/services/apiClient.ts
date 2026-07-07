@@ -8,7 +8,7 @@ import { adapter } from '@platform';
 
 import { createLogger } from '../utils/logger';
 
-import { ApiError, type ApiErrorResponse } from './apiErrors';
+import { ApiError, getNetworkErrorMessage, type ApiErrorResponse } from './apiErrors';
 
 const logger = createLogger('API');
 
@@ -132,7 +132,7 @@ function handleNetworkError(error: unknown, endpoint: string, startTime: number)
     throw new Error('Zeitüberschreitung. Server antwortet nicht.');
   }
   if (errorObj.message.includes('NetworkError') || errorObj.message.includes('network')) {
-    throw new Error('Netzwerkfehler. Bitte Verbindung prüfen.');
+    throw new Error(getNetworkErrorMessage('generic'));
   }
   throw new Error('Verbindungsfehler. Bitte Netzwerkverbindung prüfen.');
 }

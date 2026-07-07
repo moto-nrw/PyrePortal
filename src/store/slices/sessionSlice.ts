@@ -1,5 +1,6 @@
 import {
   api,
+  getNetworkErrorMessage,
   mapServerErrorToGerman,
   isNetworkRelatedError,
   type ActivityResponse,
@@ -40,7 +41,7 @@ const mapSessionValidationError = (error: unknown): string => {
   const rawMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
 
   if (isNetworkRelatedError(error)) {
-    return 'Netzwerkfehler bei der Überprüfung der gespeicherten Sitzung. Bitte Verbindung prüfen und erneut versuchen.';
+    return getNetworkErrorMessage('sessionValidation');
   }
 
   switch (rawMessage) {

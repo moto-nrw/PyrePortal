@@ -355,6 +355,39 @@ export function isNetworkRelatedError(error: unknown): boolean {
 }
 
 /**
+ * Context for network error messages shown to the user.
+ * Each context keeps its historical wording so the visible copy stays identical.
+ */
+export type NetworkErrorContext =
+  | 'generic'
+  | 'retry'
+  | 'sessionStart'
+  | 'sessionValidation'
+  | 'schulhofCheckin'
+  | 'toiletteCheckin';
+
+const NETWORK_ERROR_MESSAGES: Record<NetworkErrorContext, string> = {
+  generic: 'Netzwerkfehler. Bitte Verbindung prüfen.',
+  retry: 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.',
+  sessionStart:
+    'Netzwerkfehler beim Starten der Aktivität. Bitte Verbindung prüfen und erneut versuchen.',
+  sessionValidation:
+    'Netzwerkfehler bei der Überprüfung der gespeicherten Sitzung. Bitte Verbindung prüfen und erneut versuchen.',
+  schulhofCheckin:
+    'Netzwerkfehler bei Schulhof-Anmeldung. Bitte Verbindung prüfen und erneut scannen.',
+  toiletteCheckin:
+    'Netzwerkfehler bei Toilette-Anmeldung. Bitte Verbindung prüfen und erneut scannen.',
+};
+
+/**
+ * Get the German network error message for a given UI context.
+ * Follows the context parameter pattern of mapAttendanceErrorToGerman.
+ */
+export function getNetworkErrorMessage(context: NetworkErrorContext = 'generic'): string {
+  return NETWORK_ERROR_MESSAGES[context];
+}
+
+/**
  * Map attendance-specific errors to German user-friendly messages
  * Provides context-aware error messages for attendance operations
  *
@@ -367,7 +400,7 @@ export function mapAttendanceErrorToGerman(
 ): string {
   // Network errors - use consolidated handler
   if (isNetworkRelatedError(errorMessage)) {
-    return 'Netzwerkfehler. Bitte Verbindung prüfen.';
+    return getNetworkErrorMessage('generic');
   }
 
   // ============================================================
