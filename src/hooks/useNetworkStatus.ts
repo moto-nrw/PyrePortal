@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 
 import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import { api } from '../services/api';
+import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('useNetworkStatus');
@@ -17,13 +18,9 @@ const INITIAL_CHECK_MAX_RETRIES = 3;
 const INITIAL_CHECK_RETRY_DELAY_MS = 1000;
 
 export const useNetworkStatus = () => {
-  // Network status state
-  const [networkStatus, setNetworkStatus] = useState<NetworkStatusData>({
-    isOnline: true,
-    responseTime: 0,
-    lastChecked: Date.now(),
-    quality: 'online',
-  });
+  // Network status state lives in the store (single source of truth)
+  const networkStatus = useUserStore(state => state.networkStatus);
+  const setNetworkStatus = useUserStore(state => state.setNetworkStatus);
 
   // Refs for cleanup
   const checkIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -92,7 +89,7 @@ export const useNetworkStatus = () => {
     } finally {
       isCheckingRef.current = false;
     }
-  }, [checkNetworkStatus]);
+  }, [checkNetworkStatus, setNetworkStatus]);
 
   // Delay helper for retry logic
   const delay = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
@@ -156,7 +153,7 @@ export const useNetworkStatus = () => {
     } finally {
       isCheckingRef.current = false;
     }
-  }, [checkNetworkStatus]);
+  }, [checkNetworkStatus, setNetworkStatus]);
 
   // Start monitoring network status
   const startMonitoring = useCallback(() => {
