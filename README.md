@@ -1,6 +1,6 @@
 # PyrePortal
 
-![PyrePortal](public/img/moto_transparent_200.png)
+![PyrePortal](docs/img/moto_transparent_200.png)
 
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/typescript-5.9-blue)](https://www.typescriptlang.org)
@@ -144,7 +144,7 @@ PyrePortal talks to the Project Phoenix backend over REST. All requests carry de
 
 Enter your PIN on the login screen. PyrePortal validates it against the backend and grants access.
 
-![Login Screen](public/img/placeholder_nfc_scan.png)
+![Login Screen](docs/img/placeholder_nfc_scan.png)
 
 </details>
 
@@ -153,13 +153,13 @@ Enter your PIN on the login screen. PyrePortal validates it against the backend 
 
 Pick a room after logging in. Each room shows its current status:
 
-- ![Occupied](public/img/checked_in.png) Occupied
-- ![Available](public/img/checked_out.png) Available
+- ![Occupied](docs/img/checked_in.png) Occupied
+- ![Available](docs/img/checked_out.png) Available
 
 Room types include:
 
-- ![School Yard](public/img/school_yard_icon.png) School Yard
-- ![Toilet](public/img/toilet_icon.png) Toilet
+- ![School Yard](docs/img/school_yard_icon.png) School Yard
+- ![Toilet](docs/img/toilet_icon.png) Toilet
 
 </details>
 
@@ -168,9 +168,9 @@ Room types include:
 
 Start an activity, assign supervisors, and scan students in. At checkout, staff can leave daily feedback:
 
-- ![Positive](public/img/positive_smiley1.png) Positive
-- ![Neutral](public/img/neutral_smiley1.png) Neutral
-- ![Negative](public/img/negative_smiley1.png) Negative
+- ![Positive](docs/img/positive_smiley1.png) Positive
+- ![Neutral](docs/img/neutral_smiley1.png) Neutral
+- ![Negative](docs/img/negative_smiley1.png) Negative
 
 </details>
 

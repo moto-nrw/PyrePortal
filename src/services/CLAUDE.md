@@ -25,8 +25,7 @@ headers: {
 Key methods:
 
 - `getTeachers()`
-- `validateGlobalPIN(pin)`
-- `validateTeacherPIN(pin, staffId)`
+- `validateGlobalPin(pin)`
 - `processRfidScan(...)`
 - `getActivities(pin)`
 - `getRooms(pin)`

@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 
-import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import {
   api,
   mapServerErrorToGerman,
@@ -18,6 +17,7 @@ import {
   loadSessionSettings,
   clearLastSession,
 } from '../services/sessionStorage';
+import type { NetworkStatusData } from '../types/network';
 import { createLogger, LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
 
