@@ -1,56 +1,19 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { adapter } from '@platform';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
-import { isRealScanningEnabled } from '../platform/adapter';
-import { api, type TagAssignmentCheck } from '../services/api';
+import { getAssignedPerson, useTagAssignmentScan } from '../hooks/useTagAssignmentScan';
+import { type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import theme from '../styles/theme';
-import { getSecureRandomInt } from '../utils/crypto';
-import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
+import { logNavigation, logUserAction } from '../utils/logger';
 import { pressHandlers } from '../utils/pressHandlers';
-
-const logger = createLogger('TagAssignmentPage');
-
-/**
- * Helper to get assigned person from TagAssignmentCheck
- */
-const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
-  if (!assignment?.assigned) return null;
-  return assignment.person ?? null;
-};
-
-// RFID scanner types from Tauri backend
-const SCAN_INVOKE_TIMEOUT_MS = 20_000;
-
-const withTimeout = <T,>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  timeoutMessage: string
-): Promise<T> => {
-  return new Promise<T>((resolve, reject) => {
-    const timeoutHandle = setTimeout(() => {
-      reject(new Error(timeoutMessage));
-    }, timeoutMs);
-
-    promise
-      .then(result => {
-        clearTimeout(timeoutHandle);
-        resolve(result);
-      })
-      .catch(error => {
-        clearTimeout(timeoutHandle);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      });
-  });
-};
 
 /**
  * Tag Assignment Page - Handle RFID tag assignment to students
@@ -68,61 +31,33 @@ function TagAssignmentPage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // UI state
-  const [isLoading, setIsLoading] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-  const [scannedTag, setScannedTag] = useState<string | null>(null);
-  const [tagAssignment, setTagAssignment] = useState<TagAssignmentCheck | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
-  const [success, setSuccess] = useState<string | null>(null);
-  const [showUnassignConfirm, setShowUnassignConfirm] = useState(false);
-  const [isUnassigning, setIsUnassigning] = useState(false);
-
-  // Refs for scan cancellation
-  const mockScanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const scanCancelledRef = useRef(false);
-
-  const clearStates = useCallback(() => {
-    setScannedTag(null);
-    setTagAssignment(null);
-    setError(null);
-    setSuccess(null);
-    setShowUnassignConfirm(false);
-  }, []);
-
-  // Cancel ongoing scan operation
-  const cancelScan = useCallback(() => {
-    logUserAction('RFID scanning cancelled by user');
-
-    // Mark scan as cancelled to prevent processing results
-    scanCancelledRef.current = true;
-
-    // Clear mock scan timeout if running
-    if (mockScanTimeoutRef.current) {
-      clearTimeout(mockScanTimeoutRef.current);
-      mockScanTimeoutRef.current = null;
-    }
-
-    // Close modal and reset loading state
-    setShowScanner(false);
-    setIsLoading(false);
-  }, []);
+  const {
+    isLoading,
+    showScanner,
+    scannedTag,
+    tagAssignment,
+    error,
+    showErrorModal,
+    success,
+    showUnassignConfirm,
+    isUnassigning,
+    startScanning,
+    cancelScan,
+    scanAnother,
+    unassignTag,
+    openUnassignConfirm,
+    closeUnassignConfirm,
+    closeErrorModal,
+    showError,
+    restoreScan,
+    setSuccess,
+  } = useTagAssignmentScan();
 
   // Handle back navigation
   const handleBack = () => {
     logNavigation('Tag Assignment', '/home');
     void navigate('/home');
   };
-
-  // Cleanup timeout on unmount to prevent memory leaks
-  useEffect(() => {
-    return () => {
-      if (mockScanTimeoutRef.current) {
-        clearTimeout(mockScanTimeoutRef.current);
-      }
-    };
-  }, []);
 
   // Handle state from student selection page (success or back navigation)
   useEffect(() => {
@@ -140,8 +75,7 @@ function TagAssignmentPage() {
 
     // Restore tag data if coming back from student selection
     if (scannedTag && tagAssignment) {
-      setScannedTag(scannedTag);
-      setTagAssignment(tagAssignment);
+      restoreScan(scannedTag, tagAssignment);
     }
 
     // Handle success state
@@ -151,136 +85,12 @@ function TagAssignmentPage() {
 
     // Clear location state to prevent showing on page refresh
     window.history.replaceState({}, document.title);
-  }, [location.state]);
-
-  // Start RFID scanning process
-  const handleStartScanning = async () => {
-    logUserAction('RFID scanning started');
-
-    // Reset cancellation flag at start of new scan
-    scanCancelledRef.current = false;
-
-    clearStates();
-    setShowScanner(true);
-    setIsLoading(true);
-
-    try {
-      if (!isRealScanningEnabled()) {
-        // Development mock behavior - store timeout ref for cancellation
-        mockScanTimeoutRef.current = setTimeout(() => {
-          // Check if scan was cancelled before processing
-          if (scanCancelledRef.current) {
-            logger.debug('Mock scan completed but was cancelled, ignoring result');
-            return;
-          }
-
-          // Get mock tags from environment variable or use defaults
-          const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
-          const mockStudentTags: string[] = envTags
-            ? envTags.split(',').map(tag => tag.trim())
-            : [
-                // Default realistic hardware format tags
-                '04:D6:94:82:97:6A:80',
-                '04:A7:B3:C2:D1:E0:F5',
-                '04:12:34:56:78:9A:BC',
-                '04:FE:DC:BA:98:76:54',
-                '04:11:22:33:44:55:66',
-              ];
-
-          // Pick a random tag from the list using unbiased secure randomness
-          const randomIndex = getSecureRandomInt(mockStudentTags.length);
-          const mockTagId = mockStudentTags[randomIndex];
-          logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
-          mockScanTimeoutRef.current = null;
-          void handleTagScanned(mockTagId);
-        }, 2000);
-        return;
-      }
-
-      // Use real RFID scanner via platform adapter with frontend timeout safety net.
-      const result = await withTimeout(
-        adapter.scanSingleTag(SCAN_INVOKE_TIMEOUT_MS),
-        SCAN_INVOKE_TIMEOUT_MS,
-        'RFID-Scan Zeitüberschreitung'
-      );
-
-      // Check if scan was cancelled while waiting for result
-      if (scanCancelledRef.current) {
-        logger.debug('RFID scan completed but was cancelled, ignoring result');
-        return;
-      }
-
-      if (result.success && result.tag_id) {
-        logUserAction('RFID tag scanned successfully', { tagId: result.tag_id });
-        void handleTagScanned(result.tag_id);
-      } else {
-        const errorMessage = result.error ?? 'Unknown scanning error';
-        logError(new Error(errorMessage), 'RFID scanning failed');
-        setError('Armband konnte nicht gelesen werden. Bitte erneut versuchen.');
-        setShowErrorModal(true);
-        setShowScanner(false);
-      }
-    } catch (err) {
-      // Check if error was due to cancellation
-      if (scanCancelledRef.current) {
-        logger.debug('RFID scan error after cancellation, ignoring');
-        return;
-      }
-
-      const error = err instanceof Error ? err : new Error(String(err));
-      logError(error, 'RFID scanner invocation failed');
-      const timeoutError = error.message.toLowerCase().includes('zeitüberschreitung');
-      setError(
-        timeoutError
-          ? 'Scanner reagiert nicht mehr. Bitte Scanner neu starten und erneut versuchen.'
-          : 'Verbindung zum Scanner unterbrochen. Bitte Scanner neu starten.'
-      );
-      setShowErrorModal(true);
-      setShowScanner(false);
-    } finally {
-      // Only update loading state if not cancelled (cancelScan handles this)
-      if (!scanCancelledRef.current) {
-        setIsLoading(false);
-      }
-    }
-  };
-
-  // Handle tag scanned (connection point for RFID module)
-  const handleTagScanned = async (tagId: string) => {
-    setIsLoading(true);
-    setShowScanner(false);
-    setScannedTag(tagId);
-
-    try {
-      logUserAction('RFID tag scanned', { tagId });
-
-      // Check if tag is already assigned
-      const assignment = await checkTagAssignment(tagId);
-      setTagAssignment(assignment);
-    } catch (err) {
-      const error = err instanceof Error ? err : new Error(String(err));
-      logError(error, 'Failed to process scanned tag');
-      setError('Armband konnte nicht überprüft werden. Bitte Internetverbindung prüfen.');
-      setShowErrorModal(true);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Check current tag assignment
-  const checkTagAssignment = async (tagId: string): Promise<TagAssignmentCheck> => {
-    if (!authenticatedUser?.pin) {
-      throw new Error('Keine Authentifizierung verfügbar');
-    }
-
-    return await api.checkTagAssignment(authenticatedUser.pin, tagId);
-  };
+  }, [location.state, restoreScan, setSuccess]);
 
   // Navigate to student selection
   const handleNavigateToStudentSelection = () => {
     if (!scannedTag || !tagAssignment) {
-      setError('Ungültige Daten. Bitte erneut scannen.');
-      setShowErrorModal(true);
+      showError('Ungültige Daten. Bitte erneut scannen.');
       return;
     }
 
@@ -295,51 +105,6 @@ function TagAssignmentPage() {
         tagAssignment,
       },
     });
-  };
-
-  // Start a new scan
-  const handleScanAnother = () => {
-    logUserAction('Starting new tag scan');
-    clearStates();
-    void handleStartScanning();
-  };
-
-  // Handle unassigning a tag from a student or staff member
-  const handleUnassignTag = async () => {
-    const assignedPerson = getAssignedPerson(tagAssignment);
-    if (!authenticatedUser?.pin || !assignedPerson || !scannedTag) return;
-
-    setIsUnassigning(true);
-    try {
-      const result =
-        tagAssignment?.person_type === 'staff'
-          ? await api.unassignStaffTag(authenticatedUser.pin, assignedPerson.id)
-          : await api.unassignStudentTag(authenticatedUser.pin, assignedPerson.id);
-
-      if (!result.success) {
-        setShowUnassignConfirm(false);
-        setError(result.message ?? 'Zuweisung konnte nicht aufgehoben werden.');
-        setShowErrorModal(true);
-        return;
-      }
-
-      // Clear stale RFID caches for this tag
-      useUserStore.getState().clearTagScan(scannedTag);
-
-      setShowUnassignConfirm(false);
-      setTagAssignment(null);
-      setScannedTag(null);
-      setSuccess(`Armband wurde von ${assignedPerson.name} entfernt`);
-    } catch (err) {
-      logger.error('Failed to unassign RFID tag', {
-        error: err instanceof Error ? err.message : String(err),
-      });
-      setShowUnassignConfirm(false);
-      setError('Zuweisung konnte nicht aufgehoben werden. Bitte erneut versuchen.');
-      setShowErrorModal(true);
-    } finally {
-      setIsUnassigning(false);
-    }
   };
 
   // Redirect to login if no authenticated user
@@ -533,7 +298,7 @@ function TagAssignmentPage() {
                 </p>
 
                 <button
-                  onClick={handleStartScanning}
+                  onClick={startScanning}
                   disabled={isScanStartDisabled}
                   style={{
                     height: '68px',
@@ -752,7 +517,7 @@ function TagAssignmentPage() {
                       {tagAssignment.assigned ? 'Anderer Person zuweisen' : 'Person auswählen'}
                     </button>
                     <button
-                      onClick={handleScanAnother}
+                      onClick={scanAnother}
                       style={{
                         flex: 1,
                         height: '68px',
@@ -781,7 +546,7 @@ function TagAssignmentPage() {
                   {/* Unassign button */}
                   {tagAssignment.assigned && (
                     <button
-                      onClick={() => setShowUnassignConfirm(true)}
+                      onClick={openUnassignConfirm}
                       style={{
                         height: '56px',
                         padding: '0 40px',
@@ -864,7 +629,7 @@ function TagAssignmentPage() {
                   }}
                 >
                   <button
-                    onClick={handleScanAnother}
+                    onClick={scanAnother}
                     {...pressHandlers()}
                     style={{
                       height: '68px',
@@ -913,7 +678,7 @@ function TagAssignmentPage() {
       <ModalBase
         isOpen={showUnassignConfirm}
         onClose={() => {
-          if (!isUnassigning) setShowUnassignConfirm(false);
+          if (!isUnassigning) closeUnassignConfirm();
         }}
         size="sm"
         backgroundColor="#FFFFFF"
@@ -971,7 +736,7 @@ function TagAssignmentPage() {
 
           <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
             <button
-              onClick={handleUnassignTag}
+              onClick={unassignTag}
               disabled={isUnassigning}
               {...pressHandlers(isUnassigning)}
               style={{
@@ -992,7 +757,7 @@ function TagAssignmentPage() {
               {isUnassigning ? 'Wird entfernt...' : 'Ja, freigeben'}
             </button>
             <button
-              onClick={() => setShowUnassignConfirm(false)}
+              onClick={closeUnassignConfirm}
               disabled={isUnassigning}
               {...pressHandlers(isUnassigning)}
               style={{
@@ -1019,7 +784,7 @@ function TagAssignmentPage() {
       {/* Error Modal */}
       <ErrorModal
         isOpen={showErrorModal}
-        onClose={() => setShowErrorModal(false)}
+        onClose={closeErrorModal}
         message={error ?? ''}
         autoCloseDelay={3000}
       />
