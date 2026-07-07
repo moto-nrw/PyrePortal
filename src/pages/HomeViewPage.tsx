@@ -11,7 +11,6 @@ import {
   formatRoomName,
   isNetworkRelatedError,
   mapServerErrorToGerman,
-  type SessionStartRequest,
   type CurrentSession,
 } from '../services/api';
 import type { SessionSettings } from '../services/sessionStorage';
@@ -135,6 +134,8 @@ function HomeViewPage() {
     loadSessionSettings,
     validateAndRecreateSession,
     isValidatingLastSession,
+    recreateSession,
+    invalidateSessionRecreation,
   } = useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
@@ -143,7 +144,6 @@ function HomeViewPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
-  const recreationRequestIdRef = useRef(0);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -166,7 +166,7 @@ function HomeViewPage() {
 
   // Helper to perform user logout
   const performLogout = async () => {
-    recreationRequestIdRef.current += 1;
+    invalidateSessionRecreation();
     setIsNavigatingToScanning(false);
     logUserAction('User logout initiated');
     await logout();
@@ -249,73 +249,36 @@ function HomeViewPage() {
   const handleConfirmRecreation = async () => {
     if (!authenticatedUser || !sessionSettings?.last_session) return;
 
-    const recreationRequestId = recreationRequestIdRef.current + 1;
-    recreationRequestIdRef.current = recreationRequestId;
+    setIsNavigatingToScanning(true);
+    const outcome = await recreateSession();
 
-    const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
-
-    // Validate session data is complete
-    if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
+    if (outcome.status === 'incomplete') {
+      setIsNavigatingToScanning(false);
       showRecreationError(
         'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.'
       );
       return;
     }
 
-    logUserAction('Confirming session recreation', {
-      activityId: selectedActivity.id,
-      roomId: selectedRoom.id,
-      supervisorCount: selectedSupervisors.length,
-    });
-
-    try {
-      setIsNavigatingToScanning(true);
-
-      const sessionRequest: SessionStartRequest = {
-        activity_id: selectedActivity.id,
-        room_id: selectedRoom.id,
-        supervisor_ids: selectedSupervisors.map(s => s.id),
-      };
-
-      const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
-
-      logUserAction('Session recreated successfully', {
-        sessionId: sessionResponse.active_group_id,
-      });
-
-      // Set current session directly from start response + local state
-      // instead of making a redundant GET /api/iot/session/current round-trip
-      const newSession: CurrentSession = {
-        active_group_id: sessionResponse.active_group_id,
-        activity_id: sessionResponse.activity_id,
-        activity_name: selectedActivity.name,
-        room_id: selectedRoom.id,
-        room_name: selectedRoom.name,
-        device_id: sessionResponse.device_id,
-        start_time: sessionResponse.start_time,
-        duration: '0s',
-        is_active: true,
-        active_students: 0,
-        supervisors: sessionResponse.supervisors,
-      };
-
-      useUserStore.setState({ currentSession: newSession });
-
-      await useUserStore.getState().saveLastSessionData();
-
-      logNavigation('Home View', '/nfc-scanning');
-      void navigate('/nfc-scanning');
-    } catch (error) {
-      if (!isMountedRef.current || recreationRequestId !== recreationRequestIdRef.current) {
+    if (outcome.status === 'error') {
+      // Stale responses (superseded attempt or logout) are discarded
+      if (!isMountedRef.current || outcome.stale) {
         return;
       }
-
       setIsNavigatingToScanning(false);
-      showRecreationError(formatRecreationError(error));
-    } finally {
-      if (isMountedRef.current && recreationRequestId === recreationRequestIdRef.current) {
-        setShowConfirmModal(false);
-      }
+      showRecreationError(formatRecreationError(outcome.error));
+      return;
+    }
+
+    logUserAction('Session recreated successfully', {
+      sessionId: outcome.session.active_group_id,
+    });
+
+    logNavigation('Home View', '/nfc-scanning');
+    void navigate('/nfc-scanning');
+
+    if (isMountedRef.current && !outcome.stale) {
+      setShowConfirmModal(false);
     }
   };
 

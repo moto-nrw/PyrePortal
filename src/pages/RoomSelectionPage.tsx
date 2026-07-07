@@ -12,15 +12,13 @@ import {
 } from '../components/ui';
 import { usePagination } from '../hooks/usePagination';
 import {
-  api,
-  ApiError,
   mapServerErrorToGerman,
   isNetworkRelatedError,
   type Room,
-  type SessionStartRequest,
   type ActivityResponse,
   type CurrentSession,
 } from '../services/api';
+import { startSessionWithConflictHandling } from '../services/sessionService';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
@@ -536,6 +534,7 @@ function RoomSelectionPage() {
     error,
     fetchRooms,
     selectRoom,
+    setCurrentSession,
     saveLastSessionData,
   } = useUserStore();
 
@@ -621,60 +620,18 @@ function RoomSelectionPage() {
     setShowConfirmModal(true);
   };
 
-  // Build CurrentSession from start response + local state to avoid
-  // a redundant GET /api/iot/session/current round-trip
-  const buildSessionFromResponse = useCallback(
-    (sessionResponse: {
-      active_group_id: number;
-      activity_id: number;
-      device_id: number;
-      start_time: string;
-      supervisors: CurrentSession['supervisors'];
-    }) => {
-      if (!selectedActivity || !selectedRoom) return null;
-      const session: CurrentSession = {
-        active_group_id: sessionResponse.active_group_id,
-        activity_id: sessionResponse.activity_id,
-        activity_name: selectedActivity.name,
-        room_id: selectedRoom.id,
-        room_name: selectedRoom.name,
-        device_id: sessionResponse.device_id,
-        start_time: sessionResponse.start_time,
-        duration: '0s',
-        is_active: true,
-        active_students: 0,
-        supervisors: sessionResponse.supervisors,
-      };
-      return session;
-    },
-    [selectedActivity, selectedRoom]
-  );
-
   // Shared post-start flow: set session state, save, log, and navigate
   const completeSessionStart = useCallback(
-    async (
-      sessionResponse: {
-        active_group_id: number;
-        activity_id: number;
-        device_id: number;
-        start_time: string;
-        supervisors: CurrentSession['supervisors'];
-      },
-      actionLabel: string
-    ) => {
+    async (session: CurrentSession, actionLabel: string) => {
       if (!selectedActivity || !selectedRoom) return;
 
       selectRoom(selectedRoom.id);
-
-      const newSession = buildSessionFromResponse(sessionResponse);
-      if (newSession) {
-        useUserStore.setState({ currentSession: newSession });
-      }
+      setCurrentSession(session);
 
       await saveLastSessionData();
 
       logUserAction(actionLabel, {
-        sessionId: sessionResponse.active_group_id,
+        sessionId: session.active_group_id,
         activityId: selectedActivity.id,
         activityName: selectedActivity.name,
         roomId: selectedRoom.id,
@@ -688,21 +645,14 @@ function RoomSelectionPage() {
       setSelectedRoom(null);
 
       logNavigation('RoomSelectionPage', 'NFC-Scanning', {
-        sessionId: sessionResponse.active_group_id,
+        sessionId: session.active_group_id,
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
       });
 
       void navigate('/nfc-scanning');
     },
-    [
-      selectedActivity,
-      selectedRoom,
-      selectRoom,
-      saveLastSessionData,
-      buildSessionFromResponse,
-      navigate,
-    ]
+    [selectedActivity, selectedRoom, selectRoom, setCurrentSession, saveLastSessionData, navigate]
   );
 
   // Handle session start confirmation
@@ -710,73 +660,63 @@ function RoomSelectionPage() {
     if (!selectedRoom || !selectedActivity || !authenticatedUser) return;
 
     setIsStartingSession(true);
-    try {
-      logger.info('Starting activity session', {
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-        supervisorCount: selectedSupervisors.length,
-        supervisorIds: selectedSupervisors.map(s => s.id),
-      });
 
-      performance.mark('session-start-begin');
+    logger.info('Starting activity session', {
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+      supervisorCount: selectedSupervisors.length,
+      supervisorIds: selectedSupervisors.map(s => s.id),
+    });
 
-      const sessionRequest: SessionStartRequest = {
-        activity_id: selectedActivity.id,
-        room_id: selectedRoom.id,
-        supervisor_ids: selectedSupervisors.map(s => s.id),
-      };
+    performance.mark('session-start-begin');
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
+    const outcome = await startSessionWithConflictHandling({
+      pin: authenticatedUser.pin,
+      activity: selectedActivity,
+      room: selectedRoom,
+      supervisorIds: selectedSupervisors.map(s => s.id),
+    });
 
+    if (outcome.status === 'started') {
       performance.mark('session-start-end');
       performance.measure('session-start-duration', 'session-start-begin', 'session-start-end');
       const measure = performance.getEntriesByName('session-start-duration')[0];
 
       logger.info('Session started successfully', {
-        sessionId: sessionResponse.active_group_id,
-        activityId: sessionResponse.activity_id,
-        deviceId: sessionResponse.device_id,
+        sessionId: outcome.response.active_group_id,
+        activityId: outcome.response.activity_id,
+        deviceId: outcome.response.device_id,
         duration_ms: measure.duration,
       });
 
-      await completeSessionStart(sessionResponse, 'session_started');
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Fehler beim Starten der Session';
-      logger.error('Session start failed', {
-        error: errorMessage,
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-      });
-
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'RoomSelectionPage.handleConfirmSession'
-      );
-
-      // Handle 409 Conflict - show conflict modal
-      logger.debug('Checking for conflict error', {
-        errorMessage,
-        includes409: errorMessage.includes('409'),
-        includesConflict: errorMessage.includes('Conflict'),
-      });
-
-      if (
-        (error instanceof ApiError && error.statusCode === 409) ||
-        errorMessage.includes('409') ||
-        errorMessage.includes('Conflict')
-      ) {
-        logger.info('Showing conflict modal due to 409 error');
-        setShowConflictModal(true);
-        setIsStartingSession(false);
-        return;
-      } else {
-        showError(error, 'Fehler beim Starten der Aktivität');
-        setIsStartingSession(false);
-        setShowConfirmModal(false);
-        setSelectedRoom(null);
-      }
+      await completeSessionStart(outcome.session, 'session_started');
+      return;
     }
+
+    const error = outcome.error;
+    const errorMessage = error instanceof Error ? error.message : 'Fehler beim Starten der Session';
+    logger.error('Session start failed', {
+      error: errorMessage,
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+    });
+
+    logError(
+      error instanceof Error ? error : new Error(String(error)),
+      'RoomSelectionPage.handleConfirmSession'
+    );
+
+    if (outcome.status === 'conflict') {
+      logger.info('Showing conflict modal due to 409 error');
+      setShowConflictModal(true);
+      setIsStartingSession(false);
+      return;
+    }
+
+    showError(error, 'Fehler beim Starten der Aktivität');
+    setIsStartingSession(false);
+    setShowConfirmModal(false);
+    setSelectedRoom(null);
   };
 
   // Handle force session start from conflict modal
@@ -784,43 +724,45 @@ function RoomSelectionPage() {
     if (!selectedRoom || !selectedActivity || !authenticatedUser) return;
 
     setIsStartingSession(true);
-    try {
-      logger.info('Retrying session start with force=true', {
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-      });
 
-      const forceSessionRequest: SessionStartRequest = {
-        activity_id: selectedActivity.id,
-        room_id: selectedRoom.id,
-        supervisor_ids: selectedSupervisors.map(s => s.id),
-        force: true,
-      };
+    logger.info('Retrying session start with force=true', {
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+    });
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, forceSessionRequest);
+    const outcome = await startSessionWithConflictHandling({
+      pin: authenticatedUser.pin,
+      activity: selectedActivity,
+      room: selectedRoom,
+      supervisorIds: selectedSupervisors.map(s => s.id),
+      force: true,
+    });
 
+    if (outcome.status === 'started') {
       logger.info('Session started successfully with force override', {
-        sessionId: sessionResponse.active_group_id,
-        activityId: sessionResponse.activity_id,
-        deviceId: sessionResponse.device_id,
+        sessionId: outcome.response.active_group_id,
+        activityId: outcome.response.activity_id,
+        deviceId: outcome.response.device_id,
       });
 
-      await completeSessionStart(sessionResponse, 'session_started_force');
-    } catch (forceError) {
-      const forceErrorMessage =
-        forceError instanceof Error ? forceError.message : 'Fehler beim Überschreiben der Session';
-      logger.error('Force session start also failed', {
-        error: forceErrorMessage,
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-      });
-      showError(forceError, 'Fehler beim Überschreiben der Session');
-      // Clean up modal state only on error
-      setIsStartingSession(false);
-      setShowConfirmModal(false);
-      setShowConflictModal(false);
-      setSelectedRoom(null);
+      await completeSessionStart(outcome.session, 'session_started_force');
+      return;
     }
+
+    const forceError = outcome.error;
+    const forceErrorMessage =
+      forceError instanceof Error ? forceError.message : 'Fehler beim Überschreiben der Session';
+    logger.error('Force session start also failed', {
+      error: forceErrorMessage,
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+    });
+    showError(forceError, 'Fehler beim Überschreiben der Session');
+    // Clean up modal state only on error
+    setIsStartingSession(false);
+    setShowConfirmModal(false);
+    setShowConflictModal(false);
+    setSelectedRoom(null);
   };
 
   // Handle conflict modal cancel

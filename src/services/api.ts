@@ -137,7 +137,7 @@ interface SupervisorInfo {
 /**
  * Session start response structure
  */
-interface SessionStartResponse {
+export interface SessionStartResponse {
   active_group_id: number;
   activity_id: number;
   device_id: number;

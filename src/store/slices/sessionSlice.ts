@@ -8,6 +8,11 @@ import {
   type DailyFeedbackRating,
 } from '../../services/api';
 import {
+  createRecreationRequestTracker,
+  recreateSession as requestSessionRecreation,
+  type SessionRecreationOutcome,
+} from '../../services/sessionService';
+import {
   type SessionSettings,
   saveSessionSettings,
   loadSessionSettings,
@@ -206,384 +211,454 @@ const SESSION_INITIAL_STATE = {
   activeSupervisorTags: new Set<string>(),
 };
 
-export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserState>) => ({
-  // Initial state
-  selectedActivity: null,
-  currentSession: null,
-  selectedSupervisors: [] as User[], // New state for multi-supervisor selection
+export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserState>) => {
+  // Race guard for session recreation: stale async responses are discarded
+  const recreationTracker = createRecreationRequestTracker();
 
-  // Session settings initial state
-  sessionSettings: null,
-  isValidatingLastSession: false,
+  return {
+    // Initial state
+    selectedActivity: null,
+    currentSession: null,
+    selectedSupervisors: [] as User[], // New state for multi-supervisor selection
 
-  setSelectedActivity: (activity: ActivityResponse) => set({ selectedActivity: activity }),
+    // Session settings initial state
+    sessionSettings: null,
+    isValidatingLastSession: false,
 
-  fetchCurrentSession: async () => {
-    const { authenticatedUser } = get();
+    setSelectedActivity: (activity: ActivityResponse) => set({ selectedActivity: activity }),
 
-    if (!authenticatedUser?.pin) {
-      storeLogger.warn('Cannot fetch current session: no authenticated user or PIN');
-      return;
-    }
+    setCurrentSession: (session: CurrentSession) => set({ currentSession: session }),
 
-    try {
-      storeLogger.info('Fetching current session for device');
-      const session = await api.getCurrentSession(authenticatedUser.pin);
+    // Invalidate all in-flight recreation requests (e.g. on logout)
+    invalidateSessionRecreation: () => {
+      recreationTracker.invalidate();
+    },
 
-      if (!session) {
-        storeLogger.debug('No active session found for device, clearing session state');
-        get().clearSessionState();
-        return;
+    // Recreate the last saved session from the validated selection in the store.
+    // The request-id guard marks responses as stale when a newer attempt or an
+    // invalidation (logout) happened while the request was in flight.
+    recreateSession: async (): Promise<SessionRecreationOutcome> => {
+      const requestId = recreationTracker.begin();
+      const { authenticatedUser, selectedActivity, selectedRoom, selectedSupervisors } = get();
+
+      if (
+        !authenticatedUser?.pin ||
+        !selectedActivity ||
+        !selectedRoom ||
+        selectedSupervisors.length === 0
+      ) {
+        return { status: 'incomplete', stale: !recreationTracker.isCurrent(requestId) };
       }
 
-      storeLogger.info('Active session found', {
-        activeGroupId: session.active_group_id,
-        activityId: session.activity_id,
-        activityName: session.activity_name,
-        roomName: session.room_name,
-        startTime: session.start_time,
-        duration: session.duration,
-      });
-
-      // Resolve activity and room data using extracted helpers
-      const currentSelectedActivity = get().selectedActivity;
-      const sessionActivity = await resolveSessionActivity(
-        session,
-        currentSelectedActivity,
-        authenticatedUser.pin,
-        authenticatedUser.staffName
-      );
-      const sessionRoom = createSessionRoom(session);
-
-      // Guard: Don't overwrite selectedRoom if user just manually selected a room
-      // This prevents stale server data from reverting a recent room switch.
-      // A null sessionRoom during the recent-selection window is treated as stale/partial
-      // data — the manual selection is preserved rather than wiped.
-      const currentSelectedRoom = get().selectedRoom;
-      const roomSelectedAt = get()._roomSelectedAt;
-      const isRecentManualSelection = roomSelectedAt != null && Date.now() - roomSelectedAt < 5000;
-      const shouldPreserveRoom =
-        isRecentManualSelection &&
-        currentSelectedRoom != null &&
-        currentSelectedRoom.id !== sessionRoom?.id;
-
-      if (shouldPreserveRoom) {
-        storeLogger.debug('Preserving manually selected room during fetchCurrentSession', {
-          manualRoomId: currentSelectedRoom.id,
-          manualRoomName: currentSelectedRoom.name,
-          serverRoomId: sessionRoom?.id ?? null,
-          serverRoomName: sessionRoom?.name ?? null,
-          roomSelectedAgoMs: Date.now() - roomSelectedAt,
-        });
-      }
-
-      set({
-        currentSession: session,
-        selectedActivity: sessionActivity,
-        ...(shouldPreserveRoom ? {} : { selectedRoom: sessionRoom }),
-        // Sync supervisors from backend → local cache
-        ...(session.supervisors && {
-          selectedSupervisors: session.supervisors.map(sup => ({
-            id: sup.staff_id,
-            name: sup.display_name,
-          })),
-        }),
-      });
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      storeLogger.error('Failed to fetch current session', { error: errorMessage });
-      // Don't set error state for session check, just log it
-    }
-  },
-
-  // Supervisor selection actions
-  setSelectedSupervisors: (supervisors: User[]) =>
-    set({ selectedSupervisors: supervisors, activeSupervisorTags: new Set<string>() }),
-
-  toggleSupervisor: (user: User) => {
-    const { selectedSupervisors } = get();
-    const isSelected = selectedSupervisors.some(s => s.id === user.id);
-
-    if (isSelected) {
-      // Remove supervisor
-      set({
-        selectedSupervisors: selectedSupervisors.filter(s => s.id !== user.id),
-        activeSupervisorTags: new Set<string>(),
-      });
-    } else {
-      // Add supervisor
-      set({
-        selectedSupervisors: [...selectedSupervisors, user],
-        activeSupervisorTags: new Set<string>(),
-      });
-    }
-  },
-
-  // Activity-related actions
-  fetchActivities: (() => {
-    let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
-
-    return async (): Promise<ActivityResponse[] | null> => {
-      // Return existing promise if already fetching
-      if (fetchPromise) {
-        storeLogger.debug('Activities fetch already in progress, returning existing promise');
-        return fetchPromise;
-      }
-
-      const { authenticatedUser } = get();
-      set({ isLoading: true, error: null });
-
-      if (!authenticatedUser) {
-        const errorMsg = 'Keine Authentifizierung für das Laden von Aktivitäten';
-        set({
-          error: mapServerErrorToGerman(errorMsg),
-          isLoading: false,
-        });
-        return null;
-      }
-
-      if (!authenticatedUser.pin) {
-        const errorMsg = 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.';
-        set({
-          error: mapServerErrorToGerman(errorMsg),
-          isLoading: false,
-        });
-        return null;
-      }
-
-      // Create new fetch promise
-      fetchPromise = (async () => {
-        try {
-          storeLogger.info('Fetching activities from API', {
-            staffId: authenticatedUser.staffId,
-            staffName: authenticatedUser.staffName,
-          });
-
-          const activitiesData = await api.getActivities(authenticatedUser.pin);
-
-          storeLogger.info('Activities loaded successfully', {
-            count: activitiesData.length,
-            activities: activitiesData.map(toActivitySummary),
-          });
-
-          set({ isLoading: false });
-          return activitiesData;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-
-          storeLogger.error('Failed to fetch activities', {
-            error: errorMessage,
-            staffId: authenticatedUser.staffId,
-          });
-
-          set({
-            error: mapServerErrorToGerman(errorMessage),
-            isLoading: false,
-          });
-
-          return null;
-        } finally {
-          // Clear the promise when done
-          fetchPromise = null;
-        }
-      })();
-
-      return fetchPromise;
-    };
-  })(),
-
-  // Session settings actions
-  loadSessionSettings: async () => {
-    try {
-      storeLogger.debug('Loading session settings');
-      const settings = await loadSessionSettings();
-
-      if (settings) {
-        set({ sessionSettings: settings });
-        storeLogger.info('Session settings loaded', {
-          useLastSession: settings.use_last_session,
-          hasLastSession: !!settings.last_session,
-        });
-      }
-    } catch (error) {
-      storeLogger.error('Failed to load session settings', { error });
-    }
-  },
-
-  toggleUseLastSession: async (enabled: boolean) => {
-    const { sessionSettings } = get();
-
-    const newSettings: SessionSettings = {
-      use_last_session: enabled,
-      auto_save_enabled: true,
-      last_session: sessionSettings?.last_session ?? null,
-    };
-
-    try {
-      await saveSessionSettings(newSettings);
-      set({ sessionSettings: newSettings });
-      storeLogger.info('Toggle use last session', { enabled });
-    } catch (error) {
-      storeLogger.error('Failed to save session settings', { error });
-    }
-  },
-
-  saveLastSessionData: async () => {
-    const { selectedActivity, selectedRoom, selectedSupervisors, sessionSettings } = get();
-
-    if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
-      storeLogger.warn('Cannot save session data: missing required fields');
-      return;
-    }
-
-    const lastSessionConfig = {
-      activity_id: selectedActivity.id,
-      room_id: selectedRoom.id,
-      supervisor_ids: selectedSupervisors.map(s => s.id),
-      saved_at: new Date().toISOString(),
-      activity_name: selectedActivity.name,
-      room_name: selectedRoom.name,
-      supervisor_names: selectedSupervisors.map(s => s.name),
-    };
-
-    const newSettings: SessionSettings = {
-      use_last_session: sessionSettings?.use_last_session ?? false,
-      auto_save_enabled: true,
-      last_session: lastSessionConfig,
-    };
-
-    try {
-      await saveSessionSettings(newSettings);
-      set({ sessionSettings: newSettings });
-      storeLogger.info('Last session data saved', {
+      storeLogger.info('Confirming session recreation', {
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
         supervisorCount: selectedSupervisors.length,
       });
-    } catch (error) {
-      storeLogger.error('Failed to save last session data', { error });
-    }
-  },
 
-  validateAndRecreateSession: async () => {
-    const { sessionSettings, authenticatedUser } = get();
+      const result = await requestSessionRecreation({
+        pin: authenticatedUser.pin,
+        activity: selectedActivity,
+        room: selectedRoom,
+        supervisorIds: selectedSupervisors.map(s => s.id),
+      });
 
-    if (!sessionSettings?.last_session || !authenticatedUser?.pin) {
-      storeLogger.warn('Cannot recreate session: no saved session or authentication');
-      return false;
-    }
-
-    set({ isValidatingLastSession: true, error: null });
-
-    try {
-      // Validate activity exists
-      const activities = await api.getActivities(authenticatedUser.pin);
-      const activity = activities.find(a => a.id === sessionSettings.last_session!.activity_id);
-
-      if (!activity) {
-        throw new Error('Gespeicherte Aktivität nicht mehr verfügbar');
+      if (result.status === 'error') {
+        return {
+          status: 'error',
+          error: result.error,
+          stale: !recreationTracker.isCurrent(requestId),
+        };
       }
 
-      // Validate room is available
-      const rooms = await api.getRooms(authenticatedUser.pin);
-      const room = rooms.find(r => r.id === sessionSettings.last_session!.room_id);
+      storeLogger.info('Session recreated successfully', {
+        sessionId: result.session.active_group_id,
+      });
 
-      if (!room) {
-        throw new Error('Gespeicherter Raum nicht verfügbar');
+      // Success is applied unconditionally (historical behavior): the session
+      // state is set even when the response is stale; only UI reactions are
+      // guarded by the caller.
+      set({ currentSession: result.session });
+      await get().saveLastSessionData();
+
+      return {
+        status: 'success',
+        session: result.session,
+        stale: !recreationTracker.isCurrent(requestId),
+      };
+    },
+
+    fetchCurrentSession: async () => {
+      const { authenticatedUser } = get();
+
+      if (!authenticatedUser?.pin) {
+        storeLogger.warn('Cannot fetch current session: no authenticated user or PIN');
+        return;
       }
 
-      // Resolve supervisors - use current if already selected, otherwise validate saved ones
-      const { selectedSupervisors, users } = get();
-      const supervisors =
-        selectedSupervisors.length > 0
-          ? selectedSupervisors
-          : await resolveSupervisorsForSession(
-              sessionSettings.last_session.supervisor_ids,
-              users,
-              get().fetchTeachers,
-              () => get().users
-            );
+      try {
+        storeLogger.info('Fetching current session for device');
+        const session = await api.getCurrentSession(authenticatedUser.pin);
 
-      // Set validated data in store
-      set({
-        selectedActivity: activity,
-        selectedRoom: room,
-        selectedSupervisors: supervisors,
-        activeSupervisorTags: new Set<string>(),
-        isValidatingLastSession: false,
-      });
+        if (!session) {
+          storeLogger.debug('No active session found for device, clearing session state');
+          get().clearSessionState();
+          return;
+        }
 
-      storeLogger.info('Session validation successful', {
-        activityId: activity.id,
-        roomId: room.id,
-        supervisorCount: supervisors.length,
-      });
+        storeLogger.info('Active session found', {
+          activeGroupId: session.active_group_id,
+          activityId: session.activity_id,
+          activityName: session.activity_name,
+          roomName: session.room_name,
+          startTime: session.start_time,
+          duration: session.duration,
+        });
 
-      return true;
-    } catch (error) {
-      const userMessage = mapSessionValidationError(error);
-      storeLogger.error('Session validation failed', {
-        error: userMessage,
-        rawError: error instanceof Error ? error.message : error,
-      });
+        // Resolve activity and room data using extracted helpers
+        const currentSelectedActivity = get().selectedActivity;
+        const sessionActivity = await resolveSessionActivity(
+          session,
+          currentSelectedActivity,
+          authenticatedUser.pin,
+          authenticatedUser.staffName
+        );
+        const sessionRoom = createSessionRoom(session);
 
-      // Clear invalid session data
-      await clearLastSession();
-      set({
-        sessionSettings: sessionSettings
-          ? { ...sessionSettings, last_session: null, use_last_session: false }
-          : null,
-        isValidatingLastSession: false,
-        error: userMessage,
-      });
+        // Guard: Don't overwrite selectedRoom if user just manually selected a room
+        // This prevents stale server data from reverting a recent room switch.
+        // A null sessionRoom during the recent-selection window is treated as stale/partial
+        // data — the manual selection is preserved rather than wiped.
+        const currentSelectedRoom = get().selectedRoom;
+        const roomSelectedAt = get()._roomSelectedAt;
+        const isRecentManualSelection =
+          roomSelectedAt != null && Date.now() - roomSelectedAt < 5000;
+        const shouldPreserveRoom =
+          isRecentManualSelection &&
+          currentSelectedRoom != null &&
+          currentSelectedRoom.id !== sessionRoom?.id;
 
-      return false;
-    }
-  },
+        if (shouldPreserveRoom) {
+          storeLogger.debug('Preserving manually selected room during fetchCurrentSession', {
+            manualRoomId: currentSelectedRoom.id,
+            manualRoomName: currentSelectedRoom.name,
+            serverRoomId: sessionRoom?.id ?? null,
+            serverRoomName: sessionRoom?.name ?? null,
+            roomSelectedAgoMs: Date.now() - roomSelectedAt,
+          });
+        }
 
-  // Submit daily feedback
-  submitDailyFeedback: async (studentId: number, rating: DailyFeedbackRating): Promise<boolean> => {
-    const { authenticatedUser } = get();
+        set({
+          currentSession: session,
+          selectedActivity: sessionActivity,
+          ...(shouldPreserveRoom ? {} : { selectedRoom: sessionRoom }),
+          // Sync supervisors from backend → local cache
+          ...(session.supervisors && {
+            selectedSupervisors: session.supervisors.map(sup => ({
+              id: sup.staff_id,
+              name: sup.display_name,
+            })),
+          }),
+        });
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        storeLogger.error('Failed to fetch current session', { error: errorMessage });
+        // Don't set error state for session check, just log it
+      }
+    },
 
-    if (!authenticatedUser?.pin) {
-      storeLogger.error('Cannot submit feedback: no authenticated user');
-      return false;
-    }
+    // Supervisor selection actions
+    setSelectedSupervisors: (supervisors: User[]) =>
+      set({ selectedSupervisors: supervisors, activeSupervisorTags: new Set<string>() }),
 
-    try {
-      storeLogger.info('Submitting daily feedback', {
-        studentId,
-        rating,
-      });
+    toggleSupervisor: (user: User) => {
+      const { selectedSupervisors } = get();
+      const isSelected = selectedSupervisors.some(s => s.id === user.id);
 
-      await api.submitDailyFeedback(authenticatedUser.pin, {
-        student_id: studentId,
-        value: rating,
-      });
+      if (isSelected) {
+        // Remove supervisor
+        set({
+          selectedSupervisors: selectedSupervisors.filter(s => s.id !== user.id),
+          activeSupervisorTags: new Set<string>(),
+        });
+      } else {
+        // Add supervisor
+        set({
+          selectedSupervisors: [...selectedSupervisors, user],
+          activeSupervisorTags: new Set<string>(),
+        });
+      }
+    },
 
-      storeLogger.info('Daily feedback submitted successfully', {
-        studentId,
-        rating,
-      });
+    // Activity-related actions
+    fetchActivities: (() => {
+      let fetchPromise: Promise<ActivityResponse[] | null> | null = null;
 
-      return true;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      storeLogger.error('Failed to submit daily feedback', { error: errorMessage });
-      return false;
-    }
-  },
+      return async (): Promise<ActivityResponse[] | null> => {
+        // Return existing promise if already fetching
+        if (fetchPromise) {
+          storeLogger.debug('Activities fetch already in progress, returning existing promise');
+          return fetchPromise;
+        }
 
-  // Clear all session-scoped state when session ends
-  // This prevents stale room/activity data from causing issues (Issue #129 Bug 1)
-  clearSessionState: () => {
-    storeLogger.info('Clearing session-scoped state');
-    set(state => ({
-      ...SESSION_INITIAL_STATE,
-      rfid: {
-        ...state.rfid,
-        ...RFID_SESSION_INITIAL_STATE,
-      },
-    }));
-  },
-});
+        const { authenticatedUser } = get();
+        set({ isLoading: true, error: null });
+
+        if (!authenticatedUser) {
+          const errorMsg = 'Keine Authentifizierung für das Laden von Aktivitäten';
+          set({
+            error: mapServerErrorToGerman(errorMsg),
+            isLoading: false,
+          });
+          return null;
+        }
+
+        if (!authenticatedUser.pin) {
+          const errorMsg = 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.';
+          set({
+            error: mapServerErrorToGerman(errorMsg),
+            isLoading: false,
+          });
+          return null;
+        }
+
+        // Create new fetch promise
+        fetchPromise = (async () => {
+          try {
+            storeLogger.info('Fetching activities from API', {
+              staffId: authenticatedUser.staffId,
+              staffName: authenticatedUser.staffName,
+            });
+
+            const activitiesData = await api.getActivities(authenticatedUser.pin);
+
+            storeLogger.info('Activities loaded successfully', {
+              count: activitiesData.length,
+              activities: activitiesData.map(toActivitySummary),
+            });
+
+            set({ isLoading: false });
+            return activitiesData;
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+
+            storeLogger.error('Failed to fetch activities', {
+              error: errorMessage,
+              staffId: authenticatedUser.staffId,
+            });
+
+            set({
+              error: mapServerErrorToGerman(errorMessage),
+              isLoading: false,
+            });
+
+            return null;
+          } finally {
+            // Clear the promise when done
+            fetchPromise = null;
+          }
+        })();
+
+        return fetchPromise;
+      };
+    })(),
+
+    // Session settings actions
+    loadSessionSettings: async () => {
+      try {
+        storeLogger.debug('Loading session settings');
+        const settings = await loadSessionSettings();
+
+        if (settings) {
+          set({ sessionSettings: settings });
+          storeLogger.info('Session settings loaded', {
+            useLastSession: settings.use_last_session,
+            hasLastSession: !!settings.last_session,
+          });
+        }
+      } catch (error) {
+        storeLogger.error('Failed to load session settings', { error });
+      }
+    },
+
+    toggleUseLastSession: async (enabled: boolean) => {
+      const { sessionSettings } = get();
+
+      const newSettings: SessionSettings = {
+        use_last_session: enabled,
+        auto_save_enabled: true,
+        last_session: sessionSettings?.last_session ?? null,
+      };
+
+      try {
+        await saveSessionSettings(newSettings);
+        set({ sessionSettings: newSettings });
+        storeLogger.info('Toggle use last session', { enabled });
+      } catch (error) {
+        storeLogger.error('Failed to save session settings', { error });
+      }
+    },
+
+    saveLastSessionData: async () => {
+      const { selectedActivity, selectedRoom, selectedSupervisors, sessionSettings } = get();
+
+      if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
+        storeLogger.warn('Cannot save session data: missing required fields');
+        return;
+      }
+
+      const lastSessionConfig = {
+        activity_id: selectedActivity.id,
+        room_id: selectedRoom.id,
+        supervisor_ids: selectedSupervisors.map(s => s.id),
+        saved_at: new Date().toISOString(),
+        activity_name: selectedActivity.name,
+        room_name: selectedRoom.name,
+        supervisor_names: selectedSupervisors.map(s => s.name),
+      };
+
+      const newSettings: SessionSettings = {
+        use_last_session: sessionSettings?.use_last_session ?? false,
+        auto_save_enabled: true,
+        last_session: lastSessionConfig,
+      };
+
+      try {
+        await saveSessionSettings(newSettings);
+        set({ sessionSettings: newSettings });
+        storeLogger.info('Last session data saved', {
+          activityId: selectedActivity.id,
+          roomId: selectedRoom.id,
+          supervisorCount: selectedSupervisors.length,
+        });
+      } catch (error) {
+        storeLogger.error('Failed to save last session data', { error });
+      }
+    },
+
+    validateAndRecreateSession: async () => {
+      const { sessionSettings, authenticatedUser } = get();
+
+      if (!sessionSettings?.last_session || !authenticatedUser?.pin) {
+        storeLogger.warn('Cannot recreate session: no saved session or authentication');
+        return false;
+      }
+
+      set({ isValidatingLastSession: true, error: null });
+
+      try {
+        // Validate activity exists
+        const activities = await api.getActivities(authenticatedUser.pin);
+        const activity = activities.find(a => a.id === sessionSettings.last_session!.activity_id);
+
+        if (!activity) {
+          throw new Error('Gespeicherte Aktivität nicht mehr verfügbar');
+        }
+
+        // Validate room is available
+        const rooms = await api.getRooms(authenticatedUser.pin);
+        const room = rooms.find(r => r.id === sessionSettings.last_session!.room_id);
+
+        if (!room) {
+          throw new Error('Gespeicherter Raum nicht verfügbar');
+        }
+
+        // Resolve supervisors - use current if already selected, otherwise validate saved ones
+        const { selectedSupervisors, users } = get();
+        const supervisors =
+          selectedSupervisors.length > 0
+            ? selectedSupervisors
+            : await resolveSupervisorsForSession(
+                sessionSettings.last_session.supervisor_ids,
+                users,
+                get().fetchTeachers,
+                () => get().users
+              );
+
+        // Set validated data in store
+        set({
+          selectedActivity: activity,
+          selectedRoom: room,
+          selectedSupervisors: supervisors,
+          activeSupervisorTags: new Set<string>(),
+          isValidatingLastSession: false,
+        });
+
+        storeLogger.info('Session validation successful', {
+          activityId: activity.id,
+          roomId: room.id,
+          supervisorCount: supervisors.length,
+        });
+
+        return true;
+      } catch (error) {
+        const userMessage = mapSessionValidationError(error);
+        storeLogger.error('Session validation failed', {
+          error: userMessage,
+          rawError: error instanceof Error ? error.message : error,
+        });
+
+        // Clear invalid session data
+        await clearLastSession();
+        set({
+          sessionSettings: sessionSettings
+            ? { ...sessionSettings, last_session: null, use_last_session: false }
+            : null,
+          isValidatingLastSession: false,
+          error: userMessage,
+        });
+
+        return false;
+      }
+    },
+
+    // Submit daily feedback
+    submitDailyFeedback: async (
+      studentId: number,
+      rating: DailyFeedbackRating
+    ): Promise<boolean> => {
+      const { authenticatedUser } = get();
+
+      if (!authenticatedUser?.pin) {
+        storeLogger.error('Cannot submit feedback: no authenticated user');
+        return false;
+      }
+
+      try {
+        storeLogger.info('Submitting daily feedback', {
+          studentId,
+          rating,
+        });
+
+        await api.submitDailyFeedback(authenticatedUser.pin, {
+          student_id: studentId,
+          value: rating,
+        });
+
+        storeLogger.info('Daily feedback submitted successfully', {
+          studentId,
+          rating,
+        });
+
+        return true;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        storeLogger.error('Failed to submit daily feedback', { error: errorMessage });
+        return false;
+      }
+    },
+
+    // Clear all session-scoped state when session ends
+    // This prevents stale room/activity data from causing issues (Issue #129 Bug 1)
+    clearSessionState: () => {
+      storeLogger.info('Clearing session-scoped state');
+      set(state => ({
+        ...SESSION_INITIAL_STATE,
+        rfid: {
+          ...state.rfid,
+          ...RFID_SESSION_INITIAL_STATE,
+        },
+      }));
+    },
+  };
+};

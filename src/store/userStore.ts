@@ -7,6 +7,7 @@ import {
   type RfidScanResult,
   type DailyFeedbackRating,
 } from '../services/api';
+import type { SessionRecreationOutcome } from '../services/sessionService';
 import { type SessionSettings } from '../services/sessionStorage';
 import type { NetworkStatusData } from '../types/network';
 import { LogLevel } from '../utils/logger';
@@ -54,6 +55,7 @@ export interface UserState {
     pin: string;
   }) => void;
   setSelectedActivity: (activity: ActivityResponse) => void;
+  setCurrentSession: (session: CurrentSession) => void;
   fetchTeachers: (forceRefresh?: boolean) => Promise<void>;
   fetchRooms: () => Promise<void>;
   selectRoom: (roomId: number) => void;
@@ -95,6 +97,8 @@ export interface UserState {
   toggleUseLastSession: (enabled: boolean) => Promise<void>;
   saveLastSessionData: () => Promise<void>;
   validateAndRecreateSession: () => Promise<boolean>;
+  recreateSession: () => Promise<SessionRecreationOutcome>;
+  invalidateSessionRecreation: () => void;
 
   // Network status actions
   setNetworkStatus: (status: NetworkStatusData) => void;
