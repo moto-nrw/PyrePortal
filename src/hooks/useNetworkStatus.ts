@@ -1,8 +1,8 @@
 import { useEffect, useCallback, useRef } from 'react';
 
-import type { NetworkStatusData } from '../components/ui/NetworkStatus';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import type { NetworkStatusData } from '../types/network';
 import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('useNetworkStatus');
