@@ -436,6 +436,18 @@ function mapAttendanceErrorToGerman(errorMessage: string, context: 'toggle' | 'f
   return specificMessage;
 }
 
+/**
+ * Detect 404 responses. Prefer the structured `ApiError.statusCode` set by
+ * `apiCall`. Keep the substring fallback so errors that are not `ApiError`
+ * instances (or wrapped messages) still resolve the same way as before.
+ */
+export const isNotFoundError = (error: unknown, errorMessage: string): boolean => {
+  if (error instanceof ApiError && error.statusCode === 404) {
+    return true;
+  }
+  return errorMessage.includes('404');
+};
+
 // Environment configuration - will be loaded at runtime
 let API_BASE_URL = '';
 let DEVICE_API_KEY = '';
@@ -953,7 +965,7 @@ export const api = {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means no current session, which is fine
-      if (errorMessage.includes('404')) {
+      if (isNotFoundError(error, errorMessage)) {
         return null;
       }
       throw error;
@@ -1047,7 +1059,7 @@ export const api = {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means tag is not assigned, which is fine
-      if (errorMessage.includes('404')) {
+      if (isNotFoundError(error, errorMessage)) {
         return { assigned: false };
       }
       throw error;

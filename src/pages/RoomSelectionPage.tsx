@@ -13,6 +13,7 @@ import {
 import { usePagination } from '../hooks/usePagination';
 import {
   api,
+  ApiError,
   mapServerErrorToGerman,
   isNetworkRelatedError,
   type Room,
@@ -760,7 +761,11 @@ function RoomSelectionPage() {
         includesConflict: errorMessage.includes('Conflict'),
       });
 
-      if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
+      if (
+        (error instanceof ApiError && error.statusCode === 409) ||
+        errorMessage.includes('409') ||
+        errorMessage.includes('Conflict')
+      ) {
         logger.info('Showing conflict modal due to 409 error');
         setShowConflictModal(true);
         setIsStartingSession(false);

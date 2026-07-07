@@ -9,7 +9,7 @@ import {
 } from '../components/ui';
 import { PillButton } from '../components/ui/PillButton';
 import { usePagination } from '../hooks/usePagination';
-import type { ActivityResponse } from '../services/api';
+import { ApiError, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import {
   createLogger,
@@ -89,7 +89,11 @@ function CreateActivityPage() {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Check for authentication errors
-      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+      if (
+        (error instanceof ApiError && error.statusCode === 401) ||
+        errorMessage.includes('401') ||
+        errorMessage.includes('Unauthorized')
+      ) {
         logger.warn('Authentication failed during activity fetch, redirecting to login', {
           error: errorMessage,
         });
