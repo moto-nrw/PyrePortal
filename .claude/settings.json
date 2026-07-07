@@ -103,7 +103,12 @@
       "Bash(brew:*)",
       "Bash(jq:*)",
       "Bash(wget:*)",
-      "mcp__*",
+      "mcp__pencil",
+      "mcp__claude-in-chrome",
+      "mcp__slack__slack_read_*",
+      "mcp__slack__slack_search_*",
+      "mcp__slack__slack_get_reactions",
+      "mcp__slack__slack_list_channel_members",
       "WebFetch(domain:docs.anthropic.com)",
       "WebSearch",
       "WebFetch"
