@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -8,6 +8,7 @@ import {
   SelectionPageLayout,
 } from '../components/ui';
 import { PillButton } from '../components/ui/PillButton';
+import { useFrozenSortOrder } from '../hooks/useFrozenSortOrder';
 import { usePagination } from '../hooks/usePagination';
 import { useUserStore } from '../store/userStore';
 import { createLogger, logNavigation, logUserAction } from '../utils/logger';
@@ -27,27 +28,11 @@ function StaffSelectionPage() {
   const navigate = useNavigate();
   const logger = useMemo(() => createLogger('StaffSelectionPage'), []);
 
-  // Freeze sort order after first user interaction to prevent items from moving
-  const frozenSortOrder = useRef<Map<number, number> | null>(null);
-
   // Sort: pre-selected at top on page load, then freeze after first interaction
-  const sortedUsers = useMemo(() => {
-    if (frozenSortOrder.current) {
-      return [...users].sort((a, b) => {
-        const aOrder = frozenSortOrder.current!.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-        const bOrder = frozenSortOrder.current!.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-        return aOrder - bOrder;
-      });
-    }
-    const selectedIds = new Set(selectedSupervisors.map(s => s.id));
-    return [...users].sort((a, b) => {
-      const aSel = selectedIds.has(a.id);
-      const bSel = selectedIds.has(b.id);
-      if (aSel && !bSel) return -1;
-      if (!aSel && bSel) return 1;
-      return a.name.localeCompare(b.name, 'de');
-    });
-  }, [users, selectedSupervisors]);
+  const { sortedItems: sortedUsers, freezeSortOrder } = useFrozenSortOrder(
+    users,
+    selectedSupervisors
+  );
 
   const {
     currentPage,
@@ -81,11 +66,7 @@ function StaffSelectionPage() {
 
   const handleUserToggle = (user: { id: number; name: string }) => {
     // Freeze sort order on first interaction so items don't move
-    if (!frozenSortOrder.current) {
-      const orderMap = new Map<number, number>();
-      sortedUsers.forEach((u, idx) => orderMap.set(u.id, idx));
-      frozenSortOrder.current = orderMap;
-    }
+    freezeSortOrder();
 
     logger.info('Toggling supervisor selection', {
       username: user.name,

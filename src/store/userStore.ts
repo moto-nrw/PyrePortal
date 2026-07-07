@@ -66,6 +66,7 @@ export interface UserState {
   fetchActivities: () => Promise<ActivityResponse[] | null>;
 
   // Supervisor selection actions
+  loadSessionSupervisors: () => Promise<void>;
   setSelectedSupervisors: (supervisors: User[]) => void;
   toggleSupervisor: (user: User) => void;
   addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;

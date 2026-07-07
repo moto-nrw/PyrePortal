@@ -10,15 +10,13 @@ import {
   SelectionPageLayout,
 } from '../components/ui';
 import { usePagination } from '../hooks/usePagination';
-import { api, type Student, type Teacher } from '../services/api';
+import { useStudentFilter, type AssignableEntity } from '../hooks/useStudentFilter';
+import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logUserAction, serializeError } from '../utils/logger';
 
 const ENTITIES_PER_PAGE = 5; // 5x1 grid — filters are primary navigation
-
-// Union type for assignable entities (students and teachers)
-type AssignableEntity = { type: 'student'; data: Student } | { type: 'teacher'; data: Teacher };
 
 interface LocationState {
   scannedTag: string;
@@ -43,11 +41,25 @@ function StudentSelectionPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [gradeFilter, setGradeFilter] = useState<string | null>(null);
-  const [sectionFilter, setSectionFilter] = useState<string | null>(null);
-  const [groupFilter, setGroupFilter] = useState<string | null>(null);
-  const [showStaffOnly, setShowStaffOnly] = useState(false);
   const [showGroupPicker, setShowGroupPicker] = useState(false);
+
+  const {
+    gradeFilter,
+    sectionFilter,
+    groupFilter,
+    showStaffOnly,
+    availableGrades,
+    availableSections,
+    availableGroups,
+    filteredEntities,
+    noFiltersActive,
+    resetAll,
+    toggleStaffOnly,
+    selectGrade,
+    selectSection,
+    selectGroup,
+    clearGroupFilter,
+  } = useStudentFilter(entities);
 
   const logger = useMemo(() => createLogger('StudentSelectionPage'), []);
 
@@ -110,75 +122,6 @@ function StudentSelectionPage() {
       void fetchEntities();
     }
   }, [authenticatedUser, selectedSupervisors, logger]);
-
-  // Derive available grades from student school_class (e.g. "3C" → grade "3")
-  const availableGrades = useMemo(() => {
-    const grades = new Set<string>();
-    entities.forEach(e => {
-      if (e.type === 'student' && e.data.school_class) {
-        const grade = /^(\d+)/.exec(e.data.school_class)?.[1];
-        if (grade) grades.add(grade);
-      }
-    });
-    return Array.from(grades).sort((a, b) => a.localeCompare(b, 'de', { numeric: true }));
-  }, [entities]);
-
-  // Derive available sections within the selected grade (e.g. "3C" → section "C")
-  const availableSections = useMemo(() => {
-    if (!gradeFilter) return [];
-    const sections = new Set<string>();
-    entities.forEach(e => {
-      if (e.type === 'student' && e.data.school_class) {
-        const match = /^(\d+)(.*)/.exec(e.data.school_class);
-        if (match?.[1] === gradeFilter && match[2]) {
-          sections.add(match[2]);
-        }
-      }
-    });
-    return Array.from(sections).sort((a, b) => a.localeCompare(b, 'de'));
-  }, [entities, gradeFilter]);
-
-  // Derive all available OGS groups
-  const availableGroups = useMemo(() => {
-    const groups = new Set<string>();
-    entities.forEach(e => {
-      if (e.type === 'student' && e.data.group_name) groups.add(e.data.group_name);
-    });
-    return Array.from(groups).sort((a, b) => a.localeCompare(b, 'de'));
-  }, [entities]);
-
-  // Combined filter logic: grade, section, group, staff-only
-  const filteredEntities = useMemo(() => {
-    const filtered = entities.filter(e => {
-      if (showStaffOnly) return e.type === 'teacher';
-
-      if (gradeFilter || sectionFilter || groupFilter) {
-        if (e.type === 'teacher') return false;
-        const student = e.data;
-
-        if (gradeFilter) {
-          const grade = /^(\d+)/.exec(student.school_class ?? '')?.[1];
-          if (grade !== gradeFilter) return false;
-        }
-        if (sectionFilter) {
-          const section = /^\d+(.*)/.exec(student.school_class ?? '')?.[1];
-          if (section !== sectionFilter) return false;
-        }
-        if (groupFilter) {
-          if (student.group_name !== groupFilter) return false;
-        }
-      }
-      return true;
-    });
-
-    return filtered.sort((a, b) => {
-      const an =
-        a.type === 'student' ? `${a.data.last_name} ${a.data.first_name}` : a.data.display_name;
-      const bn =
-        b.type === 'student' ? `${b.data.last_name} ${b.data.first_name}` : b.data.display_name;
-      return an.localeCompare(bn, 'de');
-    });
-  }, [entities, gradeFilter, sectionFilter, groupFilter, showStaffOnly]);
 
   // Pagination hook
   const {
@@ -346,8 +289,6 @@ function StudentSelectionPage() {
     return null;
   }
 
-  const noFiltersActive = !gradeFilter && !sectionFilter && !groupFilter && !showStaffOnly;
-
   const chipStyle = (active: boolean): React.CSSProperties => ({
     height: '52px',
     padding: '0 20px',
@@ -362,42 +303,8 @@ function StudentSelectionPage() {
     outline: 'none',
   });
 
-  const handleResetAll = () => {
-    setGradeFilter(null);
-    setSectionFilter(null);
-    setGroupFilter(null);
-    setShowStaffOnly(false);
-  };
-
-  const handleStaffToggle = () => {
-    if (showStaffOnly) {
-      setShowStaffOnly(false);
-    } else {
-      setShowStaffOnly(true);
-      setGradeFilter(null);
-      setSectionFilter(null);
-      setGroupFilter(null);
-    }
-  };
-
-  const handleGradeSelect = (grade: string) => {
-    if (gradeFilter === grade) {
-      setGradeFilter(null);
-      setSectionFilter(null);
-    } else {
-      setGradeFilter(grade);
-      setSectionFilter(null);
-      setShowStaffOnly(false);
-    }
-  };
-
-  const handleSectionSelect = (section: string) => {
-    setSectionFilter(sectionFilter === section ? null : section);
-  };
-
   const handleGroupSelect = (group: string) => {
-    setGroupFilter(group);
-    setShowStaffOnly(false);
+    selectGroup(group);
     setShowGroupPicker(false);
   };
 
@@ -421,10 +328,10 @@ function StudentSelectionPage() {
           justifyContent: 'center',
         }}
       >
-        <button onClick={handleResetAll} style={chipStyle(noFiltersActive)}>
+        <button onClick={resetAll} style={chipStyle(noFiltersActive)}>
           Alle
         </button>
-        <button onClick={handleStaffToggle} style={chipStyle(showStaffOnly)}>
+        <button onClick={toggleStaffOnly} style={chipStyle(showStaffOnly)}>
           Betreuer
         </button>
 
@@ -443,7 +350,7 @@ function StudentSelectionPage() {
         {availableGrades.map(grade => (
           <button
             key={grade}
-            onClick={() => handleGradeSelect(grade)}
+            onClick={() => selectGrade(grade)}
             style={chipStyle(gradeFilter === grade)}
           >
             {grade}
@@ -456,7 +363,7 @@ function StudentSelectionPage() {
             {availableSections.map(section => (
               <button
                 key={section}
-                onClick={() => handleSectionSelect(section)}
+                onClick={() => selectSection(section)}
                 style={chipStyle(sectionFilter === section)}
               >
                 {section}
@@ -471,7 +378,7 @@ function StudentSelectionPage() {
         <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>OGS-Gruppe:</span>
         {groupFilter ? (
           <button
-            onClick={() => setGroupFilter(null)}
+            onClick={clearGroupFilter}
             style={{
               ...chipStyle(true),
               display: 'flex',
@@ -624,7 +531,7 @@ function StudentSelectionPage() {
 
         <button
           onClick={() => {
-            setGroupFilter(null);
+            clearGroupFilter();
             setShowGroupPicker(false);
           }}
           style={{

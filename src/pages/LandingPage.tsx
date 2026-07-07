@@ -1,23 +1,16 @@
 import { adapter } from '@platform';
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import BackButton from '../components/ui/BackButton';
-import { getSchoolName, onSchoolNameLoaded } from '../services/api';
+import { useSchoolName } from '../hooks/useSchoolName';
 import theme from '../styles/theme';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 function LandingPage() {
   const navigate = useNavigate();
   const logger = createLogger('LandingPage');
-  const [schoolName, setSchoolName] = useState<string | null>(getSchoolName());
-
-  // Subscribe once: if the name arrives after mount, update state
-  useEffect(() => {
-    if (schoolName) return;
-    return onSchoolNameLoaded(setSchoolName);
-  }, [schoolName]);
+  const schoolName = useSchoolName();
 
   const handleLogin = () => {
     logger.info('User initiated login from landing page');
