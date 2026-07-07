@@ -212,7 +212,7 @@ describe('HomeViewPage session recreation behavior', () => {
     expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
   });
 
-  it('still applies a stale success response (current behavior: success path is unguarded)', async () => {
+  it('discards a stale success response after logout invalidated the request id', async () => {
     let resolveStart: (value: typeof startResponse) => void = () => {};
     mockedApi.startSession.mockImplementationOnce(
       () =>
@@ -235,13 +235,13 @@ describe('HomeViewPage session recreation behavior', () => {
       expect(mockNavigate).toHaveBeenCalledWith('/');
     });
 
-    // The late success still sets the session and navigates (unguarded today)
+    // Now the stale request succeeds; the success must be discarded silently
     resolveStart(startResponse);
+    await new Promise(resolve => setTimeout(resolve, 50));
 
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
-    });
-    expect(useUserStore.getState().currentSession).toMatchObject({ active_group_id: 99 });
+    expect(mockNavigate).not.toHaveBeenCalledWith('/nfc-scanning');
+    // The confirmation modal state is left untouched by the stale response
+    expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
   });
 
   it('discards a stale error when a second recreation attempt superseded the first', async () => {

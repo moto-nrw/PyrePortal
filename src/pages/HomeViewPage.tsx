@@ -298,6 +298,11 @@ function HomeViewPage() {
       return;
     }
 
+    // Stale responses (superseded attempt or logout) are discarded
+    if (!isMountedRef.current || outcome.stale) {
+      return;
+    }
+
     logUserAction('Session recreated successfully', {
       sessionId: outcome.session.active_group_id,
     });
@@ -305,9 +310,7 @@ function HomeViewPage() {
     logNavigation('Home View', '/nfc-scanning');
     void navigate('/nfc-scanning');
 
-    if (isMountedRef.current && !outcome.stale) {
-      setShowConfirmModal(false);
-    }
+    setShowConfirmModal(false);
   };
 
   // Redirect to login if no authenticated user and fetch current session
