@@ -2,7 +2,7 @@ import { faCircleXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 
-import theme from '../../styles/theme';
+import { designSystem } from '../../styles/designSystem';
 
 import { ModalBase } from './ModalBase';
 
@@ -23,27 +23,27 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
     isOpen={isOpen}
     onClose={onClose}
     size="sm"
-    backgroundColor={theme.colors.background.light}
+    backgroundColor={designSystem.colors.white}
     timeout={autoCloseDelay}
   >
-    <div style={{ marginBottom: theme.spacing.lg, color: '#DC2626' }}>
+    <div style={{ marginBottom: designSystem.spacing.lg, color: '#DC2626' }}>
       <FontAwesomeIcon icon={faCircleXmark} style={{ fontSize: '3rem' }} />
     </div>
     <h2
       style={{
-        fontSize: theme.fonts.size.xl,
-        fontWeight: theme.fonts.weight.bold,
-        marginBottom: theme.spacing.lg,
-        color: theme.colors.text.primary,
+        fontSize: designSystem.fonts.size.xl,
+        fontWeight: designSystem.fonts.weight.bold,
+        marginBottom: designSystem.spacing.lg,
+        color: designSystem.colors.textStrong,
       }}
     >
       Fehler
     </h2>
     <div
       style={{
-        fontSize: theme.fonts.size.large,
-        color: theme.colors.text.secondary,
-        marginBottom: theme.spacing.xl,
+        fontSize: designSystem.fonts.size.large,
+        color: designSystem.colors.textSubtle,
+        marginBottom: designSystem.spacing.xl,
       }}
     >
       {message}

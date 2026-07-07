@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import BackButton from '../components/ui/BackButton';
 import { useSchoolName } from '../hooks/useSchoolName';
-import theme from '../styles/theme';
+import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 /** User-facing German UI copy for this page */
@@ -73,7 +73,7 @@ function LandingPage() {
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: theme.spacing.md,
+              gap: designSystem.spacing.md,
               width: '100%',
               maxWidth: '500px',
               margin: '0 auto',
@@ -84,7 +84,7 @@ function LandingPage() {
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                marginBottom: theme.spacing.sm,
+                marginBottom: designSystem.spacing.sm,
               }}
             >
               <img
@@ -93,7 +93,7 @@ function LandingPage() {
                   height: 'auto',
                   width: '280px',
                   maxWidth: '100%',
-                  transition: theme.animation.transition.slow,
+                  transition: designSystem.transitions.slow,
                   filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))',
                 }}
                 className="hover:drop-shadow-xl"
@@ -110,7 +110,7 @@ function LandingPage() {
               }
               style={{
                 fontSize: '64px',
-                marginBottom: theme.spacing.md,
+                marginBottom: designSystem.spacing.md,
                 textAlign: 'center',
                 lineHeight: 1.2,
               }}

@@ -11,7 +11,6 @@ import { getAssignedPerson, useTagAssignmentScan } from '../hooks/useTagAssignme
 import { type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
-import theme from '../styles/theme';
 import { logNavigation, logUserAction } from '../utils/logger';
 import { pressHandlers } from '../utils/pressHandlers';
 
@@ -319,7 +318,7 @@ function TagAssignmentPage() {
                 <p
                   style={{
                     fontSize: '24px',
-                    color: theme.colors.text.secondary,
+                    color: designSystem.colors.textSubtle,
                     marginBottom: '40px',
                     lineHeight: '1.4',
                   }}
@@ -382,7 +381,7 @@ function TagAssignmentPage() {
                 <p
                   style={{
                     fontSize: '24px',
-                    color: theme.colors.text.secondary,
+                    color: designSystem.colors.textSubtle,
                     fontWeight: 500,
                   }}
                 >
