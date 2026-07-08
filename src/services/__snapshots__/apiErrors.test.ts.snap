@@ -1,0 +1,268 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`ERROR_MESSAGE_MAPPINGS backend contract > keeps all patterns and German messages byte-identical 1`] = `
+[
+  [
+    [
+      "ACTIVITY_CAPACITY_EXCEEDED",
+      "activity capacity exceeded",
+      "Activity capacity exceeded",
+    ],
+    "Aktivität ist voll. Maximale Teilnehmerzahl erreicht.",
+  ],
+  [
+    [
+      "ROOM_CAPACITY_EXCEEDED",
+      "room capacity exceeded",
+      "Room capacity exceeded",
+    ],
+    "Raum ist voll. Kein Platz mehr verfügbar.",
+  ],
+  [
+    [
+      "STUDENT_ALREADY_ACTIVE",
+      "student already has an active visit",
+    ],
+    "Schüler*in ist bereits angemeldet.",
+  ],
+  [
+    "invalid device API key",
+    "API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.",
+  ],
+  [
+    "device API key is required",
+    "API-Schlüssel nicht konfiguriert. Bitte .env Datei prüfen.",
+  ],
+  [
+    "invalid API key format",
+    "API-Schlüssel Format ungültig. Bearer Token erwartet.",
+  ],
+  [
+    "invalid staff PIN",
+    "Ungültiger PIN. Bitte erneut versuchen.",
+  ],
+  [
+    "staff PIN is required",
+    "PIN nicht angegeben.",
+  ],
+  [
+    "staff account is locked due to failed PIN attempts",
+    "Konto gesperrt wegen zu vieler Fehlversuche. Bitte Administrator kontaktieren.",
+  ],
+  [
+    "maximum PIN attempts exceeded",
+    "Maximale PIN-Versuche überschritten. Konto gesperrt.",
+  ],
+  [
+    "locked",
+    "Konto gesperrt. Bitte später erneut versuchen.",
+  ],
+  [
+    "device is not active",
+    "Gerät ist deaktiviert. Bitte Administrator kontaktieren.",
+  ],
+  [
+    "device is offline",
+    "Gerät ist als offline markiert. Bitte Administrator kontaktieren.",
+  ],
+  [
+    "device is already running an activity session",
+    "Gerät führt bereits eine Aktivität durch. Bitte zuerst beenden.",
+  ],
+  [
+    "no active session to end",
+    "Keine aktive Sitzung zum Beenden vorhanden.",
+  ],
+  [
+    "no active session",
+    "Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.",
+  ],
+  [
+    "invalid session ID",
+    "Ungültige Sitzungs-ID.",
+  ],
+  [
+    "activity_id is required",
+    "Aktivität muss ausgewählt werden.",
+  ],
+  [
+    "at least one supervisor",
+    "Mindestens ein Betreuer muss ausgewählt werden.",
+  ],
+  [
+    [
+      "RFID tag not found",
+      "RFID tag not assigned",
+    ],
+    "Armband ist nicht zugewiesen. Bitte an Betreuer wenden.",
+  ],
+  [
+    "staff RFID authentication must be done via session management",
+    "Betreuer-Armband kann hier nicht verwendet werden.",
+  ],
+  [
+    "student RFID tag required for pickup query",
+    "Bitte Schüler-Armband scannen.",
+  ],
+  [
+    "RFID parameter is required",
+    "RFID-Tag fehlt in der Anfrage.",
+  ],
+  [
+    "no active visit found for student",
+    "Kein aktiver Besuch für diesen Schüler gefunden.",
+  ],
+  [
+    "person is not a student",
+    "Person ist kein Schüler.",
+  ],
+  [
+    "no active groups in specified room",
+    "Keine aktiven Gruppen im ausgewählten Raum.",
+  ],
+  [
+    "invalid staff ID",
+    "Ungültige Mitarbeiter-ID.",
+  ],
+  [
+    "staff not found",
+    "Mitarbeiter nicht gefunden.",
+  ],
+  [
+    "staff has no RFID tag assigned",
+    "Mitarbeiter hat kein Armband zugewiesen.",
+  ],
+  [
+    "student_id is required",
+    "Schüler-ID fehlt.",
+  ],
+  [
+    "value is required",
+    "Bewertung fehlt.",
+  ],
+  [
+    "student not found",
+    "Schüler nicht gefunden.",
+  ],
+  [
+    "room_id is required for check-in",
+    "Raum muss für Check-in ausgewählt werden.",
+  ],
+  [
+    "tagId parameter is required",
+    "Tag-ID fehlt in der Anfrage.",
+  ],
+  [
+    "destination must be 'zuhause' or 'unterwegs'",
+    "Ziel muss 'zuhause' oder 'unterwegs' sein.",
+  ],
+  [
+    "destination is required for confirm_daily_checkout",
+    "Ziel muss für endgültiges Auschecken angegeben werden.",
+  ],
+  [
+    "schulhof activity not configured",
+    "Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.",
+  ],
+  [
+    "WC activity not configured",
+    "Toilette-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.",
+  ],
+  [
+    "WC activity auto-create requires staff context",
+    "Toilette-Aktivität konnte nicht erstellt werden. Bitte zuerst Betreuer-RFID scannen.",
+  ],
+  [
+    "failed to create Schulhof session",
+    "Schulhof-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.",
+  ],
+  [
+    "failed to create WC session",
+    "Toilette-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.",
+  ],
+  [
+    "failed to create session",
+    "Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.",
+  ],
+  [
+    "failed to create visit record",
+    "Besuch konnte nicht erstellt werden. Bitte erneut versuchen.",
+  ],
+  [
+    "failed to end visit record",
+    "Besuch konnte nicht beendet werden. Bitte erneut versuchen.",
+  ],
+  [
+    "failed to get room information",
+    "Rauminformationen konnten nicht abgerufen werden.",
+  ],
+  [
+    "failed to check room capacity",
+    "Raumkapazität konnte nicht geprüft werden.",
+  ],
+  [
+    "failed to get activity information",
+    "Aktivitätsinformationen konnten nicht abgerufen werden.",
+  ],
+  [
+    "failed to check activity capacity",
+    "Aktivitätskapazität konnte nicht geprüft werden.",
+  ],
+  [
+    "error finding active groups in room",
+    "Aktive Gruppen im Raum konnten nicht gefunden werden.",
+  ],
+  [
+    "failed to get person data for staff",
+    "Personendaten für Mitarbeiter konnten nicht abgerufen werden.",
+  ],
+  [
+    [
+      "401",
+      "Unauthorized",
+    ],
+    "Authentifizierung fehlgeschlagen. Bitte erneut anmelden.",
+  ],
+  [
+    [
+      "403",
+      "Forbidden",
+    ],
+    "Keine Berechtigung für diese Aktion.",
+  ],
+  [
+    [
+      "404",
+      "not found",
+      "Not Found",
+    ],
+    "Ressource nicht gefunden. Bitte Konfiguration prüfen.",
+  ],
+  [
+    [
+      "409",
+      "Conflict",
+    ],
+    "Konflikt bei der Anfrage. Bitte erneut versuchen.",
+  ],
+  [
+    [
+      "400",
+      "Bad Request",
+    ],
+    "Ungültige Anfrage. Bitte Eingaben prüfen.",
+  ],
+  [
+    [
+      "500",
+      "502",
+      "503",
+      "504",
+      "Internal Server Error",
+      "Bad Gateway",
+      "Service Unavailable",
+    ],
+    "Server nicht erreichbar. Bitte später versuchen.",
+  ],
+]
+`;

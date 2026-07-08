@@ -24,11 +24,11 @@ function App() {
   const {
     selectedRoom,
     selectedActivity,
-    setNetworkStatus,
     updateNetworkQuality,
     networkStatus: storeNetworkStatus,
   } = useUserStore();
-  const { networkStatus: hookNetworkStatus } = useNetworkStatus();
+  // Starts health-check monitoring; results are written directly to the store
+  useNetworkStatus();
   const appLogger = useMemo(() => createLogger('App'), []);
 
   // Initialize logger with runtime config
@@ -41,11 +41,6 @@ function App() {
       environment: import.meta.env.MODE,
     });
   }, [appLogger]);
-
-  // Sync network status from hook to store (for periodic health checks)
-  useEffect(() => {
-    setNetworkStatus(hookNetworkStatus);
-  }, [hookNetworkStatus, setNetworkStatus]);
 
   // Register API callback to update network status on every API call
   useEffect(() => {

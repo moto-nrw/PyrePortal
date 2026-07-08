@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { safeInvoke } from '../../utils/tauriContext';
+import { safeInvoke } from './tauriContext';
 
 // Mock @platform to NOT auto-resolve to browser — we test the Tauri adapter directly
 // But we need the Tauri event API mock (already in setup.ts)

@@ -16,6 +16,15 @@ import {
   serializeError,
 } from '../utils/logger';
 
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'PIN-Eingabe',
+  subtitle: 'Bitte geben Sie Ihren 4-stelligen PIN ein',
+  incompletePinError: 'Bitte geben Sie einen 4-stelligen PIN ein',
+  invalidPinError: 'Ungültiger PIN. Bitte versuchen Sie es erneut.',
+  validationError: 'Fehler bei der PIN-Überprüfung. Bitte versuchen Sie es erneut.',
+} as const;
+
 /**
  * Custom numpad button component - Phoenix Clean Style
  * Defined outside PinPage to avoid recreation on each render
@@ -162,7 +171,7 @@ function PinPage() {
     try {
       // Check PIN length first
       if (pin.length !== maxPinLength) {
-        const errorMsg = 'Bitte geben Sie einen 4-stelligen PIN ein';
+        const errorMsg = texts.incompletePinError;
         setErrorMessage(errorMsg);
         setIsErrorModalOpen(true);
         setPin(''); // Clear PIN
@@ -216,7 +225,7 @@ function PinPage() {
 
         void navigate('/home');
       } else {
-        const errorMsg = result.error ?? 'Ungültiger PIN. Bitte versuchen Sie es erneut.';
+        const errorMsg = result.error ?? texts.invalidPinError;
         setErrorMessage(errorMsg);
         setIsErrorModalOpen(true);
         setPin(''); // Clear PIN
@@ -228,7 +237,7 @@ function PinPage() {
         });
       }
     } catch (error) {
-      const errorMsg = 'Fehler bei der PIN-Überprüfung. Bitte versuchen Sie es erneut.';
+      const errorMsg = texts.validationError;
       setErrorMessage(errorMsg);
       setIsErrorModalOpen(true);
       setPin(''); // Clear PIN
@@ -274,7 +283,7 @@ function PinPage() {
                 color: '#111827',
               }}
             >
-              PIN-Eingabe
+              {texts.title}
             </h1>
 
             {/* Subtitle */}
@@ -286,7 +295,7 @@ function PinPage() {
                 fontWeight: 500,
               }}
             >
-              Bitte geben Sie Ihren 4-stelligen PIN ein
+              {texts.subtitle}
             </p>
           </div>
 

@@ -7,8 +7,9 @@
  */
 
 import type { SessionSettings } from '../../services/sessionStorage';
-import { safeInvoke } from '../../utils/tauriContext';
 import type { NfcScanEvent, PlatformAdapter } from '../adapter';
+
+import { safeInvoke } from './tauriContext';
 
 class TauriAdapter implements PlatformAdapter {
   readonly platform = 'tauri' as const;

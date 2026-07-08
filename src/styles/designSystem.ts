@@ -81,6 +81,11 @@ export const designSystem = {
 
     // Background colors
     white: '#FFFFFF',
+
+    // Legacy text colors migrated from theme.ts (keep exact rendered values
+    // in ErrorModal, SuccessModal and TagAssignmentPage)
+    textStrong: '#0f0f0f',
+    textSubtle: '#4a4a4a',
   },
 
   /**
@@ -154,6 +159,9 @@ export const designSystem = {
     easeOut: 'cubic-bezier(0, 0, 0.2, 1)',
     easeInOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
     easeBounce: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+
+    // Legacy transition migrated from theme.ts (LandingPage logo)
+    slow: 'all 0.75s',
   },
 
   // Transform scales for interactions
@@ -211,5 +219,22 @@ export const designSystem = {
     cardGap: '14px',
     sectionGap: '48px',
     modalPadding: '24px',
+
+    // Legacy spacing scale migrated from theme.ts
+    sm: '0.5rem',
+    md: '1rem',
+    lg: '1.5rem',
+    xl: '2rem',
+  },
+
+  // Typography tokens migrated from theme.ts
+  fonts: {
+    size: {
+      large: '1.3em',
+      xl: '1.5rem',
+    },
+    weight: {
+      bold: '700',
+    },
   },
 };
