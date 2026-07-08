@@ -264,29 +264,31 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         supervisorIds: selectedSupervisors.map(s => s.id),
       });
 
+      const stale = !recreationTracker.isCurrent(requestId);
+
       if (result.status === 'error') {
-        return {
-          status: 'error',
-          error: result.error,
-          stale: !recreationTracker.isCurrent(requestId),
-        };
+        return { status: 'error', error: result.error, stale };
+      }
+
+      // A stale success (logout or superseded attempt) must not touch the
+      // store: it would repopulate currentSession after logout or overwrite
+      // a newer attempt's result. The orphaned backend session is picked up
+      // by fetchCurrentSession on next login.
+      if (stale) {
+        storeLogger.warn('Discarding stale session recreation success', {
+          sessionId: result.session.active_group_id,
+        });
+        return { status: 'success', session: result.session, stale: true };
       }
 
       storeLogger.info('Session recreated successfully', {
         sessionId: result.session.active_group_id,
       });
 
-      // Success is applied unconditionally (historical behavior): the session
-      // state is set even when the response is stale; only UI reactions are
-      // guarded by the caller.
       set({ currentSession: result.session });
       await get().saveLastSessionData();
 
-      return {
-        status: 'success',
-        session: result.session,
-        stale: !recreationTracker.isCurrent(requestId),
-      };
+      return { status: 'success', session: result.session, stale: false };
     },
 
     fetchCurrentSession: async () => {

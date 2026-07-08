@@ -278,6 +278,9 @@ function HomeViewPage() {
 
   const handleConfirmRecreation = async () => {
     if (!authenticatedUser || !sessionSettings?.last_session) return;
+    // Only one recreation request may be in flight; a duplicate submit would
+    // mark the first request stale and then fail with a 409 conflict.
+    if (isNavigatingToScanning) return;
 
     setIsNavigatingToScanning(true);
     const outcome = await recreateSession();
@@ -748,7 +751,7 @@ function HomeViewPage() {
         onClose={() => setShowConfirmModal(false)}
         size="sm"
         backgroundColor="#FFFFFF"
-        closeOnBackdropClick={!isValidatingLastSession}
+        closeOnBackdropClick={!isValidatingLastSession && !isNavigatingToScanning}
       >
         {/* Success Icon */}
         <div
@@ -845,7 +848,7 @@ function HomeViewPage() {
         <ModalActionButtons
           onCancel={() => setShowConfirmModal(false)}
           onConfirm={handleConfirmRecreation}
-          isLoading={isValidatingLastSession}
+          isLoading={isValidatingLastSession || isNavigatingToScanning}
           confirmLabel={texts.recreationConfirmButton}
           loadingLabel={texts.recreationLoadingButton}
           confirmGradient="linear-gradient(to right, #83CD2D, #70B525)"

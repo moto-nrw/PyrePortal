@@ -245,6 +245,8 @@ describe('HomeViewPage session recreation behavior', () => {
   });
 
   it('discards a stale error when a second recreation attempt superseded the first', async () => {
+    // The confirm button is disabled while a request is in flight, so a second
+    // UI submit is impossible; the supersede rule is exercised at store level.
     let rejectFirst: (error: unknown) => void = () => {};
     mockedApi.startSession
       .mockImplementationOnce(
@@ -263,16 +265,11 @@ describe('HomeViewPage session recreation behavior', () => {
       expect(mockedApi.startSession).toHaveBeenCalledTimes(1);
     });
 
-    // Second confirm click supersedes the first request
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
-
-    await waitFor(() => {
-      expect(mockedApi.startSession).toHaveBeenCalledTimes(2);
-    });
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
-    });
+    // A second store-level recreation attempt supersedes the first request
+    const secondOutcome = await useUserStore.getState().recreateSession();
+    expect(secondOutcome).toMatchObject({ status: 'success', stale: false });
+    expect(mockedApi.startSession).toHaveBeenCalledTimes(2);
+    expect(useUserStore.getState().currentSession).toMatchObject({ active_group_id: 99 });
 
     // The stale first request now fails; no error modal may appear
     rejectFirst(new Error('First request failed late'));
@@ -281,5 +278,78 @@ describe('HomeViewPage session recreation behavior', () => {
     expect(
       screen.queryAllByText(content => content.includes('First request failed late'))
     ).toHaveLength(0);
+  });
+
+  it('sends no second request when confirm is clicked again while one is in flight', async () => {
+    let resolveStart: (value: typeof startResponse) => void = () => {};
+    mockedApi.startSession.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveStart = resolve;
+        })
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByText('Aufsicht wiederholen'));
+    await waitFor(() => {
+      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
+    });
+
+    const startButtons = screen.getAllByText('Aufsicht starten');
+    const confirmButton = startButtons[startButtons.length - 1].closest('button');
+    expect(confirmButton).not.toBeNull();
+
+    await user.click(confirmButton!);
+    await waitFor(() => {
+      expect(mockedApi.startSession).toHaveBeenCalledTimes(1);
+    });
+
+    // The button is disabled and shows the loading label while in flight
+    expect(confirmButton).toBeDisabled();
+    expect(confirmButton).toHaveTextContent('Starte...');
+    await user.click(confirmButton!);
+
+    resolveStart(startResponse);
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
+    });
+
+    expect(mockedApi.startSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not repopulate the store from a stale success after logout', async () => {
+    const saveLastSessionData = vi.fn(() => Promise.resolve());
+    useUserStore.setState({ saveLastSessionData });
+
+    let resolveStart: (value: typeof startResponse) => void = () => {};
+    mockedApi.startSession.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveStart = resolve;
+        })
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    await confirmRecreation(user);
+
+    await waitFor(() => {
+      expect(mockedApi.startSession).toHaveBeenCalled();
+    });
+
+    // Logout invalidates the request id while the request is in flight
+    await user.click(screen.getByText('Abmelden'));
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/');
+    });
+
+    // The stale success must not write session state or persist session data
+    resolveStart(startResponse);
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    expect(useUserStore.getState().currentSession).toBeNull();
+    expect(saveLastSessionData).not.toHaveBeenCalled();
   });
 });
