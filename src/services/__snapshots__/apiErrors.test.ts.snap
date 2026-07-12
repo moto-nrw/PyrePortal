@@ -109,8 +109,8 @@ exports[`ERROR_MESSAGE_MAPPINGS backend contract > keeps all patterns and German
     "RFID-Tag fehlt in der Anfrage.",
   ],
   [
-    "no active visit found for student",
-    "Kein aktiver Besuch für diesen Schüler gefunden.",
+    "student has no attendance record for today",
+    "Schüler wurde heute noch nicht eingecheckt.",
   ],
   [
     "person is not a student",

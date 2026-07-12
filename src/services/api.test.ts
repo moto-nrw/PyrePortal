@@ -173,6 +173,21 @@ describe('mapServerErrorToGerman', () => {
     ).toBe('Betreuer-Armband kann hier nicht verwendet werden.');
   });
 
+  // Attendance errors
+  it('maps missing attendance record on daily checkout', () => {
+    expect(mapServerErrorToGerman('student has no attendance record for today')).toBe(
+      'Schüler wurde heute noch nicht eingecheckt.'
+    );
+  });
+
+  it('maps missing attendance record inside the full wire message', () => {
+    expect(
+      mapServerErrorToGerman(
+        'API Error: 404 - Not Found: student has no attendance record for today'
+      )
+    ).toBe('Schüler wurde heute noch nicht eingecheckt.');
+  });
+
   // Internal server errors
   it('maps schulhof not configured', () => {
     expect(mapServerErrorToGerman('schulhof activity not configured')).toBe(

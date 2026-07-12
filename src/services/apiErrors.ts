@@ -130,7 +130,7 @@ export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   ['RFID parameter is required', 'RFID-Tag fehlt in der Anfrage.'],
 
   // 6. ATTENDANCE/VISIT ERRORS (404)
-  ['no active visit found for student', 'Kein aktiver Besuch für diesen Schüler gefunden.'],
+  ['student has no attendance record for today', 'Schüler wurde heute noch nicht eingecheckt.'],
   ['person is not a student', 'Person ist kein Schüler.'],
   ['no active groups in specified room', 'Keine aktiven Gruppen im ausgewählten Raum.'],
 
