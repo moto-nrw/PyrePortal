@@ -12,7 +12,8 @@ export interface ApiErrorResponse {
   message: string;
   code?: string;
   details?: {
-    // Room capacity fields
+    // Capacity fields — the backend sends current_occupancy/max_capacity for
+    // BOTH room and activity capacity errors (project-phoenix issue #1879)
     room_id?: number;
     room_name?: string;
     current_occupancy?: number;
@@ -20,8 +21,6 @@ export interface ApiErrorResponse {
     // Activity capacity fields
     activity_id?: number;
     activity_name?: string;
-    current_participants?: number;
-    max_participants?: number;
     // Duplicate-active-visit fields (Issue #844, backend STUDENT_ALREADY_ACTIVE)
     student_id?: number;
     existing_visit_id?: number;
@@ -243,12 +242,12 @@ export function formatRoomName(name: string): string {
  */
 function formatActivityCapacityError(details: Record<string, unknown>): string {
   const activityName = details.activity_name;
-  const currentParticipants = details.current_participants;
-  const maxParticipants = details.max_participants;
+  const currentOccupancy = details.current_occupancy;
+  const maxCapacity = details.max_capacity;
 
-  if (isStringOrNumber(activityName) && isStringOrNumber(maxParticipants)) {
-    const current = isStringOrNumber(currentParticipants) ? currentParticipants : maxParticipants;
-    return `${activityName} ist voll (${current}/${maxParticipants} Teilnehmer).`;
+  if (isStringOrNumber(activityName) && isStringOrNumber(maxCapacity)) {
+    const current = isStringOrNumber(currentOccupancy) ? currentOccupancy : maxCapacity;
+    return `${activityName} ist voll (${current}/${maxCapacity} Teilnehmer).`;
   }
   return 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.';
 }
