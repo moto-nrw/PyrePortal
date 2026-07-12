@@ -170,6 +170,14 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,...
 
 GKT production scanning uses `SYSTEM.registerNfc` via `public/system.js`.
 
+The GKT scan path can be tested locally without a device: run `BUILD_TARGET=gkt VITE_API_BASE_URL=http://localhost:8080 pnpm run dev`, open `http://localhost:1420/?key=<device-api-key>`, and fire a scan from the DevTools console (`registerNfc` stores its callback as `SYSTEM.onNfcScanned`):
+
+```js
+SYSTEM.onNfcScanned({ uid: '04:D6:94:82:97:6A:80', eventSource: 'NFC', eventNumber: 1 });
+```
+
+The local Tauri Mac/mock app is launched with `pnpm dlx @tauri-apps/cli dev` (no repo script; the CLI devDependency was removed with the retired Tauri release tooling). See "Testing Locally" in README.md for the full test loop including staging.
+
 Hook usage:
 
 ```typescript
