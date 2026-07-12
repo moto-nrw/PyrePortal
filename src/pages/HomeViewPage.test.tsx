@@ -56,7 +56,6 @@ const baseUser = {
   staffId: 1,
   staffName: 'Test User',
   deviceName: 'Test Device',
-  authenticatedAt: new Date(),
   pin: '1234',
 };
 
@@ -118,7 +117,7 @@ describe('HomeViewPage', () => {
       fetchCurrentSession: vi.fn(() => Promise.resolve()),
       loadSessionSettings: vi.fn(() => Promise.resolve()),
       logout: vi.fn(() => Promise.resolve()),
-      validateAndRecreateSession: vi.fn(() => Promise.resolve(false)),
+      validateAndRecreateSession: vi.fn(() => Promise.resolve({ status: 'error' as const })),
       saveLastSessionData: vi.fn(() => Promise.resolve()),
     });
   });
@@ -212,6 +211,13 @@ describe('HomeViewPage', () => {
     renderPage();
     const activityButton = screen.getByText('Aufsicht wiederholen').closest('button');
     expect(activityButton).toBeDisabled();
+  });
+
+  it('disables logout while the saved session is being validated', () => {
+    useUserStore.setState({ isValidatingLastSession: true });
+    renderPage();
+
+    expect(screen.getByText('Abmelden').closest('button')).toBeDisabled();
   });
 
   it('does not show "Aufsicht wiederholen" when use_last_session is false', () => {
@@ -380,7 +386,7 @@ describe('HomeViewPage', () => {
 
   it('clicking activity with saved last session triggers validateAndRecreateSession', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(false));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'error' as const }));
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
       validateAndRecreateSession: validateMock,
@@ -395,7 +401,7 @@ describe('HomeViewPage', () => {
 
   it('successful validation shows confirmation modal', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
       validateAndRecreateSession: validateMock,
@@ -418,7 +424,7 @@ describe('HomeViewPage', () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => {
       useUserStore.setState({ error: 'Aktivität nicht gefunden' });
-      return Promise.resolve(false);
+      return Promise.resolve({ status: 'error' as const });
     });
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -436,7 +442,7 @@ describe('HomeViewPage', () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => {
       useUserStore.setState({ error: null });
-      return Promise.resolve(false);
+      return Promise.resolve({ status: 'error' as const });
     });
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -458,7 +464,7 @@ describe('HomeViewPage', () => {
     const user = userEvent.setup();
     const fetchCurrentSession = vi.fn(() => Promise.resolve());
     const saveLastSessionData = vi.fn(() => Promise.resolve());
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -501,7 +507,7 @@ describe('HomeViewPage', () => {
 
   it('sets currentSession immediately and navigates after session recreation', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -539,7 +545,7 @@ describe('HomeViewPage', () => {
 
   it('confirm recreation shows error when session data is incomplete (no activity)', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -570,7 +576,7 @@ describe('HomeViewPage', () => {
 
   it('confirm recreation shows error when session data is incomplete (no room)', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -600,7 +606,7 @@ describe('HomeViewPage', () => {
 
   it('confirm recreation shows error when no supervisors selected', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -630,7 +636,7 @@ describe('HomeViewPage', () => {
 
   it('confirm recreation handles api.startSession error', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
     mockedApi.startSession.mockRejectedValueOnce(new Error('Server error'));
 
     useUserStore.setState({
@@ -660,7 +666,7 @@ describe('HomeViewPage', () => {
 
   it('confirm recreation handles network-related error with specific message', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
     const networkError = new TypeError('Failed to fetch');
     mockedApi.startSession.mockRejectedValueOnce(networkError);
 
@@ -692,7 +698,7 @@ describe('HomeViewPage', () => {
 
   it('confirm modal cancel button closes the modal', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -719,7 +725,7 @@ describe('HomeViewPage', () => {
   it('does not call handleConfirmRecreation when authenticatedUser is null', async () => {
     // This tests the early return in handleConfirmRecreation
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -753,7 +759,7 @@ describe('HomeViewPage', () => {
 
   it('confirmation modal shows activity details (name, room, supervisors)', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -780,7 +786,7 @@ describe('HomeViewPage', () => {
 
   it('shows "Starte..." text when isValidatingLastSession is true in confirm modal', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -916,7 +922,7 @@ describe('HomeViewPage', () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => {
       useUserStore.setState({ error: 'Test error message' });
-      return Promise.resolve(false);
+      return Promise.resolve({ status: 'error' as const });
     });
     useUserStore.setState({
       sessionSettings: sessionSettingsWithLastSession,
@@ -937,7 +943,7 @@ describe('HomeViewPage', () => {
 
   it('handleConfirmRecreation returns early when sessionSettings.last_session is null', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     // First render with valid last_session to show the confirm modal
     useUserStore.setState({
@@ -972,7 +978,7 @@ describe('HomeViewPage', () => {
 
   it('formatRecreationError handles non-Error objects', async () => {
     const user = userEvent.setup();
-    const validateMock = vi.fn(() => Promise.resolve(true));
+    const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
     mockedApi.startSession.mockRejectedValueOnce('string error');
 
     useUserStore.setState({

@@ -8,79 +8,51 @@
 export const designSystem = {
   // Border Radius System (matching Tailwind classes from design guide)
   borderRadius: {
-    sm: '8px', // rounded-sm - Small elements
     md: '12px', // rounded-md - Buttons, inputs
     lg: '16px', // rounded-lg - Cards
     xl: '24px', // rounded-3xl - Modals, large cards
-    '2xl': '32px', // rounded-2xl - Hero sections
     full: '9999px', // rounded-full - Pills, circular elements
   },
 
   // Shadow System (from design guide)
   shadows: {
-    // Base shadows
-    soft: '0 8px 30px rgb(0,0,0,0.12)',
-    elevated: '0 20px 50px rgb(0,0,0,0.15)',
-
     // Colored shadows
     green: '0 8px 40px rgb(131,205,45,0.3)',
     blue: '0 8px 40px rgb(80,128,216,0.3)',
-    teal: '0 8px 40px rgb(20,184,166,0.3)',
 
     // Component-specific shadows
     button: '0 4px 14px 0 rgba(0,0,0,0.1)',
-    buttonHover: '0 8px 20px 0 rgba(0,0,0,0.15)',
-    card: '0 8px 30px rgb(0,0,0,0.12)',
-    cardHover: '0 20px 50px rgb(0,0,0,0.15)',
-    modal: '0 25px 50px -12px rgba(0,0,0,0.25)',
   },
 
   // Glassmorphism Effects
   glass: {
-    // Backgrounds
     background: 'rgba(255,255,255,0.9)',
-    backgroundStrong: 'rgba(255,255,255,0.95)',
-    backgroundLight: 'rgba(255,255,255,0.8)',
-
-    // Backdrop filters
     blur: 'blur(20px)',
-    blurMedium: 'blur(12px)',
-    blurLight: 'blur(8px)',
-
-    // Combined effect helpers
-    cardStyle: {
-      background: 'rgba(255,255,255,0.9)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-    },
   },
 
   // Color System
   colors: {
     // Primary brand colors
-    primaryBlue: '#5080D8',
     primaryGreen: '#83CD2D',
-    secondaryGreen: '#70B525',
 
     // Semantic colors
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
     info: '#3B82F6',
 
     // Text colors
-    textPrimary: '#1F2937',
     textDark: '#111827',
     textSecondary: '#374151',
-    textLight: '#6B7280',
     textMuted: '#9CA3AF',
 
     // Border colors
     border: '#E5E7EB',
-    borderLight: '#F3F4F6',
 
     // Background colors
     white: '#FFFFFF',
+
+    // Legacy text colors migrated from theme.ts (keep exact rendered values
+    // in ErrorModal, SuccessModal and TagAssignmentPage)
+    textStrong: '#0f0f0f',
+    textSubtle: '#4a4a4a',
   },
 
   /**
@@ -122,22 +94,8 @@ export const designSystem = {
 
   // Gradient Definitions
   gradients: {
-    // Primary gradients
-    green: 'linear-gradient(135deg, #83CD2D, #70B525)',
-    blue: 'linear-gradient(135deg, #5080D8, #4A70C8)',
-    brand: 'linear-gradient(135deg, #5080D8, #83CD2D)',
-
-    // Direction variants
     greenRight: 'linear-gradient(to right, #83CD2D, #70B525)',
     blueRight: 'linear-gradient(to right, #5080D8, #4A70C8)',
-
-    // Background gradients
-    light: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)',
-    gray: 'linear-gradient(to bottom right, #F9FAFB, #F8FAFC)',
-
-    // Overlay gradients
-    blueOverlay: 'linear-gradient(to bottom right, rgba(80,128,216,0.03), rgba(96,165,250,0.03))',
-    greenOverlay: 'linear-gradient(to bottom right, rgba(131,205,45,0.03), rgba(112,181,37,0.03))',
   },
 
   // Background bubble colors used by AnimatedBackground
@@ -145,71 +103,34 @@ export const designSystem = {
 
   // Animation & Transitions
   transitions: {
-    // Duration-based
     base: 'all 200ms ease-out',
-    smooth: 'all 300ms ease-out',
-    complex: 'all 500ms ease-out',
 
-    // Easing functions
-    easeOut: 'cubic-bezier(0, 0, 0.2, 1)',
-    easeInOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
-    easeBounce: 'cubic-bezier(0.68, -0.55, 0.265, 1.55)',
+    // Legacy transition migrated from theme.ts (LandingPage logo)
+    slow: 'all 0.75s',
   },
 
   // Transform scales for interactions
   scales: {
-    hover: 'scale(1.01)',
-    hoverLarge: 'scale(1.02)',
     active: 'scale(0.98)',
     activeSmall: 'scale(0.95)',
   },
 
-  // Component-specific styles
-  components: {
-    // Activity/User cards
-    card: {
-      borderRadius: '24px',
-      padding: '16px',
-      background: 'rgba(255,255,255,0.9)',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(229,231,235,0.5)',
-      boxShadow: '0 8px 30px rgb(0,0,0,0.12)',
-      transition: 'all 500ms ease-out',
-    },
-
-    // Primary action button
-    buttonPrimary: {
-      background: 'linear-gradient(to right, #83CD2D, #70B525)',
-      color: '#FFFFFF',
-      borderRadius: '9999px',
-      padding: '10px 20px',
-      fontSize: '16px',
-      fontWeight: '600',
-      border: 'none',
-      boxShadow: '0 4px 14px 0 rgba(131,205,45,0.4)',
-      transition: 'all 300ms ease-out',
-      cursor: 'pointer',
-    },
-
-    // Back button style
-    backButton: {
-      height: '68px',
-      padding: '0 32px',
-      backgroundColor: 'rgba(255, 255, 255, 0.9)',
-      border: '1px solid rgba(0, 0, 0, 0.1)',
-      borderRadius: '34px',
-      backdropFilter: 'blur(20px)',
-      WebkitBackdropFilter: 'blur(20px)',
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-      transition: 'all 200ms ease-out',
-    },
+  // Spacing (legacy scale migrated from theme.ts)
+  spacing: {
+    sm: '0.5rem',
+    md: '1rem',
+    lg: '1.5rem',
+    xl: '2rem',
   },
 
-  // Spacing (supplementing existing theme)
-  spacing: {
-    cardGap: '14px',
-    sectionGap: '48px',
-    modalPadding: '24px',
+  // Typography tokens migrated from theme.ts
+  fonts: {
+    size: {
+      large: '1.3em',
+      xl: '1.5rem',
+    },
+    weight: {
+      bold: '700',
+    },
   },
 };

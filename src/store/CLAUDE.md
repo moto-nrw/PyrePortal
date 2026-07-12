@@ -2,7 +2,7 @@
 
 ## Single Store Pattern
 
-PyrePortal uses **one centralized Zustand store** (`userStore.ts` - 1552 lines) for all application state.
+PyrePortal uses **one centralized Zustand store** (`userStore.ts`) for all application state.
 
 **Why single store:**
 
@@ -15,49 +15,34 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts` - 1552 lines) 
 
 ### State Categories
 
-1. **Authentication State** (lines 82-185)
-   - `authenticatedUser` - Current logged-in staff member
+1. **Authentication**
+   - `authenticatedUser` - Current logged-in staff member (includes PIN for API calls)
    - `users` - Available teachers
-   - `isLoading` - Loading indicator
-   - `error` - Error message
+   - `isLoading`, `error` - Request state
 
-2. **Session State** (lines 186-395)
-   - `currentSession` - Active session details
-   - `activities` - Teacher's activities
-   - `rooms` - Available rooms
+2. **Session**
+   - `currentSession` - Active session from the backend
+   - `selectedActivity`, `selectedRoom` (`_roomSelectedAt` guards against stale server data overwriting a fresh manual room switch)
+   - `selectedSupervisors`, `activeSupervisorTags`
+   - `sessionSettings`, `isValidatingLastSession` - "Use last session" persistence
 
-3. **RFID State** (lines 1117-1201)
-   - `rfid.processingQueue` - Tags currently being processed
-   - `rfid.recentTagScans` - Recent scans (duplicate prevention)
-   - `rfid.tagToStudentMap` - Tag → Student mapping
+3. **RFID** (`rfid.*`)
+   - `isScanning`, `currentScan`, `showModal`
+   - `scanMode`, `scanContextId`, `pickupQueryTagId` - Pickup query flow
+   - `processingQueue` - Tags currently being processed
+   - `recentTagScans` - Short-lived result cache (see `RECENT_SCAN_CACHE_TTL_MS`), NOT a dedup gate
 
-4. **UI State**
-   - `showModal` - Modal visibility
-   - `scanResult` - Last RFID scan result
+4. **Network**
+   - `networkStatus` - Online/offline quality and response time
 
 ### Action Categories
 
-1. **Teacher Management** (lines 354-450)
-   - `fetchTeachers()` - Load teacher list
-   - `selectUser(userId)` - Select teacher
-   - `setPin(pin)` - Set PIN
-
-2. **Authentication** (lines 489-629)
-   - `validateGlobalPIN(pin)` - Validate OGS PIN
-   - `validateTeacherPIN(pin, staffId)` - Validate teacher PIN
-   - `logout()` - Clear auth state
-
-3. **Session Management** (lines 721-1116)
-   - `fetchActivities()` - Load activities
-   - `fetchRooms()` - Load available rooms
-   - `startSession(...)` - Start activity session
-   - `endSession()` - End current session
-
-4. **RFID Processing** (lines 1117-1300)
-   - `canProcessTag(tagId)` - Check if tag can be processed (duplicate prevention)
-   - `recordTagScan(tagId)` - Record scan timestamp
-   - `mapTagToStudent(tagId, studentId)` - Map tag to student
-   - `isValidStudentScan(studentId, action)` - Validate student action
+1. **Authentication**: `setAuthenticatedUser`, `fetchTeachers`, `logout`
+2. **Session**: `fetchRooms`, `selectRoom`, `fetchCurrentSession`, `setSelectedActivity`, `fetchActivities`, `clearSessionState`
+3. **Supervisors**: `setSelectedSupervisors`, `toggleSupervisor`, `addSupervisorFromRfid`, `addActiveSupervisorTag`, `isActiveSupervisor`
+4. **RFID**: `startRfidScanning`, `stopRfidScanning`, `setScanResult`, `showScanModal`, `hideScanModal`, pickup-query mode actions, and the duplicate-prevention actions below
+5. **Session settings**: `loadSessionSettings`, `toggleUseLastSession`, `saveLastSessionData`, `validateAndRecreateSession`
+6. **Feedback**: `submitDailyFeedback`
 
 ## Logging Middleware
 
@@ -68,6 +53,8 @@ export const useUserStore = create<UserState>(
   loggerMiddleware(createUserStore, {
     name: 'UserStore',
     logLevel: LogLevel.DEBUG,
+    stateChanges: true,
+    actionSource: true,
     excludedActions: ['functionalUpdate'],
   })
 );
@@ -75,17 +62,10 @@ export const useUserStore = create<UserState>(
 
 **Logged Events:**
 
-- Action calls with arguments
-- State changes (before/after)
-- Action source (which component)
+- Action calls with a diff of changed state (before/after)
+- Action source (which component triggered the change)
 
-**Example Log Output:**
-
-```
-[UserStore] Action: fetchTeachers
-[UserStore] State changed: users (0 → 15 items)
-[UserStore] Action: setPin { pin: '****' }
-```
+When nothing would be logged at the configured level (typical production), the middleware takes a fast path and skips diff/stack-trace work entirely.
 
 ## Critical Store Patterns
 
@@ -113,62 +93,25 @@ actionName: async () => {
     set({ result, isLoading: false });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    logger.error('Action failed', { error: message });
-    set({ error: 'Benutzerfreundliche deutsche Nachricht', isLoading: false });
+    storeLogger.error('Action failed', { error: message });
+    set({ error: mapServerErrorToGerman(message), isLoading: false });
   }
 };
 ```
+
+Always clear `isLoading` in both the success AND error paths. User-facing error strings are German; log messages are English.
 
 ### 3. Multi-Layer Duplicate Prevention (RFID)
 
-**Three defensive layers** (lines 1117-1201):
+RFID hardware and browser mocks can deliver duplicate scan events. Defense in depth:
 
-**Layer 1: Processing Queue**
+**Layer 1: Processing queue** — `canProcessTag` rejects tags already in `rfid.processingQueue`.
 
-```typescript
-canProcessTag: (tagId: string) => {
-  if (get().rfid.processingQueue.has(tagId)) {
-    logger.debug('Tag already processing');
-    return false;
-  }
-  // ... continue checks
-};
-```
-
-**Layer 2: Recent Scans (2-second window)**
-
-```typescript
-const recentScan = get().rfid.recentTagScans.get(tagId);
-if (recentScan && Date.now() - recentScan.timestamp < 2000) {
-  logger.debug('Tag scanned too recently');
-  return false;
-}
-```
-
-**Layer 3: Student History (prevent opposite action)**
-
-```typescript
-isValidStudentScan: (studentId: number, requestedAction: 'checkin' | 'checkout') => {
-  const recentStudentAction = get().rfid.recentStudentActions.get(studentId);
-  if (!recentStudentAction) return true;
-
-  // If checked in, only allow checkout
-  if (recentStudentAction.action === 'checkin' && requestedAction === 'checkin') {
-    return false;
-  }
-
-  // If checked out, only allow checkin
-  if (recentStudentAction.action === 'checkout' && requestedAction === 'checkout') {
-    return false;
-  }
-
-  return true;
-};
-```
+**Layer 2: scanId dedup** — handled in `useRfidScanning`'s `onAdapterScan` before the store is consulted: each adapter scan event carries a `scanId`, and already-processed ids are skipped. `recentTagScans` is NOT part of this — it is only a short-lived cache for result replay and background-sync promises.
 
 ### 4. Deduplication Pattern (API Calls)
 
-**Prevents concurrent duplicate fetches:**
+`fetchActivities` prevents concurrent duplicate fetches by caching the in-flight promise in a closure:
 
 ```typescript
 fetchActivities: (() => {
@@ -176,14 +119,12 @@ fetchActivities: (() => {
 
   return async (): Promise<ActivityResponse[] | null> => {
     if (fetchPromise) {
-      logger.debug('Fetch already in progress');
       return fetchPromise;
     }
 
     fetchPromise = (async () => {
       try {
-        const data = await api.getActivities(pin);
-        return data;
+        return await api.getActivities(pin);
       } finally {
         fetchPromise = null;
       }
@@ -193,6 +134,8 @@ fetchActivities: (() => {
   };
 })();
 ```
+
+Note: `fetchActivities` returns the data to the caller; it does not cache activities in store state.
 
 ## Using Store in Components
 
@@ -205,15 +148,6 @@ function MyComponent() {
     users: state.users,
     isLoading: state.isLoading,
   }));
-}
-```
-
-### Select All State (Less Optimal)
-
-```typescript
-function MyComponent() {
-  // ⚠️ OK but not optimal: Re-renders on any store change
-  const { users, isLoading } = useUserStore();
 }
 ```
 
@@ -233,7 +167,7 @@ function MyComponent() {
 
 ```typescript
 // For simple UI state only
-useUserStore.setState({ showModal: false });
+useUserStore.setState({ ... });
 ```
 
 ## Adding Store Actions
@@ -244,61 +178,24 @@ useUserStore.setState({ showModal: false });
 actionName: async (param: ParamType): Promise<void> => {
   const { authenticatedUser } = get();
 
-  // Validation
   if (!authenticatedUser?.pin) {
     set({ error: 'Nicht authentifiziert' });
     return;
   }
 
-  // Loading state
   set({ isLoading: true, error: null });
 
   try {
     storeLogger.info('Starting action', { param });
-
-    // API call
     const result = await api.doSomething(authenticatedUser.pin, param);
-
-    // Update state
-    set({
-      result,
-      isLoading: false,
-    });
-
-    storeLogger.info('Action completed', { result });
+    set({ result, isLoading: false });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     storeLogger.error('Action failed', { error: errorMessage });
-
-    set({
-      error: 'Fehler beim Laden',
-      isLoading: false,
-    });
+    set({ error: mapServerErrorToGerman(errorMessage), isLoading: false });
   }
 };
 ```
-
-### Template for Sync Action
-
-```typescript
-actionName: (param: ParamType) => {
-  storeLogger.info('Setting value', { param });
-  set({ value: param });
-};
-```
-
-## Performance Tips
-
-### Avoid Re-renders
-
-1. Use selector functions for specific state
-2. Memoize expensive computations outside store
-3. Don't create new objects/arrays in selectors
-
-### Logging Performance
-
-- Exclude high-frequency actions from logging: `excludedActions: ['functionalUpdate']`
-- Use `LogLevel.WARN` in production to reduce overhead
 
 ## Common Pitfalls
 
@@ -316,8 +213,6 @@ if (get().user.name !== newName) {
 
 ### ❌ Forgetting to Clear Loading State
 
-Always clear `isLoading` in both success AND error paths (see Error Handling Pattern above):
-
 ```typescript
 // BAD: Loading state stuck on error
 try {
@@ -326,13 +221,5 @@ try {
 } catch (error) {
   set({ error: 'Fehler' });
   // isLoading still true!
-}
-
-// GOOD: Always clear loading in catch block too
-try {
-  const result = await api.doSomething();
-  set({ result, isLoading: false });
-} catch (error) {
-  set({ error: 'Fehler', isLoading: false });
 }
 ```

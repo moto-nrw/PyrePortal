@@ -1,529 +1,43 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
   ErrorModal,
-  ModalBase,
-  ModalActionButtons,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
   SelectionPageLayout,
 } from '../components/ui';
+import { ConfirmationModal } from '../components/ui/ConfirmationModal';
+import { ConflictModal } from '../components/ui/ConflictModal';
 import { usePagination } from '../hooks/usePagination';
 import {
-  api,
+  getNetworkErrorMessage,
   mapServerErrorToGerman,
   isNetworkRelatedError,
   type Room,
-  type SessionStartRequest,
-  type ActivityResponse,
   type CurrentSession,
 } from '../services/api';
+import {
+  createSessionRequestTracker,
+  startSessionWithConflictHandling,
+} from '../services/sessionService';
 import { useUserStore } from '../store/userStore';
-import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
-interface ConfirmationModalProps {
-  isOpen: boolean;
-  activity: ActivityResponse | null;
-  room: Room;
-  supervisors: Array<{ id: number; name: string }>;
-  onConfirm: () => void;
-  onCancel: () => void;
-  isLoading: boolean;
-}
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'Wo machen wir das?',
+  sessionStartErrorFallback: 'Fehler beim Starten der Aktivität',
+  sessionOverrideErrorFallback: 'Fehler beim Überschreiben der Session',
+  noRoomsHeading: 'Keine Räume verfügbar',
+  noRoomsHint: 'Es sind derzeit keine Räume für die Auswahl verfügbar.',
+  capacityBadge: (capacity: number) => `${capacity} Plätze`,
+} as const;
 
-interface ConflictModalProps {
-  isOpen: boolean;
-  activity: ActivityResponse | null;
-  room: Room;
-  supervisors: Array<{ id: number; name: string }>;
-  onForceStart: () => void;
-  onCancel: () => void;
-  isLoading: boolean;
-}
-
-const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
-  isOpen,
-  activity,
-  room,
-  supervisors,
-  onConfirm,
-  onCancel,
-  isLoading,
-}) => (
-  <ModalBase
-    isOpen={isOpen}
-    onClose={onCancel}
-    size="md"
-    backgroundColor="#FFFFFF"
-    backdropBlur="6px"
-    closeOnBackdropClick={!isLoading}
-  >
-    {/* Header Icon */}
-    <div
-      style={{
-        width: '64px',
-        height: '64px',
-        background: 'linear-gradient(to right, #83cd2d, #6ba529)',
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        margin: '0 auto 24px auto',
-        boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
-      }}
-    >
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="12" cy="12" r="10" />
-        <path d="M9 12l2 2 4-4" />
-      </svg>
-    </div>
-
-    <h2
-      style={{
-        fontSize: '32px',
-        fontWeight: 700,
-        marginBottom: '12px',
-        color: '#1F2937',
-        lineHeight: 1.2,
-      }}
-    >
-      Aufsicht starten?
-    </h2>
-
-    {/* Activity Details Card */}
-    <div
-      style={{
-        backgroundColor: '#F8FAFC',
-        borderRadius: designSystem.borderRadius.lg,
-        padding: '20px',
-        marginBottom: '20px',
-        border: '1px solid #E5E7EB',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '16px',
-          marginBottom: '8px',
-        }}
-      >
-        <div
-          style={{
-            fontSize: '18px',
-            fontWeight: 700,
-            color: '#1F2937',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#14B8A6"
-            strokeWidth="2"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
-          {activity?.name}
-        </div>
-
-        <div
-          style={{
-            fontSize: '14px',
-            fontWeight: 600,
-            color: '#9CA3AF',
-          }}
-        ></div>
-
-        <div
-          style={{
-            fontSize: '20px',
-            fontWeight: 600,
-            color: '#1F2937',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#4f46e5"
-            strokeWidth="2"
-          >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-            <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
-            <circle cx="11" cy="12" r="1" />
-          </svg>
-          {room.name}
-        </div>
-      </div>
-
-      {room.room_type && (
-        <div
-          style={{
-            fontSize: '14px',
-            color: '#6B7280',
-            marginBottom: '0px',
-          }}
-        >
-          Typ: {room.room_type}
-        </div>
-      )}
-    </div>
-
-    {/* Supervisors */}
-    <div
-      style={{
-        backgroundColor: '#F9FAFB',
-        borderRadius: designSystem.borderRadius.lg,
-        padding: '16px',
-        marginBottom: '20px',
-        border: '1px solid #E5E7EB',
-      }}
-    >
-      <div
-        style={{
-          fontSize: '14px',
-          fontWeight: 700,
-          color: '#374151',
-          marginBottom: '12px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}
-      >
-        Betreuer ({supervisors.length})
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-        }}
-      >
-        {supervisors.map(supervisor => (
-          <div
-            key={supervisor.id}
-            style={{
-              backgroundColor: '#FFFFFF',
-              padding: '8px 12px',
-              borderRadius: '16px',
-              fontSize: '14px',
-              fontWeight: 600,
-              color: '#1F2937',
-              border: '1px solid #E5E7EB',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#14B8A6"
-              strokeWidth="2"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            {supervisor.name}
-          </div>
-        ))}
-      </div>
-    </div>
-
-    <ModalActionButtons
-      onCancel={onCancel}
-      onConfirm={onConfirm}
-      isLoading={isLoading}
-      confirmLabel="Aufsicht starten"
-      loadingLabel="Starte..."
-    />
-  </ModalBase>
-);
-
-const ConflictModal: React.FC<ConflictModalProps> = ({
-  isOpen,
-  activity,
-  room,
-  supervisors,
-  onForceStart,
-  onCancel,
-  isLoading,
-}) => (
-  <ModalBase
-    isOpen={isOpen}
-    onClose={onCancel}
-    size="sm"
-    backgroundColor="#FFFFFF"
-    closeOnBackdropClick={!isLoading}
-  >
-    {/* Warning Icon */}
-    <div
-      style={{
-        width: '64px',
-        height: '64px',
-        background: 'linear-gradient(to right, #F59E0B, #EAB308)',
-        borderRadius: '50%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        margin: '0 auto 24px auto',
-        boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
-      }}
-    >
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#FFFFFF"
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-        <line x1="12" y1="9" x2="12" y2="13" />
-        <line x1="12" y1="17" x2="12.01" y2="17" />
-      </svg>
-    </div>
-
-    <h2
-      style={{
-        fontSize: '28px',
-        fontWeight: 700,
-        marginBottom: '16px',
-        color: '#1F2937',
-        lineHeight: 1.2,
-      }}
-    >
-      Session Konflikt
-    </h2>
-
-    <p
-      style={{
-        fontSize: '16px',
-        color: '#6B7280',
-        marginBottom: '32px',
-        lineHeight: 1.5,
-      }}
-    >
-      Es läuft bereits eine Session für diese Aktivität oder diesen Raum. Möchten Sie die bestehende
-      Session beenden und eine neue starten?
-    </p>
-
-    {/* Activity Details Card */}
-    <div
-      style={{
-        backgroundColor: '#FEF3C7',
-        borderRadius: designSystem.borderRadius.lg,
-        padding: '24px',
-        marginBottom: '32px',
-        border: '1px solid #FCD34D',
-      }}
-    >
-      <div
-        style={{
-          fontSize: '14px',
-          color: '#92400E',
-          marginBottom: '8px',
-          fontWeight: 600,
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}
-      >
-        Neue Session
-      </div>
-
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: '24px',
-          marginBottom: '12px',
-        }}
-      >
-        <div
-          style={{
-            fontSize: '20px',
-            fontWeight: 600,
-            color: '#1F2937',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#14B8A6"
-            strokeWidth="2"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
-          {activity?.name}
-        </div>
-
-        <div
-          style={{
-            fontSize: '16px',
-            fontWeight: 600,
-            color: '#9CA3AF',
-          }}
-        ></div>
-
-        <div
-          style={{
-            fontSize: '20px',
-            fontWeight: 600,
-            color: '#1F2937',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#f87C10"
-            strokeWidth="2"
-          >
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-            <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
-            <circle cx="11" cy="12" r="1" />
-          </svg>
-          {room.name}
-        </div>
-      </div>
-    </div>
-
-    {/* Supervisors */}
-    <div
-      style={{
-        backgroundColor: '#F0F9FF',
-        borderRadius: designSystem.borderRadius.lg,
-        padding: '20px',
-        marginBottom: '32px',
-        border: '1px solid #BAE6FD',
-      }}
-    >
-      <div
-        style={{
-          fontSize: '14px',
-          fontWeight: 600,
-          color: '#0369A1',
-          marginBottom: '12px',
-          textTransform: 'uppercase',
-          letterSpacing: '0.5px',
-        }}
-      >
-        Betreuer ({supervisors.length})
-      </div>
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '8px',
-        }}
-      >
-        {supervisors.map(supervisor => (
-          <div
-            key={supervisor.id}
-            style={{
-              backgroundColor: '#FFFFFF',
-              padding: '8px 16px',
-              borderRadius: '20px',
-              fontSize: '14px',
-              fontWeight: 500,
-              color: '#1F2937',
-              border: '1px solid #E0E7FF',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#14B8A6"
-              strokeWidth="2"
-            >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-            {supervisor.name}
-          </div>
-        ))}
-      </div>
-    </div>
-
-    {/* Warning Message */}
-    <div
-      style={{
-        backgroundColor: '#FEF2F2',
-        border: '1px solid #FECACA',
-        borderRadius: designSystem.borderRadius.md,
-        padding: '16px',
-        marginBottom: '32px',
-      }}
-    >
-      <div
-        style={{
-          fontSize: '14px',
-          color: '#DC2626',
-          fontWeight: 600,
-          textAlign: 'center',
-        }}
-      >
-        Diese Aktion beendet die aktuelle Session
-      </div>
-    </div>
-
-    <ModalActionButtons
-      onCancel={onCancel}
-      onConfirm={onForceStart}
-      isLoading={isLoading}
-      confirmLabel="Trotzdem starten"
-      loadingLabel="Starte..."
-      confirmGradient="linear-gradient(to right, #DC2626, #B91C1C)"
-      confirmShadow="0 4px 14px 0 rgba(220, 38, 38, 0.4)"
-    />
-  </ModalBase>
-);
+type SessionAttemptUser = NonNullable<
+  ReturnType<typeof useUserStore.getState>['authenticatedUser']
+>;
 
 function RoomSelectionPage() {
   const {
@@ -535,6 +49,7 @@ function RoomSelectionPage() {
     error,
     fetchRooms,
     selectRoom,
+    setCurrentSession,
     saveLastSessionData,
   } = useUserStore();
 
@@ -546,12 +61,33 @@ function RoomSelectionPage() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const navigate = useNavigate();
   const fetchedRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const sessionStartInFlightRef = useRef(false);
+  const sessionRequestTrackerRef = useRef(createSessionRequestTracker());
+
+  const isSessionAttemptCurrent = useCallback((requestId: number, user: SessionAttemptUser) => {
+    return (
+      isMountedRef.current &&
+      sessionRequestTrackerRef.current.isCurrent(requestId) &&
+      useUserStore.getState().authenticatedUser === user
+    );
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    const tracker = sessionRequestTrackerRef.current;
+    return () => {
+      isMountedRef.current = false;
+      sessionStartInFlightRef.current = false;
+      tracker.invalidate();
+    };
+  }, []);
 
   // Helper to show error modal with network-aware message
   const showError = useCallback((error: unknown, fallbackMessage: string) => {
     const rawMessage = error instanceof Error ? error.message : fallbackMessage;
     const userMessage = isNetworkRelatedError(error)
-      ? 'Netzwerkfehler. Bitte Verbindung prüfen und erneut versuchen.'
+      ? getNetworkErrorMessage('retry')
       : mapServerErrorToGerman(rawMessage);
     setErrorMessage(userMessage);
     setShowErrorModal(true);
@@ -575,6 +111,8 @@ function RoomSelectionPage() {
   // Redirect if missing authentication, selected activity, or supervisors
   useEffect(() => {
     if (!authenticatedUser) {
+      sessionRequestTrackerRef.current.invalidate();
+      sessionStartInFlightRef.current = false;
       logger.warn('Unauthenticated access to RoomSelectionPage');
       logNavigation('RoomSelectionPage', '/');
       void navigate('/');
@@ -582,6 +120,8 @@ function RoomSelectionPage() {
     }
 
     if (!selectedActivity) {
+      sessionRequestTrackerRef.current.invalidate();
+      sessionStartInFlightRef.current = false;
       logger.warn('No activity selected, redirecting to activity selection');
       logNavigation('RoomSelectionPage', '/activity-selection');
       void navigate('/activity-selection');
@@ -589,6 +129,8 @@ function RoomSelectionPage() {
     }
 
     if (!selectedSupervisors || selectedSupervisors.length === 0) {
+      sessionRequestTrackerRef.current.invalidate();
+      sessionStartInFlightRef.current = false;
       logger.warn('No supervisors selected, redirecting to staff selection');
       logNavigation('RoomSelectionPage', '/staff-selection');
       void navigate('/staff-selection');
@@ -620,60 +162,25 @@ function RoomSelectionPage() {
     setShowConfirmModal(true);
   };
 
-  // Build CurrentSession from start response + local state to avoid
-  // a redundant GET /api/iot/session/current round-trip
-  const buildSessionFromResponse = useCallback(
-    (sessionResponse: {
-      active_group_id: number;
-      activity_id: number;
-      device_id: number;
-      start_time: string;
-      supervisors: CurrentSession['supervisors'];
-    }) => {
-      if (!selectedActivity || !selectedRoom) return null;
-      const session: CurrentSession = {
-        active_group_id: sessionResponse.active_group_id,
-        activity_id: sessionResponse.activity_id,
-        activity_name: selectedActivity.name,
-        room_id: selectedRoom.id,
-        room_name: selectedRoom.name,
-        device_id: sessionResponse.device_id,
-        start_time: sessionResponse.start_time,
-        duration: '0s',
-        is_active: true,
-        active_students: 0,
-        supervisors: sessionResponse.supervisors,
-      };
-      return session;
-    },
-    [selectedActivity, selectedRoom]
-  );
-
   // Shared post-start flow: set session state, save, log, and navigate
   const completeSessionStart = useCallback(
     async (
-      sessionResponse: {
-        active_group_id: number;
-        activity_id: number;
-        device_id: number;
-        start_time: string;
-        supervisors: CurrentSession['supervisors'];
-      },
-      actionLabel: string
+      session: CurrentSession,
+      actionLabel: string,
+      requestId: number,
+      user: SessionAttemptUser
     ) => {
       if (!selectedActivity || !selectedRoom) return;
+      if (!isSessionAttemptCurrent(requestId, user)) return;
 
       selectRoom(selectedRoom.id);
-
-      const newSession = buildSessionFromResponse(sessionResponse);
-      if (newSession) {
-        useUserStore.setState({ currentSession: newSession });
-      }
+      setCurrentSession(session);
 
       await saveLastSessionData();
+      if (!isSessionAttemptCurrent(requestId, user)) return;
 
       logUserAction(actionLabel, {
-        sessionId: sessionResponse.active_group_id,
+        sessionId: session.active_group_id,
         activityId: selectedActivity.id,
         activityName: selectedActivity.name,
         roomId: selectedRoom.id,
@@ -684,10 +191,11 @@ function RoomSelectionPage() {
       setShowConfirmModal(false);
       setShowConflictModal(false);
       setIsStartingSession(false);
+      sessionStartInFlightRef.current = false;
       setSelectedRoom(null);
 
       logNavigation('RoomSelectionPage', 'NFC-Scanning', {
-        sessionId: sessionResponse.active_group_id,
+        sessionId: session.active_group_id,
         activityId: selectedActivity.id,
         roomId: selectedRoom.id,
       });
@@ -698,128 +206,148 @@ function RoomSelectionPage() {
       selectedActivity,
       selectedRoom,
       selectRoom,
+      setCurrentSession,
       saveLastSessionData,
-      buildSessionFromResponse,
       navigate,
+      isSessionAttemptCurrent,
     ]
   );
 
   // Handle session start confirmation
   const handleConfirmSession = async () => {
     if (!selectedRoom || !selectedActivity || !authenticatedUser) return;
+    if (sessionStartInFlightRef.current) return;
 
+    const requestId = sessionRequestTrackerRef.current.begin();
+    const attemptUser = authenticatedUser;
+    sessionStartInFlightRef.current = true;
     setIsStartingSession(true);
-    try {
-      logger.info('Starting activity session', {
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-        supervisorCount: selectedSupervisors.length,
-        supervisorIds: selectedSupervisors.map(s => s.id),
-      });
 
-      performance.mark('session-start-begin');
+    logger.info('Starting activity session', {
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+      supervisorCount: selectedSupervisors.length,
+      supervisorIds: selectedSupervisors.map(s => s.id),
+    });
 
-      const sessionRequest: SessionStartRequest = {
-        activity_id: selectedActivity.id,
-        room_id: selectedRoom.id,
-        supervisor_ids: selectedSupervisors.map(s => s.id),
-      };
+    performance.mark('session-start-begin');
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
+    const outcome = await startSessionWithConflictHandling({
+      pin: authenticatedUser.pin,
+      activity: selectedActivity,
+      room: selectedRoom,
+      supervisorIds: selectedSupervisors.map(s => s.id),
+    });
 
+    if (!isSessionAttemptCurrent(requestId, attemptUser)) {
+      logger.warn('Discarding stale session start result', { status: outcome.status });
+      return;
+    }
+
+    if (outcome.status === 'started') {
       performance.mark('session-start-end');
       performance.measure('session-start-duration', 'session-start-begin', 'session-start-end');
       const measure = performance.getEntriesByName('session-start-duration')[0];
 
       logger.info('Session started successfully', {
-        sessionId: sessionResponse.active_group_id,
-        activityId: sessionResponse.activity_id,
-        deviceId: sessionResponse.device_id,
+        sessionId: outcome.response.active_group_id,
+        activityId: outcome.response.activity_id,
+        deviceId: outcome.response.device_id,
         duration_ms: measure.duration,
       });
 
-      await completeSessionStart(sessionResponse, 'session_started');
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : 'Fehler beim Starten der Session';
-      logger.error('Session start failed', {
-        error: errorMessage,
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-      });
-
-      logError(
-        error instanceof Error ? error : new Error(String(error)),
-        'RoomSelectionPage.handleConfirmSession'
-      );
-
-      // Handle 409 Conflict - show conflict modal
-      logger.debug('Checking for conflict error', {
-        errorMessage,
-        includes409: errorMessage.includes('409'),
-        includesConflict: errorMessage.includes('Conflict'),
-      });
-
-      if (errorMessage.includes('409') || errorMessage.includes('Conflict')) {
-        logger.info('Showing conflict modal due to 409 error');
-        setShowConflictModal(true);
-        setIsStartingSession(false);
-        return;
-      } else {
-        showError(error, 'Fehler beim Starten der Aktivität');
-        setIsStartingSession(false);
-        setShowConfirmModal(false);
-        setSelectedRoom(null);
-      }
+      await completeSessionStart(outcome.session, 'session_started', requestId, attemptUser);
+      return;
     }
+
+    const error = outcome.error;
+    const errorMessage = error instanceof Error ? error.message : 'Fehler beim Starten der Session';
+    logger.error('Session start failed', {
+      error: errorMessage,
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+    });
+
+    logError(
+      error instanceof Error ? error : new Error(String(error)),
+      'RoomSelectionPage.handleConfirmSession'
+    );
+
+    if (outcome.status === 'conflict') {
+      logger.info('Showing conflict modal due to 409 error');
+      sessionStartInFlightRef.current = false;
+      setShowConflictModal(true);
+      setIsStartingSession(false);
+      return;
+    }
+
+    showError(error, texts.sessionStartErrorFallback);
+    sessionStartInFlightRef.current = false;
+    setIsStartingSession(false);
+    setShowConfirmModal(false);
+    setSelectedRoom(null);
   };
 
   // Handle force session start from conflict modal
   const handleForceSessionStart = async () => {
     if (!selectedRoom || !selectedActivity || !authenticatedUser) return;
+    if (sessionStartInFlightRef.current) return;
 
+    const requestId = sessionRequestTrackerRef.current.begin();
+    const attemptUser = authenticatedUser;
+    sessionStartInFlightRef.current = true;
     setIsStartingSession(true);
-    try {
-      logger.info('Retrying session start with force=true', {
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-      });
 
-      const forceSessionRequest: SessionStartRequest = {
-        activity_id: selectedActivity.id,
-        room_id: selectedRoom.id,
-        supervisor_ids: selectedSupervisors.map(s => s.id),
-        force: true,
-      };
+    logger.info('Retrying session start with force=true', {
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+    });
 
-      const sessionResponse = await api.startSession(authenticatedUser.pin, forceSessionRequest);
+    const outcome = await startSessionWithConflictHandling({
+      pin: authenticatedUser.pin,
+      activity: selectedActivity,
+      room: selectedRoom,
+      supervisorIds: selectedSupervisors.map(s => s.id),
+      force: true,
+    });
 
-      logger.info('Session started successfully with force override', {
-        sessionId: sessionResponse.active_group_id,
-        activityId: sessionResponse.activity_id,
-        deviceId: sessionResponse.device_id,
-      });
-
-      await completeSessionStart(sessionResponse, 'session_started_force');
-    } catch (forceError) {
-      const forceErrorMessage =
-        forceError instanceof Error ? forceError.message : 'Fehler beim Überschreiben der Session';
-      logger.error('Force session start also failed', {
-        error: forceErrorMessage,
-        activityId: selectedActivity.id,
-        roomId: selectedRoom.id,
-      });
-      showError(forceError, 'Fehler beim Überschreiben der Session');
-      // Clean up modal state only on error
-      setIsStartingSession(false);
-      setShowConfirmModal(false);
-      setShowConflictModal(false);
-      setSelectedRoom(null);
+    if (!isSessionAttemptCurrent(requestId, attemptUser)) {
+      logger.warn('Discarding stale forced session start result', { status: outcome.status });
+      return;
     }
+
+    if (outcome.status === 'started') {
+      logger.info('Session started successfully with force override', {
+        sessionId: outcome.response.active_group_id,
+        activityId: outcome.response.activity_id,
+        deviceId: outcome.response.device_id,
+      });
+
+      await completeSessionStart(outcome.session, 'session_started_force', requestId, attemptUser);
+      return;
+    }
+
+    const forceError = outcome.error;
+    const forceErrorMessage =
+      forceError instanceof Error ? forceError.message : 'Fehler beim Überschreiben der Session';
+    logger.error('Force session start also failed', {
+      error: forceErrorMessage,
+      activityId: selectedActivity.id,
+      roomId: selectedRoom.id,
+    });
+    showError(forceError, texts.sessionOverrideErrorFallback);
+    sessionStartInFlightRef.current = false;
+    // Clean up modal state only on error
+    setIsStartingSession(false);
+    setShowConfirmModal(false);
+    setShowConflictModal(false);
+    setSelectedRoom(null);
   };
 
   // Handle conflict modal cancel
   const handleConflictCancel = () => {
+    sessionRequestTrackerRef.current.invalidate();
+    sessionStartInFlightRef.current = false;
     setShowConflictModal(false);
     setIsStartingSession(false);
     setShowConfirmModal(false);
@@ -853,7 +381,7 @@ function RoomSelectionPage() {
   return (
     <>
       <SelectionPageLayout
-        title="Wo machen wir das?"
+        title={texts.title}
         onBack={handleGoBack}
         isLoading={isLoading}
         error={error}
@@ -889,7 +417,7 @@ function RoomSelectionPage() {
                 textAlign: 'center',
               }}
             >
-              Keine Räume verfügbar
+              {texts.noRoomsHeading}
             </div>
             <div
               style={{
@@ -898,7 +426,7 @@ function RoomSelectionPage() {
                 textAlign: 'center',
               }}
             >
-              Es sind derzeit keine Räume für die Auswahl verfügbar.
+              {texts.noRoomsHint}
             </div>
           </div>
         ) : (
@@ -913,7 +441,7 @@ function RoomSelectionPage() {
                   colorType="room"
                   isSelected={selectedRoom?.id === room.id}
                   isDisabled={room.is_occupied}
-                  badge={room.capacity ? `${room.capacity} Plätze` : undefined}
+                  badge={room.capacity ? texts.capacityBadge(room.capacity) : undefined}
                   onClick={() => handleRoomSelect(room)}
                 />
               )}

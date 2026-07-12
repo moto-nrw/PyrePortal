@@ -51,19 +51,6 @@ describe('BrowserAdapter', () => {
     });
   });
 
-  describe('recoverScanner', () => {
-    it('resolves without error (no-op)', async () => {
-      await expect(adapter.recoverScanner()).resolves.toBeUndefined();
-    });
-  });
-
-  describe('getScannerStatus', () => {
-    it('returns always available', async () => {
-      const status = await adapter.getScannerStatus();
-      expect(status).toEqual({ is_available: true });
-    });
-  });
-
   describe('loadConfig', () => {
     it('resolves without error (no-op)', async () => {
       await expect(adapter.loadConfig()).resolves.toBeUndefined();
@@ -148,13 +135,6 @@ describe('BrowserAdapter', () => {
   describe('restartApp', () => {
     it('resolves without error', async () => {
       await expect(adapter.restartApp()).resolves.toBeUndefined();
-    });
-  });
-
-  describe('getDeviceInfo', () => {
-    it('returns browser platform with dev version', () => {
-      const info = adapter.getDeviceInfo();
-      expect(info).toEqual({ platform: 'browser', version: 'dev' });
     });
   });
 });

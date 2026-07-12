@@ -1,89 +1,41 @@
 /**
- * Tauri Platform Adapter (stub)
+ * Tauri Platform Adapter
  *
- * Re-exports will delegate to safeInvoke + Tauri event API.
- * For now, this is a skeleton that satisfies the interface.
- * Actual implementation happens in Phase 1-4.
+ * Backs the local Mac/mock app only. Scanning is mock-based and handled
+ * entirely in the frontend (useRfidScanning hook + src/dev/mockScanSource),
+ * so the RFID methods are no-ops. Config, session persistence, logging and
+ * restart delegate to the Rust backend via safeInvoke.
  */
 
 import type { SessionSettings } from '../../services/sessionStorage';
-import { safeInvoke } from '../../utils/tauriContext';
 import type { NfcScanEvent, PlatformAdapter } from '../adapter';
+
+import { safeInvoke } from './tauriContext';
 
 class TauriAdapter implements PlatformAdapter {
   readonly platform = 'tauri' as const;
   private config: { api_base_url: string; device_api_key: string } | null = null;
 
   async initializeNfc(): Promise<void> {
-    await safeInvoke('initialize_rfid_service');
+    // No-op — mock scanning is handled directly in the useRfidScanning hook
   }
 
-  private unlisten: (() => void) | null = null;
-
-  async startScanning(onScan: (event: NfcScanEvent) => void): Promise<void> {
-    // Clean up previous listener first (post-mortem #13: prevent duplicates)
-    if (this.unlisten) {
-      this.unlisten();
-      this.unlisten = null;
-    }
-
-    // Set up listener BEFORE starting service (post-mortem #6: don't miss first scan)
-    const { listen } = await import('@tauri-apps/api/event');
-    this.unlisten = await listen<{ tag_id: string; scan_id: number }>('rfid-scan', event => {
-      onScan({
-        tagId: event.payload.tag_id,
-        scanId: event.payload.scan_id,
-      });
-    });
-
-    try {
-      await safeInvoke('start_rfid_service');
-    } catch (error) {
-      // Clean up listener if service start fails (post-mortem #12)
-      if (this.unlisten) {
-        this.unlisten();
-        this.unlisten = null;
-      }
-      throw error;
-    }
+  async startScanning(_onScan: (event: NfcScanEvent) => void): Promise<void> {
+    // No-op — mock scanning is handled directly in the useRfidScanning hook
   }
 
   async stopScanning(): Promise<void> {
-    try {
-      await safeInvoke('stop_rfid_service');
-    } finally {
-      // Always clean up listener even on failure (post-mortem #7)
-      if (this.unlisten) {
-        this.unlisten();
-        this.unlisten = null;
-      }
-    }
+    // No-op — mock scanning is handled directly in the useRfidScanning hook
   }
 
   async getServiceStatus(): Promise<{ is_running: boolean }> {
-    return await safeInvoke<{ is_running: boolean }>('get_rfid_service_status');
+    return { is_running: false };
   }
 
   async scanSingleTag(
-    timeoutMs: number
+    _timeoutMs: number
   ): Promise<{ success: boolean; tag_id?: string; error?: string }> {
-    return await safeInvoke<{ success: boolean; tag_id?: string; error?: string }>(
-      'scan_rfid_single',
-      { timeout_ms: timeoutMs }
-    );
-  }
-
-  async recoverScanner(): Promise<void> {
-    await safeInvoke('recover_rfid_scanner');
-  }
-
-  async getScannerStatus(): Promise<{
-    is_available: boolean;
-    last_error?: string;
-  }> {
-    return await safeInvoke<{ is_available: boolean; last_error?: string }>(
-      'get_rfid_scanner_status'
-    );
+    return { success: true, tag_id: '04:D6:94:82:97:6A:80' };
   }
 
   async loadConfig(): Promise<void> {
@@ -120,10 +72,6 @@ class TauriAdapter implements PlatformAdapter {
 
   async restartApp(): Promise<void> {
     await safeInvoke('restart_app');
-  }
-
-  getDeviceInfo(): { platform: 'tauri'; version: string } {
-    return { platform: this.platform, version: __APP_VERSION__ };
   }
 }
 

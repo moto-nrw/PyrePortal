@@ -1,13 +1,12 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { isRfidEnabled } from '../utils/tauriContext';
-
 import { RfidServiceInitializer } from './RfidServiceInitializer';
 
 // Mock the platform adapter
 vi.mock('@platform', () => ({
   adapter: {
+    platform: 'browser',
     initializeNfc: vi.fn(),
   },
 }));
@@ -15,10 +14,12 @@ vi.mock('@platform', () => ({
 const { adapter } = await import('@platform');
 const mockInitializeNfc = vi.mocked(adapter.initializeNfc);
 
-const mockIsRfidEnabled = vi.mocked(isRfidEnabled);
+const setPlatform = (platform: string) => {
+  (adapter as unknown as Record<string, unknown>).platform = platform;
+};
 
 beforeEach(() => {
-  mockIsRfidEnabled.mockReturnValue(false);
+  setPlatform('browser');
   mockInitializeNfc.mockResolvedValue(undefined);
 });
 
@@ -28,8 +29,8 @@ describe('RfidServiceInitializer', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('calls adapter.initializeNfc when RFID is enabled', async () => {
-    mockIsRfidEnabled.mockReturnValue(true);
+  it('calls adapter.initializeNfc on GKT (real NFC platform)', async () => {
+    setPlatform('gkt');
     render(<RfidServiceInitializer />);
 
     await vi.waitFor(() => {
@@ -37,8 +38,8 @@ describe('RfidServiceInitializer', () => {
     });
   });
 
-  it('does not call adapter.initializeNfc when RFID is disabled', async () => {
-    mockIsRfidEnabled.mockReturnValue(false);
+  it('does not call adapter.initializeNfc on mock platforms', async () => {
+    setPlatform('browser');
     render(<RfidServiceInitializer />);
 
     // Give useEffect time to run
@@ -48,7 +49,7 @@ describe('RfidServiceInitializer', () => {
   });
 
   it('handles initializeNfc failure gracefully', async () => {
-    mockIsRfidEnabled.mockReturnValue(true);
+    setPlatform('gkt');
     mockInitializeNfc.mockRejectedValueOnce(new Error('init failed'));
 
     // Should not throw

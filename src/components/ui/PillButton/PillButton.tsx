@@ -55,7 +55,6 @@ const secondaryColors = {
 export function PillButton({
   children,
   icon,
-  iconPosition = 'left',
   variant,
   color = 'gray',
   disabled = false,
@@ -119,9 +118,8 @@ export function PillButton({
       onPointerUp={handlePointerUp}
       onPointerLeave={handlePointerUp}
     >
-      {icon && iconPosition === 'left' && icon}
+      {icon}
       <span>{children}</span>
-      {icon && iconPosition === 'right' && icon}
     </button>
   );
 }

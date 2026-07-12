@@ -8,6 +8,11 @@
 
 import type { SessionSettings } from '../../services/sessionStorage';
 import type { NfcScanEvent, PlatformAdapter } from '../adapter';
+import {
+  clearLastSessionFromLocalStorage,
+  loadSessionSettingsFromLocalStorage,
+  saveSessionSettingsToLocalStorage,
+} from '../shared/localStorageSession';
 
 // SYSTEM is a global injected by system.js (loaded in index.html)
 declare const SYSTEM: {
@@ -39,7 +44,12 @@ export function normalizeNfcPayload(
 
   if (typeof payload === 'object' && payload !== null) {
     const obj = payload as Record<string, unknown>;
-    const eventNumber = typeof obj.eventNumber === 'number' ? obj.eventNumber : null;
+    const eventNumber =
+      typeof obj.eventNumber === 'number' &&
+      Number.isSafeInteger(obj.eventNumber) &&
+      obj.eventNumber >= 0
+        ? obj.eventNumber
+        : null;
 
     // Intent-path: {uid: "f0:bc:e8:44", eventSource: "NFC"}
     if (typeof obj.uid === 'string' && obj.uid) {
@@ -66,14 +76,20 @@ class GKTAdapter implements PlatformAdapter {
     // Register NFC callback with system.js — handles all payload shapes.
     // GKT NFC fires once per physical tap (Android intent-based dispatch),
     // unlike MFRC522 which polls continuously. No adapter-level dedup needed —
-    // every callback is a distinct scan. Tauri handles its own dedup in Rust.
+    // every callback is a distinct scan.
     SYSTEM.registerNfc((payload: unknown) => {
       if (!this.scanCallback) return;
 
       const parsed = normalizeNfcPayload(payload);
       if (!parsed) return;
 
-      this.scanCallback({ tagId: parsed.tagId, scanId: ++this.scanCounter });
+      this.scanCallback({
+        tagId: parsed.tagId,
+        // Keep hardware and local identities in separate numeric namespaces.
+        // system.js eventNumber values are non-negative; missing identities use
+        // negative local IDs so the two delivery paths cannot collide.
+        scanId: parsed.eventNumber ?? -++this.scanCounter,
+      });
     });
   }
 
@@ -132,18 +148,6 @@ class GKTAdapter implements PlatformAdapter {
     });
   }
 
-  async recoverScanner(): Promise<void> {
-    // No scanner recovery on GKT — NFC is managed by GKT-Kiosk system
-  }
-
-  async getScannerStatus(): Promise<{
-    is_available: boolean;
-    last_error?: string;
-  }> {
-    // NFC is always available if usbnfc APK is installed
-    return { is_available: true };
-  }
-
   async loadConfig(): Promise<void> {
     // No-op: GKT reads config synchronously from env vars / URL params
   }
@@ -166,16 +170,15 @@ class GKTAdapter implements PlatformAdapter {
   }
 
   async saveSessionSettings(settings: SessionSettings): Promise<void> {
-    localStorage.setItem('pyreportal_session', JSON.stringify(settings));
+    saveSessionSettingsToLocalStorage(settings);
   }
 
   async loadSessionSettings(): Promise<SessionSettings | null> {
-    const data = localStorage.getItem('pyreportal_session');
-    return data ? (JSON.parse(data) as SessionSettings) : null;
+    return loadSessionSettingsFromLocalStorage();
   }
 
   async clearLastSession(): Promise<void> {
-    localStorage.removeItem('pyreportal_session');
+    clearLastSessionFromLocalStorage();
   }
 
   async persistLog(entry: string): Promise<void> {
@@ -193,10 +196,6 @@ class GKTAdapter implements PlatformAdapter {
     } else {
       window.location.reload();
     }
-  }
-
-  getDeviceInfo(): { platform: 'gkt'; version: string } {
-    return { platform: this.platform, version: __APP_VERSION__ };
   }
 }
 

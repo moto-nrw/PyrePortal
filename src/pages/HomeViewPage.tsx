@@ -9,16 +9,48 @@ import { ErrorModal, ModalBase, ModalActionButtons } from '../components/ui';
 import {
   api,
   formatRoomName,
+  getNetworkErrorMessage,
+  isNetworkRelatedError,
   mapServerErrorToGerman,
-  type SessionStartRequest,
   type CurrentSession,
 } from '../services/api';
 import type { SessionSettings } from '../services/sessionStorage';
-import { useUserStore, isNetworkRelatedError } from '../store/userStore';
+import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 
 const logger = createLogger('HomeViewPage');
+
+/** User-facing German UI copy for this page */
+const texts = {
+  recreationErrorFallback: 'Fehler beim Starten der Aktivität',
+  activityFallback: 'Aktivität',
+  repeatSessionHeading: 'Aufsicht wiederholen',
+  startSessionHeading: 'Aufsicht starten',
+  continueSubtitle: 'Fortsetzen',
+  supervisorCountMismatch: (selected: number, saved: number) =>
+    `${selected} Betreuer (gespeichert: ${saved})`,
+  supervisorCount: (count: number) => `${count} Betreuer`,
+  validationFailedFallback:
+    'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.',
+  incompleteSessionDataError:
+    'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.',
+  tagAssignmentButton: 'Armband identifizieren',
+  endSessionButton: 'Aufsicht beenden',
+  logoutButton: 'Abmelden',
+  menuHeading: 'Menü',
+  teamManagementButton: 'Team anpassen',
+  recreationConfirmHeading: 'Aufsicht wiederholen?',
+  roomLabel: 'Raum:',
+  supervisorsLabel: 'Betreuer:',
+  recreationConfirmButton: 'Aufsicht starten',
+  recreationLoadingButton: 'Starte...',
+  endSessionConfirmHeading: 'Aufsicht beenden?',
+  endSessionWarningPrefix: 'Alle Kinder, die in dieser Aufsicht sind, werden auf den Status',
+  endSessionWarningHighlight: 'unterwegs',
+  endSessionWarningSuffix: 'umgestellt.',
+  endSessionConfirmButton: 'Ja, beenden',
+} as const;
 
 // ============================================================================
 // Pure helper functions (moved outside component to reduce cognitive complexity)
@@ -26,9 +58,9 @@ const logger = createLogger('HomeViewPage');
 
 /** Format session recreation error message for display */
 function formatRecreationError(error: unknown): string {
-  const rawMessage = error instanceof Error ? error.message : 'Fehler beim Starten der Aktivität';
+  const rawMessage = error instanceof Error ? error.message : texts.recreationErrorFallback;
   return isNetworkRelatedError(error)
-    ? 'Netzwerkfehler beim Starten der Aktivität. Bitte Verbindung prüfen und erneut versuchen.'
+    ? getNetworkErrorMessage('sessionStart')
     : mapServerErrorToGerman(rawMessage);
 }
 
@@ -78,12 +110,12 @@ function getActivityHeading(
   sessionSettings: SessionSettings | null
 ): string {
   if (currentSession) {
-    return currentSession.activity_name ?? 'Aktivität';
+    return currentSession.activity_name ?? texts.activityFallback;
   }
   if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return 'Aufsicht wiederholen';
+    return texts.repeatSessionHeading;
   }
-  return 'Aufsicht starten';
+  return texts.startSessionHeading;
 }
 
 /** Get activity subtitle text based on session state */
@@ -92,7 +124,7 @@ function getActivitySubtitle(
   sessionSettings: SessionSettings | null
 ): string {
   if (currentSession) {
-    return 'Fortsetzen';
+    return texts.continueSubtitle;
   }
   if (sessionSettings?.use_last_session && sessionSettings.last_session) {
     return sessionSettings.last_session.activity_name;
@@ -111,12 +143,12 @@ function getSupervisorCountLabel(
   const savedCount = sessionSettings.last_session.supervisor_names.length;
 
   if (selectedSupervisorsCount > 0 && selectedSupervisorsCount !== savedCount) {
-    return `${selectedSupervisorsCount} Betreuer (gespeichert: ${savedCount})`;
+    return texts.supervisorCountMismatch(selectedSupervisorsCount, savedCount);
   }
   if (selectedSupervisorsCount > 0) {
-    return `${selectedSupervisorsCount} Betreuer`;
+    return texts.supervisorCount(selectedSupervisorsCount);
   }
-  return `${savedCount} Betreuer`;
+  return texts.supervisorCount(savedCount);
 }
 
 // ============================================================================
@@ -134,6 +166,8 @@ function HomeViewPage() {
     loadSessionSettings,
     validateAndRecreateSession,
     isValidatingLastSession,
+    recreateSession,
+    invalidateSessionRecreation,
   } = useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
@@ -142,14 +176,15 @@ function HomeViewPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
-  const recreationRequestIdRef = useRef(0);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      invalidateSessionRecreation();
     };
-  }, []);
+  }, [invalidateSessionRecreation]);
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -165,7 +200,7 @@ function HomeViewPage() {
 
   // Helper to perform user logout
   const performLogout = async () => {
-    recreationRequestIdRef.current += 1;
+    invalidateSessionRecreation();
     setIsNavigatingToScanning(false);
     logUserAction('User logout initiated');
     await logout();
@@ -175,6 +210,7 @@ function HomeViewPage() {
 
   const handleLogout = async () => {
     setTouchedButton(null);
+    if (isValidatingLastSession) return;
     if (currentSession) {
       setShowEndSessionModal(true);
     } else {
@@ -196,16 +232,18 @@ function HomeViewPage() {
   // Helper to handle last session recreation attempt
   const attemptSessionRecreation = async () => {
     logUserAction('Attempting to recreate last session');
-    const success = await validateAndRecreateSession();
+    const outcome = await validateAndRecreateSession();
 
-    if (success) {
+    if (!isMountedRef.current || outcome.status === 'stale') {
+      return;
+    }
+
+    if (outcome.status === 'success') {
       setShowConfirmModal(true);
       return;
     }
 
-    const latestError =
-      useUserStore.getState().error ??
-      'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.';
+    const latestError = useUserStore.getState().error ?? texts.validationFailedFallback;
     setErrorMessage(latestError);
     setShowErrorModal(true);
     setShowConfirmModal(false);
@@ -247,75 +285,42 @@ function HomeViewPage() {
 
   const handleConfirmRecreation = async () => {
     if (!authenticatedUser || !sessionSettings?.last_session) return;
+    // Only one recreation request may be in flight; a duplicate submit would
+    // mark the first request stale and then fail with a 409 conflict.
+    if (isNavigatingToScanning) return;
 
-    const recreationRequestId = recreationRequestIdRef.current + 1;
-    recreationRequestIdRef.current = recreationRequestId;
+    setIsNavigatingToScanning(true);
+    const outcome = await recreateSession();
 
-    const { selectedActivity, selectedRoom, selectedSupervisors } = useUserStore.getState();
-
-    // Validate session data is complete
-    if (!selectedActivity || !selectedRoom || selectedSupervisors.length === 0) {
-      showRecreationError(
-        'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.'
-      );
+    if (outcome.status === 'incomplete') {
+      setIsNavigatingToScanning(false);
+      showRecreationError(texts.incompleteSessionDataError);
       return;
     }
 
-    logUserAction('Confirming session recreation', {
-      activityId: selectedActivity.id,
-      roomId: selectedRoom.id,
-      supervisorCount: selectedSupervisors.length,
-    });
-
-    try {
-      setIsNavigatingToScanning(true);
-
-      const sessionRequest: SessionStartRequest = {
-        activity_id: selectedActivity.id,
-        room_id: selectedRoom.id,
-        supervisor_ids: selectedSupervisors.map(s => s.id),
-      };
-
-      const sessionResponse = await api.startSession(authenticatedUser.pin, sessionRequest);
-
-      logUserAction('Session recreated successfully', {
-        sessionId: sessionResponse.active_group_id,
-      });
-
-      // Set current session directly from start response + local state
-      // instead of making a redundant GET /api/iot/session/current round-trip
-      const newSession: CurrentSession = {
-        active_group_id: sessionResponse.active_group_id,
-        activity_id: sessionResponse.activity_id,
-        activity_name: selectedActivity.name,
-        room_id: selectedRoom.id,
-        room_name: selectedRoom.name,
-        device_id: sessionResponse.device_id,
-        start_time: sessionResponse.start_time,
-        duration: '0s',
-        is_active: true,
-        active_students: 0,
-        supervisors: sessionResponse.supervisors,
-      };
-
-      useUserStore.setState({ currentSession: newSession });
-
-      await useUserStore.getState().saveLastSessionData();
-
-      logNavigation('Home View', '/nfc-scanning');
-      void navigate('/nfc-scanning');
-    } catch (error) {
-      if (!isMountedRef.current || recreationRequestId !== recreationRequestIdRef.current) {
+    if (outcome.status === 'error') {
+      // Stale responses (superseded attempt or logout) are discarded
+      if (!isMountedRef.current || outcome.stale) {
         return;
       }
-
       setIsNavigatingToScanning(false);
-      showRecreationError(formatRecreationError(error));
-    } finally {
-      if (isMountedRef.current && recreationRequestId === recreationRequestIdRef.current) {
-        setShowConfirmModal(false);
-      }
+      showRecreationError(formatRecreationError(outcome.error));
+      return;
     }
+
+    // Stale responses (superseded attempt or logout) are discarded
+    if (!isMountedRef.current || outcome.stale) {
+      return;
+    }
+
+    logUserAction('Session recreated successfully', {
+      sessionId: outcome.session.active_group_id,
+    });
+
+    logNavigation('Home View', '/nfc-scanning');
+    void navigate('/nfc-scanning');
+
+    setShowConfirmModal(false);
   };
 
   // Redirect to login if no authenticated user and fetch current session
@@ -336,9 +341,6 @@ function HomeViewPage() {
   if (!authenticatedUser) {
     return null; // Will redirect via useEffect
   }
-
-  // Extract first name from full name (unused for now)
-  // const firstName = authenticatedUser.staffName.split(' ')[0];
 
   return (
     <BackgroundWrapper>
@@ -391,7 +393,7 @@ function HomeViewPage() {
                 color: '#5080D8',
               }}
             >
-              Armband identifizieren
+              {texts.tagAssignmentButton}
             </span>
           </button>
         </div>
@@ -408,7 +410,10 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleLogout}
-            onTouchStart={() => setTouchedButton('logout')}
+            disabled={isValidatingLastSession}
+            onTouchStart={() => {
+              if (!isValidatingLastSession) setTouchedButton('logout');
+            }}
             onTouchEnd={() => setTouchedButton(null)}
             onTouchCancel={() => setTouchedButton(null)}
             onPointerLeave={() =>
@@ -427,13 +432,14 @@ function HomeViewPage() {
                   : designSystem.glass.background,
               border: '1px solid rgba(255, 49, 48, 0.2)',
               borderRadius: '34px',
-              cursor: 'pointer',
+              cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
               boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
               transform: touchedButton === 'logout' ? designSystem.scales.activeSmall : 'scale(1)',
+              opacity: isValidatingLastSession ? 0.6 : 1,
             }}
           >
             <svg
@@ -457,7 +463,9 @@ function HomeViewPage() {
                 color: '#FF3130',
               }}
             >
-              {currentSession && !isNavigatingToScanning ? 'Aufsicht beenden' : 'Abmelden'}
+              {currentSession && !isNavigatingToScanning
+                ? texts.endSessionButton
+                : texts.logoutButton}
             </span>
           </button>
         </div>
@@ -479,7 +487,7 @@ function HomeViewPage() {
               lineHeight: 1.2,
             }}
           >
-            Menü
+            {texts.menuHeading}
           </h1>
         </div>
 
@@ -711,7 +719,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    Team anpassen
+                    {texts.teamManagementButton}
                   </h3>
                 </div>
               </button>
@@ -754,7 +762,7 @@ function HomeViewPage() {
         onClose={() => setShowConfirmModal(false)}
         size="sm"
         backgroundColor="#FFFFFF"
-        closeOnBackdropClick={!isValidatingLastSession}
+        closeOnBackdropClick={!isValidatingLastSession && !isNavigatingToScanning}
       >
         {/* Success Icon */}
         <div
@@ -790,7 +798,7 @@ function HomeViewPage() {
             marginBottom: '12px',
           }}
         >
-          Aufsicht wiederholen?
+          {texts.recreationConfirmHeading}
         </h2>
 
         {/* Activity Details */}
@@ -816,7 +824,7 @@ function HomeViewPage() {
               }}
             >
               <div style={{ marginBottom: '8px' }}>
-                <span style={{ color: '#6B7280', fontSize: '14px' }}>Raum:</span>
+                <span style={{ color: '#6B7280', fontSize: '14px' }}>{texts.roomLabel}</span>
                 <span
                   style={{
                     color: '#1F2937',
@@ -829,7 +837,7 @@ function HomeViewPage() {
                 </span>
               </div>
               <div>
-                <span style={{ color: '#6B7280', fontSize: '14px' }}>Betreuer:</span>
+                <span style={{ color: '#6B7280', fontSize: '14px' }}>{texts.supervisorsLabel}</span>
                 <span
                   style={{
                     color: '#1F2937',
@@ -851,9 +859,9 @@ function HomeViewPage() {
         <ModalActionButtons
           onCancel={() => setShowConfirmModal(false)}
           onConfirm={handleConfirmRecreation}
-          isLoading={isValidatingLastSession}
-          confirmLabel="Aufsicht starten"
-          loadingLabel="Starte..."
+          isLoading={isValidatingLastSession || isNavigatingToScanning}
+          confirmLabel={texts.recreationConfirmButton}
+          loadingLabel={texts.recreationLoadingButton}
           confirmGradient="linear-gradient(to right, #83CD2D, #70B525)"
         />
       </ModalBase>
@@ -874,7 +882,7 @@ function HomeViewPage() {
             marginBottom: '16px',
           }}
         >
-          Aufsicht beenden?
+          {texts.endSessionConfirmHeading}
         </h2>
 
         {/* Warning Text */}
@@ -886,14 +894,15 @@ function HomeViewPage() {
             lineHeight: 1.5,
           }}
         >
-          Alle Kinder, die in dieser Aufsicht sind, werden auf den Status{' '}
-          <strong style={{ color: '#D97706' }}>unterwegs</strong> umgestellt.
+          {texts.endSessionWarningPrefix}{' '}
+          <strong style={{ color: '#D97706' }}>{texts.endSessionWarningHighlight}</strong>{' '}
+          {texts.endSessionWarningSuffix}
         </p>
 
         <ModalActionButtons
           onCancel={() => setShowEndSessionModal(false)}
           onConfirm={handleConfirmEndSession}
-          confirmLabel="Ja, beenden"
+          confirmLabel={texts.endSessionConfirmButton}
           confirmGradient="linear-gradient(to right, #EF4444, #DC2626)"
           confirmShadow="0 4px 14px 0 rgba(239, 68, 68, 0.4)"
         />
