@@ -38,9 +38,24 @@ export const pickRandomMockTag = (): string => {
  * running (see `isMockScanSourceRunning`).
  */
 export const startMockScanSource = (onScan: (event: NfcScanEvent) => void): void => {
+  // Dev/test hook: lets Playwright (screenshot tooling) trigger a scan with an
+  // exact tag immediately instead of waiting for the random interval.
+  if (import.meta.env.DEV) {
+    (window as unknown as Record<string, unknown>).__PYREPORTAL_MOCK_SCAN__ = (tagId: string) => {
+      const scanId = ++mockScanCounter;
+      logger.info('Mock RFID scan injected', { tagId, scanId, platform: 'Injected' });
+      onScan({ tagId, scanId });
+    };
+  }
+
   // Generate mock scans every 3-5 seconds
   mockScanInterval = setInterval(
     () => {
+      // Dev/test hook: suppress random scans so injected scans stay deterministic
+      if ((window as unknown as Record<string, unknown>).__PYREPORTAL_DISABLE_AUTOSCAN__) {
+        return;
+      }
+
       const mockTagId = pickRandomMockTag();
       const scanId = ++mockScanCounter;
 
@@ -61,6 +76,9 @@ export const stopMockScanSource = (): void => {
   if (mockScanInterval) {
     clearInterval(mockScanInterval);
     mockScanInterval = null;
+  }
+  if (import.meta.env.DEV) {
+    delete (window as unknown as Record<string, unknown>).__PYREPORTAL_MOCK_SCAN__;
   }
 };
 
