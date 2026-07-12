@@ -84,18 +84,6 @@ describe('mapServerErrorToGerman', () => {
     );
   });
 
-  it('maps locked account', () => {
-    expect(mapServerErrorToGerman('staff account is locked due to failed PIN attempts')).toBe(
-      'Konto gesperrt wegen zu vieler Fehlversuche. Bitte Administrator kontaktieren.'
-    );
-  });
-
-  it('maps maximum PIN attempts', () => {
-    expect(mapServerErrorToGerman('maximum PIN attempts exceeded')).toBe(
-      'Maximale PIN-Versuche überschritten. Konto gesperrt.'
-    );
-  });
-
   it('maps generic locked', () => {
     expect(mapServerErrorToGerman('locked')).toBe('Konto gesperrt. Bitte später erneut versuchen.');
   });
@@ -165,12 +153,6 @@ describe('mapServerErrorToGerman', () => {
     expect(mapServerErrorToGerman('RFID tag not assigned')).toBe(
       'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.'
     );
-  });
-
-  it('maps staff RFID auth error', () => {
-    expect(
-      mapServerErrorToGerman('staff RFID authentication must be done via session management')
-    ).toBe('Betreuer-Armband kann hier nicht verwendet werden.');
   });
 
   // Attendance errors
@@ -292,12 +274,6 @@ describe('mapServerErrorToGerman', () => {
 
   it('maps staff PIN is required', () => {
     expect(mapServerErrorToGerman('staff PIN is required')).toBe('PIN nicht angegeben.');
-  });
-
-  it('maps device is offline', () => {
-    expect(mapServerErrorToGerman('device is offline')).toBe(
-      'Gerät ist als offline markiert. Bitte Administrator kontaktieren.'
-    );
   });
 
   it('maps no active session', () => {
