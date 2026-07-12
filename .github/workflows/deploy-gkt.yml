@@ -10,11 +10,15 @@ defaults:
   run:
     shell: bash
 
+concurrency:
+  group: deploy-gkt-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       pull-requests: read
     env:
       API_URL: ${{ github.ref == 'refs/heads/main' && vars.GKT_PROD_API_URL || vars.GKT_STAGING_API_URL }}
@@ -28,6 +32,32 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: 22
+
+      - name: Prepare GitHub release
+        if: github.ref == 'refs/heads/main'
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          VERSION=$(node -p "require('./package.json').version")
+          TAG="v${VERSION}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+          if TARGET=$(gh release view "$TAG" --json targetCommitish --jq '.targetCommitish' 2>/dev/null); then
+            if [ "$TARGET" != "${{ github.sha }}" ]; then
+              echo "::error::Release $TAG already targets $TARGET, not ${{ github.sha }}"
+              exit 1
+            fi
+
+            echo "Release $TAG already targets this commit; treating this run as a retry."
+            echo "create=false" >> "$GITHUB_OUTPUT"
+          else
+            # Distinguish a missing release from an authentication/API failure.
+            gh api "repos/${{ github.repository }}" --silent
+            echo "create=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install pnpm
         uses: pnpm/action-setup@v6
@@ -68,6 +98,16 @@ jobs:
       - name: Cleanup secrets
         if: always()
         run: rm -f ~/.ssh/deploy_key
+
+      - name: Create GitHub release
+        if: github.ref == 'refs/heads/main' && steps.release.outputs.create == 'true' && steps.deploy.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.release.outputs.tag }}" \
+            --target "${{ github.sha }}" \
+            --title "${{ steps.release.outputs.tag }}" \
+            --generate-notes
 
       - name: Notify Slack
         if: always() && steps.deploy.outcome != 'skipped'

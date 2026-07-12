@@ -179,10 +179,12 @@ function HomeViewPage() {
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
+      invalidateSessionRecreation();
     };
-  }, []);
+  }, [invalidateSessionRecreation]);
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -208,6 +210,7 @@ function HomeViewPage() {
 
   const handleLogout = async () => {
     setTouchedButton(null);
+    if (isValidatingLastSession) return;
     if (currentSession) {
       setShowEndSessionModal(true);
     } else {
@@ -229,9 +232,13 @@ function HomeViewPage() {
   // Helper to handle last session recreation attempt
   const attemptSessionRecreation = async () => {
     logUserAction('Attempting to recreate last session');
-    const success = await validateAndRecreateSession();
+    const outcome = await validateAndRecreateSession();
 
-    if (success) {
+    if (!isMountedRef.current || outcome.status === 'stale') {
+      return;
+    }
+
+    if (outcome.status === 'success') {
       setShowConfirmModal(true);
       return;
     }
@@ -403,7 +410,10 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleLogout}
-            onTouchStart={() => setTouchedButton('logout')}
+            disabled={isValidatingLastSession}
+            onTouchStart={() => {
+              if (!isValidatingLastSession) setTouchedButton('logout');
+            }}
             onTouchEnd={() => setTouchedButton(null)}
             onTouchCancel={() => setTouchedButton(null)}
             onPointerLeave={() =>
@@ -422,13 +432,14 @@ function HomeViewPage() {
                   : designSystem.glass.background,
               border: '1px solid rgba(255, 49, 48, 0.2)',
               borderRadius: '34px',
-              cursor: 'pointer',
+              cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
               boxShadow: designSystem.shadows.button,
               backdropFilter: designSystem.glass.blur,
               WebkitBackdropFilter: designSystem.glass.blur,
               transform: touchedButton === 'logout' ? designSystem.scales.activeSmall : 'scale(1)',
+              opacity: isValidatingLastSession ? 0.6 : 1,
             }}
           >
             <svg

@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { api, ApiError, type ActivityResponse, type Room } from './api';
 import {
   buildSessionFromStartResponse,
-  createRecreationRequestTracker,
+  createSessionRequestTracker,
   isSessionConflictError,
   recreateSession,
   startSessionWithConflictHandling,
@@ -170,9 +170,9 @@ describe('recreateSession', () => {
   });
 });
 
-describe('createRecreationRequestTracker', () => {
+describe('createSessionRequestTracker', () => {
   it('marks only the latest request id as current', () => {
-    const tracker = createRecreationRequestTracker();
+    const tracker = createSessionRequestTracker();
     const first = tracker.begin();
     expect(tracker.isCurrent(first)).toBe(true);
 
@@ -182,7 +182,7 @@ describe('createRecreationRequestTracker', () => {
   });
 
   it('invalidate makes all in-flight request ids stale', () => {
-    const tracker = createRecreationRequestTracker();
+    const tracker = createSessionRequestTracker();
     const requestId = tracker.begin();
     tracker.invalidate();
     expect(tracker.isCurrent(requestId)).toBe(false);

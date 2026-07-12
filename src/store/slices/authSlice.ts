@@ -83,6 +83,9 @@ export const createAuthSlice = (set: SetState<UserState>, get: GetState<UserStat
   },
 
   logout: async () => {
+    // Invalidate validation/recreation before awaiting any network request so
+    // stale responses cannot repopulate state after logout.
+    get().invalidateSessionRecreation();
     const { authenticatedUser, currentSession } = get();
 
     // End current session if exists and user is authenticated
@@ -109,6 +112,7 @@ export const createAuthSlice = (set: SetState<UserState>, get: GetState<UserStat
       currentSession: null,
       selectedSupervisors: [],
       activeSupervisorTags: new Set<string>(),
+      isValidatingLastSession: false,
     });
   },
 });

@@ -51,7 +51,7 @@ export const useRfidScanning = () => {
   const isInitializedRef = useRef<boolean>(false);
   const isServiceStartedRef = useRef<boolean>(false);
   const scannedSupervisorsRef = useRef<Set<number>>(new Set());
-  const processedScanIdsRef = useRef<Map<number, number>>(new Map());
+  const processedScanIdsRef = useRef<Map<string, number>>(new Map());
 
   const showSupervisorRedirect = useCallback(() => {
     setScanResult(createSupervisorRedirectResult());
@@ -282,6 +282,7 @@ export const useRfidScanning = () => {
   const onAdapterScan = useCallback(
     (event: NfcScanEvent) => {
       const { tagId, scanId } = event;
+      const scanKey = `${tagId}:${scanId}`;
       const now = Date.now();
       const processedScanIds = processedScanIdsRef.current;
 
@@ -291,7 +292,7 @@ export const useRfidScanning = () => {
         }
       });
 
-      if (processedScanIds.has(scanId)) {
+      if (processedScanIds.has(scanKey)) {
         logger.debug('RFID scan event already handled, skipping duplicate delivery', {
           tagId,
           scanId,
@@ -299,7 +300,7 @@ export const useRfidScanning = () => {
         return;
       }
 
-      processedScanIds.set(scanId, now);
+      processedScanIds.set(scanKey, now);
 
       logger.info('RFID scan event received', { tagId, scanId });
       void processScan(tagId);

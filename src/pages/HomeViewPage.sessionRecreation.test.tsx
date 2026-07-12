@@ -114,7 +114,7 @@ describe('HomeViewPage session recreation behavior', () => {
       fetchCurrentSession: vi.fn(() => Promise.resolve()),
       loadSessionSettings: vi.fn(() => Promise.resolve()),
       logout: vi.fn(() => Promise.resolve()),
-      validateAndRecreateSession: vi.fn(() => Promise.resolve(true)),
+      validateAndRecreateSession: vi.fn(() => Promise.resolve({ status: 'success' as const })),
       saveLastSessionData: vi.fn(() => Promise.resolve()),
     });
   });

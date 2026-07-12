@@ -39,6 +39,9 @@ export type SessionRecreationOutcome =
   | { status: 'incomplete'; stale: boolean }
   | { status: 'error'; error: unknown; stale: boolean };
 
+export type SessionValidationOutcome =
+  { status: 'success' } | { status: 'error' } | { status: 'stale' };
+
 /**
  * Detect a session conflict (HTTP 409) via ApiError.statusCode with the
  * historical message-string check as fallback.
@@ -131,8 +134,8 @@ export async function recreateSession(params: {
   return { status: 'error', error: outcome.error };
 }
 
-export interface RecreationRequestTracker {
-  /** Register a new recreation attempt and return its request id */
+export interface SessionRequestTracker {
+  /** Register a new session operation and return its request id */
   begin(): number;
   /** True while the given request id is still the latest attempt */
   isCurrent(requestId: number): boolean;
@@ -141,11 +144,11 @@ export interface RecreationRequestTracker {
 }
 
 /**
- * Race guard for session recreation: each attempt gets a monotonically
+ * Race guard for asynchronous session operations: each attempt gets a monotonically
  * increasing request id; responses whose id is no longer current are stale
  * and must be discarded by the caller.
  */
-export function createRecreationRequestTracker(): RecreationRequestTracker {
+export function createSessionRequestTracker(): SessionRequestTracker {
   let latestRequestId = 0;
   return {
     begin: () => {

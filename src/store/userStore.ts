@@ -7,7 +7,10 @@ import {
   type RfidScanResult,
   type DailyFeedbackRating,
 } from '../services/api';
-import type { SessionRecreationOutcome } from '../services/sessionService';
+import type {
+  SessionRecreationOutcome,
+  SessionValidationOutcome,
+} from '../services/sessionService';
 import { type SessionSettings } from '../services/sessionStorage';
 import type { NetworkStatusData } from '../types/network';
 import { LogLevel } from '../utils/logger';
@@ -97,7 +100,7 @@ export interface UserState {
   loadSessionSettings: () => Promise<void>;
   toggleUseLastSession: (enabled: boolean) => Promise<void>;
   saveLastSessionData: () => Promise<void>;
-  validateAndRecreateSession: () => Promise<boolean>;
+  validateAndRecreateSession: () => Promise<SessionValidationOutcome>;
   recreateSession: () => Promise<SessionRecreationOutcome>;
   invalidateSessionRecreation: () => void;
 

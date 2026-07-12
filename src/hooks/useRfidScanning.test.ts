@@ -1572,6 +1572,44 @@ describe('useRfidScanning', () => {
 
       expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
     });
+
+    it('processes different tags that share the same numeric scanId', async () => {
+      setRealScanning();
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
+      mockAdapterStartScanning.mockImplementation(async onScan => {
+        capturedOnScan = onScan;
+      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await act(async () => {
+        capturedOnScan!({ tagId: '04:AA:BB:CC:DD:EE:FF', scanId: 404 });
+        capturedOnScan!({ tagId: '04:11:22:33:44:55:66', scanId: 404 });
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(2);
+      expect(mockedProcessRfidScan).toHaveBeenCalledWith(
+        expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
+        '1234'
+      );
+      expect(mockedProcessRfidScan).toHaveBeenCalledWith(
+        expect.objectContaining({ student_rfid: '04:11:22:33:44:55:66' }),
+        '1234'
+      );
+    });
   });
 
   // ------------------------------------------------------------------

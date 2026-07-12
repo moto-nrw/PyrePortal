@@ -18,7 +18,10 @@ import {
   type Room,
   type CurrentSession,
 } from '../services/api';
-import { startSessionWithConflictHandling } from '../services/sessionService';
+import {
+  createSessionRequestTracker,
+  startSessionWithConflictHandling,
+} from '../services/sessionService';
 import { useUserStore } from '../store/userStore';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
@@ -31,6 +34,10 @@ const texts = {
   noRoomsHint: 'Es sind derzeit keine Räume für die Auswahl verfügbar.',
   capacityBadge: (capacity: number) => `${capacity} Plätze`,
 } as const;
+
+type SessionAttemptUser = NonNullable<
+  ReturnType<typeof useUserStore.getState>['authenticatedUser']
+>;
 
 function RoomSelectionPage() {
   const {
@@ -54,6 +61,27 @@ function RoomSelectionPage() {
   const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
   const navigate = useNavigate();
   const fetchedRef = useRef(false);
+  const isMountedRef = useRef(true);
+  const sessionStartInFlightRef = useRef(false);
+  const sessionRequestTrackerRef = useRef(createSessionRequestTracker());
+
+  const isSessionAttemptCurrent = useCallback((requestId: number, user: SessionAttemptUser) => {
+    return (
+      isMountedRef.current &&
+      sessionRequestTrackerRef.current.isCurrent(requestId) &&
+      useUserStore.getState().authenticatedUser === user
+    );
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    const tracker = sessionRequestTrackerRef.current;
+    return () => {
+      isMountedRef.current = false;
+      sessionStartInFlightRef.current = false;
+      tracker.invalidate();
+    };
+  }, []);
 
   // Helper to show error modal with network-aware message
   const showError = useCallback((error: unknown, fallbackMessage: string) => {
@@ -83,6 +111,8 @@ function RoomSelectionPage() {
   // Redirect if missing authentication, selected activity, or supervisors
   useEffect(() => {
     if (!authenticatedUser) {
+      sessionRequestTrackerRef.current.invalidate();
+      sessionStartInFlightRef.current = false;
       logger.warn('Unauthenticated access to RoomSelectionPage');
       logNavigation('RoomSelectionPage', '/');
       void navigate('/');
@@ -90,6 +120,8 @@ function RoomSelectionPage() {
     }
 
     if (!selectedActivity) {
+      sessionRequestTrackerRef.current.invalidate();
+      sessionStartInFlightRef.current = false;
       logger.warn('No activity selected, redirecting to activity selection');
       logNavigation('RoomSelectionPage', '/activity-selection');
       void navigate('/activity-selection');
@@ -97,6 +129,8 @@ function RoomSelectionPage() {
     }
 
     if (!selectedSupervisors || selectedSupervisors.length === 0) {
+      sessionRequestTrackerRef.current.invalidate();
+      sessionStartInFlightRef.current = false;
       logger.warn('No supervisors selected, redirecting to staff selection');
       logNavigation('RoomSelectionPage', '/staff-selection');
       void navigate('/staff-selection');
@@ -130,13 +164,20 @@ function RoomSelectionPage() {
 
   // Shared post-start flow: set session state, save, log, and navigate
   const completeSessionStart = useCallback(
-    async (session: CurrentSession, actionLabel: string) => {
+    async (
+      session: CurrentSession,
+      actionLabel: string,
+      requestId: number,
+      user: SessionAttemptUser
+    ) => {
       if (!selectedActivity || !selectedRoom) return;
+      if (!isSessionAttemptCurrent(requestId, user)) return;
 
       selectRoom(selectedRoom.id);
       setCurrentSession(session);
 
       await saveLastSessionData();
+      if (!isSessionAttemptCurrent(requestId, user)) return;
 
       logUserAction(actionLabel, {
         sessionId: session.active_group_id,
@@ -150,6 +191,7 @@ function RoomSelectionPage() {
       setShowConfirmModal(false);
       setShowConflictModal(false);
       setIsStartingSession(false);
+      sessionStartInFlightRef.current = false;
       setSelectedRoom(null);
 
       logNavigation('RoomSelectionPage', 'NFC-Scanning', {
@@ -160,13 +202,25 @@ function RoomSelectionPage() {
 
       void navigate('/nfc-scanning');
     },
-    [selectedActivity, selectedRoom, selectRoom, setCurrentSession, saveLastSessionData, navigate]
+    [
+      selectedActivity,
+      selectedRoom,
+      selectRoom,
+      setCurrentSession,
+      saveLastSessionData,
+      navigate,
+      isSessionAttemptCurrent,
+    ]
   );
 
   // Handle session start confirmation
   const handleConfirmSession = async () => {
     if (!selectedRoom || !selectedActivity || !authenticatedUser) return;
+    if (sessionStartInFlightRef.current) return;
 
+    const requestId = sessionRequestTrackerRef.current.begin();
+    const attemptUser = authenticatedUser;
+    sessionStartInFlightRef.current = true;
     setIsStartingSession(true);
 
     logger.info('Starting activity session', {
@@ -185,6 +239,11 @@ function RoomSelectionPage() {
       supervisorIds: selectedSupervisors.map(s => s.id),
     });
 
+    if (!isSessionAttemptCurrent(requestId, attemptUser)) {
+      logger.warn('Discarding stale session start result', { status: outcome.status });
+      return;
+    }
+
     if (outcome.status === 'started') {
       performance.mark('session-start-end');
       performance.measure('session-start-duration', 'session-start-begin', 'session-start-end');
@@ -197,7 +256,7 @@ function RoomSelectionPage() {
         duration_ms: measure.duration,
       });
 
-      await completeSessionStart(outcome.session, 'session_started');
+      await completeSessionStart(outcome.session, 'session_started', requestId, attemptUser);
       return;
     }
 
@@ -216,12 +275,14 @@ function RoomSelectionPage() {
 
     if (outcome.status === 'conflict') {
       logger.info('Showing conflict modal due to 409 error');
+      sessionStartInFlightRef.current = false;
       setShowConflictModal(true);
       setIsStartingSession(false);
       return;
     }
 
     showError(error, texts.sessionStartErrorFallback);
+    sessionStartInFlightRef.current = false;
     setIsStartingSession(false);
     setShowConfirmModal(false);
     setSelectedRoom(null);
@@ -230,7 +291,11 @@ function RoomSelectionPage() {
   // Handle force session start from conflict modal
   const handleForceSessionStart = async () => {
     if (!selectedRoom || !selectedActivity || !authenticatedUser) return;
+    if (sessionStartInFlightRef.current) return;
 
+    const requestId = sessionRequestTrackerRef.current.begin();
+    const attemptUser = authenticatedUser;
+    sessionStartInFlightRef.current = true;
     setIsStartingSession(true);
 
     logger.info('Retrying session start with force=true', {
@@ -246,6 +311,11 @@ function RoomSelectionPage() {
       force: true,
     });
 
+    if (!isSessionAttemptCurrent(requestId, attemptUser)) {
+      logger.warn('Discarding stale forced session start result', { status: outcome.status });
+      return;
+    }
+
     if (outcome.status === 'started') {
       logger.info('Session started successfully with force override', {
         sessionId: outcome.response.active_group_id,
@@ -253,7 +323,7 @@ function RoomSelectionPage() {
         deviceId: outcome.response.device_id,
       });
 
-      await completeSessionStart(outcome.session, 'session_started_force');
+      await completeSessionStart(outcome.session, 'session_started_force', requestId, attemptUser);
       return;
     }
 
@@ -266,6 +336,7 @@ function RoomSelectionPage() {
       roomId: selectedRoom.id,
     });
     showError(forceError, texts.sessionOverrideErrorFallback);
+    sessionStartInFlightRef.current = false;
     // Clean up modal state only on error
     setIsStartingSession(false);
     setShowConfirmModal(false);
@@ -275,6 +346,8 @@ function RoomSelectionPage() {
 
   // Handle conflict modal cancel
   const handleConflictCancel = () => {
+    sessionRequestTrackerRef.current.invalidate();
+    sessionStartInFlightRef.current = false;
     setShowConflictModal(false);
     setIsStartingSession(false);
     setShowConfirmModal(false);

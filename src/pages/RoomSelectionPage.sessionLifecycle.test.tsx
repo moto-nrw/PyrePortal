@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -281,5 +281,85 @@ describe('RoomSelectionPage session lifecycle behavior', () => {
       is_active: true,
       active_students: 0,
     });
+  });
+
+  // =========================================================================
+  // Stale session-start responses
+  // =========================================================================
+
+  it('discards a successful start that resolves after logout', async () => {
+    let resolveStart: (response: typeof startResponse) => void = () => {};
+    mockedApi.startSession.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveStart = resolve;
+        })
+    );
+
+    const user = userEvent.setup();
+    renderPage();
+    await confirmSessionStart(user);
+
+    await waitFor(() => expect(mockedApi.startSession).toHaveBeenCalledTimes(1));
+    await act(async () => {
+      await useUserStore.getState().logout();
+      resolveStart(startResponse);
+    });
+
+    await waitFor(() => expect(useUserStore.getState().currentSession).toBeNull());
+    expect(mockNavigate).not.toHaveBeenCalledWith('/nfc-scanning');
+    expect(useUserStore.getState().selectedActivity).toBeNull();
+    expect(useUserStore.getState().selectedSupervisors).toEqual([]);
+  });
+
+  it('discards a late conflict after the page unmounts', async () => {
+    let rejectStart: (error: unknown) => void = () => {};
+    mockedApi.startSession.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectStart = reject;
+        })
+    );
+
+    const user = userEvent.setup();
+    const view = renderPage();
+    await confirmSessionStart(user);
+    await waitFor(() => expect(mockedApi.startSession).toHaveBeenCalledTimes(1));
+
+    view.unmount();
+    await act(async () => {
+      rejectStart(new ApiError('Late conflict', 409));
+    });
+
+    expect(useUserStore.getState().currentSession).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalledWith('/nfc-scanning');
+  });
+
+  it('discards a successful forced start that resolves after logout', async () => {
+    let resolveForceStart: (response: typeof startResponse) => void = () => {};
+    mockedApi.startSession
+      .mockRejectedValueOnce(new ApiError('Session Konflikt', 409))
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveForceStart = resolve;
+          })
+      );
+
+    const user = userEvent.setup();
+    renderPage();
+    await confirmSessionStart(user);
+    await waitFor(() => expect(screen.getByText('Trotzdem starten')).toBeInTheDocument());
+
+    await user.click(screen.getByText('Trotzdem starten'));
+    await waitFor(() => expect(mockedApi.startSession).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      await useUserStore.getState().logout();
+      resolveForceStart({ ...startResponse, active_group_id: 99 });
+    });
+
+    await waitFor(() => expect(useUserStore.getState().currentSession).toBeNull());
+    expect(mockNavigate).not.toHaveBeenCalledWith('/nfc-scanning');
   });
 });

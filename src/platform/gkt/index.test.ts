@@ -68,6 +68,17 @@ describe('normalizeNfcPayload', () => {
     const payload = { uid: 'aa:bb', eventNumber: 'not-a-number' };
     expect(normalizeNfcPayload(payload)).toEqual({ tagId: 'AA:BB', eventNumber: null });
   });
+
+  it('rejects negative and non-finite eventNumber values', () => {
+    expect(normalizeNfcPayload({ uid: 'aa:bb', eventNumber: -1 })).toEqual({
+      tagId: 'AA:BB',
+      eventNumber: null,
+    });
+    expect(normalizeNfcPayload({ uid: 'aa:bb', eventNumber: Number.POSITIVE_INFINITY })).toEqual({
+      tagId: 'AA:BB',
+      eventNumber: null,
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -160,7 +171,30 @@ describe('GKTAdapter', () => {
       const firstScanId = (onScan.mock.calls[0]?.[0] as { scanId: number }).scanId;
       const secondScanId = (onScan.mock.calls[1]?.[0] as { scanId: number }).scanId;
 
-      expect(secondScanId).toBe(firstScanId + 1);
+      expect(firstScanId).toBeLessThan(0);
+      expect(secondScanId).toBe(firstScanId - 1);
+    });
+
+    it('keeps hardware and fallback scan IDs in separate namespaces', async () => {
+      let nfcCallback: ((payload: unknown) => void) | undefined;
+      mockRegisterNfc.mockImplementation((cb: (payload: unknown) => void) => {
+        nfcCallback = cb;
+      });
+
+      await adapter.initializeNfc();
+
+      const onScan = vi.fn();
+      await adapter.startScanning(onScan);
+
+      nfcCallback!({ uid: 'aa:bb:cc:dd', eventSource: 'NFC', eventNumber: 5 });
+      nfcCallback!({ barcode: '11:22:33:44', eventSource: 'nfc' });
+
+      const hardwareScanId = (onScan.mock.calls[0]?.[0] as { scanId: number }).scanId;
+      const fallbackScanId = (onScan.mock.calls[1]?.[0] as { scanId: number }).scanId;
+
+      expect(hardwareScanId).toBe(5);
+      expect(fallbackScanId).toBeLessThan(0);
+      expect(fallbackScanId).not.toBe(hardwareScanId);
     });
 
     it('registered callback ignores invalid payloads', async () => {

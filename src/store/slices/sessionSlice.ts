@@ -9,7 +9,7 @@ import {
   type DailyFeedbackRating,
 } from '../../services/api';
 import {
-  createRecreationRequestTracker,
+  createSessionRequestTracker,
   recreateSession as requestSessionRecreation,
   type SessionRecreationOutcome,
 } from '../../services/sessionService';
@@ -214,7 +214,7 @@ const SESSION_INITIAL_STATE = {
 
 export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserState>) => {
   // Race guard for session recreation: stale async responses are discarded
-  const recreationTracker = createRecreationRequestTracker();
+  const recreationTracker = createSessionRequestTracker();
 
   return {
     // Initial state
@@ -233,6 +233,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
     // Invalidate all in-flight recreation requests (e.g. on logout)
     invalidateSessionRecreation: () => {
       recreationTracker.invalidate();
+      set({ isValidatingLastSession: false });
     },
 
     // Recreate the last saved session from the validated selection in the store.
@@ -562,11 +563,12 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
     },
 
     validateAndRecreateSession: async () => {
+      const requestId = recreationTracker.begin();
       const { sessionSettings, authenticatedUser } = get();
 
       if (!sessionSettings?.last_session || !authenticatedUser?.pin) {
         storeLogger.warn('Cannot recreate session: no saved session or authentication');
-        return false;
+        return { status: 'error' as const };
       }
 
       set({ isValidatingLastSession: true, error: null });
@@ -574,6 +576,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
       try {
         // Validate activity exists
         const activities = await api.getActivities(authenticatedUser.pin);
+        if (!recreationTracker.isCurrent(requestId)) return { status: 'stale' as const };
         const activity = activities.find(a => a.id === sessionSettings.last_session!.activity_id);
 
         if (!activity) {
@@ -582,6 +585,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
 
         // Validate room is available
         const rooms = await api.getRooms(authenticatedUser.pin);
+        if (!recreationTracker.isCurrent(requestId)) return { status: 'stale' as const };
         const room = rooms.find(r => r.id === sessionSettings.last_session!.room_id);
 
         if (!room) {
@@ -600,6 +604,8 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
                 () => get().users
               );
 
+        if (!recreationTracker.isCurrent(requestId)) return { status: 'stale' as const };
+
         // Set validated data in store
         set({
           selectedActivity: activity,
@@ -615,8 +621,13 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           supervisorCount: supervisors.length,
         });
 
-        return true;
+        return { status: 'success' as const };
       } catch (error) {
+        if (!recreationTracker.isCurrent(requestId)) {
+          storeLogger.warn('Discarding stale session validation result');
+          return { status: 'stale' as const };
+        }
+
         const userMessage = mapSessionValidationError(error);
         storeLogger.error('Session validation failed', {
           error: userMessage,
@@ -625,6 +636,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
 
         // Clear invalid session data
         await clearLastSession();
+        if (!recreationTracker.isCurrent(requestId)) return { status: 'stale' as const };
         set({
           sessionSettings: sessionSettings
             ? { ...sessionSettings, last_session: null, use_last_session: false }
@@ -633,7 +645,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           error: userMessage,
         });
 
-        return false;
+        return { status: 'error' as const };
       }
     },
 
