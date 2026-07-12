@@ -102,7 +102,7 @@ Use `SelectionPageLayout` with `SelectableGrid`, `SelectableCard`, `PaginationCo
 
 ## Styling Conventions
 
-- Prefer `designSystem` and `theme` constants for shared colors, spacing, radii, shadows, and typography.
+- Prefer `designSystem` constants (`src/styles/designSystem.ts`) for shared colors, spacing, radii, shadows, and typography.
 - Use Tailwind utility classes for layout where existing pages already do so.
 - Keep UI-facing text German and log messages English.
 - Preserve touch-friendly sizing for kiosk use.

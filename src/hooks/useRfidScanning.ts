@@ -3,7 +3,6 @@ import { useEffect, useRef, useCallback } from 'react';
 
 import {
   isMockScanSourceRunning,
-  resetMockScanSourceForTesting,
   startMockScanSource,
   stopMockScanSource,
 } from '../dev/mockScanSource';
@@ -22,11 +21,6 @@ import {
 } from '../services/scanProcessor';
 import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
-
-/** Reset module-level state between tests. Not for production use. */
-export function __resetModuleStateForTesting(): void {
-  resetMockScanSourceForTesting();
-}
 
 const logger = createLogger('useRfidScanning');
 const PROCESSED_SCAN_ID_TTL_MS = 30_000;
@@ -380,7 +374,7 @@ export const useRfidScanning = () => {
 
     // Real RFID scanning
     try {
-      logger.debug('Calling start_rfid_service backend command', {
+      logger.debug('Starting adapter scanning', {
         timestamp: callTimestamp,
       });
       await adapter.startScanning(onAdapterScan);
@@ -425,7 +419,7 @@ export const useRfidScanning = () => {
 
     try {
       if (isRealScanningEnabled()) {
-        logger.debug('Calling stop_rfid_service backend command', {
+        logger.debug('Stopping adapter scanning', {
           timestamp: callTimestamp,
         });
         await adapter.stopScanning();

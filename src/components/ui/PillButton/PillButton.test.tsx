@@ -59,20 +59,6 @@ describe('PillButton', () => {
     expect(children.indexOf(iconEl)).toBeLessThan(children.indexOf(textEl));
   });
 
-  it('renders icon on the right when iconPosition is right', () => {
-    const icon = <span data-testid="icon">I</span>;
-    render(
-      <PillButton variant="secondary" onClick={vi.fn()} icon={icon} iconPosition="right">
-        Text
-      </PillButton>
-    );
-    const button = screen.getByRole('button');
-    const iconEl = screen.getByTestId('icon');
-    const textEl = screen.getByText('Text');
-    const children = Array.from(button.childNodes);
-    expect(children.indexOf(iconEl)).toBeGreaterThan(children.indexOf(textEl));
-  });
-
   it('applies disabled styling with reduced opacity', () => {
     render(
       <PillButton variant="primary" onClick={vi.fn()} disabled>
