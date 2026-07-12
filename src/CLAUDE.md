@@ -25,8 +25,8 @@ This directory contains the React/TypeScript frontend for PyrePortal.
 
 - Use `@platform` for platform-specific behavior.
 - GKT production behavior belongs in `platform/gkt`.
-- Browser/Mac mock behavior belongs in `platform/browser`.
-- The Tauri adapter is legacy only; do not add new behavior there.
+- Browser mock behavior belongs in `platform/browser`.
+- The Tauri adapter (`platform/tauri`) supports the local Mac/mock app only; do not add production behavior there. Its RFID methods are no-ops — mock scanning lives in the frontend (`dev/mockScanSource.ts`).
 
 ### Import Order
 

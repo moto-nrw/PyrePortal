@@ -1,6 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod logging;
-mod rfid;
 mod session_storage;
 
 use serde::{Deserialize, Serialize};
@@ -64,11 +63,6 @@ pub fn run() {
             get_api_config,
             restart_app,
             logging::write_log,
-            rfid::initialize_rfid_service,
-            rfid::start_rfid_service,
-            rfid::stop_rfid_service,
-            rfid::get_rfid_service_status,
-            rfid::scan_rfid_single,
             session_storage::save_session_settings,
             session_storage::load_session_settings,
             session_storage::clear_last_session
