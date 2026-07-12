@@ -18,6 +18,6 @@ describe('ERROR_MESSAGE_MAPPINGS backend contract', () => {
   });
 
   it('keeps the number of mappings stable', () => {
-    expect(ERROR_MESSAGE_MAPPINGS).toHaveLength(56);
+    expect(ERROR_MESSAGE_MAPPINGS).toHaveLength(52);
   });
 });

@@ -46,24 +46,12 @@ exports[`ERROR_MESSAGE_MAPPINGS backend contract > keeps all patterns and German
     "PIN nicht angegeben.",
   ],
   [
-    "staff account is locked due to failed PIN attempts",
-    "Konto gesperrt wegen zu vieler Fehlversuche. Bitte Administrator kontaktieren.",
-  ],
-  [
-    "maximum PIN attempts exceeded",
-    "Maximale PIN-Versuche überschritten. Konto gesperrt.",
-  ],
-  [
     "locked",
     "Konto gesperrt. Bitte später erneut versuchen.",
   ],
   [
     "device is not active",
     "Gerät ist deaktiviert. Bitte Administrator kontaktieren.",
-  ],
-  [
-    "device is offline",
-    "Gerät ist als offline markiert. Bitte Administrator kontaktieren.",
   ],
   [
     "device is already running an activity session",
@@ -95,10 +83,6 @@ exports[`ERROR_MESSAGE_MAPPINGS backend contract > keeps all patterns and German
       "RFID tag not assigned",
     ],
     "Armband ist nicht zugewiesen. Bitte an Betreuer wenden.",
-  ],
-  [
-    "staff RFID authentication must be done via session management",
-    "Betreuer-Armband kann hier nicht verwendet werden.",
   ],
   [
     "student RFID tag required for pickup query",
