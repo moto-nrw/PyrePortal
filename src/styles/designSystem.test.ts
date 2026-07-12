@@ -4,14 +4,13 @@ import { designSystem } from './designSystem';
 
 describe('designSystem', () => {
   it('has border radius values', () => {
-    expect(designSystem.borderRadius.sm).toBe('8px');
+    expect(designSystem.borderRadius.md).toBe('12px');
     expect(designSystem.borderRadius.full).toBe('9999px');
   });
 
   it('has shadow values', () => {
-    expect(designSystem.shadows.soft).toBeDefined();
-    expect(designSystem.shadows.modal).toBeDefined();
-    expect(typeof designSystem.shadows.soft).toBe('string');
+    expect(designSystem.shadows.button).toBeDefined();
+    expect(typeof designSystem.shadows.button).toBe('string');
   });
 
   it('has glass effects', () => {

@@ -7,17 +7,9 @@
 
 // Check if we're running in a Tauri context
 const isTauriContext = (): boolean => {
-  // Primary check: Tauri runtime indicators
-  if (typeof window !== 'undefined') {
-    // Check for Tauri runtime
-    if ('__TAURI__' in window || '__TAURI_INTERNALS__' in window) {
-      return true;
-    }
-
-    // Check for Tauri API availability
-    if ('__TAURI_INVOKE__' in window) {
-      return true;
-    }
+  // Primary check: Tauri v2 injects __TAURI_INTERNALS__ as the invoke bridge
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    return true;
   }
 
   // Secondary check: Environment variables that indicate Tauri dev mode

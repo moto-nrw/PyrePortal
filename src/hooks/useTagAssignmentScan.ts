@@ -1,10 +1,10 @@
 import { adapter } from '@platform';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import { pickRandomMockTag } from '../dev/mockScanSource';
 import { isRealScanningEnabled } from '../platform/adapter';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, logError, logUserAction } from '../utils/logger';
 
 const logger = createLogger('useTagAssignmentScan');
@@ -152,22 +152,7 @@ export function useTagAssignmentScan() {
             return;
           }
 
-          // Get mock tags from environment variable or use defaults
-          const envTags = import.meta.env.VITE_MOCK_RFID_TAGS as string | undefined;
-          const mockStudentTags: string[] = envTags
-            ? envTags.split(',').map(tag => tag.trim())
-            : [
-                // Default realistic hardware format tags
-                '04:D6:94:82:97:6A:80',
-                '04:A7:B3:C2:D1:E0:F5',
-                '04:12:34:56:78:9A:BC',
-                '04:FE:DC:BA:98:76:54',
-                '04:11:22:33:44:55:66',
-              ];
-
-          // Pick a random tag from the list using unbiased secure randomness
-          const randomIndex = getSecureRandomInt(mockStudentTags.length);
-          const mockTagId = mockStudentTags[randomIndex];
+          const mockTagId = pickRandomMockTag();
           logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
           mockScanTimeoutRef.current = null;
           void handleTagScanned(mockTagId);

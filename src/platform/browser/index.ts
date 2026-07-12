@@ -8,6 +8,11 @@
 
 import type { SessionSettings } from '../../services/sessionStorage';
 import type { NfcScanEvent, PlatformAdapter } from '../adapter';
+import {
+  clearLastSessionFromLocalStorage,
+  loadSessionSettingsFromLocalStorage,
+  saveSessionSettingsToLocalStorage,
+} from '../shared/localStorageSession';
 
 class BrowserAdapter implements PlatformAdapter {
   readonly platform = 'browser' as const;
@@ -52,16 +57,15 @@ class BrowserAdapter implements PlatformAdapter {
   }
 
   async saveSessionSettings(settings: SessionSettings): Promise<void> {
-    localStorage.setItem('pyreportal_session', JSON.stringify(settings));
+    saveSessionSettingsToLocalStorage(settings);
   }
 
   async loadSessionSettings(): Promise<SessionSettings | null> {
-    const data = localStorage.getItem('pyreportal_session');
-    return data ? (JSON.parse(data) as SessionSettings) : null;
+    return loadSessionSettingsFromLocalStorage();
   }
 
   async clearLastSession(): Promise<void> {
-    localStorage.removeItem('pyreportal_session');
+    clearLastSessionFromLocalStorage();
   }
 
   async persistLog(entry: string): Promise<void> {

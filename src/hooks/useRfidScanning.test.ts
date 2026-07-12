@@ -1,6 +1,7 @@
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
+import { resetMockScanSourceForTesting } from '../dev/mockScanSource';
 import type { NfcScanEvent } from '../platform/adapter';
 import {
   api,
@@ -10,7 +11,7 @@ import {
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
-import { useRfidScanning, __resetModuleStateForTesting } from './useRfidScanning';
+import { useRfidScanning } from './useRfidScanning';
 
 // ====================================================================
 // Mock modules
@@ -240,7 +241,7 @@ describe('useRfidScanning', () => {
     // cleanup() in afterEach fires the unmount effect, but if timer mode was
     // swapped (real↔fake) the clearInterval may target the wrong timer pool,
     // leaving mockScanInterval non-null for the next test.
-    __resetModuleStateForTesting();
+    resetMockScanSourceForTesting();
 
     vi.useFakeTimers();
     resetStore();

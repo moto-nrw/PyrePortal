@@ -8,6 +8,11 @@
 
 import type { SessionSettings } from '../../services/sessionStorage';
 import type { NfcScanEvent, PlatformAdapter } from '../adapter';
+import {
+  clearLastSessionFromLocalStorage,
+  loadSessionSettingsFromLocalStorage,
+  saveSessionSettingsToLocalStorage,
+} from '../shared/localStorageSession';
 
 // SYSTEM is a global injected by system.js (loaded in index.html)
 declare const SYSTEM: {
@@ -66,7 +71,7 @@ class GKTAdapter implements PlatformAdapter {
     // Register NFC callback with system.js — handles all payload shapes.
     // GKT NFC fires once per physical tap (Android intent-based dispatch),
     // unlike MFRC522 which polls continuously. No adapter-level dedup needed —
-    // every callback is a distinct scan. Tauri handles its own dedup in Rust.
+    // every callback is a distinct scan.
     SYSTEM.registerNfc((payload: unknown) => {
       if (!this.scanCallback) return;
 
@@ -157,16 +162,15 @@ class GKTAdapter implements PlatformAdapter {
   }
 
   async saveSessionSettings(settings: SessionSettings): Promise<void> {
-    localStorage.setItem('pyreportal_session', JSON.stringify(settings));
+    saveSessionSettingsToLocalStorage(settings);
   }
 
   async loadSessionSettings(): Promise<SessionSettings | null> {
-    const data = localStorage.getItem('pyreportal_session');
-    return data ? (JSON.parse(data) as SessionSettings) : null;
+    return loadSessionSettingsFromLocalStorage();
   }
 
   async clearLastSession(): Promise<void> {
-    localStorage.removeItem('pyreportal_session');
+    clearLastSessionFromLocalStorage();
   }
 
   async persistLog(entry: string): Promise<void> {
