@@ -20,6 +20,7 @@ PyrePortal is a web kiosk frontend for German after-school care (OGS). Staff use
 Supported targets:
 
 - **GKT/GKTL**: production target. NFC comes from the GKT `system.js` bridge.
+- **Wedge**: kiosk target for iPads/tablets with a USB NFC reader in keyboard-emulation mode. See `docs/wedge-reader-setup.md`.
 - **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
 - **Tauri Mac/mock app**: local development target for launching the mock frontend as a desktop app.
 
@@ -29,7 +30,9 @@ The Raspberry Pi/Balena deployment path and Tauri production deployment are reti
 
 ```bash
 pnpm run dev          # Browser/mock development
+pnpm run dev:wedge    # Wedge development (USB NFC reader types scans)
 pnpm run build:gkt    # Production GKT bundle
+pnpm run build:wedge  # Production wedge bundle
 pnpm run build        # Browser/mock production build
 pnpm run check        # ESLint + TypeScript
 pnpm run test         # Vitest
@@ -74,6 +77,7 @@ RFID hardware and browser mocks can emit duplicate scan events. Defense in depth
 `BUILD_TARGET` chooses which adapter Vite bundles:
 
 - `BUILD_TARGET=gkt`: production GKT adapter.
+- `BUILD_TARGET=wedge`: keyboard-wedge adapter for tablets with USB NFC readers.
 - default/browser: browser mock adapter.
 - `BUILD_TARGET=tauri`: local Mac/mock app adapter. Keep this path limited to local mock-app support.
 

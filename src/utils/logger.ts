@@ -96,8 +96,18 @@ export const getRuntimeConfig = (): LoggerConfig => {
 // Default configuration used by Logger constructor
 const DEFAULT_CONFIG: LoggerConfig = getRuntimeConfig();
 
+// crypto.randomUUID only exists in secure contexts (HTTPS or localhost);
+// plain-HTTP deployments (e.g. wedge dev server reached via LAN IP) need the
+// getRandomValues fallback, which is available in insecure contexts too.
+const randomSessionSuffix = (): string =>
+  typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID().slice(0, 8)
+    : Array.from(crypto.getRandomValues(new Uint8Array(4)), byte =>
+        byte.toString(16).padStart(2, '0')
+      ).join('');
+
 // Shared session ID across all logger instances
-const SESSION_ID = `${Date.now().toString(36)}_${crypto.randomUUID().slice(0, 8)}`;
+const SESSION_ID = `${Date.now().toString(36)}_${randomSessionSuffix()}`;
 
 /**
  * Serialize an error into a plain object safe for JSON.stringify

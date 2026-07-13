@@ -11,6 +11,7 @@ vi.mock('@platform', () => ({
   adapter: {
     platform: 'browser',
     scanSingleTag: vi.fn(),
+    stopScanning: vi.fn().mockResolvedValue(undefined),
   },
 }));
 

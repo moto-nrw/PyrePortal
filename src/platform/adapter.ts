@@ -9,14 +9,16 @@ import { adapter } from '@platform';
 
 import type { SessionSettings } from '../services/sessionStorage';
 
-type Platform = 'tauri' | 'gkt' | 'browser';
+type Platform = 'tauri' | 'gkt' | 'browser' | 'wedge';
 
 /**
  * True when the current platform uses real NFC/RFID hardware (not mock).
  * - GKT: always real (NFC via system.js)
+ * - Wedge: always real (USB reader in keyboard-emulation mode)
  * - Browser and Tauri Mac/mock app: mock
  */
-export const isRealScanningEnabled = (): boolean => adapter.platform === 'gkt';
+export const isRealScanningEnabled = (): boolean =>
+  adapter.platform === 'gkt' || adapter.platform === 'wedge';
 
 export interface NfcScanEvent {
   tagId: string;
