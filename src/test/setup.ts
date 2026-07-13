@@ -22,7 +22,7 @@ vi.mock('@tauri-apps/api/event', () => ({
 // 2. tauriContext mock — safeInvoke should be mockable per-test
 // ---------------------------------------------------------------------------
 
-vi.mock('../utils/tauriContext', () => ({
+vi.mock('../platform/tauri/tauriContext', () => ({
   safeInvoke: vi.fn(() => Promise.reject(new Error('Tauri context not available in tests'))),
 }));
 

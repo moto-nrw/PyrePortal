@@ -1034,7 +1034,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
   });
 
   it('returns false when not authenticated', async () => {
@@ -1048,7 +1048,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
   });
 
   it('validates and restores session successfully', async () => {
@@ -1072,7 +1072,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(true);
+    expect(result).toEqual({ status: 'success' });
     expect(useUserStore.getState().selectedActivity!.id).toBe(10);
     expect(useUserStore.getState().selectedRoom!.id).toBe(5);
     expect(useUserStore.getState().selectedSupervisors).toHaveLength(2);
@@ -1095,7 +1095,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(true);
+    expect(result).toEqual({ status: 'success' });
     expect(useUserStore.getState().selectedSupervisors).toHaveLength(1);
     expect(useUserStore.getState().selectedSupervisors[0].id).toBe(99);
   });
@@ -1114,7 +1114,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
     expect(mockClearLastSession).toHaveBeenCalled();
   });
@@ -1134,7 +1134,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
   });
 
@@ -1159,7 +1159,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(true);
+    expect(result).toEqual({ status: 'success' });
     expect(mockGetTeachers).toHaveBeenCalled();
   });
 
@@ -1182,7 +1182,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
   });
 
@@ -1204,6 +1204,109 @@ describe('validateAndRecreateSession', () => {
     const settings = useUserStore.getState().sessionSettings;
     expect(settings!.last_session).toBeNull();
     expect(settings!.use_last_session).toBe(false);
+  });
+
+  it('discards a validation success that resolves after logout', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      sessionSettings: {
+        use_last_session: true,
+        auto_save_enabled: true,
+        last_session: lastSession,
+      },
+      users: [
+        { id: 1, name: 'Herr A' },
+        { id: 2, name: 'Frau B' },
+      ],
+    });
+
+    let resolveActivities: (activities: ActivityResponse[]) => void = () => {};
+    mockGetActivities.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveActivities = resolve;
+        })
+    );
+
+    const validation = useUserStore.getState().validateAndRecreateSession();
+    expect(useUserStore.getState().isValidatingLastSession).toBe(true);
+
+    await useUserStore.getState().logout();
+    resolveActivities([mockActivity({ id: 10, name: 'Late activity' })]);
+
+    await expect(validation).resolves.toEqual({ status: 'stale' });
+    expect(useUserStore.getState()).toMatchObject({
+      authenticatedUser: null,
+      selectedActivity: null,
+      selectedRoom: null,
+      selectedSupervisors: [],
+      isValidatingLastSession: false,
+    });
+    expect(mockGetRooms).not.toHaveBeenCalled();
+    expect(mockClearLastSession).not.toHaveBeenCalled();
+  });
+
+  it('does not clear saved settings when a stale validation fails after logout', async () => {
+    setAuthenticated();
+    const settings: SessionSettings = {
+      use_last_session: true,
+      auto_save_enabled: true,
+      last_session: lastSession,
+    };
+    useUserStore.setState({ sessionSettings: settings });
+
+    let rejectActivities: (error: unknown) => void = () => {};
+    mockGetActivities.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectActivities = reject;
+        })
+    );
+
+    const validation = useUserStore.getState().validateAndRecreateSession();
+    await useUserStore.getState().logout();
+    rejectActivities(new Error('Late failure'));
+
+    await expect(validation).resolves.toEqual({ status: 'stale' });
+    expect(useUserStore.getState().sessionSettings).toEqual(settings);
+    expect(useUserStore.getState().error).toBeNull();
+    expect(mockClearLastSession).not.toHaveBeenCalled();
+  });
+
+  it('allows a newer validation to supersede an older request', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      sessionSettings: {
+        use_last_session: true,
+        auto_save_enabled: true,
+        last_session: lastSession,
+      },
+      users: [
+        { id: 1, name: 'Herr A' },
+        { id: 2, name: 'Frau B' },
+      ],
+    });
+
+    let resolveFirstActivities: (activities: ActivityResponse[]) => void = () => {};
+    mockGetActivities
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveFirstActivities = resolve;
+          })
+      )
+      .mockResolvedValueOnce([mockActivity({ id: 10, name: 'New activity' })]);
+    mockGetRooms.mockResolvedValueOnce([mockRoom({ id: 5 })]);
+
+    const firstValidation = useUserStore.getState().validateAndRecreateSession();
+    const secondValidation = useUserStore.getState().validateAndRecreateSession();
+
+    await expect(secondValidation).resolves.toEqual({ status: 'success' });
+    resolveFirstActivities([mockActivity({ id: 10, name: 'Old activity' })]);
+    await expect(firstValidation).resolves.toEqual({ status: 'stale' });
+
+    expect(useUserStore.getState().selectedActivity?.name).toBe('New activity');
+    expect(useUserStore.getState().isValidatingLastSession).toBe(false);
   });
 });
 

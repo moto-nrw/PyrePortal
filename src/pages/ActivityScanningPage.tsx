@@ -6,58 +6,47 @@ import {
   faRestroom,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
-import { useRfidScanning } from '../hooks/useRfidScanning';
-import {
-  api,
-  formatRoomName,
-  mapServerErrorToGerman,
-  isNetworkRelatedError,
-  WC_ROOM_ALIASES,
-  type RfidScanResult,
-  type DailyFeedbackRating,
-  type DeviceConfig,
-  type Room,
-} from '../services/api';
-import { useUserStore } from '../store/userStore';
-import { createLogger, serializeError } from '../utils/logger';
+import { useActivityScanningPage } from '../hooks/pages/useActivityScanningPage';
+import { formatRoomName, type DailyFeedbackRating } from '../services/api';
 
-const logger = createLogger('ActivityScanningPage');
-
-/**
- * Timeout duration (in milliseconds) for daily checkout/destination modals.
- * 7 seconds provides a quick flow while still giving students time to respond.
- */
-const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
-
-/**
- * Timeout duration (in milliseconds) for farewell messages after actions.
- * 1.5 seconds is enough to read a short goodbye message while keeping queue throughput high.
- */
-const FAREWELL_TIMEOUT_MS = 1500;
-
-/**
- * Timeout duration for successful pickup lookups.
- * Longer than transient attendance toasts so children can actually read the result.
- */
-const PICKUP_QUERY_RESULT_TIMEOUT_MS = 5000;
-
-/**
- * Build a visible error result when pickup lookup stalls long enough to time out.
- * This keeps the kiosk responsive instead of silently dropping back to idle.
- */
-const createPickupQueryTimeoutResult = (): RfidScanResult => ({
-  student_name: 'Abholzeit konnte nicht geladen werden',
-  student_id: null,
-  action: 'error',
-  message: 'Zeitüberschreitung beim Laden der Abholzeit. Bitte erneut scannen.',
-  showAsError: true,
-});
+/** User-facing German UI copy for this page */
+const texts = {
+  noActivitySelected: 'Keine Aktivität ausgewählt',
+  backToHomeButton: 'Zurück zur Startseite',
+  pickupTimeLoading: 'Abholzeit wird geladen...',
+  pickupQueryScanPrompt: 'Bitte halte dein Armband an das Lesegerät.',
+  feedbackPositive: 'Gut',
+  feedbackNeutral: 'Okay',
+  feedbackNegative: 'Schlecht',
+  destinationRaumwechsel: 'Raumwechsel',
+  destinationSchulhof: 'Schulhof',
+  destinationToilette: 'Toilette',
+  destinationNachHause: 'nach Hause',
+  pickupTimeToday: 'Abholzeit heute',
+  pickupTimeValue: (time: string) => `${time} Uhr`,
+  noPickupTimeToday: 'Für heute ist keine Abholzeit hinterlegt.',
+  roomFallback: 'diesem Raum',
+  checkedInMessage: (roomName: string) => `Du bist jetzt in ${roomName}`,
+  transferSuccess: 'Raumwechsel erfolgreich',
+  loginButton: 'Anmelden',
+  loginAriaLabel: 'Anmelden - zur PIN-Eingabe',
+  pickupQueryAriaLabel: 'Abholzeit abfragen',
+  unknownRoom: 'Unbekannt',
+  pickupQueryHeading: 'Abholzeit abfragen',
+  feedbackHeading: (firstName: string) => `Wie war dein Tag, ${firstName}?`,
+  farewellHeading: (firstName: string) => `Tschüss, ${firstName}!`,
+  supervisorRoomFallback: 'diesen Raum',
+  supervisorHeading: (name: string, roomName: string) => `${name} betreut jetzt ${roomName}`,
+  pickupInfoHeading: (firstName: string) => `Abholzeit für ${firstName}`,
+  checkinGreeting: (name: string) => `Hallo, ${name}!`,
+  destinationQuestionHeading: (firstName: string) => `Wohin geht ${firstName}?`,
+} as const;
 
 // Feedback button color schemes: green (positive), yellow (neutral), red (negative)
 const FEEDBACK_BUTTON_COLORS = {
@@ -251,101 +240,10 @@ function DestinationButton({
 
 // Button configuration arrays
 const feedbackButtons = [
-  { rating: 'positive' as DailyFeedbackRating, icon: faFaceSmile, label: 'Gut' },
-  { rating: 'neutral' as DailyFeedbackRating, icon: faFaceMeh, label: 'Okay' },
-  { rating: 'negative' as DailyFeedbackRating, icon: faFaceFrown, label: 'Schlecht' },
+  { rating: 'positive' as DailyFeedbackRating, icon: faFaceSmile, label: texts.feedbackPositive },
+  { rating: 'neutral' as DailyFeedbackRating, icon: faFaceMeh, label: texts.feedbackNeutral },
+  { rating: 'negative' as DailyFeedbackRating, icon: faFaceFrown, label: texts.feedbackNegative },
 ];
-
-// =============================================================================
-// Helper types and functions for scan action handling (extracted to reduce
-// cognitive complexity of the student count useEffect - SonarCloud S3776)
-// =============================================================================
-
-/** Extended scan result type with optional flags */
-interface ExtendedScanResult extends RfidScanResult {
-  showAsError?: boolean;
-  isInfo?: boolean;
-  isSchulhof?: boolean;
-  isToilette?: boolean;
-}
-
-/** State for checkout destination modal (unified checkout + "nach Hause" flow) */
-interface CheckoutDestinationState {
-  rfid: string;
-  studentName: string;
-  studentId: number | null;
-  dailyCheckoutAvailable: boolean;
-  showingFarewell: boolean;
-}
-
-/**
- * Handles check-in action and returns count delta.
- * Schulhof check-ins don't increment (student is leaving, not entering).
- */
-const handleCheckinAction = (scan: ExtendedScanResult): number => {
-  if (scan.isSchulhof || scan.isToilette) {
-    return 0; // No change for Schulhof/WC check-in
-  }
-  return 1; // Increment count
-};
-
-/**
- * Handles check-out action: sets up destination modal state and returns count delta.
- * Uses scan.scannedTagId directly instead of looking up from recentTagScans (fixes race condition).
- */
-const handleCheckoutAction = (
-  scan: RfidScanResult,
-  setCheckoutDestinationState: (state: CheckoutDestinationState) => void
-): number => {
-  setCheckoutDestinationState({
-    rfid: scan.scannedTagId ?? '',
-    studentName: scan.student_name,
-    studentId: scan.student_id,
-    dailyCheckoutAvailable: scan.daily_checkout_available ?? false,
-    showingFarewell: false,
-  });
-  return -1; // Decrement count
-};
-
-/**
- * Handles transfer action: returns count delta based on room direction.
- * +1 if incoming to our room, -1 if outgoing from our room.
- */
-const handleTransferAction = (
-  scan: RfidScanResult,
-  currentRoomName: string | undefined
-): number => {
-  if (scan.room_name === currentRoomName) {
-    return 1; // Student transferred TO our room
-  }
-  if (scan.previous_room === currentRoomName) {
-    return -1; // Student transferred FROM our room
-  }
-  return 0; // Not related to our room
-};
-
-/**
- * Checks if a scan result represents an error or info state.
- */
-const isNonActionableScan = (scan: ExtendedScanResult): boolean => {
-  return Boolean(scan.showAsError) || Boolean(scan.isInfo);
-};
-
-/**
- * Returns the first room whose name matches one of the given aliases.
- * Aliases are tried in order, so callers can pass a canonical-first list.
- */
-const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | undefined => {
-  for (const alias of aliases) {
-    const match = rooms.find(r => r.name === alias);
-    if (match) return match;
-  }
-  return undefined;
-};
-
-// =============================================================================
-// End helper functions
-// =============================================================================
 
 const ActivityScanningPage: React.FC = () => {
   const navigate = useNavigate();
@@ -353,750 +251,50 @@ const ActivityScanningPage: React.FC = () => {
     selectedActivity,
     selectedRoom,
     authenticatedUser,
-    rfid,
-    currentSession,
-    fetchCurrentSession,
-  } = useUserStore();
-
-  const { currentScan, showModal, startScanning, stopScanning } = useRfidScanning();
-
-  // Get access to the store's RFID functions
-  const { recentTagScans } = useUserStore(state => state.rfid);
-  const {
-    hideScanModal,
-    removeFromProcessingQueue,
-    resetScanMode,
-    setScanResult,
-    showScanModal,
-    startPickupQueryMode,
-  } = useUserStore();
-
-  // Debug logging for selectedActivity
-  useEffect(() => {
-    if (selectedActivity) {
-      logger.debug('Selected activity data', {
-        id: selectedActivity.id,
-        name: selectedActivity.name,
-        max_participants: selectedActivity.max_participants,
-        enrollment_count: selectedActivity.enrollment_count,
-      });
-    }
-  }, [selectedActivity]);
-
-  // Debug logging for modal state
-  useEffect(() => {
-    if (showModal && currentScan) {
-      logger.debug('Modal should be showing', {
-        showModal,
-        studentName: currentScan.student_name,
-        action: currentScan.action,
-      });
-
-      // Additional debug logging
-      logger.debug('Modal rendering with currentScan', {
-        action: currentScan.action,
-        actionCheck: currentScan.action === 'checked_in',
-        studentName: currentScan.student_name,
-        message: currentScan.message,
-      });
-    }
-  }, [showModal, currentScan]);
-
-  // State consistency guard - detect and fix stale room state (Issue #129 Bug 1)
-  // Skips during recent manual room transitions to avoid ping-pong with stale server data.
-  // Schedules a deferred re-check so the guard runs once the transition window elapses.
-  useEffect(() => {
-    const roomSelectedAt = useUserStore.getState()._roomSelectedAt;
-    const remainingMs = roomSelectedAt != null ? 5000 - (Date.now() - roomSelectedAt) : 0;
-    const isRecentTransition = remainingMs > 0;
-
-    if (isRecentTransition) {
-      logger.debug(
-        'Skipping room mismatch check during recent room transition, re-checking after window'
-      );
-      const timeout = setTimeout(() => {
-        const state = useUserStore.getState();
-        if (
-          state.currentSession?.room_id &&
-          state.selectedRoom &&
-          state.selectedRoom.id !== state.currentSession.room_id
-        ) {
-          logger.warn(
-            'Deferred state inconsistency detected: selectedRoom does not match session',
-            {
-              selectedRoomId: state.selectedRoom.id,
-              sessionRoomId: state.currentSession.room_id,
-            }
-          );
-          void fetchCurrentSession();
-        }
-      }, remainingMs + 100); // small buffer past the 5s window
-      return () => clearTimeout(timeout);
-    }
-
-    if (currentSession?.room_id && selectedRoom && selectedRoom.id !== currentSession.room_id) {
-      logger.warn('State inconsistency detected: selectedRoom does not match session', {
-        selectedRoomId: selectedRoom.id,
-        selectedRoomName: selectedRoom.name,
-        sessionRoomId: currentSession.room_id,
-        sessionRoomName: currentSession.room_name,
-      });
-      // Re-sync state from server to fix inconsistency
-      void fetchCurrentSession();
-    }
-  }, [currentSession, selectedRoom, fetchCurrentSession]);
-
-  // Track student count based on check-ins
-  const [studentCount, setStudentCount] = useState(0);
-  // Removed initial loading indicator (arrow removed)
-
-  // State for checkout destination selection (unified: Raumwechsel, Schulhof, nach Hause)
-  const [checkoutDestinationState, setCheckoutDestinationState] =
-    useState<CheckoutDestinationState | null>(null);
-
-  // Feedback prompt state
-  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
-
-  // Track which visit started the feedback prompt so we can detect new scans
-  const feedbackVisitIdRef = useRef<number | null>(null);
-
-  // Schulhof room ID (discovered dynamically from server)
-  const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
-
-  // WC room ID (discovered dynamically from server)
-  const [wcRoomId, setWcRoomId] = useState<number | null>(null);
-
-  // Device config (checkout button visibility, fetched once on mount)
-  const [deviceConfig, setDeviceConfig] = useState<DeviceConfig | null>(null);
-
-  // Compute how many destination buttons will be visible (drives modal size)
-  const destinationCount = useMemo(() => {
-    if (!checkoutDestinationState || checkoutDestinationState.showingFarewell) return 0;
-    let count = 0;
-    if (deviceConfig?.checkout.raumwechsel_enabled !== false) count++;
-    if (schulhofRoomId && deviceConfig?.checkout.schulhof_enabled !== false) count++;
-    if (wcRoomId && deviceConfig?.checkout.wc_enabled !== false) count++;
-    if (checkoutDestinationState.dailyCheckoutAvailable) count++;
-    return count;
-  }, [deviceConfig, schulhofRoomId, wcRoomId, checkoutDestinationState]);
-
-  // Pickup query prompt state
-  const [isAwaitingPickupQueryScan, setIsAwaitingPickupQueryScan] = useState(false);
-  const isPickupQueryLoading =
-    rfid.scanMode === 'pickupQuery' && rfid.processingQueue.size > 0 && !currentScan;
-
-  useEffect(() => {
-    if (currentScan && isAwaitingPickupQueryScan) {
-      setIsAwaitingPickupQueryScan(false);
-    }
-  }, [currentScan, isAwaitingPickupQueryScan]);
-
-  // Clear stale checkout/feedback/farewell state when a new scan arrives.
-  // A "new scan" is detected by: different RFID tag, different visit_id, or
-  // a check-in arriving while we're in a checkout flow (always means new scan).
-  useEffect(() => {
-    if (!currentScan || !checkoutDestinationState) return;
-
-    const currentRfid = currentScan.scannedTagId ?? '';
-    const isDifferentTag = currentRfid && checkoutDestinationState.rfid !== currentRfid;
-    const isDifferentVisit =
-      feedbackVisitIdRef.current !== null &&
-      currentScan.visit_id != null &&
-      currentScan.visit_id !== feedbackVisitIdRef.current;
-    const isCheckinDuringCheckoutFlow = currentScan.action === 'checked_in';
-
-    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow) {
-      logger.debug('Clearing stale checkout state for new scan', {
-        reason: isDifferentTag
-          ? 'different_tag'
-          : isDifferentVisit
-            ? 'different_visit'
-            : 'checkin_during_checkout',
-        oldRfid: checkoutDestinationState.rfid,
-        newRfid: currentRfid,
-        newAction: currentScan.action,
-      });
-      setCheckoutDestinationState(null);
-      setShowFeedbackPrompt(false);
-      feedbackVisitIdRef.current = null;
-    }
-  }, [currentScan, checkoutDestinationState]);
-
-  // Start scanning when component mounts
-  useEffect(() => {
-    const initializeScanning = async () => {
-      await startScanning();
-    };
-
-    void initializeScanning();
-
-    // Cleanup: stop scanning when component unmounts
-    return () => {
-      const { hideScanModal, resetScanMode } = useUserStore.getState();
-      hideScanModal();
-      resetScanMode();
-      void stopScanning();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty dependency array - only run on mount/unmount
-
-  // Function to fetch current session info
-  const fetchSessionInfo = async () => {
-    if (!authenticatedUser?.pin) return;
-
-    try {
-      const session = await api.getCurrentSession(authenticatedUser.pin);
-      logger.debug('Session info received', { session });
-
-      if (session) {
-        const count = session.active_students ?? 0;
-        logger.info('Setting student count', { count });
-        setStudentCount(count);
-      } else {
-        logger.warn('No session info received');
-        setStudentCount(0);
-      }
-    } catch (error) {
-      logger.error('Failed to fetch session info', { error: serializeError(error) });
-    }
-  };
-
-  // Initialize and periodically update student count
-  useEffect(() => {
-    // Initial fetch
-    void fetchSessionInfo();
-
-    // Set up periodic updates every 15 seconds (for multi-kiosk sync)
-    const interval = setInterval(() => {
-      void fetchSessionInfo();
-    }, 15000);
-
-    return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authenticatedUser?.pin]); // fetchSessionInfo is stable within this component lifecycle
-
-  // Fetch Schulhof room ID once on page mount
-  useEffect(() => {
-    const fetchSchulhofRoom = async () => {
-      if (!authenticatedUser?.pin) return;
-
-      try {
-        logger.debug('Fetching rooms to find Schulhof');
-        const rooms = await api.getRooms(authenticatedUser.pin);
-
-        // Find Schulhof room by name (consistent with backend name-based detection)
-        const schulhofRoom = rooms.find(r => r.name === 'Schulhof');
-
-        if (schulhofRoom) {
-          setSchulhofRoomId(schulhofRoom.id);
-          logger.info('Found Schulhof room', {
-            id: schulhofRoom.id,
-            name: schulhofRoom.name,
-            category: schulhofRoom.category,
-          });
-        } else {
-          logger.warn('No Schulhof room found in available rooms - Schulhof button will not work');
-          // Don't fail - just won't show Schulhof option
-        }
-
-        // Find toilet room by alias, preferring the canonical backend name.
-        // WC_ROOM_ALIASES is canonical-first, so the first match wins.
-        const wcRoom = findRoomByAliases(rooms, WC_ROOM_ALIASES);
-        if (wcRoom) {
-          setWcRoomId(wcRoom.id);
-          logger.info('Found toilet room', { id: wcRoom.id, name: wcRoom.name });
-        } else {
-          logger.warn('No WC/Toilette room found - Toilette button will not work');
-        }
-      } catch (error) {
-        logger.error('Failed to fetch Schulhof room', { error: serializeError(error) });
-        // Non-critical error - continue without Schulhof functionality
-      }
-    };
-
-    void fetchSchulhofRoom();
-  }, [authenticatedUser?.pin]);
-
-  // Fetch device config once on mount (checkout button visibility, feedback settings)
-  useEffect(() => {
-    const fetchDeviceConfig = async () => {
-      try {
-        const config = await api.getDeviceConfig();
-        setDeviceConfig(config);
-        logger.info('Device config loaded', {
-          raumwechsel: config.checkout.raumwechsel_enabled,
-          schulhof: config.checkout.schulhof_enabled,
-          wc: config.checkout.wc_enabled,
-          feedbackEnabled: config.feedback.enabled,
-        });
-      } catch (error) {
-        logger.error('Failed to fetch device config', { error: serializeError(error) });
-        // Non-critical — buttons default to visible when config is unavailable
-      }
-    };
-
-    void fetchDeviceConfig();
-  }, []);
-
-  // Update student count based on scan result
-  // Refactored to use extracted helper functions (SonarCloud S3776 fix)
-  useEffect(() => {
-    if (!currentScan || !showModal) return;
-
-    logger.debug('Updating student count based on scan', {
-      action: currentScan.action,
-      currentCount: studentCount,
-    });
-
-    // Skip error and info scans - they don't affect count
-    const extendedScan = currentScan as ExtendedScanResult;
-    if (isNonActionableScan(extendedScan)) return;
-
-    // Use authoritative server count when available, otherwise fall back to optimistic delta
-    const hasAuthoritativeCount = currentScan.active_students != null;
-
-    // Run action-specific side effects (e.g. checkout destination state) regardless of count source
-    switch (currentScan.action) {
-      case 'checked_in':
-        // Legacy: optimistic delta fallback for servers that don't provide active_students
-        if (!hasAuthoritativeCount) {
-          const delta = handleCheckinAction(extendedScan);
-          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
-        }
-        break;
-      case 'checked_out': {
-        const delta = handleCheckoutAction(currentScan, setCheckoutDestinationState);
-        // Legacy: optimistic delta fallback for servers that don't provide active_students
-        if (!hasAuthoritativeCount && delta !== 0)
-          setStudentCount(prev => Math.max(0, prev + delta));
-        break;
-      }
-      case 'transferred':
-        // Legacy: optimistic delta fallback for servers that don't provide active_students
-        if (!hasAuthoritativeCount) {
-          const delta = handleTransferAction(currentScan, selectedRoom?.name);
-          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
-        }
-        break;
-    }
-
-    // Apply authoritative count after side effects
-    // Skip for Schulhof scans: active_students refers to the Schulhof room, not our room
-    if (hasAuthoritativeCount && !extendedScan.isSchulhof && !extendedScan.isToilette) {
-      setStudentCount(currentScan.active_students!);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentScan, showModal]); // Only update when scan modal shows
-
-  // Determine modal timeout duration based on current state
-  const modalTimeoutDuration = useMemo(() => {
-    if (isPickupQueryLoading) {
-      // Loading is also kiosk-blocking, so it needs the same bounded timeout as the scan prompt.
-      return rfid.scanTimeout;
-    }
-    if (isAwaitingPickupQueryScan) {
-      return rfid.scanTimeout;
-    }
-    // Farewell messages use shorter timeout (just showing goodbye)
-    if (checkoutDestinationState?.showingFarewell) {
-      return FAREWELL_TIMEOUT_MS;
-    }
-    // Checkout destination states (buttons, feedback) use longer timeout
-    if (checkoutDestinationState || showFeedbackPrompt) {
-      return DAILY_CHECKOUT_TIMEOUT_MS;
-    }
-    if (currentScan?.action === 'pickup_info') {
-      return PICKUP_QUERY_RESULT_TIMEOUT_MS;
-    }
-    // Check-in with pickup time needs longer so the child can read it
-    if (currentScan?.action === 'checked_in' && currentScan.pickup_time) {
-      return 3500;
-    }
-    // Normal scans use configured display time
-    return rfid.modalDisplayTime;
-  }, [
-    checkoutDestinationState,
     currentScan,
+    studentCount,
+    processingQueueSize,
+    scanContextId,
+    checkoutDestinationState,
+    setCheckoutDestinationState,
+    handleDestinationSelect,
+    destinationCount,
+    schulhofRoomId,
+    wcRoomId,
+    deviceConfig,
+    showFeedbackPrompt,
+    handleNachHause,
+    handleFeedbackSubmit,
     isAwaitingPickupQueryScan,
     isPickupQueryLoading,
-    rfid.modalDisplayTime,
-    rfid.scanTimeout,
-    showFeedbackPrompt,
-  ]);
-
-  // Handle modal timeout - cleanup state and dismiss modal
-  // Student is already checked out by the server, so timeout just closes the modal
-  const handleModalTimeout = useCallback(() => {
-    logger.debug('Modal timeout triggered', {
-      hasDestinationState: !!checkoutDestinationState,
-      showingFarewell: checkoutDestinationState?.showingFarewell,
-      showFeedbackPrompt,
-      isAwaitingPickupQueryScan,
-      isPickupQueryLoading,
-      navigateOnClose: (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose,
-    });
-
-    // Check if navigation is required after modal close
-    const navigateTo = (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose;
-
-    if (isPickupQueryLoading) {
-      logger.warn('Pickup query loading timed out, showing timeout error before reset', {
-        tagId: rfid.pickupQueryTagId,
-        scanContextId: rfid.scanContextId,
-      });
-
-      if (rfid.pickupQueryTagId) {
-        removeFromProcessingQueue(rfid.pickupQueryTagId);
-      }
-
-      setIsAwaitingPickupQueryScan(false);
-      setScanResult(createPickupQueryTimeoutResult());
-      showScanModal();
-      return;
-    }
-
-    // Clean up checkout destination state
-    if (checkoutDestinationState) {
-      setCheckoutDestinationState(null);
-    }
-
-    // Clear feedback prompt state to prevent orphaned state (Issue #129 Bug 2 fix)
-    if (showFeedbackPrompt) {
-      setShowFeedbackPrompt(false);
-    }
-    // Always clear visit ID ref to prevent stale ref from wiping next checkout's destination state
-    feedbackVisitIdRef.current = null;
-
-    if (isAwaitingPickupQueryScan) {
-      setIsAwaitingPickupQueryScan(false);
-    }
-
-    if (rfid.scanMode === 'pickupQuery') {
-      resetScanMode();
-    }
-
-    hideScanModal();
-
-    // Navigate after modal is closed if required
-    if (navigateTo) {
-      logger.info('Navigating after modal timeout', { navigateTo });
-      const result = navigate(navigateTo);
-      if (result instanceof Promise) {
-        result.catch((err: unknown) => {
-          logger.error('Navigation failed after modal timeout', { navigateTo, error: err });
-        });
-      }
-    }
-  }, [
-    checkoutDestinationState,
-    currentScan,
-    hideScanModal,
-    removeFromProcessingQueue,
-    isAwaitingPickupQueryScan,
-    isPickupQueryLoading,
-    navigate,
-    rfid.pickupQueryTagId,
-    rfid.scanMode,
-    rfid.scanContextId,
-    resetScanMode,
-    setScanResult,
-    showFeedbackPrompt,
-    showScanModal,
-  ]);
+    isPickupQueryPromptOpen,
+    isPickupQueryVisualState,
+    isPickupQueryHeadingState,
+    pickupQueryButtonDisabled,
+    handlePickupQueryClick,
+    shouldShowCheckModal,
+    shouldKeepPickupQueryModalOpen,
+    modalTimeoutDuration,
+    handleModalTimeout,
+    handleAnmelden,
+  } = useActivityScanningPage();
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
         <div className="text-center">
-          <p className="text-lg text-gray-600">Keine Aktivität ausgewählt</p>
+          <p className="text-lg text-gray-600">{texts.noActivitySelected}</p>
           <button
             onClick={() => navigate('/home')}
             className="mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
           >
-            Zurück zur Startseite
+            {texts.backToHomeButton}
           </button>
         </div>
       </div>
     );
   }
-
-  const handleAnmelden = () => {
-    // Stop scanning temporarily
-    void stopScanning(); // Handle async function
-    // Navigate to PIN page for teacher access
-    void navigate('/pin');
-  };
-
-  const handlePickupQueryClick = () => {
-    logger.info('Starting pickup query mode');
-    setScanResult(null);
-    setIsAwaitingPickupQueryScan(true);
-    startPickupQueryMode();
-    showScanModal();
-  };
-
-  // Handle "nach Hause" button - student confirmed going home
-  // Call confirm_daily_checkout to finalize attendance, then show feedback prompt
-  const handleNachHause = async () => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
-
-    logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
-      rfid: checkoutDestinationState.rfid,
-      studentName: checkoutDestinationState.studentName,
-    });
-
-    try {
-      const response = await api.toggleAttendance(
-        authenticatedUser.pin,
-        checkoutDestinationState.rfid,
-        'confirm_daily_checkout',
-        'zuhause'
-      );
-      logger.info('Daily checkout confirmed');
-      feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
-
-      // Show feedback prompt only if feedback is enabled for this tenant
-      const feedbackEnabled = response.data?.feedback_enabled !== false;
-      if (feedbackEnabled) {
-        setShowFeedbackPrompt(true);
-      } else {
-        logger.info('Feedback disabled for tenant, skipping feedback prompt');
-        setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-      }
-    } catch (error) {
-      logger.error('Failed to confirm daily checkout', {
-        rfid: checkoutDestinationState.rfid,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      // Still proceed — the visit is already ended,
-      // attendance sync failure shouldn't block the student.
-      // Fall back to checkin scan's feedback_enabled flag.
-      feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
-      const feedbackEnabled = currentScan?.feedback_enabled !== false;
-      if (feedbackEnabled) {
-        setShowFeedbackPrompt(true);
-      } else {
-        setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-      }
-    }
-  };
-
-  // Handle feedback submission
-  const handleFeedbackSubmit = async (rating: DailyFeedbackRating) => {
-    if (!checkoutDestinationState || !currentScan) return;
-
-    const { submitDailyFeedback } = useUserStore.getState();
-
-    logger.info('Submitting feedback', {
-      studentId: currentScan.student_id,
-      rating,
-    });
-
-    // Guard against null student_id (shouldn't happen for real student scans)
-    if (currentScan.student_id === null) {
-      logger.warn('Cannot submit feedback: student_id is null');
-      setShowFeedbackPrompt(false);
-      // Show farewell - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
-      setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-      return;
-    }
-
-    const success = await submitDailyFeedback(currentScan.student_id, rating);
-
-    if (success) {
-      logger.info('Feedback submitted successfully', { rating });
-    } else {
-      // On error, still show farewell (don't block user from leaving)
-      logger.warn('Feedback submission failed but continuing with checkout');
-    }
-
-    // Show farewell message - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
-    setShowFeedbackPrompt(false);
-    setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-  };
-
-  // Handle checkout destination selection (Schulhof or Raumwechsel)
-  const handleDestinationSelect = async (destination: 'schulhof' | 'raumwechsel' | 'toilette') => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
-
-    if (destination === 'schulhof') {
-      // Check if Schulhof room ID is available
-      if (!schulhofRoomId) {
-        logger.error('Cannot check into Schulhof: room ID not available');
-
-        // Show error modal
-        const errorResult: RfidScanResult = {
-          student_name: 'Schulhof nicht verfügbar',
-          student_id: checkoutDestinationState.studentId,
-          action: 'error',
-          message: `${checkoutDestinationState.studentName}: Schulhof-Raum wurde nicht konfiguriert.`,
-          showAsError: true,
-        };
-
-        setScanResult(errorResult);
-        setCheckoutDestinationState(null);
-        showScanModal();
-        // Modal will auto-close via useModalTimeout hook
-        return;
-      }
-
-      try {
-        logger.info('Checking student into Schulhof', {
-          rfid: checkoutDestinationState.rfid,
-          studentName: checkoutDestinationState.studentName,
-          schulhofRoomId,
-        });
-
-        // CRITICAL: Wait for background checkout sync to complete
-        // This prevents race condition where check-in happens before checkout
-        const recentScan = recentTagScans.get(checkoutDestinationState.rfid);
-        if (recentScan?.syncPromise) {
-          logger.debug('Waiting for background checkout sync to complete');
-          await recentScan.syncPromise;
-          logger.debug('Background sync completed, proceeding with Schulhof check-in');
-        }
-
-        // Now safe to check into Schulhof
-        const result = await api.processRfidScan(
-          {
-            student_rfid: checkoutDestinationState.rfid,
-            action: 'checkin',
-            room_id: schulhofRoomId,
-          },
-          authenticatedUser.pin
-        );
-
-        logger.info('Schulhof check-in successful', {
-          action: result.action,
-          room: result.room_name,
-        });
-
-        // Show special Schulhof success modal with custom message
-        const firstName = checkoutDestinationState.studentName.split(' ')[0];
-        const schulhofResult = {
-          ...result,
-          message: `Viel Spaß auf dem Schulhof, ${firstName}!`,
-          isSchulhof: true, // Flag for special yellow styling
-        } as RfidScanResult & { isSchulhof: boolean };
-
-        setScanResult(schulhofResult);
-        setCheckoutDestinationState(null);
-        showScanModal();
-        // Modal will auto-close via useModalTimeout hook
-      } catch (error) {
-        logger.error('Failed to check into Schulhof', { error: serializeError(error) });
-
-        // Map error to user-friendly German message with network detection
-        const errorMessage =
-          error instanceof Error ? error.message : 'Schulhof Check-in fehlgeschlagen';
-        const userFriendlyError = isNetworkRelatedError(error)
-          ? 'Netzwerkfehler bei Schulhof-Anmeldung. Bitte Verbindung prüfen und erneut scannen.'
-          : mapServerErrorToGerman(errorMessage);
-
-        // Show error modal
-        const errorResult: RfidScanResult = {
-          student_name: 'Schulhof Check-in fehlgeschlagen',
-          student_id: checkoutDestinationState.studentId,
-          action: 'error',
-          message: userFriendlyError,
-          showAsError: true,
-        };
-
-        setScanResult(errorResult);
-        setCheckoutDestinationState(null);
-        showScanModal();
-        // Modal will auto-close via useModalTimeout hook
-      }
-    }
-
-    if (destination === 'toilette') {
-      // Check if WC room ID is available
-      if (!wcRoomId) {
-        logger.error('Cannot check into WC: room ID not available');
-
-        const errorResult: RfidScanResult = {
-          student_name: 'Toilette nicht verfügbar',
-          student_id: checkoutDestinationState.studentId,
-          action: 'error',
-          message: `${checkoutDestinationState.studentName}: Toilette-Raum wurde nicht konfiguriert.`,
-          showAsError: true,
-        };
-
-        setScanResult(errorResult);
-        setCheckoutDestinationState(null);
-        showScanModal();
-        return;
-      }
-
-      try {
-        logger.info('Checking student into WC', {
-          rfid: checkoutDestinationState.rfid,
-          studentName: checkoutDestinationState.studentName,
-          wcRoomId,
-        });
-
-        // CRITICAL: Wait for background checkout sync to complete
-        const recentScan = recentTagScans.get(checkoutDestinationState.rfid);
-        if (recentScan?.syncPromise) {
-          logger.debug('Waiting for background checkout sync to complete');
-          await recentScan.syncPromise;
-          logger.debug('Background sync completed, proceeding with WC check-in');
-        }
-
-        const result = await api.processRfidScan(
-          {
-            student_rfid: checkoutDestinationState.rfid,
-            action: 'checkin',
-            room_id: wcRoomId,
-          },
-          authenticatedUser.pin
-        );
-
-        logger.info('WC check-in successful', {
-          action: result.action,
-          room: result.room_name,
-        });
-
-        const firstName = checkoutDestinationState.studentName.split(' ')[0];
-        const wcResult = {
-          ...result,
-          message: `${firstName} geht auf Toilette`,
-          isToilette: true,
-        } as RfidScanResult & { isToilette: boolean };
-
-        setScanResult(wcResult);
-        setCheckoutDestinationState(null);
-        showScanModal();
-      } catch (error) {
-        logger.error('Failed to check into WC', { error: serializeError(error) });
-
-        const errorMessage =
-          error instanceof Error ? error.message : 'Toilette Check-in fehlgeschlagen';
-        const userFriendlyError = isNetworkRelatedError(error)
-          ? 'Netzwerkfehler bei Toilette-Anmeldung. Bitte Verbindung prüfen und erneut scannen.'
-          : mapServerErrorToGerman(errorMessage);
-
-        const errorResult: RfidScanResult = {
-          student_name: 'Toilette Check-in fehlgeschlagen',
-          student_id: checkoutDestinationState.studentId,
-          action: 'error',
-          message: userFriendlyError,
-          showAsError: true,
-        };
-
-        setScanResult(errorResult);
-        setCheckoutDestinationState(null);
-        showScanModal();
-      }
-
-      return;
-    }
-
-    // destination === 'raumwechsel'
-    // Clear destination state - student will scan at destination room
-    setCheckoutDestinationState(null);
-  };
 
   // Helper function to render modal content area - extracted to avoid nested ternaries
   const renderModalContent = () => {
@@ -1113,7 +311,7 @@ const ActivityScanningPage: React.FC = () => {
               textAlign: 'center',
             }}
           >
-            Abholzeit wird geladen...
+            {texts.pickupTimeLoading}
           </div>
         );
       }
@@ -1131,7 +329,7 @@ const ActivityScanningPage: React.FC = () => {
             textAlign: 'center',
           }}
         >
-          Bitte halte dein Armband an das Lesegerät.
+          {texts.pickupQueryScanPrompt}
         </div>
       );
     }
@@ -1216,7 +414,7 @@ const ActivityScanningPage: React.FC = () => {
           ? [
               {
                 destination: 'raumwechsel' as const,
-                label: 'Raumwechsel',
+                label: texts.destinationRaumwechsel,
                 icon: ICON_RAUMWECHSEL,
                 onClick: () => void handleDestinationSelect('raumwechsel'),
               },
@@ -1226,7 +424,7 @@ const ActivityScanningPage: React.FC = () => {
           ? [
               {
                 destination: 'schulhof' as const,
-                label: 'Schulhof',
+                label: texts.destinationSchulhof,
                 colorScheme: 'schulhof' as const,
                 icon: ICON_SCHULHOF,
                 onClick: () => void handleDestinationSelect('schulhof'),
@@ -1237,7 +435,7 @@ const ActivityScanningPage: React.FC = () => {
           ? [
               {
                 destination: 'toilette' as const,
-                label: 'Toilette',
+                label: texts.destinationToilette,
                 colorScheme: 'toilette' as const,
                 icon: (
                   <FontAwesomeIcon
@@ -1253,7 +451,7 @@ const ActivityScanningPage: React.FC = () => {
           ? [
               {
                 destination: 'nach_hause' as const,
-                label: 'nach Hause',
+                label: texts.destinationNachHause,
                 colorScheme: 'destructive' as const,
                 icon: ICON_NACH_HAUSE,
                 onClick: handleNachHause,
@@ -1343,7 +541,7 @@ const ActivityScanningPage: React.FC = () => {
                           fontWeight: 500,
                         }}
                       >
-                        Abholzeit heute
+                        {texts.pickupTimeToday}
                       </div>
                       <div
                         style={{
@@ -1352,12 +550,16 @@ const ActivityScanningPage: React.FC = () => {
                           lineHeight: 1.1,
                         }}
                       >
-                        {currentScan.pickup_time} Uhr
+                        {texts.pickupTimeValue(currentScan.pickup_time)}
                       </div>
                     </div>
                   )}
                   <div style={{ fontSize: currentScan.pickup_time ? '22px' : undefined }}>
-                    {`Du bist jetzt in ${currentScan.room_name ? formatRoomName(currentScan.room_name) : 'diesem Raum'}`}
+                    {texts.checkedInMessage(
+                      currentScan.room_name
+                        ? formatRoomName(currentScan.room_name)
+                        : texts.roomFallback
+                    )}
                   </div>
                 </>
               );
@@ -1379,7 +581,7 @@ const ActivityScanningPage: React.FC = () => {
                           fontWeight: 500,
                         }}
                       >
-                        Abholzeit heute
+                        {texts.pickupTimeToday}
                       </div>
                       <div
                         style={{
@@ -1388,13 +590,11 @@ const ActivityScanningPage: React.FC = () => {
                           lineHeight: 1.1,
                         }}
                       >
-                        {currentScan.pickup_time} Uhr
+                        {texts.pickupTimeValue(currentScan.pickup_time)}
                       </div>
                     </div>
                   ) : (
-                    <div style={{ textAlign: 'center' }}>
-                      Für heute ist keine Abholzeit hinterlegt.
-                    </div>
+                    <div style={{ textAlign: 'center' }}>{texts.noPickupTimeToday}</div>
                   )}
                   {currentScan.pickup_note && (
                     <div
@@ -1414,7 +614,7 @@ const ActivityScanningPage: React.FC = () => {
             case 'checked_out':
               return ''; // Checkout shows destination buttons, no extra text needed
             case 'transferred':
-              return 'Raumwechsel erfolgreich';
+              return texts.transferSuccess;
             default:
               return '';
           }
@@ -1422,15 +622,6 @@ const ActivityScanningPage: React.FC = () => {
       </div>
     );
   };
-
-  const shouldShowCheckModal = showModal && (!!currentScan || isAwaitingPickupQueryScan);
-  const shouldKeepPickupQueryModalOpen = isAwaitingPickupQueryScan || isPickupQueryLoading;
-  const isPickupQueryPromptOpen =
-    shouldShowCheckModal && isAwaitingPickupQueryScan && !isPickupQueryLoading && !currentScan;
-  const isPickupQueryVisualState =
-    isPickupQueryPromptOpen || isPickupQueryLoading || currentScan?.action === 'pickup_info';
-  const isPickupQueryHeadingState = isPickupQueryPromptOpen || isPickupQueryLoading;
-  const pickupQueryButtonDisabled = showModal || rfid.processingQueue.size > 0;
 
   return (
     <>
@@ -1456,7 +647,7 @@ const ActivityScanningPage: React.FC = () => {
           >
             <BackButton
               onClick={handleAnmelden}
-              text="Anmelden"
+              text={texts.loginButton}
               customIcon={
                 <svg
                   width="28"
@@ -1470,7 +661,7 @@ const ActivityScanningPage: React.FC = () => {
                   <circle cx="12" cy="7" r="4" />
                 </svg>
               }
-              ariaLabel="Anmelden - zur PIN-Eingabe"
+              ariaLabel={texts.loginAriaLabel}
             />
           </div>
 
@@ -1478,7 +669,7 @@ const ActivityScanningPage: React.FC = () => {
             type="button"
             onClick={handlePickupQueryClick}
             disabled={pickupQueryButtonDisabled}
-            aria-label="Abholzeit abfragen"
+            aria-label={texts.pickupQueryAriaLabel}
             style={{
               position: 'absolute',
               top: '20px',
@@ -1552,7 +743,7 @@ const ActivityScanningPage: React.FC = () => {
                   fontWeight: 500,
                 }}
               >
-                {selectedRoom?.name || 'Unbekannt'}
+                {selectedRoom?.name || texts.unknownRoom}
               </p>
             </div>
 
@@ -1574,7 +765,7 @@ const ActivityScanningPage: React.FC = () => {
                   color: '#83cd2d',
                   lineHeight: 1,
                   marginTop: '-12px',
-                  opacity: rfid.processingQueue.size > 0 ? 0 : 1,
+                  opacity: processingQueueSize > 0 ? 0 : 1,
                 }}
               >
                 {studentCount ?? 0}
@@ -1591,11 +782,9 @@ const ActivityScanningPage: React.FC = () => {
                   WebkitMask:
                     'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
                   animation:
-                    rfid.processingQueue.size > 0
-                      ? 'rfid-center-spin 0.8s linear infinite'
-                      : 'none',
+                    processingQueueSize > 0 ? 'rfid-center-spin 0.8s linear infinite' : 'none',
                   transition: 'opacity 0.3s ease',
-                  opacity: rfid.processingQueue.size > 0 ? 1 : 0,
+                  opacity: processingQueueSize > 0 ? 1 : 0,
                   pointerEvents: 'none',
                 }}
               />
@@ -1641,7 +830,7 @@ const ActivityScanningPage: React.FC = () => {
           timeout={modalTimeoutDuration}
           timeoutResetKey={
             isPickupQueryPromptOpen
-              ? `pickup-query-prompt-${rfid.scanContextId}`
+              ? `pickup-query-prompt-${scanContextId}`
               : showFeedbackPrompt
                 ? `feedback-${checkoutDestinationState?.studentId}`
                 : `${currentScan?.student_id ?? 'none'}-${currentScan?.action ?? 'none'}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
@@ -1822,27 +1011,27 @@ const ActivityScanningPage: React.FC = () => {
           >
             {(() => {
               if (isPickupQueryHeadingState) {
-                return 'Abholzeit abfragen';
+                return texts.pickupQueryHeading;
               }
 
               // Feedback prompt
               if (showFeedbackPrompt) {
                 const firstName = checkoutDestinationState?.studentName?.split(' ')[0] ?? '';
-                return `Wie war dein Tag, ${firstName}?`;
+                return texts.feedbackHeading(firstName);
               }
 
               // Farewell state after "nach Hause" feedback
               if (checkoutDestinationState?.showingFarewell) {
                 const firstName = checkoutDestinationState.studentName.split(' ')[0];
-                return `Tschüss, ${firstName}!`;
+                return texts.farewellHeading(firstName);
               }
 
               // Supervisor authentication - prefer custom message (e.g., redirect hint)
               if (currentScan?.action === 'supervisor_authenticated') {
                 if (currentScan.message) return currentScan.message;
 
-                const roomName = selectedRoom?.name ?? 'diesen Raum';
-                return `${currentScan.student_name} betreut jetzt ${roomName}`;
+                const roomName = selectedRoom?.name ?? texts.supervisorRoomFallback;
+                return texts.supervisorHeading(currentScan.student_name, roomName);
               }
 
               // Error/Info states use student_name as the title
@@ -1855,12 +1044,12 @@ const ActivityScanningPage: React.FC = () => {
 
               if (currentScan?.action === 'pickup_info') {
                 const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return `Abholzeit für ${firstName}`;
+                return texts.pickupInfoHeading(firstName);
               }
 
               // Check-in: use backend message if available, otherwise default greeting
               if (currentScan?.action === 'checked_in') {
-                return currentScan.message ?? `Hallo, ${currentScan.student_name}!`;
+                return currentScan.message ?? texts.checkinGreeting(currentScan.student_name);
               }
 
               // Checkout with destination buttons: ask where the student is going
@@ -1870,13 +1059,13 @@ const ActivityScanningPage: React.FC = () => {
                 !checkoutDestinationState.showingFarewell
               ) {
                 const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return `Wohin geht ${firstName}?`;
+                return texts.destinationQuestionHeading(firstName);
               }
 
               // Checkout farewell: after destination selected or no destinations available
               if (currentScan?.action === 'checked_out') {
                 const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return `Tschüss, ${firstName}!`;
+                return texts.farewellHeading(firstName);
               }
 
               // Fallback: use backend message or student name

@@ -1,6 +1,7 @@
 import { renderHook, act, cleanup } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 
+import { resetMockScanSourceForTesting } from '../dev/mockScanSource';
 import type { NfcScanEvent } from '../platform/adapter';
 import {
   api,
@@ -10,7 +11,7 @@ import {
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
-import { useRfidScanning, __resetModuleStateForTesting } from './useRfidScanning';
+import { useRfidScanning } from './useRfidScanning';
 
 // ====================================================================
 // Mock modules
@@ -240,7 +241,7 @@ describe('useRfidScanning', () => {
     // cleanup() in afterEach fires the unmount effect, but if timer mode was
     // swapped (real↔fake) the clearInterval may target the wrong timer pool,
     // leaving mockScanInterval non-null for the next test.
-    __resetModuleStateForTesting();
+    resetMockScanSourceForTesting();
 
     vi.useFakeTimers();
     resetStore();
@@ -1570,6 +1571,44 @@ describe('useRfidScanning', () => {
       });
 
       expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
+    });
+
+    it('processes different tags that share the same numeric scanId', async () => {
+      setRealScanning();
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      let capturedOnScan: ((event: NfcScanEvent) => void) | undefined;
+      mockAdapterStartScanning.mockImplementation(async onScan => {
+        capturedOnScan = onScan;
+      });
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      await act(async () => {
+        capturedOnScan!({ tagId: '04:AA:BB:CC:DD:EE:FF', scanId: 404 });
+        capturedOnScan!({ tagId: '04:11:22:33:44:55:66', scanId: 404 });
+      });
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(2);
+      expect(mockedProcessRfidScan).toHaveBeenCalledWith(
+        expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
+        '1234'
+      );
+      expect(mockedProcessRfidScan).toHaveBeenCalledWith(
+        expect.objectContaining({ student_rfid: '04:11:22:33:44:55:66' }),
+        '1234'
+      );
     });
   });
 

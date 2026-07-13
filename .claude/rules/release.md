@@ -22,8 +22,13 @@ The script checks that `package.json` is greater than the latest GitHub release 
 2. Run `./scripts/check-version.sh`.
 3. Commit the version bump.
 4. Push to `development`.
-5. Let the GKT deployment workflow build and deploy the app.
-6. Verify the deployed GKT environment.
+5. Let the GKT deployment workflow build and deploy the staging app.
+6. Verify the deployed staging GKT environment.
+7. Merge the release PR from `development` into `main`.
+8. Let the GKT deployment workflow deploy production and create the GitHub release for the version in `package.json`.
+9. Verify the production GKT environment and confirm that the `v<version>` tag and GitHub release target the deployed commit.
+
+The production workflow creates a metadata-only GitHub release with generated notes after a successful deployment. Re-running the workflow for the same commit is idempotent; reusing an existing version for a different commit fails before deployment.
 
 ## Rules
 

@@ -4,11 +4,8 @@ export interface PillButtonProps {
   /** Button content (text) */
   children: ReactNode;
 
-  /** Optional icon element */
+  /** Optional icon element (rendered left of the text) */
   icon?: ReactNode;
-
-  /** Icon position - defaults to 'left' */
-  iconPosition?: 'left' | 'right';
 
   /** Button variant - determines color scheme */
   variant: 'primary' | 'action' | 'secondary';

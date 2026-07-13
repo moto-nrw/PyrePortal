@@ -1,6 +1,6 @@
 # PyrePortal
 
-![PyrePortal](public/img/moto_transparent_200.png)
+![PyrePortal](docs/img/moto_transparent_200.png)
 
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/typescript-5.9-blue)](https://www.typescriptlang.org)
@@ -99,6 +99,36 @@ GKT deployments pass the device API key through the kiosk URL (`?key=...`) and b
 pnpm run dev
 ```
 
+### Testing Locally
+
+Four stages, from fastest feedback to closest-to-production:
+
+1. **Browser mock (daily loop).** Run the Phoenix backend locally (`../project-phoenix`, port 8080), then `pnpm run dev`. Mock RFID scans fire automatically every 5-10 seconds from `VITE_MOCK_RFID_TAGS`; those tags must exist in the backend data.
+
+2. **GKT adapter without a device.** The production scan path can be tested locally:
+
+   ```bash
+   BUILD_TARGET=gkt VITE_API_BASE_URL=http://localhost:8080 pnpm run dev
+   ```
+
+   Open `http://localhost:1420/?key=<device-api-key>`. The dev server injects `system.js`, which falls back to `console.log` when the native `GKTKiosk` object is missing. Simulate a hardware NFC scan from the browser DevTools console:
+
+   ```js
+   SYSTEM.onNfcScanned({ uid: '04:D6:94:82:97:6A:80', eventSource: 'NFC', eventNumber: 1 });
+   ```
+
+   This exercises the real production code path: GKT adapter, payload normalization, server round-trip.
+
+3. **Tauri Mac/mock app** (only needed when touching Rust or the platform adapters):
+
+   ```bash
+   pnpm dlx @tauri-apps/cli dev
+   ```
+
+   There is no repo script for this; the Tauri CLI tooling was removed when Tauri stopped being a release target.
+
+4. **Staging.** Merging to `development` auto-deploys the GKT staging environment (`deploy-gkt.yml`). Production deploys only on pushes to `main`, so verify on staging before merging `development` into `main`.
+
 ### Build
 
 ```bash
@@ -144,7 +174,7 @@ PyrePortal talks to the Project Phoenix backend over REST. All requests carry de
 
 Enter your PIN on the login screen. PyrePortal validates it against the backend and grants access.
 
-![Login Screen](public/img/placeholder_nfc_scan.png)
+![Login Screen](docs/img/placeholder_nfc_scan.png)
 
 </details>
 
@@ -153,13 +183,13 @@ Enter your PIN on the login screen. PyrePortal validates it against the backend 
 
 Pick a room after logging in. Each room shows its current status:
 
-- ![Occupied](public/img/checked_in.png) Occupied
-- ![Available](public/img/checked_out.png) Available
+- ![Occupied](docs/img/checked_in.png) Occupied
+- ![Available](docs/img/checked_out.png) Available
 
 Room types include:
 
-- ![School Yard](public/img/school_yard_icon.png) School Yard
-- ![Toilet](public/img/toilet_icon.png) Toilet
+- ![School Yard](docs/img/school_yard_icon.png) School Yard
+- ![Toilet](docs/img/toilet_icon.png) Toilet
 
 </details>
 
@@ -168,9 +198,9 @@ Room types include:
 
 Start an activity, assign supervisors, and scan students in. At checkout, staff can leave daily feedback:
 
-- ![Positive](public/img/positive_smiley1.png) Positive
-- ![Neutral](public/img/neutral_smiley1.png) Neutral
-- ![Negative](public/img/negative_smiley1.png) Negative
+- ![Positive](docs/img/positive_smiley1.png) Positive
+- ![Neutral](docs/img/neutral_smiley1.png) Neutral
+- ![Negative](docs/img/negative_smiley1.png) Negative
 
 </details>
 

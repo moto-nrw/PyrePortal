@@ -39,7 +39,12 @@ export function normalizeNfcPayload(
 
   if (typeof payload === 'object' && payload !== null) {
     const obj = payload as Record<string, unknown>;
-    const eventNumber = typeof obj.eventNumber === 'number' ? obj.eventNumber : null;
+    const eventNumber =
+      typeof obj.eventNumber === 'number' &&
+      Number.isSafeInteger(obj.eventNumber) &&
+      obj.eventNumber >= 0
+        ? obj.eventNumber
+        : null;
 
     // Intent-path: {uid: "f0:bc:e8:44", eventSource: "NFC"}
     if (typeof obj.uid === 'string' && obj.uid) {
@@ -62,7 +67,7 @@ class GKTAdapter extends WebAdapterBase implements PlatformAdapter {
     // Register NFC callback with system.js — handles all payload shapes.
     // GKT NFC fires once per physical tap (Android intent-based dispatch),
     // unlike MFRC522 which polls continuously. No adapter-level dedup needed —
-    // every callback is a distinct scan. Tauri handles its own dedup in Rust.
+    // every callback is a distinct scan.
     SYSTEM.registerNfc((payload: unknown) => {
       if (!this.scanCallback) return;
 
@@ -71,7 +76,10 @@ class GKTAdapter extends WebAdapterBase implements PlatformAdapter {
 
       this.scanCallback({
         tagId: parsed.tagId,
-        scanId: parsed.eventNumber ?? ++this.scanCounter,
+        // Keep hardware and local identities in separate numeric namespaces.
+        // system.js eventNumber values are non-negative; missing identities use
+        // negative local IDs so the two delivery paths cannot collide.
+        scanId: parsed.eventNumber ?? -++this.scanCounter,
       });
     });
   }

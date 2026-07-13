@@ -33,7 +33,7 @@ export interface PlatformAdapter {
   startScanning(onScan: (event: NfcScanEvent) => void): Promise<void>;
   stopScanning(): Promise<void>;
 
-  // --- Service Lifecycle (Tauri: polls backend, GKT: no-op) ---
+  // --- Service Lifecycle (GKT: reflects NFC registration, others: mock no-op) ---
   getServiceStatus(): Promise<{ is_running: boolean }>;
 
   // --- Single Tag Scan (admin tag assignment UI) ---

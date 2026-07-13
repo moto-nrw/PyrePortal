@@ -84,18 +84,6 @@ describe('mapServerErrorToGerman', () => {
     );
   });
 
-  it('maps locked account', () => {
-    expect(mapServerErrorToGerman('staff account is locked due to failed PIN attempts')).toBe(
-      'Konto gesperrt wegen zu vieler Fehlversuche. Bitte Administrator kontaktieren.'
-    );
-  });
-
-  it('maps maximum PIN attempts', () => {
-    expect(mapServerErrorToGerman('maximum PIN attempts exceeded')).toBe(
-      'Maximale PIN-Versuche überschritten. Konto gesperrt.'
-    );
-  });
-
   it('maps generic locked', () => {
     expect(mapServerErrorToGerman('locked')).toBe('Konto gesperrt. Bitte später erneut versuchen.');
   });
@@ -167,10 +155,19 @@ describe('mapServerErrorToGerman', () => {
     );
   });
 
-  it('maps staff RFID auth error', () => {
+  // Attendance errors
+  it('maps missing attendance record on daily checkout', () => {
+    expect(mapServerErrorToGerman('student has no attendance record for today')).toBe(
+      'Schüler wurde heute noch nicht eingecheckt.'
+    );
+  });
+
+  it('maps missing attendance record inside the full wire message', () => {
     expect(
-      mapServerErrorToGerman('staff RFID authentication must be done via session management')
-    ).toBe('Betreuer-Armband kann hier nicht verwendet werden.');
+      mapServerErrorToGerman(
+        'API Error: 404 - Not Found: student has no attendance record for today'
+      )
+    ).toBe('Schüler wurde heute noch nicht eingecheckt.');
   });
 
   // Internal server errors
@@ -279,12 +276,6 @@ describe('mapServerErrorToGerman', () => {
     expect(mapServerErrorToGerman('staff PIN is required')).toBe('PIN nicht angegeben.');
   });
 
-  it('maps device is offline', () => {
-    expect(mapServerErrorToGerman('device is offline')).toBe(
-      'Gerät ist als offline markiert. Bitte Administrator kontaktieren.'
-    );
-  });
-
   it('maps no active session', () => {
     expect(mapServerErrorToGerman('no active session')).toBe(
       'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.'
@@ -338,10 +329,12 @@ describe('mapApiErrorToGerman', () => {
   });
 
   it('handles ApiError with activity capacity details', () => {
+    // Backend sends current_occupancy/max_capacity for activity capacity too
+    // (project-phoenix issue #1879)
     const error = new ApiError('Activity capacity exceeded', 409, 'ACTIVITY_CAPACITY_EXCEEDED', {
       activity_name: 'Fußball AG',
-      current_participants: 20,
-      max_participants: 20,
+      current_occupancy: 20,
+      max_capacity: 20,
     });
     const result = mapApiErrorToGerman(error);
     expect(result).toBe('Fußball AG ist voll (20/20 Teilnehmer).');
@@ -374,10 +367,21 @@ describe('mapApiErrorToGerman', () => {
     );
   });
 
+  it('activity 409 with details omitted (setting off) shows generic message', () => {
+    // The backend omits `details` when the tenant setting
+    // checkin.activity_capacity_details_enabled is off — the default
+    // (project-phoenix issue #1879). The kiosk must fall back cleanly.
+    const error = new ApiError('Activity capacity exceeded', 409, 'ACTIVITY_CAPACITY_EXCEEDED');
+    expect(error.details).toBeUndefined();
+    expect(mapApiErrorToGerman(error)).toBe(
+      'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.'
+    );
+  });
+
   it('handles activity capacity with partial details', () => {
     const error = new ApiError('capacity', 409, 'ACTIVITY_CAPACITY_EXCEEDED', {
       activity_name: 'Kunst',
-      max_participants: 15,
+      max_capacity: 15,
     });
     expect(mapApiErrorToGerman(error)).toBe('Kunst ist voll (15/15 Teilnehmer).');
   });
@@ -397,7 +401,7 @@ describe('mapApiErrorToGerman', () => {
 
   it('handles activity capacity details without activity_name', () => {
     const error = new ApiError('capacity', 409, 'ACTIVITY_CAPACITY_EXCEEDED', {
-      max_participants: 15,
+      max_capacity: 15,
     });
     // No activity_name → falls back to generic message
     expect(mapApiErrorToGerman(error)).toBe(

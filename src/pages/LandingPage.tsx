@@ -1,23 +1,23 @@
 import { adapter } from '@platform';
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import BackButton from '../components/ui/BackButton';
-import { getSchoolName, onSchoolNameLoaded } from '../services/api';
-import theme from '../styles/theme';
+import { useSchoolName } from '../hooks/useSchoolName';
+import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
+
+/** User-facing German UI copy for this page */
+const texts = {
+  restartButton: 'Neu starten',
+  welcomeHeading: 'Willkommen bei moto!',
+  loginButton: 'Anmelden',
+} as const;
 
 function LandingPage() {
   const navigate = useNavigate();
   const logger = createLogger('LandingPage');
-  const [schoolName, setSchoolName] = useState<string | null>(getSchoolName());
-
-  // Subscribe once: if the name arrives after mount, update state
-  useEffect(() => {
-    if (schoolName) return;
-    return onSchoolNameLoaded(setSchoolName);
-  }, [schoolName]);
+  const schoolName = useSchoolName();
 
   const handleLogin = () => {
     logger.info('User initiated login from landing page');
@@ -56,7 +56,12 @@ function LandingPage() {
           zIndex: 50,
         }}
       >
-        <BackButton onClick={handleRestart} text="Neu starten" color="blue" icon="restart" />
+        <BackButton
+          onClick={handleRestart}
+          text={texts.restartButton}
+          color="blue"
+          icon="restart"
+        />
       </div>
 
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -68,7 +73,7 @@ function LandingPage() {
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: theme.spacing.md,
+              gap: designSystem.spacing.md,
               width: '100%',
               maxWidth: '500px',
               margin: '0 auto',
@@ -79,7 +84,7 @@ function LandingPage() {
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                marginBottom: theme.spacing.sm,
+                marginBottom: designSystem.spacing.sm,
               }}
             >
               <img
@@ -88,7 +93,7 @@ function LandingPage() {
                   height: 'auto',
                   width: '280px',
                   maxWidth: '100%',
-                  transition: theme.animation.transition.slow,
+                  transition: designSystem.transitions.slow,
                   filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))',
                 }}
                 className="hover:drop-shadow-xl"
@@ -105,12 +110,12 @@ function LandingPage() {
               }
               style={{
                 fontSize: '64px',
-                marginBottom: theme.spacing.md,
+                marginBottom: designSystem.spacing.md,
                 textAlign: 'center',
                 lineHeight: 1.2,
               }}
             >
-              Willkommen bei moto!
+              {texts.welcomeHeading}
             </h1>
 
             <p
@@ -164,7 +169,7 @@ function LandingPage() {
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
               }}
             >
-              Anmelden
+              {texts.loginButton}
             </button>
           </div>
         </div>
