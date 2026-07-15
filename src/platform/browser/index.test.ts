@@ -1,10 +1,15 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { adapter } = await import('./index');
 
 beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear();
+  window.history.pushState({}, '', '/');
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe('BrowserAdapter', () => {
@@ -66,10 +71,23 @@ describe('BrowserAdapter', () => {
   });
 
   describe('getDeviceApiKey', () => {
-    it('returns a string key', () => {
-      const key = adapter.getDeviceApiKey();
-      expect(typeof key).toBe('string');
-      expect(key.length).toBeGreaterThan(0);
+    it('prefers the URL key over VITE_DEVICE_API_KEY', () => {
+      vi.stubEnv('VITE_DEVICE_API_KEY', 'env-key-456');
+      window.history.pushState({}, '', '/?key=url-key');
+
+      expect(adapter.getDeviceApiKey()).toBe('url-key');
+    });
+
+    it('uses VITE_DEVICE_API_KEY when no key is in the URL', () => {
+      vi.stubEnv('VITE_DEVICE_API_KEY', 'env-key-456');
+
+      expect(adapter.getDeviceApiKey()).toBe('env-key-456');
+    });
+
+    it('falls back to dev-key when no URL or env key exists', () => {
+      vi.stubEnv('VITE_DEVICE_API_KEY', undefined);
+
+      expect(adapter.getDeviceApiKey()).toBe('dev-key');
     });
   });
 

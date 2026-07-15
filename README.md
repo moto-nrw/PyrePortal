@@ -11,6 +11,7 @@ PyrePortal is the web kiosk frontend for German after-school care (OGS). Staff u
 ## Supported Targets
 
 - **GKT/GKTL kiosk devices**: production target. NFC is provided by the GKT system bridge via `system.js`.
+- **Wedge (iPad/tablet + USB NFC reader)**: kiosk target for tablets with a USB NFC reader in keyboard-emulation mode (e.g. ACS ACR1552U-MF). See [docs/wedge-reader-setup.md](docs/wedge-reader-setup.md).
 - **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
 - **Tauri Mac/mock app**: local development target for launching the mock frontend as a desktop app.
 
@@ -133,6 +134,7 @@ Four stages, from fastest feedback to closest-to-production:
 
 ```bash
 pnpm run build:gkt    # Production GKT bundle
+pnpm run build:wedge  # Production wedge bundle (tablet + USB NFC reader)
 pnpm run build        # Browser/mock bundle
 ```
 

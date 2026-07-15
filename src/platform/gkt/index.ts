@@ -6,13 +6,8 @@
  * Actual implementation happens in Phase 1-4.
  */
 
-import type { SessionSettings } from '../../services/sessionStorage';
-import type { NfcScanEvent, PlatformAdapter } from '../adapter';
-import {
-  clearLastSessionFromLocalStorage,
-  loadSessionSettingsFromLocalStorage,
-  saveSessionSettingsToLocalStorage,
-} from '../shared/localStorageSession';
+import type { PlatformAdapter } from '../adapter';
+import { WebAdapterBase } from '../webAdapterBase';
 
 // SYSTEM is a global injected by system.js (loaded in index.html)
 declare const SYSTEM: {
@@ -65,12 +60,8 @@ export function normalizeNfcPayload(
   return null;
 }
 
-class GKTAdapter implements PlatformAdapter {
+class GKTAdapter extends WebAdapterBase implements PlatformAdapter {
   readonly platform = 'gkt' as const;
-  private scanCallback: ((event: NfcScanEvent) => void) | null = null;
-  private cachedApiKey: string | null = null;
-  private scanCounter = 0;
-  private singleScanTimer: ReturnType<typeof setTimeout> | null = null;
 
   async initializeNfc(): Promise<void> {
     // Register NFC callback with system.js — handles all payload shapes.
@@ -93,108 +84,12 @@ class GKTAdapter implements PlatformAdapter {
     });
   }
 
-  private cancelPendingSingleScan(): void {
-    if (this.singleScanTimer) {
-      clearTimeout(this.singleScanTimer);
-      this.singleScanTimer = null;
-    }
-  }
-
-  async startScanning(onScan: (event: NfcScanEvent) => void): Promise<void> {
-    // Cancel any pending scanSingleTag timeout so its stale closure
-    // can't overwrite this newer callback when it fires.
-    this.cancelPendingSingleScan();
-    this.scanCallback = onScan;
-  }
-
-  async stopScanning(): Promise<void> {
-    this.cancelPendingSingleScan();
-    this.scanCallback = null;
-  }
-
-  async getServiceStatus(): Promise<{ is_running: boolean }> {
-    // GKT NFC is always running once registered
-    return { is_running: this.scanCallback !== null };
-  }
-
-  async scanSingleTag(
-    timeoutMs: number
-  ): Promise<{ success: boolean; tag_id?: string; error?: string }> {
-    // GKT has no blocking single-scan API — simulate by capturing the next
-    // NFC callback and resolving the promise with it.
-    const previousCallback = this.scanCallback;
-    return new Promise(resolve => {
-      const oneShotCallback = (event: NfcScanEvent) => {
-        this.singleScanTimer = null;
-        clearTimeout(timer);
-        // Only restore if we're still the active callback
-        if (this.scanCallback === oneShotCallback) {
-          this.scanCallback = previousCallback;
-        }
-        resolve({ success: true, tag_id: event.tagId });
-      };
-
-      const timer = setTimeout(() => {
-        this.singleScanTimer = null;
-        // Only restore if we're still the active callback
-        if (this.scanCallback === oneShotCallback) {
-          this.scanCallback = previousCallback;
-        }
-        resolve({ success: false, error: 'Scan timed out' });
-      }, timeoutMs);
-
-      this.singleScanTimer = timer;
-      this.scanCallback = oneShotCallback;
-    });
-  }
-
-  async loadConfig(): Promise<void> {
-    // No-op: GKT reads config synchronously from env vars / URL params
-  }
-
-  getApiBaseUrl(): string {
-    return (import.meta.env.VITE_API_BASE_URL as string) ?? 'https://api.moto-app.de';
-  }
-
-  getDeviceApiKey(): string {
-    const params = new URLSearchParams(window.location.search);
-    const key = params.get('key');
-    if (!key) {
-      if (this.cachedApiKey) {
-        return this.cachedApiKey;
-      }
-      throw new Error('DEVICE_API_KEY not found in URL. Expected ?key=...');
-    }
-    this.cachedApiKey = key;
-    return key;
-  }
-
-  async saveSessionSettings(settings: SessionSettings): Promise<void> {
-    saveSessionSettingsToLocalStorage(settings);
-  }
-
-  async loadSessionSettings(): Promise<SessionSettings | null> {
-    return loadSessionSettingsFromLocalStorage();
-  }
-
-  async clearLastSession(): Promise<void> {
-    clearLastSessionFromLocalStorage();
-  }
-
   async persistLog(entry: string): Promise<void> {
     try {
       SYSTEM.log2('PyrePortal', entry);
     } catch {
       // eslint-disable-next-line no-console
       console.log(entry);
-    }
-  }
-
-  async restartApp(): Promise<void> {
-    if (this.cachedApiKey) {
-      window.location.href = `${window.location.origin}/?key=${encodeURIComponent(this.cachedApiKey)}`;
-    } else {
-      window.location.reload();
     }
   }
 }

@@ -64,6 +64,7 @@ export function useTagAssignmentScan() {
   // Refs for scan cancellation
   const mockScanTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanCancelledRef = useRef(false);
+  const scanRequestIdRef = useRef(0);
 
   const clearStates = useCallback(() => {
     setScannedTag(null);
@@ -79,11 +80,19 @@ export function useTagAssignmentScan() {
 
     // Mark scan as cancelled to prevent processing results
     scanCancelledRef.current = true;
+    scanRequestIdRef.current += 1;
 
     // Clear mock scan timeout if running
     if (mockScanTimeoutRef.current) {
       clearTimeout(mockScanTimeoutRef.current);
       mockScanTimeoutRef.current = null;
+    }
+
+    if (isRealScanningEnabled()) {
+      void adapter.stopScanning().catch(err => {
+        const error = err instanceof Error ? err : new Error(String(err));
+        logError(error, 'Failed to cancel RFID scanner');
+      });
     }
 
     // Close modal and reset loading state
@@ -94,11 +103,21 @@ export function useTagAssignmentScan() {
   // Cleanup timeout on unmount to prevent memory leaks
   useEffect(() => {
     return () => {
+      scanRequestIdRef.current += 1;
       if (mockScanTimeoutRef.current) {
         clearTimeout(mockScanTimeoutRef.current);
       }
+      if (isRealScanningEnabled()) {
+        void adapter.stopScanning().catch(err => {
+          const error = err instanceof Error ? err : new Error(String(err));
+          logError(error, 'Failed to stop RFID scanner during cleanup');
+        });
+      }
     };
   }, []);
+
+  const isCurrentScanRequest = (scanRequestId: number): boolean =>
+    scanRequestIdRef.current === scanRequestId && !scanCancelledRef.current;
 
   // Check current tag assignment
   const checkTagAssignment = async (tagId: string): Promise<TagAssignmentCheck> => {
@@ -110,7 +129,9 @@ export function useTagAssignmentScan() {
   };
 
   // Handle tag scanned (connection point for RFID module)
-  const handleTagScanned = async (tagId: string) => {
+  const handleTagScanned = async (tagId: string, scanRequestId: number) => {
+    if (!isCurrentScanRequest(scanRequestId)) return;
+
     setIsLoading(true);
     setShowScanner(false);
     setScannedTag(tagId);
@@ -120,20 +141,33 @@ export function useTagAssignmentScan() {
 
       // Check if tag is already assigned
       const assignment = await checkTagAssignment(tagId);
+      if (!isCurrentScanRequest(scanRequestId)) {
+        logger.debug('RFID tag assignment result ignored after scan cancellation', { tagId });
+        return;
+      }
       setTagAssignment(assignment);
     } catch (err) {
+      if (!isCurrentScanRequest(scanRequestId)) {
+        logger.debug('RFID tag assignment error ignored after scan cancellation', { tagId });
+        return;
+      }
+
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'Failed to process scanned tag');
       setError('Armband konnte nicht überprüft werden. Bitte Internetverbindung prüfen.');
       setShowErrorModal(true);
     } finally {
-      setIsLoading(false);
+      if (isCurrentScanRequest(scanRequestId)) {
+        setIsLoading(false);
+      }
     }
   };
 
   // Start RFID scanning process
   const startScanning = async () => {
     logUserAction('RFID scanning started');
+
+    const scanRequestId = ++scanRequestIdRef.current;
 
     // Reset cancellation flag at start of new scan
     scanCancelledRef.current = false;
@@ -147,7 +181,7 @@ export function useTagAssignmentScan() {
         // Development mock behavior - store timeout ref for cancellation
         mockScanTimeoutRef.current = setTimeout(() => {
           // Check if scan was cancelled before processing
-          if (scanCancelledRef.current) {
+          if (!isCurrentScanRequest(scanRequestId)) {
             logger.debug('Mock scan completed but was cancelled, ignoring result');
             return;
           }
@@ -155,7 +189,7 @@ export function useTagAssignmentScan() {
           const mockTagId = pickRandomMockTag();
           logUserAction('Mock RFID tag scanned', { tagId: mockTagId, platform: 'Development' });
           mockScanTimeoutRef.current = null;
-          void handleTagScanned(mockTagId);
+          void handleTagScanned(mockTagId, scanRequestId);
         }, 2000);
         return;
       }
@@ -168,14 +202,14 @@ export function useTagAssignmentScan() {
       );
 
       // Check if scan was cancelled while waiting for result
-      if (scanCancelledRef.current) {
+      if (!isCurrentScanRequest(scanRequestId)) {
         logger.debug('RFID scan completed but was cancelled, ignoring result');
         return;
       }
 
       if (result.success && result.tag_id) {
         logUserAction('RFID tag scanned successfully', { tagId: result.tag_id });
-        void handleTagScanned(result.tag_id);
+        void handleTagScanned(result.tag_id, scanRequestId);
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';
         logError(new Error(errorMessage), 'RFID scanning failed');
@@ -185,7 +219,7 @@ export function useTagAssignmentScan() {
       }
     } catch (err) {
       // Check if error was due to cancellation
-      if (scanCancelledRef.current) {
+      if (!isCurrentScanRequest(scanRequestId)) {
         logger.debug('RFID scan error after cancellation, ignoring');
         return;
       }
@@ -202,7 +236,7 @@ export function useTagAssignmentScan() {
       setShowScanner(false);
     } finally {
       // Only update loading state if not cancelled (cancelScan handles this)
-      if (!scanCancelledRef.current) {
+      if (isCurrentScanRequest(scanRequestId)) {
         setIsLoading(false);
       }
     }
