@@ -41,7 +41,7 @@ const RestartIcon = ({ stroke }: { stroke: string }) => (
 interface BackButtonProps {
   onClick: () => void;
   text?: string;
-  /** Icon and text color - defaults to gray (#374151), use 'blue' for primary blue */
+  /** Icon and text color - defaults to gray (#4B5563), use 'blue' for primary blue */
   color?: 'gray' | 'blue';
   /** Icon type - 'back' for back arrow (default), 'restart' for restart icon */
   icon?: 'back' | 'restart';
@@ -54,8 +54,9 @@ interface BackButtonProps {
 }
 
 /**
- * Navigation back button with glassmorphism styling.
- * Thin wrapper around PillButton with secondary variant.
+ * Navigation back button with subtle ghost styling.
+ * Thin wrapper around PillButton with the ghost variant (transparent, no
+ * border/shadow, muted gray text that deepens on press).
  */
 const BackButton: React.FC<BackButtonProps> = ({
   onClick,
@@ -66,7 +67,7 @@ const BackButton: React.FC<BackButtonProps> = ({
   ariaLabel,
   disabled,
 }) => {
-  const strokeColor = color === 'blue' ? '#5080d8' : '#374151';
+  const strokeColor = color === 'blue' ? '#5080d8' : '#4B5563';
 
   const renderIcon = () => {
     if (customIcon) return customIcon;
@@ -76,7 +77,7 @@ const BackButton: React.FC<BackButtonProps> = ({
 
   return (
     <PillButton
-      variant="secondary"
+      variant="ghost"
       color={color}
       onClick={onClick}
       disabled={disabled}

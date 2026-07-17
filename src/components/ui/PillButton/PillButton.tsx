@@ -33,6 +33,15 @@ const variantStyles = {
     shadow: designSystem.shadows.sm,
     border: `1px solid ${designSystem.gray[300]}`,
   },
+  ghost: {
+    background: 'transparent',
+    hoverBackground: designSystem.gray[100],
+    color: designSystem.gray[600],
+    fontSize: '20px',
+    padding: '0 32px',
+    shadow: 'none',
+    border: '1px solid transparent',
+  },
 };
 
 /** Color-specific styling for secondary variant */
@@ -45,6 +54,23 @@ const secondaryColors = {
   blue: {
     color: '#5080D8',
     border: '1px solid rgba(80, 128, 216, 0.3)',
+    touchBackground: 'rgba(80, 128, 216, 0.1)',
+  },
+};
+
+/**
+ * Color-specific styling for the ghost variant (subtle, no border/shadow).
+ * Resting text is muted; press/hover deepens the text and adds a faint tint.
+ */
+const ghostColors = {
+  gray: {
+    color: designSystem.gray[600],
+    touchColor: designSystem.gray[900],
+    touchBackground: designSystem.gray[100],
+  },
+  blue: {
+    color: '#5080D8',
+    touchColor: '#4A70C8',
     touchBackground: 'rgba(80, 128, 216, 0.1)',
   },
 };
@@ -65,7 +91,12 @@ export function PillButton({
   ariaLabel,
 }: Readonly<PillButtonProps>) {
   const vstyle = variantStyles[variant];
-  const colorStyle = variant === 'secondary' ? secondaryColors[color] : null;
+  const colorStyle =
+    variant === 'secondary'
+      ? secondaryColors[color]
+      : variant === 'ghost'
+        ? ghostColors[color]
+        : null;
 
   const baseStyle: CSSProperties = {
     display: 'flex',
@@ -78,7 +109,7 @@ export function PillButton({
     fontWeight: 500,
     color: colorStyle?.color ?? vstyle.color,
     background: disabled ? designSystem.gray[400] : vstyle.background,
-    border: colorStyle?.border ?? vstyle.border,
+    border: (colorStyle && 'border' in colorStyle ? colorStyle.border : undefined) ?? vstyle.border,
     borderRadius: '34px',
     cursor: disabled ? 'not-allowed' : 'pointer',
     outline: 'none',
@@ -91,7 +122,11 @@ export function PillButton({
   const handlePointerDown = (e: PointerEvent<HTMLButtonElement>) => {
     if (disabled) return;
     e.currentTarget.style.transform = designSystem.scales.activeSmall;
-    if (variant === 'secondary' && colorStyle) {
+    if (variant === 'ghost') {
+      const gc = ghostColors[color];
+      e.currentTarget.style.backgroundColor = gc.touchBackground;
+      e.currentTarget.style.color = gc.touchColor;
+    } else if (variant === 'secondary' && colorStyle) {
       e.currentTarget.style.backgroundColor = colorStyle.touchBackground;
     } else {
       e.currentTarget.style.backgroundColor = vstyle.hoverBackground;
@@ -102,6 +137,9 @@ export function PillButton({
     if (disabled) return;
     e.currentTarget.style.transform = '';
     e.currentTarget.style.backgroundColor = vstyle.background;
+    if (variant === 'ghost') {
+      e.currentTarget.style.color = ghostColors[color].color;
+    }
   };
 
   return (

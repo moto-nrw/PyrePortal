@@ -134,8 +134,19 @@ function LandingPage() {
                 textAlign: 'center',
                 fontWeight: 700,
                 marginTop: '-8px',
+                marginBottom: designSystem.spacing.sm,
                 opacity: schoolName ? 1 : 0,
                 transition: 'opacity 500ms ease-in',
+                lineHeight: 1.2,
+                // Clamp long school names to 2 lines so they never wrap into the
+                // login button or the card's bottom padding.
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                wordBreak: 'break-word',
+                maxWidth: '100%',
                 minHeight: '1.5em',
               }}
             >

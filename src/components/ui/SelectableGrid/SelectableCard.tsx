@@ -163,10 +163,13 @@ export const SelectableCard = memo(function SelectableCard({
           style={{
             fontSize: '12px',
             padding: '4px 12px',
-            borderRadius: designSystem.borderRadius.md,
+            borderRadius: designSystem.borderRadius.full,
             backgroundColor:
-              badgeColor === 'blue' ? designSystem.colors.info : designSystem.colors.primaryGreen,
-            color: designSystem.colors.white,
+              badgeColor === 'blue'
+                ? designSystem.brand.bluePillBg
+                : designSystem.brand.greenPillBg,
+            color:
+              badgeColor === 'blue' ? designSystem.brand.blueText : designSystem.brand.greenText,
             fontWeight: 600,
           }}
         >

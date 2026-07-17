@@ -64,6 +64,7 @@ export const designSystem = {
     // Blue (secondary action)
     blue: '#5080D8',
     blueHover: '#4A70C8',
+    blueText: '#3A5FA8', // accessible dark blue text on white / blue pill tint
     bluePillBg: 'rgba(80, 128, 216, 0.15)',
     // Red (danger / home)
     red: '#FF3130',
