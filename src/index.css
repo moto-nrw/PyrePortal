@@ -2,11 +2,6 @@
 @import "@moto-nrw/design-system/tokens";
 
 /* Geist Sans (phoenix app font) */
-@import "@fontsource/geist-sans/400.css";
-@import "@fontsource/geist-sans/500.css";
-@import "@fontsource/geist-sans/600.css";
-@import "@fontsource/geist-sans/700.css";
-@import "@fontsource/geist-sans/800.css";
 
 /* Box model reset - must come before Tailwind's base to override it */
 * {
