@@ -40,13 +40,13 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
       style={{
         width: '64px',
         height: '64px',
-        background: 'linear-gradient(to right, #F59E0B, #EAB308)',
+        background: designSystem.status.sick,
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         margin: '0 auto 24px auto',
-        boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
+        boxShadow: '0 4px 12px rgba(234, 179, 8, 0.2)',
       }}
     >
       <svg
@@ -272,8 +272,8 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
       isLoading={isLoading}
       confirmLabel="Trotzdem starten"
       loadingLabel="Starte..."
-      confirmGradient="linear-gradient(to right, #DC2626, #B91C1C)"
-      confirmShadow="0 4px 14px 0 rgba(220, 38, 38, 0.4)"
+      confirmGradient={designSystem.flat.danger}
+      confirmShadow={designSystem.shadows.md}
     />
   </ModalBase>
 );

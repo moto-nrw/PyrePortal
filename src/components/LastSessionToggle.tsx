@@ -36,7 +36,7 @@ export const LastSessionToggle: React.FC = () => {
           backgroundColor: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(12px)',
           borderRadius: '34px',
-          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.12)',
+          boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
           border: '1px solid rgba(229, 231, 235, 0.5)',
           padding: '0 32px',
           display: 'flex',

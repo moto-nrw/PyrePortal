@@ -73,10 +73,11 @@ export function SelectionPageLayout({
         {error && (
           <div
             style={{
-              backgroundColor: '#FEE2E2',
-              color: '#DC2626',
+              backgroundColor: 'rgba(255, 49, 48, 0.10)',
+              color: '#FF3130',
+              border: '1px solid rgba(255, 49, 48, 0.30)',
               padding: '16px',
-              borderRadius: '8px',
+              borderRadius: '12px',
               marginBottom: '16px',
               textAlign: 'center',
               fontSize: '16px',

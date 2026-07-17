@@ -87,10 +87,8 @@ export const SelectableCard = memo(function SelectableCard({
         justifyContent: 'center',
         gap: badge ? '12px' : '16px',
         position: 'relative',
-        transition: 'all 150ms ease-out',
-        boxShadow: isSelected
-          ? '0 8px 30px rgba(131, 205, 45, 0.2)'
-          : '0 4px 12px rgba(0, 0, 0, 0.08)',
+        transition: designSystem.transitions.base,
+        boxShadow: designSystem.surface.shadow,
         opacity: isDisabled ? 0.6 : 1,
       }}
     >
@@ -148,7 +146,7 @@ export const SelectableCard = memo(function SelectableCard({
       <span
         style={{
           fontSize: '18px',
-          fontWeight: 700,
+          fontWeight: 600,
           lineHeight: '1.2',
           maxWidth: '100%',
           wordBreak: 'break-word',

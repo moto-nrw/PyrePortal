@@ -41,13 +41,13 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       style={{
         width: '64px',
         height: '64px',
-        background: 'linear-gradient(to right, #83cd2d, #6ba529)',
+        background: designSystem.brand.green,
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         margin: '0 auto 24px auto',
-        boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
+        boxShadow: '0 4px 12px rgba(131, 205, 45, 0.2)',
       }}
     >
       <svg
