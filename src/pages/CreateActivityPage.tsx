@@ -11,6 +11,7 @@ import { PillButton } from '../components/ui/PillButton';
 import { usePagination } from '../hooks/usePagination';
 import { ApiError, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import {
   createLogger,
   logNavigation,
@@ -230,41 +231,65 @@ function CreateActivityPage() {
             justifyContent: 'center',
             alignItems: 'center',
             minHeight: '400px',
-            flexDirection: 'column',
-            gap: '16px',
           }}
         >
-          <svg
-            width="64"
-            height="64"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#9CA3AF"
-            strokeWidth="2"
-          >
-            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-            <line x1="16" y1="2" x2="16" y2="6" />
-            <line x1="8" y1="2" x2="8" y2="6" />
-            <line x1="3" y1="10" x2="21" y2="10" />
-          </svg>
           <div
             style={{
-              fontSize: '24px',
-              color: '#6B7280',
-              fontWeight: 600,
-              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '20px',
+              padding: '56px 72px',
+              border: `1px dashed ${designSystem.gray[200]}`,
+              backgroundColor: 'rgba(249,250,251,0.4)',
+              borderRadius: designSystem.borderRadius.xl,
             }}
           >
-            {texts.noActivitiesHeading}
-          </div>
-          <div
-            style={{
-              fontSize: '16px',
-              color: '#9CA3AF',
-              textAlign: 'center',
-            }}
-          >
-            {texts.noActivitiesHint}
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: '96px',
+                height: '96px',
+                borderRadius: designSystem.borderRadius.full,
+                backgroundColor: designSystem.gray[100],
+              }}
+            >
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={designSystem.gray[400]}
+                strokeWidth="2"
+              >
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </div>
+            <div
+              style={{
+                fontSize: '24px',
+                color: designSystem.gray[500],
+                fontWeight: 600,
+                textAlign: 'center',
+              }}
+            >
+              {texts.noActivitiesHeading}
+            </div>
+            <div
+              style={{
+                fontSize: '16px',
+                color: designSystem.gray[500],
+                textAlign: 'center',
+              }}
+            >
+              {texts.noActivitiesHint}
+            </div>
           </div>
         </div>
       ) : (

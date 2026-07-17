@@ -14,6 +14,7 @@ import { ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { useActivityScanningPage } from '../hooks/pages/useActivityScanningPage';
 import { formatRoomName, type DailyFeedbackRating } from '../services/api';
+import { designSystem } from '../styles/designSystem';
 
 /** User-facing German UI copy for this page */
 const texts = {
@@ -282,12 +283,40 @@ const ActivityScanningPage: React.FC = () => {
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
-        <div className="text-center">
-          <p className="text-lg text-gray-600">{texts.noActivitySelected}</p>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: designSystem.gray[50],
+          padding: '16px',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '20px', color: designSystem.gray[500] }}>
+            {texts.noActivitySelected}
+          </p>
           <button
             onClick={() => navigate('/home')}
-            className="mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+            style={{
+              marginTop: '16px',
+              borderRadius: designSystem.borderRadius.md,
+              backgroundColor: designSystem.flat.primary,
+              color: designSystem.colors.white,
+              border: 'none',
+              padding: '16px 24px',
+              fontSize: '18px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: designSystem.transitions.base,
+            }}
+            onPointerEnter={e => {
+              e.currentTarget.style.backgroundColor = designSystem.flat.primaryHover;
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.backgroundColor = designSystem.flat.primary;
+            }}
           >
             {texts.backToHomeButton}
           </button>
@@ -679,14 +708,14 @@ const ActivityScanningPage: React.FC = () => {
               height: '76px',
               borderRadius: '50%',
               border: 'none',
-              backgroundColor: pickupQueryButtonDisabled ? 'rgba(80, 128, 216, 0.35)' : '#5080D8',
-              color: '#FFFFFF',
+              backgroundColor: pickupQueryButtonDisabled
+                ? 'rgba(80, 128, 216, 0.35)'
+                : designSystem.brand.blue,
+              color: designSystem.colors.white,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: pickupQueryButtonDisabled
-                ? 'none'
-                : '0 12px 24px rgba(80, 128, 216, 0.28)',
+              boxShadow: pickupQueryButtonDisabled ? 'none' : designSystem.shadows.md,
               cursor: pickupQueryButtonDisabled ? 'not-allowed' : 'pointer',
               transition:
                 'transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease',
@@ -728,7 +757,7 @@ const ActivityScanningPage: React.FC = () => {
                 style={{
                   fontSize: '56px',
                   fontWeight: 700,
-                  color: '#111827',
+                  color: designSystem.gray[900],
                   margin: 0,
                   lineHeight: 1.2,
                 }}
@@ -738,7 +767,7 @@ const ActivityScanningPage: React.FC = () => {
               <p
                 style={{
                   fontSize: '32px',
-                  color: '#6B7280',
+                  color: designSystem.gray[500],
                   margin: 0,
                   fontWeight: 500,
                 }}
@@ -762,8 +791,9 @@ const ActivityScanningPage: React.FC = () => {
                 style={{
                   fontSize: '220px',
                   fontWeight: 800,
-                  color: '#83cd2d',
+                  color: designSystem.brand.green,
                   lineHeight: 1,
+                  fontVariantNumeric: 'tabular-nums',
                   marginTop: '-12px',
                   opacity: processingQueueSize > 0 ? 0 : 1,
                 }}
@@ -776,8 +806,7 @@ const ActivityScanningPage: React.FC = () => {
                   width: '140px',
                   height: '140px',
                   borderRadius: '50%',
-                  background:
-                    'conic-gradient(from 0deg, transparent 0%, #5080D8 50%, #83CD2D 100%)',
+                  background: `conic-gradient(from 0deg, ${designSystem.gray[200]} 0%, ${designSystem.gray[900]} 100%)`,
                   mask: 'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
                   WebkitMask:
                     'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
@@ -811,7 +840,7 @@ const ActivityScanningPage: React.FC = () => {
               : 'lg'
           }
           backgroundColor={(() => {
-            if (isPickupQueryVisualState) return '#5080D8';
+            if (isPickupQueryVisualState) return designSystem.brand.blue;
             // "nach Hause" flow states (farewell, feedback) use blue
             if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) return '#6366f1';
             // Check for Schulhof check-in (special yellow)
@@ -824,7 +853,7 @@ const ActivityScanningPage: React.FC = () => {
             if ((currentScan as { isInfo?: boolean } | null)?.isInfo) return '#6366f1'; // Blue for info
             // Original logic for success states
             return currentScan?.action === 'checked_in' || currentScan?.action === 'transferred'
-              ? '#83cd2d'
+              ? designSystem.brand.green
               : '#f87C10';
           })()}
           timeout={modalTimeoutDuration}
@@ -1003,7 +1032,7 @@ const ActivityScanningPage: React.FC = () => {
               fontSize: '48px',
               fontWeight: 800,
               marginBottom: '24px',
-              color: '#FFFFFF',
+              color: designSystem.colors.white,
               lineHeight: 1.2,
               position: 'relative',
               zIndex: 2,

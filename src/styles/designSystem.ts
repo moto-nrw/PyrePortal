@@ -45,6 +45,7 @@ export const designSystem = {
     300: '#D1D5DB',
     400: '#9CA3AF',
     500: '#6B7280',
+    600: '#4B5563',
     700: '#374151',
     800: '#1F2937',
     900: '#111827',
@@ -63,6 +64,7 @@ export const designSystem = {
     // Blue (secondary action)
     blue: '#5080D8',
     blueHover: '#4A70C8',
+    bluePillBg: 'rgba(80, 128, 216, 0.15)',
     // Red (danger / home)
     red: '#FF3130',
     redPillBg: 'rgba(255,49,48,0.15)',

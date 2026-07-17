@@ -65,8 +65,17 @@ function LandingPage() {
       </div>
 
       <div className="flex min-h-screen items-center justify-center p-4">
-        {/* White container with shadow - Phoenix style */}
-        <div className="relative w-full max-w-2xl rounded-3xl bg-white/90 p-12 shadow-xl backdrop-blur-md">
+        {/* White container - Phoenix content surface (flat, 24px radius, shadow-sm) */}
+        <div
+          className="relative w-full max-w-2xl p-12"
+          style={{
+            background: designSystem.surface.background,
+            border: `1px solid ${designSystem.surface.border}`,
+            borderRadius: designSystem.surface.borderRadius,
+            boxShadow: designSystem.surface.shadow,
+            backdropFilter: designSystem.surface.blur,
+          }}
+        >
           <div
             style={{
               display: 'flex',
@@ -121,7 +130,7 @@ function LandingPage() {
             <p
               style={{
                 fontSize: '36px',
-                color: '#4B5563',
+                color: designSystem.gray[600],
                 textAlign: 'center',
                 fontWeight: 700,
                 marginTop: '-8px',
@@ -144,28 +153,28 @@ function LandingPage() {
                 fontSize: '28px',
                 fontWeight: 600,
                 padding: '16px 32px',
-                backgroundColor: '#111827',
-                color: '#FFFFFF',
-                borderRadius: '16px',
+                backgroundColor: designSystem.brand.primary,
+                color: designSystem.colors.white,
+                borderRadius: designSystem.borderRadius.md,
                 border: 'none',
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                 cursor: 'pointer',
-                transition: 'all 200ms ease-out',
+                transition: designSystem.transitions.base,
                 outline: 'none',
               }}
               onPointerDown={e => {
-                e.currentTarget.style.transform = 'scale(0.95)';
-                e.currentTarget.style.backgroundColor = '#1F2937';
+                e.currentTarget.style.transform = designSystem.scales.activeSmall;
+                e.currentTarget.style.backgroundColor = designSystem.brand.primaryHover;
                 e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
               }}
               onPointerUp={e => {
                 e.currentTarget.style.transform = '';
-                e.currentTarget.style.backgroundColor = '#111827';
+                e.currentTarget.style.backgroundColor = designSystem.brand.primary;
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
               }}
               onPointerLeave={e => {
                 e.currentTarget.style.transform = '';
-                e.currentTarget.style.backgroundColor = '#111827';
+                e.currentTarget.style.backgroundColor = designSystem.brand.primary;
                 e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
               }}
             >

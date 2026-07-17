@@ -314,14 +314,15 @@ function StudentSelectionPage() {
     height: '52px',
     padding: '0 20px',
     borderRadius: designSystem.borderRadius.full,
-    border: active ? 'none' : '1px solid #E5E7EB',
-    background: active ? designSystem.gradients.blueRight : '#FFFFFF',
-    color: active ? '#FFFFFF' : '#374151',
+    border: active ? 'none' : `1px solid ${designSystem.gray[200]}`,
+    background: active ? designSystem.brand.blue : designSystem.surface.background,
+    color: active ? designSystem.colors.white : designSystem.gray[700],
     fontSize: '17px',
     fontWeight: 600,
-    boxShadow: active ? designSystem.shadows.blue : 'none',
+    boxShadow: 'none',
     cursor: 'pointer',
     outline: 'none',
+    transition: designSystem.transitions.base,
   });
 
   const handleGroupSelect = (group: string) => {
@@ -361,13 +362,13 @@ function StudentSelectionPage() {
           style={{
             width: '1px',
             height: '32px',
-            backgroundColor: '#D1D5DB',
+            backgroundColor: designSystem.gray[300],
             margin: '0 4px',
           }}
         />
 
         {/* Grade chips */}
-        <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>
+        <span style={{ color: designSystem.gray[500], fontSize: '16px', fontWeight: 600 }}>
           {texts.filterGradeLabel}
         </span>
         {availableGrades.map(grade => (
@@ -398,7 +399,7 @@ function StudentSelectionPage() {
 
       {/* Row 2: OGS Group selector */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span style={{ color: '#6B7280', fontSize: '16px', fontWeight: 600 }}>
+        <span style={{ color: designSystem.gray[500], fontSize: '16px', fontWeight: 600 }}>
           {texts.filterGroupLabel}
         </span>
         {groupFilter ? (
@@ -444,26 +445,44 @@ function StudentSelectionPage() {
         {entities.length === 0 ? (
           <div
             style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
               textAlign: 'center',
-              padding: '60px 20px',
-              color: '#6B7280',
+              padding: '64px 40px',
+              border: `1px dashed ${designSystem.gray[200]}`,
+              background: 'rgba(249,250,251,0.4)',
+              borderRadius: designSystem.borderRadius.xl,
+              color: designSystem.gray[500],
             }}
           >
-            <svg
-              width="64"
-              height="64"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ margin: '0 auto 16px' }}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '96px',
+                height: '96px',
+                borderRadius: designSystem.borderRadius.full,
+                background: designSystem.gray[100],
+                marginBottom: '20px',
+              }}
             >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-              <line x1="1" y1="1" x2="23" y2="23" />
-            </svg>
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+                <line x1="1" y1="1" x2="23" y2="23" />
+              </svg>
+            </div>
             <p style={{ fontSize: '18px', fontWeight: 500, marginBottom: '8px' }}>
               {texts.noEntitiesHeading}
             </p>
@@ -509,22 +528,33 @@ function StudentSelectionPage() {
               <button
                 onClick={handleAssignTag}
                 disabled={!selectedEntityId || isSaving}
+                onMouseEnter={e => {
+                  if (!(!selectedEntityId || isSaving)) {
+                    e.currentTarget.style.background = designSystem.flat.successHover;
+                  }
+                }}
+                onMouseLeave={e => {
+                  if (!(!selectedEntityId || isSaving)) {
+                    e.currentTarget.style.background = designSystem.flat.success;
+                  }
+                }}
                 style={{
                   height: '68px',
                   padding: '0 64px',
                   fontSize: '24px',
                   fontWeight: 700,
-                  color: '#FFFFFF',
+                  color: designSystem.colors.white,
                   background:
                     !selectedEntityId || isSaving
-                      ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                      : designSystem.gradients.greenRight,
+                      ? designSystem.gray[400]
+                      : designSystem.flat.success,
                   border: 'none',
                   borderRadius: designSystem.borderRadius.full,
                   cursor: !selectedEntityId || isSaving ? 'not-allowed' : 'pointer',
                   outline: 'none',
-                  boxShadow: !selectedEntityId || isSaving ? 'none' : designSystem.shadows.green,
+                  boxShadow: !selectedEntityId || isSaving ? 'none' : designSystem.shadows.md,
                   opacity: !selectedEntityId || isSaving ? 0.6 : 1,
+                  transition: designSystem.transitions.base,
                 }}
               >
                 {isSaving ? texts.assignButtonSaving : texts.assignButton}
@@ -547,7 +577,7 @@ function StudentSelectionPage() {
           style={{
             fontSize: '22px',
             fontWeight: 700,
-            color: '#1F2937',
+            color: designSystem.gray[800],
             marginBottom: '20px',
           }}
         >
@@ -564,13 +594,14 @@ function StudentSelectionPage() {
             height: '48px',
             marginBottom: '16px',
             borderRadius: designSystem.borderRadius.md,
-            border: '1px solid #E5E7EB',
-            background: !groupFilter ? designSystem.gradients.blueRight : '#FFFFFF',
-            color: !groupFilter ? '#FFFFFF' : '#374151',
+            border: !groupFilter ? 'none' : `1px solid ${designSystem.gray[200]}`,
+            background: !groupFilter ? designSystem.brand.blue : designSystem.surface.background,
+            color: !groupFilter ? designSystem.colors.white : designSystem.gray[700],
             fontSize: '15px',
             fontWeight: 600,
             cursor: 'pointer',
             outline: 'none',
+            transition: designSystem.transitions.base,
           }}
         >
           {texts.allGroups}
@@ -592,14 +623,16 @@ function StudentSelectionPage() {
               style={{
                 height: '48px',
                 borderRadius: designSystem.borderRadius.md,
-                border: groupFilter === group ? 'none' : '1px solid #E5E7EB',
-                background: groupFilter === group ? designSystem.gradients.blueRight : '#FFFFFF',
-                color: groupFilter === group ? '#FFFFFF' : '#374151',
+                border: groupFilter === group ? 'none' : `1px solid ${designSystem.gray[200]}`,
+                background:
+                  groupFilter === group ? designSystem.brand.blue : designSystem.surface.background,
+                color: groupFilter === group ? designSystem.colors.white : designSystem.gray[700],
                 fontSize: '14px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 outline: 'none',
-                boxShadow: groupFilter === group ? designSystem.shadows.blue : 'none',
+                boxShadow: 'none',
+                transition: designSystem.transitions.base,
               }}
             >
               {group}
