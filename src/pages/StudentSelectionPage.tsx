@@ -575,10 +575,10 @@ function StudentSelectionPage() {
       <ModalBase isOpen={showGroupPicker} onClose={() => setShowGroupPicker(false)} size="md">
         <h2
           style={{
-            fontSize: '22px',
+            fontSize: '24px',
             fontWeight: 700,
-            color: designSystem.gray[800],
-            marginBottom: '20px',
+            color: designSystem.gray[900],
+            marginBottom: '24px',
           }}
         >
           {texts.groupPickerHeading}
@@ -603,13 +603,13 @@ function StudentSelectionPage() {
           }}
           style={{
             width: '100%',
-            height: '48px',
-            marginBottom: '16px',
+            height: '52px',
+            marginBottom: '12px',
             borderRadius: designSystem.borderRadius.md,
             border: `1px solid ${!groupFilter ? designSystem.gray[400] : designSystem.gray[200]}`,
             background: !groupFilter ? designSystem.gray[50] : designSystem.surface.background,
             color: designSystem.gray[900],
-            fontSize: '15px',
+            fontSize: '16px',
             fontWeight: 600,
             cursor: 'pointer',
             outline: 'none',
@@ -623,7 +623,7 @@ function StudentSelectionPage() {
           style={{
             display: 'grid',
             gridTemplateColumns: '1fr 1fr',
-            gap: '10px',
+            gap: '12px',
             maxHeight: '400px',
             overflowY: 'auto',
           }}
@@ -643,13 +643,13 @@ function StudentSelectionPage() {
                   groupFilter === group ? designSystem.gray[400] : designSystem.gray[200];
               }}
               style={{
-                height: '48px',
+                height: '52px',
                 borderRadius: designSystem.borderRadius.md,
                 border: `1px solid ${groupFilter === group ? designSystem.gray[400] : designSystem.gray[200]}`,
                 background:
                   groupFilter === group ? designSystem.gray[50] : designSystem.surface.background,
                 color: designSystem.gray[900],
-                fontSize: '14px',
+                fontSize: '16px',
                 fontWeight: 600,
                 cursor: 'pointer',
                 outline: 'none',

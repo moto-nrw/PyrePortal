@@ -97,16 +97,17 @@ function getActivityIcon(
   }
   return (
     <svg
-      width="52"
-      height="52"
+      width="44"
+      height="44"
       viewBox="0 0 24 24"
       fill="none"
       stroke={designSystem.brand.green}
-      strokeWidth="2.5"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
     >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="16" />
-      <line x1="8" y1="12" x2="16" y2="12" />
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
     </svg>
   );
 }
@@ -375,27 +376,29 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '12px',
               padding: '0 32px',
+              // Mirror of the "Abmelden" corner button: white pill, blue accent
+              // border + text + icon, blue-tinted press. Not a solid blue fill.
               backgroundColor:
-                touchedButton === 'tag' ? designSystem.flat.actionHover : designSystem.flat.action,
-              border: 'none',
+                touchedButton === 'tag' ? 'rgba(80, 128, 216, 0.1)' : designSystem.colors.white,
+              border: `1px solid ${designSystem.brand.blue}`,
               borderRadius: '34px',
               cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
-              boxShadow: designSystem.shadows.md,
+              boxShadow: designSystem.shadows.sm,
               transform: touchedButton === 'tag' ? designSystem.scales.activeSmall : 'scale(1)',
             }}
           >
             <FontAwesomeIcon
               icon={faWifi}
               size="xl"
-              style={{ color: designSystem.colors.white, transform: 'rotate(90deg)' }}
+              style={{ color: designSystem.brand.blue, transform: 'rotate(90deg)' }}
             />
             <span
               style={{
                 fontSize: '20px',
                 fontWeight: 600,
-                color: designSystem.colors.white,
+                color: designSystem.brand.blue,
               }}
             >
               {texts.tagAssignmentButton}
@@ -699,12 +702,14 @@ function HomeViewPage() {
                     }}
                   >
                     <svg
-                      width="52"
-                      height="52"
+                      width="44"
+                      height="44"
                       viewBox="0 0 24 24"
                       fill="none"
                       stroke={designSystem.status.excused}
-                      strokeWidth="2.5"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
                     >
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                       <circle cx="9" cy="7" r="4" />

@@ -515,8 +515,11 @@ function TagAssignmentPage() {
                       style={{
                         flex: 1,
                         height: '68px',
-                        fontSize: '24px',
+                        // 20px + nowrap keeps "Anderer Person zuweisen" on one line
+                        // inside the flex:1 half-width action button.
+                        fontSize: '20px',
                         fontWeight: 700,
+                        whiteSpace: 'nowrap',
                         color: designSystem.colors.white,
                         backgroundColor: designSystem.flat.action,
                         border: 'none',
@@ -542,8 +545,10 @@ function TagAssignmentPage() {
                       style={{
                         flex: 1,
                         height: '68px',
-                        fontSize: '24px',
+                        // Match the sibling reassign button so the action row is even.
+                        fontSize: '20px',
                         fontWeight: 700,
+                        whiteSpace: 'nowrap',
                         backgroundColor: designSystem.colors.white,
                         color: designSystem.gray[700],
                         border: `1px solid ${designSystem.gray[300]}`,

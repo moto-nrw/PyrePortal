@@ -93,7 +93,7 @@ function LandingPage() {
               style={{
                 display: 'flex',
                 justifyContent: 'center',
-                marginBottom: designSystem.spacing.sm,
+                marginBottom: 0,
               }}
             >
               <img
@@ -119,7 +119,7 @@ function LandingPage() {
               }
               style={{
                 fontSize: '64px',
-                marginBottom: designSystem.spacing.md,
+                marginBottom: 0,
                 textAlign: 'center',
                 lineHeight: 1.2,
               }}
@@ -129,15 +129,17 @@ function LandingPage() {
 
             <p
               style={{
-                fontSize: '36px',
-                color: designSystem.gray[600],
+                // School name is metadata, not a heading: smaller, medium weight,
+                // muted gray so it never competes with the MOTO wordmark above.
+                fontSize: '20px',
+                color: designSystem.gray[500],
                 textAlign: 'center',
-                fontWeight: 700,
-                marginTop: '-8px',
-                marginBottom: designSystem.spacing.sm,
+                fontWeight: 500,
+                marginTop: 0,
+                marginBottom: 0,
                 opacity: schoolName ? 1 : 0,
                 transition: 'opacity 500ms ease-in',
-                lineHeight: 1.2,
+                lineHeight: 1.3,
                 // Clamp long school names to 2 lines so they never wrap into the
                 // login button or the card's bottom padding.
                 display: '-webkit-box',
@@ -161,12 +163,14 @@ function LandingPage() {
                 width: '100%',
                 maxWidth: '360px',
                 height: '90px',
+                marginTop: '32px',
                 fontSize: '28px',
                 fontWeight: 600,
                 padding: '16px 32px',
                 backgroundColor: designSystem.brand.primary,
                 color: designSystem.colors.white,
-                borderRadius: designSystem.borderRadius.md,
+                // Fully round to match the kiosk's pill button language (radius not frozen).
+                borderRadius: '9999px',
                 border: 'none',
                 boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                 cursor: 'pointer',
