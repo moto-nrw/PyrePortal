@@ -54,7 +54,7 @@ describe('LandingPage', () => {
         <LandingPage />
       </MemoryRouter>
     );
-    expect(screen.getByText('Willkommen bei moto!')).toBeInTheDocument();
+    expect(screen.getByText('Willkommen!')).toBeInTheDocument();
   });
 
   it('shows the login button', () => {
@@ -100,7 +100,7 @@ describe('LandingPage', () => {
         <LandingPage />
       </MemoryRouter>
     );
-    const heading = screen.getByText('Willkommen bei moto!');
+    const heading = screen.getByText('Willkommen!');
     expect(heading.tagName).toBe('H1');
   });
 
@@ -156,16 +156,17 @@ describe('LandingPage', () => {
     expect(button.style.color).toBe('#FFFFFF');
   });
 
-  it('renders the welcome heading with gradient styling', () => {
+  it('renders the welcome heading in flat gray without gradient styling', () => {
     render(
       <MemoryRouter>
         <LandingPage />
       </MemoryRouter>
     );
-    const heading = screen.getByText('Willkommen bei moto!');
-    // The heading should have the gradient class
-    expect(heading.className).toContain('bg-gradient-to-r');
-    expect(heading.className).toContain('bg-clip-text');
+    const heading = screen.getByText('Willkommen!');
+    // Phoenix design sync: flat gray-900 heading, no gradient text
+    expect(heading.className).not.toContain('bg-gradient-to-r');
+    expect(heading.className).not.toContain('bg-clip-text');
+    expect(heading.style.color).toBe('rgb(17, 24, 39)');
   });
 
   // --- handleRestart tests ---
