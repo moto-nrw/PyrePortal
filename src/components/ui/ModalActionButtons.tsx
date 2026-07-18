@@ -1,7 +1,8 @@
 import React from 'react';
 
 import { designSystem } from '../../styles/designSystem';
-import { pressHandlers } from '../../utils/pressHandlers';
+
+import { SpinKeyframes } from './LoadingSpinner';
 
 interface ModalActionButtonsProps {
   onCancel: () => void;
@@ -10,15 +11,41 @@ interface ModalActionButtonsProps {
   cancelLabel?: string;
   confirmLabel: string;
   loadingLabel?: string;
-  /** CSS gradient string for the confirm button (default: green) */
+  /**
+   * Semantic confirm color override. Prop name kept for backward compatibility
+   * (it no longer carries a CSS gradient — modal buttons are flat, §4b).
+   * Default confirm is gray-900 (#111827). Pass a brand hex ONLY where the
+   * action's meaning demands it: destructive → #DC2626 (red-600), positive
+   * confirm → #83CD2D (green). Everything else stays the gray-900 default.
+   */
   confirmGradient?: string;
-  /** CSS box-shadow for the confirm button when not loading */
+  /**
+   * @deprecated Modal confirm buttons carry no resting shadow (§4b). Retained
+   * so existing call sites keep compiling; the value is ignored.
+   */
   confirmShadow?: string;
 }
 
+/** Darker press/hover shade for the known semantic confirm colors. */
+const confirmPressColor = (base: string): string => {
+  switch (base) {
+    case designSystem.brand.primary: // gray-900
+      return designSystem.brand.primaryHover; // #1F2937
+    case designSystem.flat.success: // green
+      return designSystem.flat.successHover; // #74B827
+    case designSystem.flat.dangerHover: // red-600 (#DC2626)
+      return '#B91C1C'; // red-700
+    default:
+      return base;
+  }
+};
+
 /**
  * Reusable cancel/confirm button pair for modal footers.
- * Provides consistent sizing, press animation, and loading state.
+ *
+ * A distinct compact fork of the page-level PillButton (§4b): 56px height,
+ * 18px text, flat gray-900 confirm by default (no resting shadow), white
+ * bordered cancel, inline spinner while loading.
  */
 export const ModalActionButtons: React.FC<ModalActionButtonsProps> = ({
   onCancel,
@@ -26,54 +53,111 @@ export const ModalActionButtons: React.FC<ModalActionButtonsProps> = ({
   isLoading = false,
   cancelLabel = 'Abbrechen',
   confirmLabel,
-  loadingLabel,
-  confirmGradient = 'linear-gradient(to right, #83cd2d, #6ba529)',
-  confirmShadow = '0 4px 14px 0 rgba(131, 205, 45, 0.4)',
-}) => (
-  <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-    <button
-      onClick={onCancel}
-      disabled={isLoading}
-      {...pressHandlers(isLoading)}
-      style={{
-        flex: 1,
-        height: '68px',
-        fontSize: '20px',
-        fontWeight: 600,
-        color: '#6B7280',
-        backgroundColor: 'transparent',
-        border: '2px solid #E5E7EB',
-        borderRadius: designSystem.borderRadius.lg,
-        cursor: isLoading ? 'not-allowed' : 'pointer',
-        transition: 'all 200ms',
-        outline: 'none',
-        opacity: isLoading ? 0.6 : 1,
-      }}
-    >
-      {cancelLabel}
-    </button>
+  loadingLabel = 'Wird geladen...',
+  confirmGradient = designSystem.brand.primary,
+}) => {
+  const confirmBase = confirmGradient;
+  const confirmPress = confirmPressColor(confirmBase);
 
-    <button
-      onClick={onConfirm}
-      disabled={isLoading}
-      {...pressHandlers(isLoading)}
-      style={{
-        flex: 1,
-        height: '68px',
-        fontSize: '20px',
-        fontWeight: 600,
-        color: '#FFFFFF',
-        background: isLoading ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)' : confirmGradient,
-        border: 'none',
-        borderRadius: designSystem.borderRadius.lg,
-        cursor: isLoading ? 'not-allowed' : 'pointer',
-        transition: 'all 200ms',
-        outline: 'none',
-        boxShadow: isLoading ? 'none' : confirmShadow,
-        opacity: isLoading ? 0.6 : 1,
-      }}
-    >
-      {isLoading ? (loadingLabel ?? confirmLabel) : confirmLabel}
-    </button>
-  </div>
-);
+  return (
+    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+      <SpinKeyframes />
+
+      <button
+        onClick={onCancel}
+        disabled={isLoading}
+        onPointerDown={e => {
+          if (isLoading) return;
+          e.currentTarget.style.transform = 'scale(0.98)';
+          e.currentTarget.style.backgroundColor = designSystem.gray[50];
+          e.currentTarget.style.borderColor = designSystem.gray[400];
+        }}
+        onPointerEnter={e => {
+          if (isLoading) return;
+          e.currentTarget.style.backgroundColor = designSystem.gray[50];
+          e.currentTarget.style.borderColor = designSystem.gray[400];
+        }}
+        onPointerUp={e => {
+          e.currentTarget.style.transform = '';
+        }}
+        onPointerLeave={e => {
+          e.currentTarget.style.transform = '';
+          e.currentTarget.style.backgroundColor = '#FFFFFF';
+          e.currentTarget.style.borderColor = designSystem.gray[300];
+        }}
+        style={{
+          flex: 1,
+          height: '56px',
+          fontSize: '18px',
+          fontWeight: 500,
+          color: designSystem.gray[700],
+          backgroundColor: '#FFFFFF',
+          border: `1px solid ${designSystem.gray[300]}`,
+          borderRadius: designSystem.borderRadius.full,
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          transition: designSystem.transitions.base,
+          outline: 'none',
+          opacity: isLoading ? 0.5 : 1,
+        }}
+      >
+        {cancelLabel}
+      </button>
+
+      <button
+        onClick={onConfirm}
+        disabled={isLoading}
+        onPointerDown={e => {
+          if (isLoading) return;
+          e.currentTarget.style.transform = 'scale(0.98)';
+          e.currentTarget.style.backgroundColor = confirmPress;
+        }}
+        onPointerEnter={e => {
+          if (isLoading) return;
+          e.currentTarget.style.backgroundColor = confirmPress;
+        }}
+        onPointerUp={e => {
+          e.currentTarget.style.transform = '';
+        }}
+        onPointerLeave={e => {
+          e.currentTarget.style.transform = '';
+          e.currentTarget.style.backgroundColor = confirmBase;
+        }}
+        style={{
+          flex: 1,
+          height: '56px',
+          fontSize: '18px',
+          fontWeight: 500,
+          color: '#FFFFFF',
+          backgroundColor: isLoading ? designSystem.gray[400] : confirmBase,
+          border: 'none',
+          borderRadius: designSystem.borderRadius.full,
+          cursor: isLoading ? 'not-allowed' : 'pointer',
+          transition: designSystem.transitions.base,
+          outline: 'none',
+          boxShadow: 'none',
+          opacity: isLoading ? 0.5 : 1,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '10px',
+        }}
+      >
+        {isLoading && (
+          <span
+            aria-hidden="true"
+            style={{
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              border: '2px solid rgba(255,255,255,0.4)',
+              borderTopColor: '#FFFFFF',
+              animation: 'spin 1s linear infinite',
+              flexShrink: 0,
+            }}
+          />
+        )}
+        {isLoading ? loadingLabel : confirmLabel}
+      </button>
+    </div>
+  );
+};

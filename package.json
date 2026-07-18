@@ -26,6 +26,7 @@
     "prepare": "lefthook install || true"
   },
   "dependencies": {
+    "@fontsource/geist-sans": "^5.2.5",
     "@fortawesome/fontawesome-svg-core": "^7.3.0",
     "@fortawesome/free-solid-svg-icons": "^7.3.0",
     "@fortawesome/react-fontawesome": "^3.4.0",

@@ -14,9 +14,9 @@ export const EmptySlot = memo(function EmptySlot({ icon }: EmptySlotProps) {
     <div
       style={{
         height: '160px',
-        backgroundColor: '#FAFAFA',
-        border: '2px dashed #E5E7EB',
-        borderRadius: '20px',
+        backgroundColor: 'rgba(249, 250, 251, 0.4)',
+        border: '1px dashed #E5E7EB',
+        borderRadius: '24px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -37,7 +37,7 @@ export const EmptySlot = memo(function EmptySlot({ icon }: EmptySlotProps) {
         <span
           style={{
             fontSize: '14px',
-            color: '#9CA3AF',
+            color: '#6B7280',
             fontWeight: 400,
           }}
         >

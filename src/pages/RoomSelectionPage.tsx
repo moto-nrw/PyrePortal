@@ -23,6 +23,7 @@ import {
   startSessionWithConflictHandling,
 } from '../services/sessionService';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, logError } from '../utils/logger';
 
 /** User-facing German UI copy for this page */
@@ -394,25 +395,41 @@ function RoomSelectionPage() {
               alignItems: 'center',
               minHeight: '400px',
               flexDirection: 'column',
-              gap: '16px',
+              gap: '20px',
+              border: `1px dashed ${designSystem.gray[200]}`,
+              backgroundColor: 'rgba(249,250,251,0.4)',
+              borderRadius: designSystem.borderRadius.xl,
+              padding: '48px',
             }}
           >
-            <svg
-              width="64"
-              height="64"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="#9CA3AF"
-              strokeWidth="2"
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: '96px',
+                height: '96px',
+                borderRadius: designSystem.borderRadius.full,
+                backgroundColor: designSystem.gray[100],
+              }}
             >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
-              <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
-              <circle cx="11" cy="12" r="1" />
-            </svg>
+              <svg
+                width="48"
+                height="48"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke={designSystem.gray[400]}
+                strokeWidth="2"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
+                <path d="M18 2h2a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2h-2" />
+                <circle cx="11" cy="12" r="1" />
+              </svg>
+            </div>
             <div
               style={{
                 fontSize: '24px',
-                color: '#6B7280',
+                color: designSystem.gray[500],
                 fontWeight: 600,
                 textAlign: 'center',
               }}
@@ -422,7 +439,7 @@ function RoomSelectionPage() {
             <div
               style={{
                 fontSize: '16px',
-                color: '#9CA3AF',
+                color: designSystem.gray[400],
                 textAlign: 'center',
               }}
             >

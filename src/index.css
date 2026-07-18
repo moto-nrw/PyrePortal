@@ -1,6 +1,8 @@
 /* Design System tokens (CSS variables) */
 @import "@moto-nrw/design-system/tokens";
 
+/* Geist Sans (phoenix app font) */
+
 /* Box model reset - must come before Tailwind's base to override it */
 * {
   margin: 0;
@@ -23,7 +25,7 @@
   }
 
   :root {
-    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+    font-family: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
     font-size: 18px;
     line-height: 27px;
     font-weight: 400;
@@ -44,7 +46,7 @@
   option,
   button,
   input {
-    font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+    font-family: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
   }
 
   a {
@@ -60,9 +62,32 @@
 
 /* Native dialog backdrop with blur effect */
 dialog::backdrop {
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: rgba(0, 0, 0, 0.4);
   backdrop-filter: var(--modal-backdrop-blur, blur(4px));
   -webkit-backdrop-filter: var(--modal-backdrop-blur, blur(4px));
+}
+
+/* Modal entrance motion (phoenix modal.tsx). Runs each time the native
+   <dialog> is shown because the subtree paints from display:none. */
+.moto-modal-container {
+  animation: moto-modal-enter 250ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@keyframes moto-modal-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moto-modal-container {
+    animation: none;
+  }
 }
 
 /* Dark mode styles */

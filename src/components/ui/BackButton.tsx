@@ -54,8 +54,10 @@ interface BackButtonProps {
 }
 
 /**
- * Navigation back button with glassmorphism styling.
- * Thin wrapper around PillButton with secondary variant.
+ * Navigation back button with the corner-utility affordance.
+ * Thin wrapper around PillButton's secondary variant: white pill, 1px border,
+ * accent text + chevron, shadow-sm, fully round (68px touch height). Gray accent
+ * by default; blue accent for the "Neu starten" top-right control.
  */
 const BackButton: React.FC<BackButtonProps> = ({
   onClick,

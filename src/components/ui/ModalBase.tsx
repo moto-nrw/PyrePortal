@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 
 import { useModalTimeout } from '../../hooks/useModalTimeout';
+import { designSystem } from '../../styles/designSystem';
 
 import { ModalTimeoutIndicator } from './ModalTimeoutIndicator';
 
@@ -9,10 +10,10 @@ type ModalSize = 'sm' | 'md' | 'lg' | 'xl';
 
 /** Size preset configurations matching existing modal dimensions */
 const SIZE_PRESETS = {
-  sm: { maxWidth: '500px', padding: '48px', borderRadius: '20px' }, // ErrorModal, SuccessModal
+  sm: { maxWidth: '500px', padding: '48px', borderRadius: '24px' }, // ErrorModal, SuccessModal
   md: { maxWidth: '600px', padding: '56px', borderRadius: '24px' }, // GroupPicker, TagAssignment scanner
-  lg: { maxWidth: '700px', padding: '64px', borderRadius: '32px' }, // ActivityScanningPage (current default)
-  xl: { maxWidth: '1060px', padding: '64px', borderRadius: '32px' }, // Wide modals (e.g., 4-button checkout)
+  lg: { maxWidth: '700px', padding: '64px', borderRadius: '24px' }, // ActivityScanningPage (current default)
+  xl: { maxWidth: '1060px', padding: '64px', borderRadius: '24px' }, // Wide modals (e.g., 4-button checkout)
 } as const;
 
 /**
@@ -219,6 +220,11 @@ export function ModalBase({
 
   const shouldShowIndicator = showTimeoutIndicator && timeout !== undefined;
 
+  // Phoenix modal chrome: light (white) backgrounds get the translucent gradient
+  // + blur; full-bleed scan-result modals keep their solid state color.
+  const isLight = isLightBackground(backgroundColor);
+  const containerBackground = isLight ? designSystem.modal.background : backgroundColor;
+
   // Build dialog style with optional backdrop blur override
   const dialogStyle: React.CSSProperties & { '--modal-backdrop-blur'?: string } = {
     backgroundColor: 'transparent',
@@ -254,15 +260,19 @@ export function ModalBase({
         }
         role={closeOnContentClick ? 'button' : undefined}
         tabIndex={closeOnContentClick ? 0 : undefined}
+        className="moto-modal-container"
         style={{
-          backgroundColor,
+          background: containerBackground,
           borderRadius: sizePreset.borderRadius,
+          border: designSystem.modal.border,
           padding: sizePreset.padding,
           maxWidth: sizePreset.maxWidth,
           width: autoWidth ? 'fit-content' : '90vw',
           minWidth: autoWidth ? '700px' : undefined,
           textAlign: 'center',
-          boxShadow: '0 20px 50px rgba(0, 0, 0, 0.3)',
+          boxShadow: designSystem.modal.shadow,
+          backdropFilter: isLight ? designSystem.modal.blur : undefined,
+          WebkitBackdropFilter: isLight ? designSystem.modal.blur : undefined,
           position: 'relative',
           overflow: 'hidden',
           cursor: closeOnContentClick ? 'pointer' : undefined,

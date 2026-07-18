@@ -37,10 +37,8 @@ const RfidProcessingIndicator = memo(function RfidProcessingIndicator({
             width: '48px',
             height: '48px',
             borderRadius: '50%',
-            background: 'conic-gradient(from 0deg, transparent 0%, #5080D8 50%, #83CD2D 100%)',
-            mask: 'radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px))',
-            WebkitMask:
-              'radial-gradient(farthest-side, transparent calc(100% - 4px), #000 calc(100% - 4px))',
+            border: '4px solid #E5E7EB',
+            borderTopColor: '#111827',
             animation: 'rfid-processing-spin 0.8s linear infinite',
           }}
         />

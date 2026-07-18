@@ -39,7 +39,7 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
 
   // Red color with pulse animation for both states
   const wifiIconStyle = {
-    color: '#EF4444',
+    color: '#FF3130',
     animation: 'pulse-scale 2s ease-in-out infinite',
     opacity: isOffline ? 0.4 : 1, // Dimmed for offline to show it's not working
   } as const;
@@ -50,7 +50,7 @@ const NetworkStatus: React.FC<NetworkStatusProps> = ({ status }) => {
     top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    color: '#EF4444',
+    color: '#FF3130',
     animation: 'pulse-scale-centered 2s ease-in-out infinite',
   };
 
