@@ -10,7 +10,7 @@ import { createLogger, logNavigation, logUserAction, logError } from '../utils/l
 const texts = {
   restartButton: 'Neu starten',
   brandWordmark: 'moto',
-  welcomeHeading: 'Willkommen!',
+  welcomeHeading: 'Willkommen bei moto!',
   loginButton: 'Anmelden',
   badgeCare: 'Offener Ganztag',
   badgeSecure: 'Sichere Anmeldung',
@@ -122,14 +122,18 @@ function LandingPage() {
             </span>
           </div>
 
+          {/* Welcome Heading with Phoenix MOTO Gradient (solid fallback for GKT WebView) */}
           <h1
-            className="font-bold"
+            className={
+              adapter.platform === 'gkt'
+                ? 'font-bold text-[#5080d8]'
+                : 'bg-gradient-to-r from-[#5080d8] to-[#83cd2d] bg-clip-text font-bold text-transparent'
+            }
             style={{
               fontSize: '44px',
               marginBottom: 0,
               textAlign: 'center',
               lineHeight: 1.15,
-              color: designSystem.gray[900],
             }}
           >
             {texts.welcomeHeading}
@@ -207,7 +211,7 @@ function LandingPage() {
 
       {/* RIGHT PANEL - dotted decorative surface */}
       <aside
-        className="relative flex min-h-screen flex-col items-center justify-center px-8"
+        className="relative hidden min-h-screen flex-col items-center justify-center px-8 lg:flex"
         style={{
           backgroundColor: designSystem.dottedBackground.base,
           backgroundImage: designSystem.dottedBackground.image,
