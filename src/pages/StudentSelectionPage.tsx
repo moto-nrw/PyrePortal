@@ -589,14 +589,26 @@ function StudentSelectionPage() {
             clearGroupFilter();
             setShowGroupPicker(false);
           }}
+          onPointerEnter={e => {
+            e.currentTarget.style.background = designSystem.gray[50];
+            e.currentTarget.style.borderColor = designSystem.gray[400];
+          }}
+          onPointerLeave={e => {
+            e.currentTarget.style.background = !groupFilter
+              ? designSystem.gray[50]
+              : designSystem.surface.background;
+            e.currentTarget.style.borderColor = !groupFilter
+              ? designSystem.gray[400]
+              : designSystem.gray[200];
+          }}
           style={{
             width: '100%',
             height: '48px',
             marginBottom: '16px',
             borderRadius: designSystem.borderRadius.md,
-            border: !groupFilter ? 'none' : `1px solid ${designSystem.gray[200]}`,
-            background: !groupFilter ? designSystem.brand.blue : designSystem.surface.background,
-            color: !groupFilter ? designSystem.colors.white : designSystem.gray[700],
+            border: `1px solid ${!groupFilter ? designSystem.gray[400] : designSystem.gray[200]}`,
+            background: !groupFilter ? designSystem.gray[50] : designSystem.surface.background,
+            color: designSystem.gray[900],
             fontSize: '15px',
             fontWeight: 600,
             cursor: 'pointer',
@@ -620,13 +632,23 @@ function StudentSelectionPage() {
             <button
               key={group}
               onClick={() => handleGroupSelect(group)}
+              onPointerEnter={e => {
+                e.currentTarget.style.background = designSystem.gray[50];
+                e.currentTarget.style.borderColor = designSystem.gray[400];
+              }}
+              onPointerLeave={e => {
+                e.currentTarget.style.background =
+                  groupFilter === group ? designSystem.gray[50] : designSystem.surface.background;
+                e.currentTarget.style.borderColor =
+                  groupFilter === group ? designSystem.gray[400] : designSystem.gray[200];
+              }}
               style={{
                 height: '48px',
                 borderRadius: designSystem.borderRadius.md,
-                border: groupFilter === group ? 'none' : `1px solid ${designSystem.gray[200]}`,
+                border: `1px solid ${groupFilter === group ? designSystem.gray[400] : designSystem.gray[200]}`,
                 background:
-                  groupFilter === group ? designSystem.brand.blue : designSystem.surface.background,
-                color: groupFilter === group ? designSystem.colors.white : designSystem.gray[700],
+                  groupFilter === group ? designSystem.gray[50] : designSystem.surface.background,
+                color: designSystem.gray[900],
                 fontSize: '14px',
                 fontWeight: 600,
                 cursor: 'pointer',

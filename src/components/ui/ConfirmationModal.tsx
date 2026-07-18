@@ -237,6 +237,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
       isLoading={isLoading}
       confirmLabel="Aufsicht starten"
       loadingLabel="Starte..."
+      confirmGradient={designSystem.flat.success}
     />
   </ModalBase>
 );

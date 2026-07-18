@@ -912,8 +912,8 @@ function HomeViewPage() {
           onCancel={() => setShowEndSessionModal(false)}
           onConfirm={handleConfirmEndSession}
           confirmLabel={texts.endSessionConfirmButton}
-          confirmGradient={designSystem.flat.danger}
-          confirmShadow={designSystem.shadows.md}
+          // destructive end-session → red-600 (#DC2626), §4b
+          confirmGradient={designSystem.flat.dangerHover}
         />
       </ModalBase>
     </BackgroundWrapper>

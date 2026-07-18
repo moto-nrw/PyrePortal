@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal, ModalBase } from '../components/ui';
+import { ErrorModal, ModalActionButtons, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { getAssignedPerson, useTagAssignmentScan } from '../hooks/useTagAssignmentScan';
@@ -759,50 +759,16 @@ function TagAssignmentPage() {
             {texts.unassignConfirmHint}
           </p>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button
-              onClick={unassignTag}
-              disabled={isUnassigning}
-              {...pressHandlers(isUnassigning)}
-              style={{
-                height: '52px',
-                padding: '0 32px',
-                fontSize: '18px',
-                fontWeight: 700,
-                backgroundColor: designSystem.flat.danger,
-                color: designSystem.colors.white,
-                border: 'none',
-                borderRadius: designSystem.borderRadius.full,
-                cursor: isUnassigning ? 'not-allowed' : 'pointer',
-                outline: 'none',
-                transition: designSystem.transitions.base,
-                opacity: isUnassigning ? 0.7 : 1,
-              }}
-            >
-              {isUnassigning ? texts.unassigningButton : texts.confirmUnassignButton}
-            </button>
-            <button
-              onClick={closeUnassignConfirm}
-              disabled={isUnassigning}
-              {...pressHandlers(isUnassigning)}
-              style={{
-                height: '52px',
-                padding: '0 32px',
-                fontSize: '18px',
-                fontWeight: 700,
-                backgroundColor: designSystem.colors.white,
-                color: designSystem.gray[700],
-                border: `1px solid ${designSystem.gray[300]}`,
-                borderRadius: designSystem.borderRadius.full,
-                cursor: isUnassigning ? 'not-allowed' : 'pointer',
-                outline: 'none',
-                transition: designSystem.transitions.base,
-                opacity: isUnassigning ? 0.5 : 1,
-              }}
-            >
-              {texts.cancelButton}
-            </button>
-          </div>
+          <ModalActionButtons
+            onCancel={closeUnassignConfirm}
+            onConfirm={unassignTag}
+            isLoading={isUnassigning}
+            cancelLabel={texts.cancelButton}
+            confirmLabel={texts.confirmUnassignButton}
+            loadingLabel={texts.unassigningButton}
+            // destructive tag freigeben → red-600 (#DC2626), §4b
+            confirmGradient={designSystem.flat.dangerHover}
+          />
         </div>
       </ModalBase>
 

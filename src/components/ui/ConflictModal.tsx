@@ -272,8 +272,8 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
       isLoading={isLoading}
       confirmLabel="Trotzdem starten"
       loadingLabel="Starte..."
-      confirmGradient={designSystem.flat.danger}
-      confirmShadow={designSystem.shadows.md}
+      // destructive takeover → red-600 (#DC2626), §4b
+      confirmGradient={designSystem.flat.dangerHover}
     />
   </ModalBase>
 );
