@@ -211,7 +211,7 @@ function LandingPage() {
 
       {/* RIGHT PANEL - dotted decorative surface */}
       <aside
-        className="relative hidden min-h-screen flex-col items-center justify-center px-8 lg:flex"
+        className="relative flex min-h-screen flex-col items-center justify-center px-8"
         style={{
           backgroundColor: designSystem.dottedBackground.base,
           backgroundImage: designSystem.dottedBackground.image,
