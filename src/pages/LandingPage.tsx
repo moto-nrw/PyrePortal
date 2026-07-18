@@ -14,6 +14,7 @@ const texts = {
   loginButton: 'Anmelden',
   badgeCare: 'Offener Ganztag',
   badgeSecure: 'Sichere Anmeldung',
+  loginHint: 'Anmeldung mit deiner Personal-PIN',
 } as const;
 
 function LandingPage() {
@@ -74,54 +75,55 @@ function LandingPage() {
 
       {/* LEFT PANEL - solid white form surface */}
       <section
-        className="flex min-h-screen items-center justify-center px-8"
+        className="relative flex min-h-screen items-center justify-center px-8"
         style={{
           background: designSystem.colors.white,
           borderRight: `1px solid ${designSystem.surface.border}`,
         }}
       >
+        {/* Brand row anchored top-left (phoenix auth-shell pattern) */}
+        <div
+          style={{
+            position: 'absolute',
+            top: '28px',
+            left: '32px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+          }}
+        >
+          <img
+            src="/img/moto_transparent.png"
+            alt=""
+            style={{
+              height: '34px',
+              width: 'auto',
+              objectFit: 'contain',
+            }}
+          />
+          <span
+            style={{
+              fontSize: '26px',
+              fontWeight: 800,
+              lineHeight: 1,
+              color: designSystem.gray[900],
+            }}
+          >
+            {texts.brandWordmark}
+          </span>
+        </div>
+
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: designSystem.spacing.md,
+            gap: '20px',
             width: '100%',
             maxWidth: '420px',
           }}
         >
-          {/* Brand row (phoenix MotoBrand pattern): small logo mark + "moto" wordmark */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '12px',
-              marginBottom: designSystem.spacing.sm,
-            }}
-          >
-            <img
-              src="/img/moto_transparent.png"
-              alt=""
-              style={{
-                height: '42px',
-                width: 'auto',
-                objectFit: 'contain',
-              }}
-            />
-            <span
-              style={{
-                fontSize: '34px',
-                fontWeight: 800,
-                lineHeight: 1,
-                color: designSystem.gray[900],
-              }}
-            >
-              {texts.brandWordmark}
-            </span>
-          </div>
-
           {/* Welcome Heading with Phoenix MOTO Gradient (solid fallback for GKT WebView) */}
           <h1
             className={
@@ -130,35 +132,37 @@ function LandingPage() {
                 : 'bg-gradient-to-r from-[#5080d8] to-[#83cd2d] bg-clip-text font-bold text-transparent'
             }
             style={{
-              fontSize: '44px',
+              fontSize: '46px',
               marginBottom: 0,
               textAlign: 'center',
               lineHeight: 1.15,
+              textWrap: 'balance',
             }}
           >
             {texts.welcomeHeading}
           </h1>
 
+          {/* School name as a quiet metadata pill: single line, never wraps into the CTA */}
           <p
             style={{
-              // School name is metadata, not a heading: smaller, medium weight,
-              // muted gray so it never competes with the MOTO wordmark above.
-              fontSize: '18px',
-              color: designSystem.gray[500],
-              textAlign: 'center',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 18px',
+              borderRadius: designSystem.borderRadius.full,
+              background: designSystem.gray[50],
+              border: `1px solid ${designSystem.surface.border}`,
+              fontSize: '16px',
+              color: designSystem.gray[600],
               fontWeight: 500,
               marginTop: 0,
               marginBottom: 0,
               opacity: schoolName ? 1 : 0,
               transition: 'opacity 500ms ease-in',
               lineHeight: 1.3,
-              // Clamp long school names so they never wrap into the login button.
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
+              whiteSpace: 'nowrap',
               overflow: 'hidden',
               textOverflow: 'ellipsis',
-              wordBreak: 'break-word',
               maxWidth: '100%',
               minHeight: '1.5em',
             }}
@@ -206,37 +210,66 @@ function LandingPage() {
           >
             {texts.loginButton}
           </button>
+
+          {/* Kiosk microcopy: tells staff what the CTA needs before they tap it */}
+          <p
+            style={{
+              fontSize: '15px',
+              color: designSystem.gray[400],
+              fontWeight: 500,
+              margin: 0,
+              textAlign: 'center',
+            }}
+          >
+            {texts.loginHint}
+          </p>
         </div>
       </section>
 
       {/* RIGHT PANEL - dotted decorative surface */}
       <aside
-        className="relative hidden min-h-screen flex-col items-center justify-center px-8 lg:flex"
+        className="relative flex min-h-screen flex-col items-center justify-center px-8"
         style={{
           backgroundColor: designSystem.dottedBackground.base,
           backgroundImage: designSystem.dottedBackground.image,
           backgroundSize: designSystem.dottedBackground.size,
         }}
       >
-        <img
-          src="/img/moto_transparent.png"
-          alt="Moto logo"
+        {/* White stage card framing the playful brand illustration */}
+        <div
           style={{
-            height: 'auto',
-            width: '260px',
-            maxWidth: '80%',
-            filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 'min(440px, 70%)',
+            aspectRatio: '1 / 0.82',
+            background: designSystem.surface.background,
+            border: `1px solid ${designSystem.surface.border}`,
+            borderRadius: designSystem.surface.borderRadius,
+            boxShadow: designSystem.shadows.md,
           }}
-        />
+        >
+          <img
+            src="/img/moto_transparent.png"
+            alt="Moto logo"
+            style={{
+              height: 'auto',
+              width: '62%',
+              filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.1))',
+            }}
+          />
+        </div>
 
-        {/* Phoenix badge pills */}
+        {/* Phoenix badge pills, overlapping the stage card's bottom edge */}
         <div
           style={{
             display: 'flex',
             flexWrap: 'wrap',
             justifyContent: 'center',
             gap: '12px',
-            marginTop: '40px',
+            marginTop: '-21px',
+            position: 'relative',
+            zIndex: 1,
           }}
         >
           <BadgePill label={texts.badgeCare} dotColor={designSystem.brand.green} />
