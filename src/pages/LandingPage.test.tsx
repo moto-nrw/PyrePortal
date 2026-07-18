@@ -166,7 +166,7 @@ describe('LandingPage', () => {
     // Phoenix design sync: flat gray-900 heading, no gradient text
     expect(heading.className).not.toContain('bg-gradient-to-r');
     expect(heading.className).not.toContain('bg-clip-text');
-    expect(heading.style.color).toBe('rgb(17, 24, 39)');
+    expect(heading.style.color).toBe('#111827');
   });
 
   // --- handleRestart tests ---
