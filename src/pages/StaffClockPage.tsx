@@ -35,12 +35,40 @@ const SCAN_TIMEOUT_MS = 20_000;
 const SCANNED_TAG_IDLE_TIMEOUT_MS = 45_000;
 const SCAN_TIMEOUT_MESSAGE =
   'Scanner reagiert nicht mehr. Bitte Scanner neu starten und erneut versuchen.';
+/**
+ * Every control on this page is disabled while a request is in flight, so a
+ * backend that accepts the connection but never answers would trap the kiosk.
+ * Bound each request instead of trusting the network stack to give up.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+const REQUEST_TIMEOUT_MESSAGE = 'Server antwortet nicht. Bitte erneut versuchen.';
+
+/** Failure that already carries a German, user-facing message. */
+class LocalizedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LocalizedError';
+  }
+}
 
 /** Scanner-level failure that already carries a German, user-facing message. */
-class ScannerError extends Error {
+class ScannerError extends LocalizedError {
   constructor(message: string) {
     super(message);
     this.name = 'ScannerError';
+  }
+}
+
+/** Reject a stalled backend call so the page becomes operable again. */
+async function withRequestTimeout<T>(promise: Promise<T>): Promise<T> {
+  try {
+    return await withTimeout(promise, REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MESSAGE);
+  } catch (error) {
+    if (error instanceof Error && error.message === REQUEST_TIMEOUT_MESSAGE) {
+      logger.error('Staff clock request timed out');
+      throw new LocalizedError(REQUEST_TIMEOUT_MESSAGE);
+    }
+    throw error;
   }
 }
 
@@ -199,7 +227,7 @@ function StaffClockPage() {
 
   const showFailure = (error: unknown) => {
     logger.error('Staff clock operation failed', { error: serializeError(error) });
-    let message = error instanceof ScannerError ? error.message : mapApiErrorToGerman(error);
+    let message = error instanceof LocalizedError ? error.message : mapApiErrorToGerman(error);
     if (error instanceof ApiError && error.code === 'planned_start_not_reached') {
       const planned = error.details?.planned_start_time;
       if (planned) message = `Einstempeln ist erst ab ${planned} Uhr möglich.`;
@@ -208,12 +236,32 @@ function StaffClockPage() {
     setShowError(true);
   };
 
+  /**
+   * Re-read the authoritative state for a still-held card. Used after the server
+   * rejected an action as stale, so the page stops offering it.
+   */
+  const refreshState = async (pin: string, tag: string) => {
+    try {
+      const state = await withRequestTimeout(api.getStaffClockState(pin, tag));
+      setClockState(state);
+      setSelectedStatus(state.session?.status ?? 'present');
+    } catch (error) {
+      // Without fresh state every displayed action could be stale — drop the card.
+      logger.warn('Failed to reload staff clock state after conflict', {
+        error: serializeError(error),
+      });
+      setClockState(null);
+      setScannedTag(null);
+    }
+  };
+
   const runCommand = async (command: StaffClockCommand) => {
     if (!authenticatedUser?.pin || inFlightRef.current) return;
+    const pin = authenticatedUser.pin;
     inFlightRef.current = true;
     setIsBusy(true);
     try {
-      const nextState = await api.executeStaffClockAction(authenticatedUser.pin, command);
+      const nextState = await withRequestTimeout(api.executeStaffClockAction(pin, command));
       setClockState(nextState);
       setCompletedMessage(`${actionLabels[command.action]} erfolgreich`);
       setPendingCommand(null);
@@ -235,6 +283,12 @@ function StaffClockPage() {
         setPendingCommand(command);
       } else {
         showFailure(error);
+        // The state moved on (web app, other kiosk, lost response): the cached
+        // allowed_actions are wrong now, so reload before offering anything else.
+        if (error instanceof ApiError && error.code === 'invalid_staff_clock_state') {
+          setPendingCommand(null);
+          await refreshState(pin, command.rfid_tag);
+        }
       }
     } finally {
       inFlightRef.current = false;
@@ -252,7 +306,7 @@ function StaffClockPage() {
     setCompletedMessage(null);
     try {
       const tag = await scanStaffTag();
-      const state = await api.getStaffClockState(authenticatedUser.pin, tag);
+      const state = await withRequestTimeout(api.getStaffClockState(authenticatedUser.pin, tag));
       if (requestId !== requestIdRef.current) return;
       setScannedTag(tag);
       setClockState(state);

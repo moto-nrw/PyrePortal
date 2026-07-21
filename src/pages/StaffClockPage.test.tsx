@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -161,6 +161,46 @@ describe('StaffClockPage', () => {
       status: 'present',
       reason: 'Vertretung übernommen',
     });
+  });
+
+  it('reloads the authoritative state when the server rejects a stale action', async () => {
+    const user = userEvent.setup();
+    mockedApi.getStaffClockState
+      .mockResolvedValueOnce(checkedOutState)
+      .mockResolvedValueOnce(checkedInState);
+    mockedApi.executeStaffClockAction.mockRejectedValueOnce(
+      new ApiError('invalid state', 409, 'invalid_staff_clock_state')
+    );
+    renderPage();
+    await scanCard(user);
+
+    await user.click(screen.getByRole('button', { name: 'Einstempeln' }));
+
+    expect(
+      await screen.findByText('Diese Aktion passt nicht zum aktuellen Stempelstatus.')
+    ).toBeInTheDocument();
+    await waitFor(() => expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(2));
+    expect(screen.getByText('Eingestempelt')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Einstempeln' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ausstempeln' })).toBeInTheDocument();
+  });
+
+  it('recovers when a backend request never answers', async () => {
+    vi.useFakeTimers();
+    try {
+      mockedApi.getStaffClockState.mockReturnValue(new Promise(() => {}));
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(15_000));
+
+      expect(
+        screen.getByText('Server antwortet nicht. Bitte erneut versuchen.')
+      ).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Armband scannen' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not launch a second scan while the first one is pending', async () => {
