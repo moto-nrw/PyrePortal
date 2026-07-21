@@ -8,6 +8,7 @@ import { adapter } from '@platform';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
+import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
 import {
   ApiError,
   api,
@@ -42,6 +43,14 @@ const SCAN_TIMEOUT_MESSAGE =
  */
 const REQUEST_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MESSAGE = 'Server antwortet nicht. Bitte erneut versuchen.';
+/**
+ * A timed-out clock action is indeterminate, not failed: the request may have
+ * committed with only the response lost. Never claim it did not happen.
+ */
+const INDETERMINATE_RELOADED_MESSAGE =
+  'Zeitüberschreitung: Die Stempelung konnte nicht bestätigt werden. Bitte den angezeigten Status prüfen.';
+const INDETERMINATE_UNKNOWN_MESSAGE =
+  'Zeitüberschreitung: Die Stempelung konnte nicht bestätigt werden. Bitte Armband erneut scannen und Status prüfen.';
 
 /** Failure that already carries a German, user-facing message. */
 class LocalizedError extends Error {
@@ -59,6 +68,17 @@ class ScannerError extends LocalizedError {
   }
 }
 
+/**
+ * Timeout of a request whose outcome is unknown — the call was not aborted, so
+ * the server may still have applied it.
+ */
+class RequestTimeoutError extends LocalizedError {
+  constructor() {
+    super(REQUEST_TIMEOUT_MESSAGE);
+    this.name = 'RequestTimeoutError';
+  }
+}
+
 /** Reject a stalled backend call so the page becomes operable again. */
 async function withRequestTimeout<T>(promise: Promise<T>): Promise<T> {
   try {
@@ -66,7 +86,7 @@ async function withRequestTimeout<T>(promise: Promise<T>): Promise<T> {
   } catch (error) {
     if (error instanceof Error && error.message === REQUEST_TIMEOUT_MESSAGE) {
       logger.error('Staff clock request timed out');
-      throw new LocalizedError(REQUEST_TIMEOUT_MESSAGE);
+      throw new RequestTimeoutError();
     }
     throw error;
   }
@@ -238,13 +258,15 @@ function StaffClockPage() {
 
   /**
    * Re-read the authoritative state for a still-held card. Used after the server
-   * rejected an action as stale, so the page stops offering it.
+   * rejected an action as stale, so the page stops offering it. Returns whether
+   * the reload succeeded; on failure the card is dropped.
    */
-  const refreshState = async (pin: string, tag: string) => {
+  const refreshState = async (pin: string, tag: string): Promise<boolean> => {
     try {
       const state = await withRequestTimeout(api.getStaffClockState(pin, tag));
       setClockState(state);
       setSelectedStatus(state.session?.status ?? 'present');
+      return true;
     } catch (error) {
       // Without fresh state every displayed action could be stale — drop the card.
       logger.warn('Failed to reload staff clock state after conflict', {
@@ -252,6 +274,7 @@ function StaffClockPage() {
       });
       setClockState(null);
       setScannedTag(null);
+      return false;
     }
   };
 
@@ -281,6 +304,22 @@ function StaffClockPage() {
             : `Die Stempelzeit weicht${minutes ? ` um ${minutes} Minuten` : ''} vom Dienstplan ab. Bitte begründen.`
         );
         setPendingCommand(command);
+      } else if (error instanceof RequestTimeoutError) {
+        // The request was never aborted, so the mutation may well have committed
+        // with only the answer lost. Reconcile against the server before any
+        // control is enabled again instead of reporting a failure that may be a
+        // lie — and if even the reload fails, drop the card rather than offer
+        // actions derived from a state we can no longer trust.
+        logger.warn('Staff clock action timed out with unknown outcome', {
+          action: command.action,
+        });
+        setPendingCommand(null);
+        setReason('');
+        const reconciled = await refreshState(pin, command.rfid_tag);
+        setErrorMessage(
+          reconciled ? INDETERMINATE_RELOADED_MESSAGE : INDETERMINATE_UNKNOWN_MESSAGE
+        );
+        setShowError(true);
       } else {
         showFailure(error);
         // The state moved on (web app, other kiosk, lost response): the cached
@@ -726,6 +765,13 @@ function StaffClockPage() {
           )}
         </div>
       </div>
+
+      {/*
+        A scan timeout means the Rust command may still hold the scanner mutex,
+        so the page must offer recovery itself — the message tells the employee
+        to restart the reader, and this is the control that does it.
+      */}
+      {__BUILD_TARGET__ !== 'gkt' && <ScannerRestartButton />}
 
       <ErrorModal isOpen={showError} onClose={() => setShowError(false)} message={errorMessage} />
 

@@ -17,6 +17,13 @@ vi.mock('@platform', () => ({
   },
 }));
 
+vi.mock('../utils/tauriContext', async () => {
+  const actual =
+    // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+    await vi.importActual<typeof import('../utils/tauriContext')>('../utils/tauriContext');
+  return { ...actual, isRfidEnabled: vi.fn(() => true) };
+});
+
 vi.mock('../services/api', async () => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   const actual = await vi.importActual<typeof import('../services/api')>('../services/api');
@@ -201,6 +208,60 @@ describe('StaffClockPage', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('reconciles a timed-out clock action instead of reporting a failure', async () => {
+    vi.useFakeTimers();
+    try {
+      // The POST commits but its answer never arrives — the reload must reveal it.
+      mockedApi.getStaffClockState
+        .mockResolvedValueOnce(checkedOutState)
+        .mockResolvedValueOnce(checkedInState);
+      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(15_000));
+
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(2);
+      expect(screen.getByText(/konnte nicht bestätigt werden/)).toBeInTheDocument();
+      expect(screen.getByText('Eingestempelt')).toBeInTheDocument();
+      expect(screen.queryByText('Einstempeln erfolgreich')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Einstempeln' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Ausstempeln' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops the credential when a timed-out action cannot be reconciled', async () => {
+    vi.useFakeTimers();
+    try {
+      mockedApi.getStaffClockState
+        .mockResolvedValueOnce(checkedOutState)
+        .mockReturnValueOnce(new Promise(() => {}));
+      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(30_000));
+
+      expect(screen.getByText(/Armband erneut scannen und Status prüfen/)).toBeInTheDocument();
+      expect(screen.queryByText('Mara Muster')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Armband scannen' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('offers scanner recovery on the page itself', () => {
+    renderPage();
+
+    expect(screen.getByRole('button', { name: 'Lesegerät neu starten' })).toBeInTheDocument();
   });
 
   it('does not launch a second scan while the first one is pending', async () => {
