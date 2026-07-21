@@ -94,13 +94,18 @@ const INDETERMINATE_SETTLE_MS = 10_000;
  */
 const FENCE_ABORT_MS = 120_000;
 /**
- * Grace after aborting a silent mutation, before its card is unfenced.
+ * How often the kiosk asks the backend what became of a cancelled mutation.
  *
- * The abort tears down the request, so nothing from this kiosk is on its way to
- * the backend afterwards; this window only covers the abort propagating. If the
- * aborted call rejects sooner — the normal case — the fence lifts then.
+ * Aborting the silent request is not by itself an answer: it tears down this
+ * kiosk's connection, but only the backend can say whether the write landed
+ * before that. So the card stays fenced until the backend has answered — a
+ * state read, which is served after the aborted request has been dealt with and
+ * therefore reports the settled truth. Retried, because the one moment the
+ * backend is unreachable is the worst moment to conclude anything.
  */
-const FENCE_ABORT_SETTLE_MS = 5_000;
+const RECONCILE_ATTEMPTS = 3;
+/** Pause between reconciliation attempts, so a brief outage can pass. */
+const RECONCILE_RETRY_MS = 5_000;
 
 /**
  * Cards whose last clock mutation never reported an outcome, keyed by RFID tag.
@@ -206,6 +211,47 @@ async function settleMutation(
     });
     return { kind: 'indeterminate' };
   }
+}
+
+/**
+ * Establish, against the backend, what became of a mutation that was cancelled
+ * because it never reported back — and only then let its card go.
+ *
+ * The abort ends this kiosk's request; it does not say what the backend did
+ * with it. The one party that knows is the backend, so the kiosk asks it. That
+ * read is issued after the cancellation, not beside a live write, so its answer
+ * is the outcome rather than a snapshot that a pending commit could overtake.
+ *
+ * The answer is not shown anywhere: the card is long gone from the reader and
+ * whoever picks it up next will scan again and get a fresh read. What matters
+ * here is only that the backend has spoken before the card is released.
+ *
+ * Bounded on purpose. If the backend stays silent for every attempt, the fence
+ * is released anyway with a loud log — a hallway kiosk that fences a card
+ * forever is broken in a way that no employee can clear.
+ */
+async function reconcileAfterAbort(reconcile: () => Promise<StaffClockState>): Promise<void> {
+  for (let attempt = 1; attempt <= RECONCILE_ATTEMPTS; attempt++) {
+    try {
+      const state = await reconcile();
+      logger.warn('Cancelled clock mutation reconciled against the backend', {
+        attempt,
+        state: state.state,
+      });
+      return;
+    } catch (error) {
+      logger.error('Could not reconcile a cancelled clock mutation', {
+        attempt,
+        error: serializeError(error),
+      });
+      if (attempt < RECONCILE_ATTEMPTS) {
+        await new Promise(resolve => setTimeout(resolve, RECONCILE_RETRY_MS));
+      }
+    }
+  }
+  logger.error('Releasing a card the backend never reconciled', {
+    attempts: RECONCILE_ATTEMPTS,
+  });
 }
 
 const stateLabels: Record<StaffClockState['state'], string> = {
@@ -417,32 +463,33 @@ function StaffClockPage() {
    * window in that case. The returned function lifts it early, for the one case
    * that is proof: a structured refusal from the handler.
    *
-   * A request that never reports back at all cannot lift its own fence. Rather
-   * than dropping the fence while that call is still live — it could commit
-   * right behind the next read — the kiosk aborts the request at
-   * FENCE_ABORT_MS and unfences once the abort has taken effect. Cancelling is
-   * what makes the recovery bounded and still safe: after it, no stamp from this
-   * kiosk is in flight for that card.
+   * A request that never reports back at all cannot lift its own fence. The
+   * kiosk then aborts it and asks the backend what became of it; the fence lifts
+   * on that answer, never on a timer running beside a live write. Cancelling
+   * first is what makes the question answerable: the aborted request is out of
+   * the way by the time the reconciling read is served, so what it returns is
+   * the settled outcome rather than a snapshot taken before the commit.
    */
   const fenceCard = (
     tag: string,
     mutation: Promise<StaffClockState>,
-    abort: () => void
+    abort: () => void,
+    reconcile: () => Promise<StaffClockState>
   ): (() => void) => {
     let release: () => void = () => undefined;
     const released = new Promise<void>(resolve => {
       release = resolve;
     });
     let live = true;
-    // Not a race against the request — it ends the request first, then waits.
+    // Not a race against the request — it ends the request first, then asks.
     const cancelled = new Promise<void>(resolve =>
       setTimeout(() => {
         if (!live) return;
-        logger.warn('Clock mutation never reported back, aborting it to unfence its card', {
+        logger.warn('Clock mutation never reported back, cancelling it to reconcile its card', {
           abortAfterMs: FENCE_ABORT_MS,
         });
         abort();
-        setTimeout(resolve, FENCE_ABORT_SETTLE_MS);
+        void reconcileAfterAbort(reconcile).then(resolve);
       }, FENCE_ABORT_MS)
     );
     const settled = Promise.race([
@@ -492,8 +539,21 @@ function StaffClockPage() {
       // Fence the card up front. The request is live from here on, and the page
       // can be left and reopened before any deadline expires. The fence owns the
       // abort: it is the only place allowed to end this call, and only once
-      // waiting for an answer has become pointless.
-      const releaseFence = fenceCard(command.rfid_tag, mutation, () => controller.abort());
+      // waiting for an answer has become pointless. It also owns the read that
+      // establishes what that cancelled call did, since the fence is what has to
+      // wait for the answer before releasing the card.
+      const releaseFence = fenceCard(
+        command.rfid_tag,
+        mutation,
+        () => controller.abort(),
+        () => {
+          const readController = new AbortController();
+          return withRequestTimeout(
+            api.getStaffClockState(pin, command.rfid_tag, staffId, readController.signal),
+            () => readController.abort()
+          );
+        }
+      );
       let outcome = await settleMutation(mutation, REQUEST_TIMEOUT_MS);
       if (outcome.kind === 'indeterminate') {
         // Give the original call a bounded second chance rather than issuing a

@@ -478,13 +478,17 @@ describe('StaffClockPage', () => {
       const readsBefore = mockedApi.getStaffClockState.mock.calls.length;
 
       // The kiosk in the hallway has nobody to restart it, so the fence must
-      // expire by itself rather than burn 20s on every further scan forever.
+      // resolve by itself rather than burn 20s on every further scan forever.
       await act(() => vi.advanceTimersByTimeAsync(120_000));
+
+      // What resolves it is the backend, not a timer: the cancelled stamp is
+      // reconciled by a read before the card is handed back.
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 1);
 
       fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
       await act(() => vi.advanceTimersByTimeAsync(0));
 
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 1);
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 2);
       expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
       expect(screen.getByText('Mara Muster')).toBeInTheDocument();
     } finally {
@@ -492,7 +496,7 @@ describe('StaffClockPage', () => {
     }
   });
 
-  it('cancels a silent mutation before it unfences the card', async () => {
+  it('keeps a cancelled stamp fenced until the backend has reconciled it', async () => {
     vi.useFakeTimers();
     try {
       let stampSignal: AbortSignal | undefined;
@@ -509,22 +513,64 @@ describe('StaffClockPage', () => {
 
       expect(stampSignal?.aborted).toBe(false);
 
-      // The fence is not simply dropped at the ceiling: the write is ended
-      // first, so nothing can commit behind the read that follows.
+      // Hold the reconciling read open: it is the only thing allowed to end
+      // this fence, so the test can watch the card stay locked without it.
+      let answerReconcile: ((state: StaffClockState) => void) | undefined;
+      mockedApi.getStaffClockState.mockImplementation(
+        () =>
+          new Promise(resolve => {
+            answerReconcile = resolve;
+          })
+      );
+
+      // At the ceiling the stamp is cancelled first, then reconciled — the card
+      // is never released by a timer running beside a live write.
       await act(() => vi.advanceTimersByTimeAsync(95_001));
       expect(stampSignal?.aborted).toBe(true);
+      const readsAfterAbort = mockedApi.getStaffClockState.mock.calls.length;
 
-      // Still fenced while the abort propagates.
-      const readsBefore = mockedApi.getStaffClockState.mock.calls.length;
+      // Cancelling is not an answer. While the backend has not spoken, no scan
+      // of this card gets through to a read.
       fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
-      await act(() => vi.advanceTimersByTimeAsync(1_000));
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore);
-
-      // Once it has, that held scan goes through — bounded recovery, and the
-      // card was never read while a stamp for it was still live.
       await act(() => vi.advanceTimersByTimeAsync(10_000));
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 1);
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort);
+
+      // The backend answers — now, and only now, the held scan goes through.
+      answerReconcile?.(checkedOutState);
+      mockedApi.getStaffClockState.mockResolvedValue(checkedOutState);
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort + 1);
       expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('releases the card when the backend never reconciles the cancelled stamp', async () => {
+    vi.useFakeTimers();
+    try {
+      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      // A backend that answers nothing at all cannot reconcile anything either.
+      mockedApi.getStaffClockState.mockReturnValue(new Promise(() => {}));
+      await act(() => vi.advanceTimersByTimeAsync(95_001));
+
+      // Three bounded attempts, then the card is handed back anyway: a hallway
+      // kiosk that fences a card forever is broken for everyone behind it.
+      await act(() => vi.advanceTimersByTimeAsync(55_001));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(4);
+
+      mockedApi.getStaffClockState.mockResolvedValue(checkedOutState);
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
+      expect(screen.getByText('Mara Muster')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
