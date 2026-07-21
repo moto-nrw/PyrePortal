@@ -40,9 +40,7 @@ export type SessionRecreationOutcome =
   | { status: 'error'; error: unknown; stale: boolean };
 
 export type SessionValidationOutcome =
-  | { status: 'success' }
-  | { status: 'error' }
-  | { status: 'stale' };
+  { status: 'success' } | { status: 'error' } | { status: 'stale' };
 
 /**
  * Detect a session conflict (HTTP 409) via ApiError.statusCode with the

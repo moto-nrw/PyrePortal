@@ -4,8 +4,7 @@ import type { Student, Teacher } from '../services/api';
 
 // Union type for assignable entities (students and teachers)
 export type AssignableEntity =
-  | { type: 'student'; data: Student }
-  | { type: 'teacher'; data: Teacher };
+  { type: 'student'; data: Student } | { type: 'teacher'; data: Teacher };
 
 export interface StudentFilterState {
   gradeFilter: string | null;

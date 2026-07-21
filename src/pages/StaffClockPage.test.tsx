@@ -1,9 +1,8 @@
+import { adapter } from '@platform';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { adapter } from '@platform';
 
 import { ApiError, api, type StaffClockState } from '../services/api';
 import { useUserStore } from '../store/userStore';
