@@ -269,6 +269,67 @@ describe('StaffClockPage', () => {
     }
   });
 
+  it('refuses to read state while the unconfirmed action is still outstanding', async () => {
+    vi.useFakeTimers();
+    try {
+      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      // Rescanning the same card must not read state beside the write that is
+      // still in flight — that read can predate the commit and would re-offer an
+      // action the employee has effectively already taken.
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
+
+      await act(() => vi.advanceTimersByTimeAsync(20_000));
+      expect(screen.getByText(/vorherige Stempelung wird noch verarbeitet/)).toBeInTheDocument();
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads state again once the unconfirmed action finally settles', async () => {
+    vi.useFakeTimers();
+    try {
+      let failAction: ((error: Error) => void) | undefined;
+      mockedApi.executeStaffClockAction.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          failAction = reject;
+        })
+      );
+      mockedApi.getStaffClockState
+        .mockResolvedValueOnce(checkedOutState)
+        .mockResolvedValueOnce(checkedInState);
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
+
+      // The outstanding call reports back: nothing can commit behind it anymore,
+      // so the waiting scan may now trust what it reads.
+      failAction?.(new Error('connection reset'));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(2);
+      expect(screen.getByText('Eingestempelt')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('offers scanner recovery on the page itself', () => {
     renderPage();
 

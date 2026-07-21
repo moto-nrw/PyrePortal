@@ -51,6 +51,14 @@ const REQUEST_TIMEOUT_MESSAGE = 'Server antwortet nicht. Bitte erneut versuchen.
  * the kiosk for longer than REQUEST_TIMEOUT_MS + this.
  */
 const MUTATION_GRACE_MS = 10_000;
+/**
+ * How long a fresh scan waits for a still-unresolved mutation on the same card
+ * before refusing. Reading state next to an outstanding write is what has to be
+ * prevented; waiting forever would instead hand the kiosk to nobody.
+ */
+const UNRESOLVED_FENCE_MS = 20_000;
+const UNRESOLVED_FENCE_MESSAGE =
+  'Die vorherige Stempelung wird noch verarbeitet. Bitte kurz warten und erneut scannen.';
 /** Internal marker distinguishing our own deadline from a backend error. */
 const TIMEOUT_SENTINEL = '__staff_clock_request_timeout__';
 /**
@@ -278,6 +286,15 @@ function StaffClockPage() {
   const [idleTick, setIdleTick] = useState(0);
   const requestIdRef = useRef(0);
   const inFlightRef = useRef(false);
+  /**
+   * A mutation that left the kiosk without a verdict, remembered per card. The
+   * call was never aborted, so its write can still commit: until it settles, any
+   * state read for that card may be answered from before the commit and would
+   * re-offer an action the employee has effectively already taken — a stalled
+   * checkout committing after a "Pause starten erfolgreich" would silently drop
+   * the rest of the shift.
+   */
+  const unresolvedMutationRef = useRef<{ tag: string; settled: Promise<void> } | null>(null);
 
   /** Any interaction restarts the credential expiry window. */
   const registerActivity = useCallback(() => setIdleTick(tick => tick + 1), []);
@@ -349,6 +366,36 @@ function StaffClockPage() {
     setShowError(true);
   };
 
+  /**
+   * Fence the card behind the mutation whose outcome stayed unknown, so nothing
+   * touches that employee's state until the outstanding call has settled.
+   */
+  const fenceCard = (tag: string, mutation: Promise<StaffClockState>) => {
+    const settled = mutation.then(
+      () => undefined,
+      () => undefined
+    );
+    const entry = { tag, settled };
+    unresolvedMutationRef.current = entry;
+    void settled.then(() => {
+      if (unresolvedMutationRef.current === entry) unresolvedMutationRef.current = null;
+    });
+  };
+
+  /** Block a read on a card whose previous mutation has not reported back yet. */
+  const awaitUnresolvedMutation = async (tag: string): Promise<void> => {
+    const unresolved = unresolvedMutationRef.current;
+    if (unresolved?.tag !== tag) return;
+    logger.warn('Holding a scan until the unresolved clock mutation settles');
+    try {
+      await withTimeout(unresolved.settled, UNRESOLVED_FENCE_MS, UNRESOLVED_FENCE_MESSAGE);
+    } catch {
+      // Refusing is the honest answer: the write is still out there, and any
+      // state shown now could be overtaken by it moments later.
+      throw new LocalizedError(UNRESOLVED_FENCE_MESSAGE);
+    }
+  };
+
   const runCommand = async (command: StaffClockCommand) => {
     if (!authenticatedUser?.pin || inFlightRef.current) return;
     const pin = authenticatedUser.pin;
@@ -382,6 +429,7 @@ function StaffClockPage() {
       }
 
       if (outcome.kind === 'indeterminate') {
+        fenceCard(command.rfid_tag, mutation);
         discardAfterIndeterminate(command.action);
         return;
       }
@@ -425,6 +473,7 @@ function StaffClockPage() {
     setCompletedMessage(null);
     try {
       const tag = await scanStaffTag();
+      await awaitUnresolvedMutation(tag);
       const state = await withRequestTimeout(api.getStaffClockState(authenticatedUser.pin, tag));
       if (requestId !== requestIdRef.current) return;
       setScannedTag(tag);
