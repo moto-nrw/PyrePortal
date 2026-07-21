@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -9,11 +9,23 @@ import {
   PaginationControls,
   SelectionPageLayout,
 } from '../components/ui';
+import { useFrozenSortOrder } from '../hooks/useFrozenSortOrder';
 import { usePagination } from '../hooks/usePagination';
 import { api } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
+
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'Team anpassen',
+  noSupervisorSelectedError: 'Bitte wählen Sie mindestens einen Betreuer aus.',
+  updateFailedError: 'Fehler beim Aktualisieren der Betreuer. Bitte versuchen Sie es erneut.',
+  saveButtonSaving: 'Speichern...',
+  saveButton: 'Team speichern',
+  successUpdated: 'Team erfolgreich aktualisiert!',
+  successSaved: 'Team erfolgreich gespeichert!',
+} as const;
 
 function TeamManagementPage() {
   const {
@@ -22,6 +34,7 @@ function TeamManagementPage() {
     selectedSupervisors,
     toggleSupervisor,
     setSelectedSupervisors,
+    loadSessionSupervisors,
     isLoading,
     error,
     authenticatedUser,
@@ -31,31 +44,16 @@ function TeamManagementPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  // Freeze sort order after first user interaction to prevent items from moving
-  const frozenSortOrder = useRef<Map<number, number> | null>(null);
   const navigate = useNavigate();
 
   // Create stable logger instance for this component
   const logger = useMemo(() => createLogger('TeamManagementPage'), []);
 
   // Sort: pre-selected at top on page load, then freeze after first interaction
-  const sortedUsers = useMemo(() => {
-    if (frozenSortOrder.current) {
-      return [...users].sort((a, b) => {
-        const aOrder = frozenSortOrder.current!.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-        const bOrder = frozenSortOrder.current!.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-        return aOrder - bOrder;
-      });
-    }
-    const selectedIds = new Set(selectedSupervisors.map(s => s.id));
-    return [...users].sort((a, b) => {
-      const aSel = selectedIds.has(a.id);
-      const bSel = selectedIds.has(b.id);
-      if (aSel && !bSel) return -1;
-      if (!aSel && bSel) return 1;
-      return a.name.localeCompare(b.name, 'de');
-    });
-  }, [users, selectedSupervisors]);
+  const { sortedItems: sortedUsers, freezeSortOrder } = useFrozenSortOrder(
+    users,
+    selectedSupervisors
+  );
 
   // Pagination hook with sorted users
   const {
@@ -87,17 +85,7 @@ function TeamManagementPage() {
 
         // Always refresh supervisors from backend when there's an active session
         if (currentSession) {
-          // Fetch current session details to get supervisors
-          const sessionDetails = await api.getCurrentSession(authenticatedUser!.pin);
-          if (sessionDetails && 'supervisors' in sessionDetails) {
-            // Map supervisor info to user format
-            const currentSupervisors =
-              sessionDetails.supervisors?.map(sup => ({
-                id: sup.staff_id,
-                name: sup.display_name,
-              })) ?? [];
-            setSelectedSupervisors(currentSupervisors);
-          }
+          await loadSessionSupervisors();
         }
       } catch (error) {
         logger.error('Failed to initialize team management page', { error: serializeError(error) });
@@ -107,15 +95,11 @@ function TeamManagementPage() {
     if (authenticatedUser) {
       void initializePage();
     }
-  }, [authenticatedUser, currentSession, fetchTeachers, setSelectedSupervisors, logger]);
+  }, [authenticatedUser, currentSession, fetchTeachers, loadSessionSupervisors, logger]);
 
   const handleUserToggle = (user: { id: number; name: string }) => {
     // Freeze sort order on first interaction so items don't move
-    if (!frozenSortOrder.current) {
-      const orderMap = new Map<number, number>();
-      sortedUsers.forEach((u, idx) => orderMap.set(u.id, idx));
-      frozenSortOrder.current = orderMap;
-    }
+    freezeSortOrder();
 
     logger.info('Toggling supervisor selection', {
       username: user.name,
@@ -135,7 +119,7 @@ function TeamManagementPage() {
   const handleSave = async () => {
     if (selectedSupervisors.length === 0) {
       logger.warn('Attempted to save without selecting supervisors');
-      setErrorMessage('Bitte wählen Sie mindestens einen Betreuer aus.');
+      setErrorMessage(texts.noSupervisorSelectedError);
       setShowErrorModal(true);
       return;
     }
@@ -178,7 +162,7 @@ function TeamManagementPage() {
       setShowSuccessModal(true);
     } catch (error) {
       logger.error('Failed to update supervisors', { error: serializeError(error) });
-      setErrorMessage('Fehler beim Aktualisieren der Betreuer. Bitte versuchen Sie es erneut.');
+      setErrorMessage(texts.updateFailedError);
       setShowErrorModal(true);
     } finally {
       setIsSaving(false);
@@ -211,7 +195,7 @@ function TeamManagementPage() {
 
   return (
     <SelectionPageLayout
-      title="Team anpassen"
+      title={texts.title}
       onBack={handleBack}
       isLoading={isLoading}
       error={error}
@@ -275,7 +259,7 @@ function TeamManagementPage() {
             }
           }}
         >
-          {isSaving ? 'Speichern...' : 'Team speichern'}
+          {isSaving ? texts.saveButtonSaving : texts.saveButton}
         </button>
       </div>
 
@@ -286,9 +270,7 @@ function TeamManagementPage() {
           logNavigation('TeamManagementPage', 'HomeViewPage');
           void navigate('/home');
         }}
-        message={
-          currentSession ? 'Team erfolgreich aktualisiert!' : 'Team erfolgreich gespeichert!'
-        }
+        message={currentSession ? texts.successUpdated : texts.successSaved}
         autoCloseDelay={1000}
       />
 

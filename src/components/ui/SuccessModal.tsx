@@ -1,6 +1,6 @@
 import React from 'react';
 
-import theme from '../../styles/theme';
+import { designSystem } from '../../styles/designSystem';
 
 import { ModalBase } from './ModalBase';
 
@@ -21,7 +21,7 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
     isOpen={isOpen}
     onClose={onClose}
     size="sm"
-    backgroundColor={theme.colors.background.light}
+    backgroundColor={designSystem.colors.white}
     timeout={autoCloseDelay}
   >
     <div
@@ -34,7 +34,7 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
         alignItems: 'center',
         justifyContent: 'center',
         margin: '0 auto',
-        marginBottom: theme.spacing.lg,
+        marginBottom: designSystem.spacing.lg,
         boxShadow: '0 4px 12px rgba(131, 205, 45, 0.25)',
       }}
     >
@@ -53,9 +53,9 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
     </div>
     <h2
       style={{
-        fontSize: theme.fonts.size.xl,
-        fontWeight: theme.fonts.weight.bold,
-        marginBottom: theme.spacing.lg,
+        fontSize: designSystem.fonts.size.xl,
+        fontWeight: designSystem.fonts.weight.bold,
+        marginBottom: designSystem.spacing.lg,
         color: '#83CD2D',
       }}
     >
@@ -63,9 +63,9 @@ export const SuccessModal: React.FC<SuccessModalProps> = ({
     </h2>
     <div
       style={{
-        fontSize: theme.fonts.size.large,
-        color: theme.colors.text.secondary,
-        marginBottom: theme.spacing.xl,
+        fontSize: designSystem.fonts.size.large,
+        color: designSystem.colors.textSubtle,
+        marginBottom: designSystem.spacing.xl,
       }}
     >
       {message}

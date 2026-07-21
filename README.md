@@ -1,81 +1,80 @@
 # PyrePortal
 
-![PyrePortal](public/img/moto_transparent_200.png)
+![PyrePortal](docs/img/moto_transparent_200.png)
 
-[![Tauri](https://img.shields.io/badge/tauri-v2-blue)](https://tauri.app)
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/typescript-5.9-blue)](https://www.typescriptlang.org)
-[![Version](https://img.shields.io/badge/version-0.1.0-green)](package.json)
+[![Version](https://img.shields.io/badge/version-1.3.3-green)](package.json)
 
-A Raspberry Pi kiosk app for German after-school care (OGS). Staff tap RFID wristbands to check students in and out, pick rooms, run activities, and track attendance — all from a single touchscreen.
+PyrePortal is the web kiosk frontend for German after-school care (OGS). Staff use NFC/RFID wristbands to check students in and out, pick rooms, run activities, and track attendance from a kiosk device.
+
+## Supported Targets
+
+- **GKT/GKTL kiosk devices**: production target. NFC is provided by the GKT system bridge via `system.js`.
+- **Wedge (iPad/tablet + USB NFC reader)**: kiosk target for tablets with a USB NFC reader in keyboard-emulation mode (e.g. ACS ACR1552U-MF). See [docs/wedge-reader-setup.md](docs/wedge-reader-setup.md).
+- **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
+- **Tauri Mac/mock app**: local development target for launching the mock frontend as a desktop app.
+
+The old Raspberry Pi/Balena deployment path and Tauri production deployment are retired. Tauri is retained only for local Mac/mock app usage and is not a production release target.
 
 ## What It Does
 
-- **RFID check-in/check-out** — Scan a wristband, and the server records the student's arrival or departure instantly.
-- **PIN authentication** — Staff unlock the kiosk with a PIN. Supports both a shared OGS PIN and individual teacher PINs.
-- **Room and activity management** — Choose a room, start an activity session, assign supervisors, and see live occupancy.
-- **Attendance tracking** — View student status, toggle check-in/check-out, and submit daily feedback (positive / neutral / negative).
-- **RFID tag assignment** — Pair wristbands to students or staff directly from the device.
-- **Network-aware** — Shows connection quality and gives clear German-language error messages when things go wrong.
-- **Structured logging** — Logs flow from the browser to Rust to disk, with automatic file rotation.
-
-## Target Hardware
-
-**Raspberry Pi 5** (64-bit, `aarch64-unknown-linux-gnu`), fullscreen kiosk mode, MFRC522 RFID reader on SPI.
-
-The app builds on macOS, Windows, and Linux for development, but the RFID reader only works on ARM/ARM64 Linux with the `rfid` feature flag. On other platforms, a mock scanner fills in for testing.
+- **RFID check-in/check-out**: scan a wristband and the server records the student's arrival or departure.
+- **PIN authentication**: staff unlock the kiosk with a shared OGS PIN or individual teacher PIN.
+- **Room and activity management**: choose a room, start an activity session, assign supervisors, and see live occupancy.
+- **Attendance tracking**: view student status, toggle check-in/check-out, and submit daily feedback.
+- **RFID tag assignment**: pair wristbands to students or staff directly from the kiosk UI.
+- **Network-aware UI**: shows connection quality and German-language error messages.
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-    subgraph "PyrePortal (Tauri Desktop App)"
-        UI[React Frontend] -->|Tauri IPC| Backend[Rust Backend]
-        Backend -->|Invoke| UI
-        UI -->|State| Store[Zustand Store]
-        Store --> UI
+    subgraph "PyrePortal Frontend"
+        UI[React UI] --> Store[Zustand Store]
+        UI --> Platform[Platform Adapter]
+        Platform --> GKT[GKT NFC bridge]
+        Platform --> Mock[Browser mock scanner]
+        Platform --> Tauri[Tauri Mac/mock app]
     end
 
     subgraph "Project Phoenix"
-        Server[Backend Server] -->|SQL| DB[(Database)]
+        Server[Backend Server] --> DB[(Database)]
     end
 
-    Backend -->|REST API| Server
+    UI -->|REST API| Server
 ```
 
-| Layer              | Role                                               |
-| ------------------ | -------------------------------------------------- |
-| React + TypeScript | UI, routing, state (Zustand), RFID scanning hook   |
-| Rust (Tauri v2)    | Runtime config, file logging, SPI/RFID hardware    |
-| Project Phoenix    | Source of truth for students, staff, rooms, visits |
+| Layer              | Role                                                             |
+| ------------------ | ---------------------------------------------------------------- |
+| React + TypeScript | UI, routing, state, RFID scanning flow                           |
+| Platform adapters  | GKT NFC bridge, browser mock, and Tauri Mac/mock implementations |
+| Project Phoenix    | Source of truth for students, staff, rooms, visits               |
 
 ### Key Design Decisions
 
 1. **Server-first RFID scans.** Every scan hits the backend before the UI reacts. No local student cache.
-2. **Edge-triggered duplicate prevention.** Tauri emits one event per physical tap via Rust-side presence detection; the frontend keeps processing-queue and short fallback guards.
-3. **Runtime config via Rust.** API keys live in `.env` and are read by Rust at startup — never baked into the frontend build.
-4. **Two-level auth on every request.** Device API key (`Authorization: Bearer ...`) plus staff PIN (`X-Staff-PIN` header).
+2. **Platform adapters.** `BUILD_TARGET=gkt` bundles the production GKT adapter; plain browser builds use the browser mock adapter; `BUILD_TARGET=tauri` is for the local Mac/mock app.
+3. **Two-level auth on every request.** Device API key (`Authorization: Bearer ...`) plus staff PIN (`X-Staff-PIN` header).
+4. **Backend-owned data.** Project Phoenix is the source of truth for rooms, sessions, attendance, and tag assignments.
 
 ## Tech Stack
 
-| Component  | Technology   | Version  |
-| ---------- | ------------ | -------- |
-| Framework  | Tauri        | v2       |
-| Frontend   | React        | 19       |
-| Language   | TypeScript   | 5.9      |
-| State      | Zustand      | 5        |
-| Routing    | React Router | 7        |
-| Styling    | TailwindCSS  | 4        |
-| Build Tool | Vite         | 7        |
-| Backend    | Rust         | 2021 ed. |
+| Component  | Technology   | Version |
+| ---------- | ------------ | ------- |
+| Frontend   | React        | 19      |
+| Language   | TypeScript   | 5.9     |
+| State      | Zustand      | 5       |
+| Routing    | React Router | 7       |
+| Styling    | TailwindCSS  | 4       |
+| Build Tool | Vite         | 8       |
 
 ## Getting Started
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) v18+
-- [Rust](https://www.rust-lang.org/tools/install) (stable)
-- Platform deps for [Tauri v2](https://v2.tauri.app/start/prerequisites/)
+- pnpm 10+
 
 ### Setup
 
@@ -85,61 +84,90 @@ cd PyrePortal
 pnpm install
 ```
 
-Create a `.env` file in the project root:
+Create a `.env` file in the project root for local browser development:
 
 ```bash
-API_BASE_URL=http://localhost:8080
-DEVICE_API_KEY=your_device_key
-VITE_ENABLE_RFID=false          # true on Pi with hardware
+VITE_API_BASE_URL=http://localhost:8080
+VITE_DEVICE_API_KEY=your_dev_device_key
 VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80
 ```
+
+GKT deployments pass the device API key through the kiosk URL (`?key=...`) and bake the API base URL into the GKT build.
 
 ### Run
 
 ```bash
-pnpm run tauri dev    # Full app (Rust + React)
-pnpm run dev          # Frontend only (faster, no RFID)
+pnpm run dev
 ```
+
+### Testing Locally
+
+Four stages, from fastest feedback to closest-to-production:
+
+1. **Browser mock (daily loop).** Run the Phoenix backend locally (`../project-phoenix`, port 8080), then `pnpm run dev`. Mock RFID scans fire automatically every 5-10 seconds from `VITE_MOCK_RFID_TAGS`; those tags must exist in the backend data.
+
+2. **GKT adapter without a device.** The production scan path can be tested locally:
+
+   ```bash
+   BUILD_TARGET=gkt VITE_API_BASE_URL=http://localhost:8080 pnpm run dev
+   ```
+
+   Open `http://localhost:1420/?key=<device-api-key>`. The dev server injects `system.js`, which falls back to `console.log` when the native `GKTKiosk` object is missing. Simulate a hardware NFC scan from the browser DevTools console:
+
+   ```js
+   SYSTEM.onNfcScanned({ uid: '04:D6:94:82:97:6A:80', eventSource: 'NFC', eventNumber: 1 });
+   ```
+
+   This exercises the real production code path: GKT adapter, payload normalization, server round-trip.
+
+3. **Tauri Mac/mock app** (only needed when touching Rust or the platform adapters):
+
+   ```bash
+   pnpm dlx @tauri-apps/cli dev
+   ```
+
+   There is no repo script for this; the Tauri CLI tooling was removed when Tauri stopped being a release target.
+
+4. **Staging.** Merging to `development` auto-deploys the GKT staging environment (`deploy-gkt.yml`). Production deploys only on pushes to `main`, so verify on staging before merging `development` into `main`.
 
 ### Build
 
 ```bash
-pnpm run tauri build
-# Output: src-tauri/target/release/bundle/
+pnpm run build:gkt    # Production GKT bundle
+pnpm run build:wedge  # Production wedge bundle (tablet + USB NFC reader)
+pnpm run build        # Browser/mock bundle
 ```
 
 ### Code Quality
 
 ```bash
-pnpm run check        # ESLint + TypeScript (must pass before committing)
+pnpm run check        # ESLint + TypeScript
+pnpm run test         # Vitest
 pnpm run format       # Prettier auto-format
-cd src-tauri && cargo clippy   # Rust linter
 ```
 
 ## API Endpoints
 
 PyrePortal talks to the Project Phoenix backend over REST. All requests carry device and staff credentials.
 
-| Endpoint                           | Method | Purpose                   |
-| ---------------------------------- | ------ | ------------------------- |
-| `/api/iot/teachers`                | GET    | Fetch staff list          |
-| `/api/iot/ping`                    | POST   | Validate global PIN       |
-| `/api/iot/status`                  | GET    | Validate teacher PIN      |
-| `/api/iot/activities`              | GET    | Today's activities        |
-| `/api/iot/rooms/available`         | GET    | Available rooms           |
-| `/api/iot/checkin`                 | POST   | RFID check-in/check-out   |
-| `/api/iot/session/start`           | POST   | Start activity session    |
-| `/api/iot/session/end`             | POST   | End session               |
-| `/api/iot/session/current`         | GET    | Current session info      |
-| `/api/iot/session/activity`        | POST   | Prevent session timeout   |
-| `/api/iot/students`                | GET    | Students by teacher       |
-| `/api/iot/rfid/:tagId`             | GET    | Check tag assignment      |
-| `/api/students/:id/rfid`           | POST   | Assign tag to student     |
-| `/api/iot/staff/:id/rfid`          | POST   | Assign tag to staff       |
-| `/api/iot/attendance/status/:rfid` | GET    | Student attendance status |
-| `/api/iot/attendance/toggle`       | POST   | Toggle check-in/check-out |
-| `/api/iot/feedback`                | POST   | Submit daily feedback     |
-| `/health`                          | GET    | Server health check       |
+| Endpoint                     | Method | Purpose                   |
+| ---------------------------- | ------ | ------------------------- |
+| `/api/iot/teachers`          | GET    | Fetch staff list          |
+| `/api/iot/ping`              | POST   | Validate global PIN       |
+| `/api/iot/activities`        | GET    | Today's activities        |
+| `/api/iot/rooms/available`   | GET    | Available rooms           |
+| `/api/iot/checkin`           | POST   | RFID check-in/check-out   |
+| `/api/iot/session/start`     | POST   | Start activity session    |
+| `/api/iot/session/end`       | POST   | End session               |
+| `/api/iot/session/current`   | GET    | Current session info      |
+| `/api/iot/session/activity`  | POST   | Prevent session timeout   |
+| `/api/iot/students`          | GET    | Students by teacher       |
+| `/api/iot/rfid/:tagId`       | GET    | Check tag assignment      |
+| `/api/students/:id/rfid`     | POST   | Assign tag to student     |
+| `/api/iot/staff/:id/rfid`    | POST   | Assign tag to staff       |
+| `/api/iot/attendance/toggle` | POST   | Toggle check-in/check-out |
+| `/api/iot/feedback`          | POST   | Submit daily feedback     |
+| `/health`                    | GET    | Server health check       |
 
 ## Usage
 
@@ -148,7 +176,7 @@ PyrePortal talks to the Project Phoenix backend over REST. All requests carry de
 
 Enter your PIN on the login screen. PyrePortal validates it against the backend and grants access.
 
-![Login Screen](public/img/placeholder_nfc_scan.png)
+![Login Screen](docs/img/placeholder_nfc_scan.png)
 
 </details>
 
@@ -157,13 +185,13 @@ Enter your PIN on the login screen. PyrePortal validates it against the backend 
 
 Pick a room after logging in. Each room shows its current status:
 
-- ![Occupied](public/img/checked_in.png) Occupied
-- ![Available](public/img/checked_out.png) Available
+- ![Occupied](docs/img/checked_in.png) Occupied
+- ![Available](docs/img/checked_out.png) Available
 
 Room types include:
 
-- ![School Yard](public/img/school_yard_icon.png) School Yard
-- ![Toilet](public/img/toilet_icon.png) Toilet
+- ![School Yard](docs/img/school_yard_icon.png) School Yard
+- ![Toilet](docs/img/toilet_icon.png) Toilet
 
 </details>
 
@@ -172,9 +200,9 @@ Room types include:
 
 Start an activity, assign supervisors, and scan students in. At checkout, staff can leave daily feedback:
 
-- ![Positive](public/img/positive_smiley1.png) Positive
-- ![Neutral](public/img/neutral_smiley1.png) Neutral
-- ![Negative](public/img/negative_smiley1.png) Negative
+- ![Positive](docs/img/positive_smiley1.png) Positive
+- ![Neutral](docs/img/neutral_smiley1.png) Neutral
+- ![Negative](docs/img/negative_smiley1.png) Negative
 
 </details>
 
@@ -185,29 +213,28 @@ Start an activity, assign supervisors, and scan students in. At checkout, staff 
 
 ### App won't start
 
-- Check `.env` for `API_BASE_URL` and `DEVICE_API_KEY`
-- Check logs: `~/Library/Logs/pyreportal/` (macOS) or `~/.config/pyreportal/logs/` (Linux)
-- Verify Tauri platform deps are installed
+- Check local `.env` for `VITE_API_BASE_URL` and `VITE_DEVICE_API_KEY`.
+- For GKT, confirm the kiosk URL contains `?key=...`.
+- Confirm the backend is reachable: `curl http://localhost:8080/health`.
 
 ### Build errors
 
 ```bash
-pnpm run clean:target   # Clean Rust artifacts
 rm -rf node_modules dist
 pnpm install
-pnpm run tauri build
+pnpm run build:gkt
 ```
 
-### RFID not working
+### RFID/NFC not working
 
-- Development: set `VITE_ENABLE_RFID=false` in `.env`
-- Pi hardware: run `cd src-tauri && ./test_rfid.sh`
-- Console should show "RFID service initialized"
+- Browser development uses mock scans from `VITE_MOCK_RFID_TAGS`.
+- GKT devices receive NFC scans through the `SYSTEM.registerNfc` bridge.
+- Check browser console logs for scanner initialization and scan events.
 
 ### API connection fails
 
-- Confirm backend is running: `curl http://localhost:8080/health`
-- Check `DEVICE_API_KEY` matches what the server expects
+- Confirm Project Phoenix is running.
+- Check the device API key matches what the server expects.
 
 </details>
 

@@ -8,7 +8,7 @@ import { adapter } from '@platform';
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
-import { ScannerRestartButton } from '../components/ui/ScannerRestartButton';
+import { isRealScanningEnabled } from '../platform/adapter';
 import {
   ApiError,
   api,
@@ -23,7 +23,6 @@ import { designSystem } from '../styles/designSystem';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 import { pressHandlers } from '../utils/pressHandlers';
-import { isRfidEnabled } from '../utils/tauriContext';
 import { withTimeout } from '../utils/withTimeout';
 
 const logger = createLogger('StaffClockPage');
@@ -184,10 +183,6 @@ function formatMinutes(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
   return hours > 0 ? `${hours} Std. ${rest} Min.` : `${rest} Min.`;
-}
-
-function isRealScanningEnabled(): boolean {
-  return adapter.platform === 'gkt' || isRfidEnabled();
 }
 
 async function scanStaffTag(): Promise<string> {
@@ -611,12 +606,12 @@ function StaffClockPage() {
               style={{
                 width: '100%',
                 maxWidth: '820px',
-                background: designSystem.glass.backgroundStrong,
+                background: designSystem.glass.background,
                 backdropFilter: designSystem.glass.blur,
                 WebkitBackdropFilter: designSystem.glass.blur,
                 border: '1px solid rgba(229,231,235,0.5)',
                 borderRadius: '32px',
-                boxShadow: designSystem.shadows.card,
+                boxShadow: designSystem.shadows.button,
                 padding: '40px 48px',
                 textAlign: 'left',
               }}
@@ -894,13 +889,6 @@ function StaffClockPage() {
           )}
         </div>
       </div>
-
-      {/*
-        A scan timeout means the Rust command may still hold the scanner mutex,
-        so the page must offer recovery itself — the message tells the employee
-        to restart the reader, and this is the control that does it.
-      */}
-      {__BUILD_TARGET__ !== 'gkt' && <ScannerRestartButton />}
 
       <ErrorModal isOpen={showError} onClose={() => setShowError(false)} message={errorMessage} />
 

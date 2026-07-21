@@ -1,0 +1,45 @@
+/**
+ * Tauri Context Detection Utility
+ *
+ * Provides utilities to detect if the app is running in a Tauri context
+ * and handle invoke calls gracefully when Tauri is not available.
+ */
+
+// Check if we're running in a Tauri context
+const isTauriContext = (): boolean => {
+  // Primary check: Tauri v2 injects __TAURI_INTERNALS__ as the invoke bridge
+  if (typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+    return true;
+  }
+
+  // Secondary check: Environment variables that indicate Tauri dev mode
+  if (import.meta.env.VITE_TAURI_DEV_HOST || import.meta.env.TAURI_DEV_HOST) {
+    return true;
+  }
+
+  // Fallback: Check user agent for Tauri
+  if (typeof navigator !== 'undefined' && navigator.userAgent.includes('Tauri')) {
+    return true;
+  }
+
+  return false;
+};
+
+// Safe invoke wrapper that handles missing Tauri context
+export const safeInvoke = async <T>(
+  command: string,
+  args?: Record<string, unknown>
+): Promise<T> => {
+  if (!isTauriContext()) {
+    throw new Error(`Tauri context not available. Command: ${command}`);
+  }
+
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    return await invoke<T>(command, args);
+  } catch (error) {
+    throw new Error(
+      `Failed to invoke ${command}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+};

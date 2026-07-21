@@ -1,6 +1,5 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod logging;
-mod rfid;
 mod session_storage;
 
 use serde::{Deserialize, Serialize};
@@ -40,8 +39,8 @@ fn parse_fullscreen_env() -> bool {
 
 #[tauri::command]
 fn restart_app() {
-    // Exit with code 0 - Balena's restart: always policy will restart the container
-    // On macOS/dev mode, the app simply exits
+    // Exit with code 0 - the local Mac/mock app simply exits
+    // (the retired Balena deployment relied on a container restart policy here)
     std::process::exit(0);
 }
 
@@ -64,18 +63,6 @@ pub fn run() {
             get_api_config,
             restart_app,
             logging::write_log,
-            logging::get_log_files,
-            logging::read_log_file,
-            logging::clear_log_file,
-            logging::cleanup_old_logs,
-            rfid::initialize_rfid_service,
-            rfid::start_rfid_service,
-            rfid::stop_rfid_service,
-            rfid::recover_rfid_scanner,
-            rfid::get_rfid_service_status,
-            rfid::get_rfid_scanner_status,
-            rfid::scan_rfid_single,
-            rfid::scan_rfid_with_timeout,
             session_storage::save_session_settings,
             session_storage::load_session_settings,
             session_storage::clear_last_session

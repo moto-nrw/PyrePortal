@@ -25,11 +25,11 @@ function App() {
   const {
     selectedRoom,
     selectedActivity,
-    setNetworkStatus,
     updateNetworkQuality,
     networkStatus: storeNetworkStatus,
   } = useUserStore();
-  const { networkStatus: hookNetworkStatus } = useNetworkStatus();
+  // Starts health-check monitoring; results are written directly to the store
+  useNetworkStatus();
   const appLogger = useMemo(() => createLogger('App'), []);
 
   // Initialize logger with runtime config
@@ -43,11 +43,6 @@ function App() {
     });
   }, [appLogger]);
 
-  // Sync network status from hook to store (for periodic health checks)
-  useEffect(() => {
-    setNetworkStatus(hookNetworkStatus);
-  }, [hookNetworkStatus, setNetworkStatus]);
-
   // Register API callback to update network status on every API call
   useEffect(() => {
     setNetworkStatusCallback(updateNetworkQuality);
@@ -56,7 +51,6 @@ function App() {
 
   // Conditions for protected routes with additional requirements
   // Note: Authentication is handled by ProtectedRoute component
-  const hasSelectedRoom = !!selectedRoom;
   const hasActiveSession = !!selectedActivity && !!selectedRoom;
 
   return (
@@ -155,14 +149,6 @@ function App() {
               element={
                 <ProtectedRoute condition={hasActiveSession}>
                   <ActivityScanningPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/create-activity"
-              element={
-                <ProtectedRoute condition={hasSelectedRoom}>
-                  <CreateActivityPage />
                 </ProtectedRoute>
               }
             />

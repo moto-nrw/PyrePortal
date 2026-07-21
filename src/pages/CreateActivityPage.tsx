@@ -2,14 +2,14 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
-  ContinueButton,
   SelectableGrid,
   SelectableCard,
   PaginationControls,
   SelectionPageLayout,
 } from '../components/ui';
+import { PillButton } from '../components/ui/PillButton';
 import { usePagination } from '../hooks/usePagination';
-import type { ActivityResponse } from '../services/api';
+import { ApiError, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import {
   createLogger,
@@ -18,6 +18,14 @@ import {
   logError,
   serializeError,
 } from '../utils/logger';
+
+/** User-facing German UI copy for this page */
+const texts = {
+  title: 'Was machen wir?',
+  noActivitiesHeading: 'Keine Aktivitäten verfügbar',
+  noActivitiesHint: 'Sie haben derzeit keine zugewiesenen Aktivitäten.',
+  continueButton: 'Weiter',
+} as const;
 
 function CreateActivityPage() {
   const {
@@ -89,7 +97,11 @@ function CreateActivityPage() {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Check for authentication errors
-      if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+      if (
+        (error instanceof ApiError && error.statusCode === 401) ||
+        errorMessage.includes('401') ||
+        errorMessage.includes('Unauthorized')
+      ) {
         logger.warn('Authentication failed during activity fetch, redirecting to login', {
           error: errorMessage,
         });
@@ -206,7 +218,7 @@ function CreateActivityPage() {
 
   return (
     <SelectionPageLayout
-      title="Was machen wir?"
+      title={texts.title}
       onBack={handleBack}
       isLoading={isLoading || isFetching}
       error={error}
@@ -243,7 +255,7 @@ function CreateActivityPage() {
               textAlign: 'center',
             }}
           >
-            Keine Aktivitäten verfügbar
+            {texts.noActivitiesHeading}
           </div>
           <div
             style={{
@@ -252,7 +264,7 @@ function CreateActivityPage() {
               textAlign: 'center',
             }}
           >
-            Sie haben derzeit keine zugewiesenen Aktivitäten.
+            {texts.noActivitiesHint}
           </div>
         </div>
       ) : (
@@ -285,7 +297,9 @@ function CreateActivityPage() {
           />
 
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-            <ContinueButton onClick={handleContinue} disabled={!selectedActivity} />
+            <PillButton variant="primary" onClick={handleContinue} disabled={!selectedActivity}>
+              {texts.continueButton}
+            </PillButton>
           </div>
         </>
       )}

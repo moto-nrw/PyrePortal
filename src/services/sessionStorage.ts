@@ -9,7 +9,7 @@ import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('SessionStorage');
 
-export interface LastSessionConfig {
+interface LastSessionConfig {
   activity_id: number;
   room_id: number;
   supervisor_ids: number[];

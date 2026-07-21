@@ -4,9 +4,11 @@ import {
   ApiError,
   formatRoomName,
   isNetworkRelatedError,
+  isWCRoomAlias,
   mapApiErrorToGerman,
   mapServerErrorToGerman,
   setNetworkStatusCallback,
+  WC_ROOM_ALIASES,
 } from './api';
 
 // ====================================================================
@@ -28,7 +30,7 @@ function mockResponse(
     json: () => Promise.resolve(body),
     headers: new Headers(),
     redirected: false,
-    type: 'basic' as ResponseType,
+    type: 'basic',
     url: '',
     clone: () => mockResponse(body, init),
     body: null,
@@ -82,18 +84,6 @@ describe('mapServerErrorToGerman', () => {
     );
   });
 
-  it('maps locked account', () => {
-    expect(mapServerErrorToGerman('staff account is locked due to failed PIN attempts')).toBe(
-      'Konto gesperrt wegen zu vieler Fehlversuche. Bitte Administrator kontaktieren.'
-    );
-  });
-
-  it('maps maximum PIN attempts', () => {
-    expect(mapServerErrorToGerman('maximum PIN attempts exceeded')).toBe(
-      'Maximale PIN-Versuche überschritten. Konto gesperrt.'
-    );
-  });
-
   it('maps generic locked', () => {
     expect(mapServerErrorToGerman('locked')).toBe('Konto gesperrt. Bitte später erneut versuchen.');
   });
@@ -114,6 +104,21 @@ describe('mapServerErrorToGerman', () => {
   it('maps room capacity exceeded', () => {
     expect(mapServerErrorToGerman('ROOM_CAPACITY_EXCEEDED')).toBe(
       'Raum ist voll. Kein Platz mehr verfügbar.'
+    );
+  });
+
+  // Issue #844 — duplicate active visit (409). Substring + code variants
+  // are both registered so degraded paths or older response shapes still
+  // resolve to the friendly German copy instead of the generic 409 fallback.
+  it('maps STUDENT_ALREADY_ACTIVE code', () => {
+    expect(mapServerErrorToGerman('STUDENT_ALREADY_ACTIVE')).toBe(
+      'Schüler*in ist bereits angemeldet.'
+    );
+  });
+
+  it('maps "student already has an active visit" message', () => {
+    expect(mapServerErrorToGerman('student already has an active visit')).toBe(
+      'Schüler*in ist bereits angemeldet.'
     );
   });
 
@@ -150,10 +155,19 @@ describe('mapServerErrorToGerman', () => {
     );
   });
 
-  it('maps staff RFID auth error', () => {
+  // Attendance errors
+  it('maps missing attendance record on daily checkout', () => {
+    expect(mapServerErrorToGerman('student has no attendance record for today')).toBe(
+      'Schüler wurde heute noch nicht eingecheckt.'
+    );
+  });
+
+  it('maps missing attendance record inside the full wire message', () => {
     expect(
-      mapServerErrorToGerman('staff RFID authentication must be done via session management')
-    ).toBe('Betreuer-Armband kann hier nicht verwendet werden.');
+      mapServerErrorToGerman(
+        'API Error: 404 - Not Found: student has no attendance record for today'
+      )
+    ).toBe('Schüler wurde heute noch nicht eingecheckt.');
   });
 
   // Internal server errors
@@ -262,12 +276,6 @@ describe('mapServerErrorToGerman', () => {
     expect(mapServerErrorToGerman('staff PIN is required')).toBe('PIN nicht angegeben.');
   });
 
-  it('maps device is offline', () => {
-    expect(mapServerErrorToGerman('device is offline')).toBe(
-      'Gerät ist als offline markiert. Bitte Administrator kontaktieren.'
-    );
-  });
-
   it('maps no active session', () => {
     expect(mapServerErrorToGerman('no active session')).toBe(
       'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.'
@@ -334,10 +342,12 @@ describe('mapApiErrorToGerman', () => {
   });
 
   it('handles ApiError with activity capacity details', () => {
+    // Backend sends current_occupancy/max_capacity for activity capacity too
+    // (project-phoenix issue #1879)
     const error = new ApiError('Activity capacity exceeded', 409, 'ACTIVITY_CAPACITY_EXCEEDED', {
       activity_name: 'Fußball AG',
-      current_participants: 20,
-      max_participants: 20,
+      current_occupancy: 20,
+      max_capacity: 20,
     });
     const result = mapApiErrorToGerman(error);
     expect(result).toBe('Fußball AG ist voll (20/20 Teilnehmer).');
@@ -370,10 +380,21 @@ describe('mapApiErrorToGerman', () => {
     );
   });
 
+  it('activity 409 with details omitted (setting off) shows generic message', () => {
+    // The backend omits `details` when the tenant setting
+    // checkin.activity_capacity_details_enabled is off — the default
+    // (project-phoenix issue #1879). The kiosk must fall back cleanly.
+    const error = new ApiError('Activity capacity exceeded', 409, 'ACTIVITY_CAPACITY_EXCEEDED');
+    expect(error.details).toBeUndefined();
+    expect(mapApiErrorToGerman(error)).toBe(
+      'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.'
+    );
+  });
+
   it('handles activity capacity with partial details', () => {
     const error = new ApiError('capacity', 409, 'ACTIVITY_CAPACITY_EXCEEDED', {
       activity_name: 'Kunst',
-      max_participants: 15,
+      max_capacity: 15,
     });
     expect(mapApiErrorToGerman(error)).toBe('Kunst ist voll (15/15 Teilnehmer).');
   });
@@ -393,7 +414,7 @@ describe('mapApiErrorToGerman', () => {
 
   it('handles activity capacity details without activity_name', () => {
     const error = new ApiError('capacity', 409, 'ACTIVITY_CAPACITY_EXCEEDED', {
-      max_participants: 15,
+      max_capacity: 15,
     });
     // No activity_name → falls back to generic message
     expect(mapApiErrorToGerman(error)).toBe(
@@ -411,11 +432,55 @@ describe('mapApiErrorToGerman', () => {
 
   it('handles room capacity with numeric room_name', () => {
     const error = new ApiError('capacity', 409, 'ROOM_CAPACITY_EXCEEDED', {
-      room_name: 'Raum 5' as string,
+      room_name: 'Raum 5',
       current_occupancy: 10,
       max_capacity: 10,
     });
     expect(mapApiErrorToGerman(error)).toBe('Raum 5 ist voll (10/10 Plätze belegt).');
+  });
+
+  // Issue #844: STUDENT_ALREADY_ACTIVE 409 surfaces the existing visit's
+  // room_name so the kiosk can tell the user where the student actually is.
+  it('formats STUDENT_ALREADY_ACTIVE with room_name from details', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      {
+        student_id: 231,
+        existing_visit_id: 9001,
+        room_id: 42,
+        room_name: 'Raum 1A',
+        entry_time: '2026-04-29T12:30:00Z',
+      }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet in Raum 1A.');
+  });
+
+  // The internal "WC" room name is a backend implementation detail; the UI
+  // shows it as "Toilette" everywhere else (formatRoomName) — duplicate
+  // visit copy must follow the same convention.
+  it('translates internal WC room name to Toilette in STUDENT_ALREADY_ACTIVE copy', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      { student_id: 231, room_name: 'WC' }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet in Toilette.');
+  });
+
+  // Degraded path: backend's best-effort lookup of the existing visit
+  // failed (race window) so room_name is missing — fall back to generic
+  // German wording rather than emit a half-formed sentence.
+  it('falls back to generic copy when STUDENT_ALREADY_ACTIVE lacks room_name', () => {
+    const error = new ApiError(
+      'student already has an active visit',
+      409,
+      'STUDENT_ALREADY_ACTIVE',
+      { student_id: 231 }
+    );
+    expect(mapApiErrorToGerman(error)).toBe('Schüler*in ist bereits angemeldet.');
   });
 });
 
@@ -428,10 +493,59 @@ describe('formatRoomName', () => {
     expect(formatRoomName('WC')).toBe('Toilette');
   });
 
+  it('maps Toilette alias to Toilette (idempotent on the canonical UI label)', () => {
+    expect(formatRoomName('Toilette')).toBe('Toilette');
+  });
+
   it('keeps other names unchanged', () => {
     expect(formatRoomName('Turnhalle')).toBe('Turnhalle');
     expect(formatRoomName('Raum 101')).toBe('Raum 101');
     expect(formatRoomName('Schulhof')).toBe('Schulhof');
+  });
+
+  it('does not match case variants — exact-case mirror of backend IsWCRoomName', () => {
+    // Backend `IsWCRoomName` is exact-case; the kiosk must mirror that so the
+    // toilet button only lights up for rooms the backend actually treats as
+    // toilet special rooms. A lowercase "wc" lookup is intentionally NOT
+    // remapped here.
+    expect(formatRoomName('wc')).toBe('wc');
+    expect(formatRoomName('toilette')).toBe('toilette');
+  });
+});
+
+// ====================================================================
+// isWCRoomAlias / WC_ROOM_ALIASES
+// ====================================================================
+
+describe('WC_ROOM_ALIASES', () => {
+  it('lists canonical name first, alias second', () => {
+    // Order is load-bearing: ActivityScanningPage picks the first matching
+    // alias when both rooms exist on the same kiosk, so the device sends
+    // check-ins to the canonical "WC" room rather than the manually-created
+    // "Toilette" alias.
+    expect(WC_ROOM_ALIASES).toEqual(['WC', 'Toilette']);
+  });
+});
+
+describe('isWCRoomAlias', () => {
+  it('returns true for canonical WC', () => {
+    expect(isWCRoomAlias('WC')).toBe(true);
+  });
+
+  it('returns true for Toilette alias', () => {
+    expect(isWCRoomAlias('Toilette')).toBe(true);
+  });
+
+  it('returns false for case variants', () => {
+    expect(isWCRoomAlias('wc')).toBe(false);
+    expect(isWCRoomAlias('Wc')).toBe(false);
+    expect(isWCRoomAlias('toilette')).toBe(false);
+  });
+
+  it('returns false for unrelated names', () => {
+    expect(isWCRoomAlias('Schulhof')).toBe(false);
+    expect(isWCRoomAlias('Raum 101')).toBe(false);
+    expect(isWCRoomAlias('')).toBe(false);
   });
 });
 
@@ -951,137 +1065,6 @@ describe('api methods', () => {
   });
 
   // ------------------------------------------------------------------
-  // api.validateTeacherPin
-  // ------------------------------------------------------------------
-
-  describe('api.validateTeacherPin', () => {
-    it('returns success result with staff data', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: 'Pi-1', status: 'active' },
-            staff: { id: 5, person_id: 50 },
-            person: { first_name: 'Anna', last_name: 'Schmidt' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(true);
-      expect(result.userData?.staffName).toBe('Anna Schmidt');
-      expect(result.userData?.staffId).toBe(5);
-      expect(result.userData?.deviceName).toBe('Pi-1');
-    });
-
-    it('returns failure with isLocked when account is locked', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'staff account is locked due to failed PIN attempts' },
-          { status: 423, statusText: 'Locked', ok: false }
-        )
-      );
-
-      const result = await freshApi.validateTeacherPin('wrong', 5);
-      expect(result.success).toBe(false);
-      expect(result.isLocked).toBe(true);
-    });
-
-    it('handles unexpected response structure', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            // Missing device, person, staff
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('Unerwartete Server-Antwort');
-    });
-
-    it('handles error with 423 status code in message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'API Error: 423 - locked' },
-          { status: 423, statusText: 'Locked', ok: false }
-        )
-      );
-
-      const result = await freshApi.validateTeacherPin('wrong', 5);
-      expect(result.success).toBe(false);
-      expect(result.isLocked).toBe(true);
-    });
-
-    it('handles network error in validateTeacherPin', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(false);
-      expect(result.error).toBeDefined();
-    });
-
-    it('handles missing device name and person names', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: '', status: 'active' },
-            staff: { id: 5, person_id: 50 },
-            person: { first_name: '', last_name: '' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.validateTeacherPin('1234', 5);
-      expect(result.success).toBe(true);
-      expect(result.userData?.staffName).toBe('');
-      expect(result.userData?.deviceName).toBe('Unknown Device');
-    });
-
-    it('sends X-Staff-ID header', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            device: { id: 1, device_id: 'dev-1', name: 'Pi-1', status: 'active' },
-            staff: { id: 42, person_id: 50 },
-            person: { first_name: 'Max', last_name: 'Müller' },
-            authenticated_at: '2025-01-01T00:00:00Z',
-          },
-          message: 'ok',
-        })
-      );
-
-      await freshApi.validateTeacherPin('1234', 42);
-
-      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
-      expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('42');
-    });
-  });
-
-  // ------------------------------------------------------------------
   // api.getActivities
   // ------------------------------------------------------------------
 
@@ -1123,27 +1106,6 @@ describe('api methods', () => {
       );
 
       await expect(freshApi.healthCheck()).rejects.toThrow('Health check failed: 503');
-    });
-  });
-
-  // ------------------------------------------------------------------
-  // api.pingDevice
-  // ------------------------------------------------------------------
-
-  describe('api.pingDevice', () => {
-    it('sends POST to /api/iot/ping', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', message: 'pong' }));
-
-      await freshApi.pingDevice('1234');
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://test-api.local/api/iot/ping',
-        expect.objectContaining({
-          method: 'POST',
-        })
-      );
     });
   });
 
@@ -1637,17 +1599,38 @@ describe('api methods', () => {
   // ------------------------------------------------------------------
 
   describe('api.unassignStaffTag', () => {
-    it('sends DELETE request', async () => {
+    it('sends DELETE request and returns result', async () => {
       const { api: freshApi } = await getFreshApi();
 
-      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', message: 'ok' }));
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({
+          status: 'success',
+          data: {
+            success: true,
+            student_id: 5,
+            student_name: 'Frau Mueller',
+            rfid_tag: 'AA:BB:CC',
+            previous_tag: 'AA:BB:CC',
+            message: 'Staff tag removed',
+          },
+          message: 'ok',
+        })
+      );
 
-      await freshApi.unassignStaffTag('1234', 5);
+      const result = await freshApi.unassignStaffTag('1234', 5);
 
       const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
       expect(url).toBe('http://test-api.local/api/iot/staff/5/rfid');
       expect(options.method).toBe('DELETE');
       expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('5');
+      expect(result).toEqual({
+        success: true,
+        message: 'Staff tag removed',
+        student_id: 5,
+        student_name: 'Frau Mueller',
+        rfid_tag: 'AA:BB:CC',
+        previous_tag: 'AA:BB:CC',
+      });
     });
   });
 
@@ -1802,259 +1785,6 @@ describe('api methods', () => {
       };
       expect(body.activity_type).toBe('rfid_scan');
       expect(body.timestamp).toBeDefined();
-    });
-  });
-
-  // ------------------------------------------------------------------
-  // api.getCurrentSessionInfo
-  // ------------------------------------------------------------------
-
-  describe('api.getCurrentSessionInfo', () => {
-    it('returns simplified session info when active', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            active_group_id: 1,
-            activity_id: 5,
-            activity_name: 'Fußball AG',
-            room_name: 'Turnhalle',
-            device_id: 10,
-            start_time: '2025-01-01T10:00:00Z',
-            duration: '1h',
-            active_students: 15,
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.getCurrentSessionInfo('1234');
-      expect(result).toEqual({
-        activity_name: 'Fußball AG',
-        room_name: 'Turnhalle',
-        active_students: 15,
-      });
-    });
-
-    it('returns null when session is not active', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: { device_id: 10, is_active: false },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.getCurrentSessionInfo('1234');
-      expect(result).toBeNull();
-    });
-
-    it('returns null on 404 error', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'not found' },
-          { status: 404, statusText: 'Not Found', ok: false }
-        )
-      );
-
-      const result = await freshApi.getCurrentSessionInfo('1234');
-      expect(result).toBeNull();
-    });
-
-    it('rethrows non-404 errors', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'server error' },
-          { status: 500, statusText: 'Internal Server Error', ok: false }
-        )
-      );
-
-      await expect(freshApi.getCurrentSessionInfo('1234')).rejects.toThrow();
-    });
-
-    it('returns defaults when optional session fields are missing', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: {
-            active_group_id: 1,
-            activity_id: 5,
-            device_id: 10,
-            start_time: '2025-01-01T10:00:00Z',
-            duration: '1h',
-            // activity_name, room_name, active_students all missing
-          },
-          message: 'ok',
-        })
-      );
-
-      const result = await freshApi.getCurrentSessionInfo('1234');
-      expect(result).toEqual({
-        activity_name: 'Unknown Activity',
-        room_name: 'Unknown Room',
-        active_students: 0,
-      });
-    });
-  });
-
-  // ------------------------------------------------------------------
-  // api.getAttendanceStatus (mapAttendanceErrorToGerman coverage)
-  // ------------------------------------------------------------------
-
-  describe('api.getAttendanceStatus', () => {
-    it('returns attendance status on success', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      const attendanceData = {
-        status: 'success',
-        data: {
-          student: {
-            id: 1,
-            first_name: 'Lena',
-            last_name: 'Müller',
-            group: { id: 1, name: 'Gruppe A' },
-          },
-          attendance: {
-            status: 'checked_in',
-            date: '2025-01-01',
-            check_in_time: '08:00:00',
-            check_out_time: null,
-            checked_in_by: 'staff',
-            checked_out_by: '',
-          },
-        },
-        message: 'ok',
-      };
-      mockFetch.mockResolvedValueOnce(mockResponse(attendanceData));
-
-      const result = await freshApi.getAttendanceStatus('1234', 'AA:BB:CC');
-      expect(result.data.student.first_name).toBe('Lena');
-    });
-
-    it('maps network error to German in attendance context', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Netzwerkfehler. Bitte Verbindung prüfen.'
-      );
-    });
-
-    it('maps 404 error to attendance-specific German message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'student not found' },
-          { status: 404, statusText: 'Not Found', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Schüler nicht gefunden.'
-      );
-    });
-
-    it('maps 403 error to attendance status-specific message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: '403 Forbidden' },
-          { status: 403, statusText: 'Forbidden', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Keine Berechtigung für Anwesenheitsstatus dieses Schülers.'
-      );
-    });
-
-    it('maps 401 error to auth message in attendance context', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: '401 Unauthorized' },
-          { status: 401, statusText: 'Unauthorized', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.'
-      );
-    });
-
-    it('maps 400 error to bad request message in attendance context', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: '400 Bad Request' },
-          { status: 400, statusText: 'Bad Request', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Ungültige Anfrage. Bitte Eingaben prüfen.'
-      );
-    });
-
-    it('uses specific error mapping for known backend errors', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'invalid staff PIN' },
-          { status: 401, statusText: 'Unauthorized', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Ungültiger PIN. Bitte erneut versuchen.'
-      );
-    });
-
-    it('passes through generic 5xx fallback message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'Internal Server Error' },
-          { status: 500, statusText: 'Internal Server Error', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Server nicht erreichbar. Bitte später versuchen.'
-      );
-    });
-
-    it('maps generic not found 404 to status-specific message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      // A 404 where the error message contains "404" but no specific mapping
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'something 404 generic' },
-          { status: 404, statusText: 'Not Found', ok: false }
-        )
-      );
-
-      await expect(freshApi.getAttendanceStatus('1234', 'AA:BB')).rejects.toThrow(
-        'Schüler nicht gefunden oder keine Anwesenheitsdaten für heute verfügbar.'
-      );
     });
   });
 
@@ -2232,6 +1962,43 @@ describe('api methods', () => {
       await expect(
         freshApi.submitDailyFeedback('1234', { student_id: 1, value: 'neutral' })
       ).rejects.toThrow('Netzwerkfehler. Bitte Verbindung prüfen.');
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // api.getDeviceConfig
+  // ------------------------------------------------------------------
+
+  describe('api.getDeviceConfig', () => {
+    it('preserves presence_mode from device config response', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      const config = {
+        presence_mode: 'binary' as const,
+        checkout: {
+          raumwechsel_enabled: false,
+          schulhof_enabled: true,
+          wc_enabled: false,
+          daily_checkout_time: null,
+        },
+        feedback: {
+          enabled: true,
+        },
+      };
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: config, message: 'ok' })
+      );
+
+      const result = await freshApi.getDeviceConfig();
+
+      expect(result).toEqual(config);
+      expect(result.presence_mode).toBe('binary');
+      expect(mockFetch).toHaveBeenCalledWith('http://test-api.local/api/iot/config', {
+        headers: expect.objectContaining({
+          Authorization: expect.stringMatching(/^Bearer /),
+        }),
+      });
     });
   });
 

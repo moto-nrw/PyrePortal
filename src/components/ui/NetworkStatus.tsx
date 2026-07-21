@@ -2,12 +2,9 @@ import { faWifi, faSlash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 
-export interface NetworkStatusData {
-  isOnline: boolean;
-  responseTime: number;
-  lastChecked: number;
-  quality: 'online' | 'poor' | 'offline';
-}
+import type { NetworkStatusData } from '../../types/network';
+
+export type { NetworkStatusData } from '../../types/network';
 
 interface NetworkStatusProps {
   status: NetworkStatusData;

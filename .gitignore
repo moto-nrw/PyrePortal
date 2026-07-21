@@ -20,8 +20,6 @@ dist-*
 *.local
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
 .idea
 .DS_Store
 *.suo
@@ -44,7 +42,12 @@ coverage/
 
 # Playwright
 screenshots/output/*.png
+screenshots/output/*.webm
+screenshots/output/*.mp4
 screenshots/test-results/
 
 # Devbox
 .devbox/
+
+# Local agent state
+.serena/

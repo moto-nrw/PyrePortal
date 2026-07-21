@@ -1,15 +1,8 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { safeInvoke } from '../../utils/tauriContext';
+import { safeInvoke } from './tauriContext';
 
 // Mock @platform to NOT auto-resolve to browser — we test the Tauri adapter directly
-// But we need the Tauri event API mock (already in setup.ts)
-
-const mockListen = vi.fn();
-
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: (...args: unknown[]) => (mockListen as (...a: unknown[]) => unknown)(...args),
-}));
 
 const mockSafeInvoke = vi.mocked(safeInvoke);
 
@@ -19,7 +12,6 @@ const { adapter } = await import('./index');
 beforeEach(() => {
   vi.clearAllMocks();
   mockSafeInvoke.mockReset();
-  mockListen.mockReset();
 });
 
 describe('TauriAdapter', () => {
@@ -27,120 +19,28 @@ describe('TauriAdapter', () => {
     expect(adapter.platform).toBe('tauri');
   });
 
-  describe('initializeNfc', () => {
-    it('calls safeInvoke with initialize_rfid_service', async () => {
-      mockSafeInvoke.mockResolvedValueOnce(undefined);
+  describe('RFID methods (no-ops — mock scanning lives in the useRfidScanning hook)', () => {
+    it('initializeNfc resolves without invoking the Rust backend', async () => {
       await adapter.initializeNfc();
-      expect(mockSafeInvoke).toHaveBeenCalledWith('initialize_rfid_service');
-    });
-  });
-
-  describe('startScanning', () => {
-    it('sets up listener and starts service', async () => {
-      const unlisten = vi.fn();
-      mockListen.mockResolvedValueOnce(unlisten);
-      mockSafeInvoke.mockResolvedValueOnce(undefined); // start_rfid_service
-
-      const onScan = vi.fn();
-      await adapter.startScanning(onScan);
-
-      expect(mockListen).toHaveBeenCalledWith('rfid-scan', expect.any(Function));
-      expect(mockSafeInvoke).toHaveBeenCalledWith('start_rfid_service');
+      expect(mockSafeInvoke).not.toHaveBeenCalled();
     });
 
-    it('dispatches scan events through onScan callback', async () => {
-      let capturedCallback:
-        | ((event: { payload: { tag_id: string; scan_id: number } }) => void)
-        | null = null;
-      mockListen.mockImplementation((_event: unknown, cb: unknown) => {
-        capturedCallback = cb as typeof capturedCallback;
-        return Promise.resolve(vi.fn());
-      });
-      mockSafeInvoke.mockResolvedValueOnce(undefined);
-
-      const onScan = vi.fn();
-      await adapter.startScanning(onScan);
-
-      capturedCallback!({ payload: { tag_id: 'AA:BB:CC:DD', scan_id: 42 } });
-      expect(onScan).toHaveBeenCalledWith({ tagId: 'AA:BB:CC:DD', scanId: 42 });
-    });
-
-    it('cleans up previous listener before starting new one', async () => {
-      const unlisten1 = vi.fn();
-      const unlisten2 = vi.fn();
-      mockListen.mockResolvedValueOnce(unlisten1);
-      mockSafeInvoke.mockResolvedValue(undefined);
-
+    it('startScanning and stopScanning resolve without invoking the Rust backend', async () => {
       await adapter.startScanning(vi.fn());
-
-      mockListen.mockResolvedValueOnce(unlisten2);
-      await adapter.startScanning(vi.fn());
-
-      expect(unlisten1).toHaveBeenCalledOnce();
-    });
-
-    it('cleans up listener if service start fails', async () => {
-      const unlisten = vi.fn();
-      mockListen.mockResolvedValueOnce(unlisten);
-      mockSafeInvoke.mockRejectedValueOnce(new Error('service failed'));
-
-      await expect(adapter.startScanning(vi.fn())).rejects.toThrow('service failed');
-      expect(unlisten).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe('stopScanning', () => {
-    it('calls safeInvoke with stop_rfid_service', async () => {
-      mockSafeInvoke.mockResolvedValueOnce(undefined);
       await adapter.stopScanning();
-      expect(mockSafeInvoke).toHaveBeenCalledWith('stop_rfid_service');
+      expect(mockSafeInvoke).not.toHaveBeenCalled();
     });
 
-    it('cleans up listener even if stop fails', async () => {
-      const unlisten = vi.fn();
-      mockListen.mockResolvedValueOnce(unlisten);
-      mockSafeInvoke.mockResolvedValueOnce(undefined); // start_rfid_service
-
-      await adapter.startScanning(vi.fn());
-
-      mockSafeInvoke.mockRejectedValueOnce(new Error('stop failed'));
-      await expect(adapter.stopScanning()).rejects.toThrow('stop failed');
-      expect(unlisten).toHaveBeenCalledOnce();
-    });
-  });
-
-  describe('getServiceStatus', () => {
-    it('returns service status from safeInvoke', async () => {
-      mockSafeInvoke.mockResolvedValueOnce({ is_running: true });
+    it('getServiceStatus reports not running', async () => {
       const result = await adapter.getServiceStatus();
-      expect(result).toEqual({ is_running: true });
-      expect(mockSafeInvoke).toHaveBeenCalledWith('get_rfid_service_status');
+      expect(result).toEqual({ is_running: false });
+      expect(mockSafeInvoke).not.toHaveBeenCalled();
     });
-  });
 
-  describe('scanSingleTag', () => {
-    it('passes timeout_ms to safeInvoke', async () => {
-      mockSafeInvoke.mockResolvedValueOnce({ success: true, tag_id: 'AA:BB' });
+    it('scanSingleTag returns the deterministic mock tag', async () => {
       const result = await adapter.scanSingleTag(5000);
-      expect(result).toEqual({ success: true, tag_id: 'AA:BB' });
-      expect(mockSafeInvoke).toHaveBeenCalledWith('scan_rfid_single', { timeout_ms: 5000 });
-    });
-  });
-
-  describe('recoverScanner', () => {
-    it('calls safeInvoke with recover_rfid_scanner', async () => {
-      mockSafeInvoke.mockResolvedValueOnce(undefined);
-      await adapter.recoverScanner();
-      expect(mockSafeInvoke).toHaveBeenCalledWith('recover_rfid_scanner');
-    });
-  });
-
-  describe('getScannerStatus', () => {
-    it('returns scanner status', async () => {
-      mockSafeInvoke.mockResolvedValueOnce({ is_available: true });
-      const result = await adapter.getScannerStatus();
-      expect(result).toEqual({ is_available: true });
-      expect(mockSafeInvoke).toHaveBeenCalledWith('get_rfid_scanner_status');
+      expect(result).toEqual({ success: true, tag_id: '04:D6:94:82:97:6A:80' });
+      expect(mockSafeInvoke).not.toHaveBeenCalled();
     });
   });
 
@@ -226,14 +126,6 @@ describe('TauriAdapter', () => {
       mockSafeInvoke.mockResolvedValueOnce(undefined);
       await adapter.restartApp();
       expect(mockSafeInvoke).toHaveBeenCalledWith('restart_app');
-    });
-  });
-
-  describe('getDeviceInfo', () => {
-    it('returns platform and version', () => {
-      const info = adapter.getDeviceInfo();
-      expect(info.platform).toBe('tauri');
-      expect(typeof info.version).toBe('string');
     });
   });
 });

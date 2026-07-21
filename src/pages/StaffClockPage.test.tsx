@@ -17,11 +17,11 @@ vi.mock('@platform', () => ({
   },
 }));
 
-vi.mock('../utils/tauriContext', async () => {
+vi.mock('../platform/adapter', async () => {
   const actual =
     // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-    await vi.importActual<typeof import('../utils/tauriContext')>('../utils/tauriContext');
-  return { ...actual, isRfidEnabled: vi.fn(() => true) };
+    await vi.importActual<typeof import('../platform/adapter')>('../platform/adapter');
+  return { ...actual, isRealScanningEnabled: vi.fn(() => true) };
 });
 
 vi.mock('../services/api', async () => {
@@ -91,7 +91,6 @@ describe('StaffClockPage', () => {
         staffId: 1,
         staffName: 'Kiosk User',
         deviceName: 'Kiosk',
-        authenticatedAt: new Date(),
         pin: '1234',
       },
     });
@@ -328,12 +327,6 @@ describe('StaffClockPage', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it('offers scanner recovery on the page itself', () => {
-    renderPage();
-
-    expect(screen.getByRole('button', { name: 'Lesegerät neu starten' })).toBeInTheDocument();
   });
 
   it('does not launch a second scan while the first one is pending', async () => {

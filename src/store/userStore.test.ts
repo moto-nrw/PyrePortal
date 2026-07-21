@@ -47,19 +47,14 @@ function resetStore() {
   const store = useUserStore;
   store.setState({
     users: [],
-    selectedUser: '',
-    selectedUserId: null,
     authenticatedUser: null,
     rooms: [],
     selectedRoom: null,
     _roomSelectedAt: null,
     currentSession: null,
-    activities: [],
     selectedActivity: null,
-    currentActivity: null,
     isLoading: false,
     error: null,
-    nfcScanActive: false,
     selectedSupervisors: [],
     activeSupervisorTags: new Set<string>(),
     sessionSettings: null,
@@ -73,18 +68,14 @@ function resetStore() {
     rfid: {
       isScanning: false,
       currentScan: null,
-      blockedTags: new Map(),
       showModal: false,
       scanTimeout: 3000,
       modalDisplayTime: 1500,
       scanMode: 'checkin' as const,
       scanContextId: 0,
       pickupQueryTagId: null,
-      optimisticScans: [],
-      studentHistory: new Map(),
       processingQueue: new Set(),
       recentTagScans: new Map(),
-      tagToStudentMap: new Map(),
     },
   });
 }
@@ -148,13 +139,6 @@ beforeEach(() => {
 // ====================================================================
 
 describe('Authentication', () => {
-  it('sets selected user', () => {
-    useUserStore.getState().setSelectedUser('Herr Müller', 42);
-    const state = useUserStore.getState();
-    expect(state.selectedUser).toBe('Herr Müller');
-    expect(state.selectedUserId).toBe(42);
-  });
-
   it('sets authenticated user', () => {
     useUserStore.getState().setAuthenticatedUser({
       staffId: 1,
@@ -167,7 +151,6 @@ describe('Authentication', () => {
     expect(auth!.staffId).toBe(1);
     expect(auth!.staffName).toBe('Frau Schmidt');
     expect(auth!.pin).toBe('1234');
-    expect(auth!.authenticatedAt).toBeDefined();
   });
 });
 
@@ -334,7 +317,7 @@ describe('fetchCurrentSession', () => {
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
     });
 
     await useUserStore.getState().fetchCurrentSession();
@@ -541,8 +524,6 @@ describe('logout', () => {
   it('clears all auth and session state', async () => {
     setAuthenticated();
     useUserStore.setState({
-      selectedUser: 'Herr Müller',
-      selectedUserId: 1,
       selectedRoom: mockRoom(),
       selectedActivity: mockActivity(),
       currentSession: {
@@ -551,7 +532,7 @@ describe('logout', () => {
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
       selectedSupervisors: [{ id: 1, name: 'Test' }],
     });
 
@@ -561,8 +542,6 @@ describe('logout', () => {
 
     const state = useUserStore.getState();
     expect(state.authenticatedUser).toBeNull();
-    expect(state.selectedUser).toBe('');
-    expect(state.selectedUserId).toBeNull();
     expect(state.selectedRoom).toBeNull();
     expect(state.selectedActivity).toBeNull();
     expect(state.currentSession).toBeNull();
@@ -578,7 +557,7 @@ describe('logout', () => {
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
     });
     mockEndSession.mockResolvedValueOnce(undefined);
 
@@ -596,7 +575,7 @@ describe('logout', () => {
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
     });
     mockEndSession.mockRejectedValueOnce(new Error('Network error'));
 
@@ -646,12 +625,6 @@ describe('Supervisor selection', () => {
     expect(useUserStore.getState().selectedSupervisors).toHaveLength(2);
   });
 
-  it('clears supervisors', () => {
-    useUserStore.getState().setSelectedSupervisors([user1]);
-    useUserStore.getState().clearSelectedSupervisors();
-    expect(useUserStore.getState().selectedSupervisors).toHaveLength(0);
-  });
-
   it('addSupervisorFromRfid adds new supervisor', () => {
     useUserStore.setState({ users: [{ id: 10, name: 'Max Müller' }] });
     const alreadyPresent = useUserStore.getState().addSupervisorFromRfid(10, 'Max Müller');
@@ -669,9 +642,6 @@ describe('Supervisor selection', () => {
     useUserStore.getState().addActiveSupervisorTag('04:AA:BB:CC');
     expect(useUserStore.getState().isActiveSupervisor('04:AA:BB:CC')).toBe(true);
     expect(useUserStore.getState().isActiveSupervisor('04:XX:YY:ZZ')).toBe(false);
-
-    useUserStore.getState().clearActiveSupervisorTags();
-    expect(useUserStore.getState().isActiveSupervisor('04:AA:BB:CC')).toBe(false);
   });
 });
 
@@ -713,36 +683,7 @@ describe('RFID scanning state', () => {
 });
 
 // ====================================================================
-// Tag blocking
-// ====================================================================
-
-describe('Tag blocking', () => {
-  it('blocks a tag for given duration', () => {
-    useUserStore.getState().blockTag('04:AA:BB', 5000);
-    expect(useUserStore.getState().isTagBlocked('04:AA:BB')).toBe(true);
-  });
-
-  it('returns false for unblocked tag', () => {
-    expect(useUserStore.getState().isTagBlocked('04:XX:YY')).toBe(false);
-  });
-
-  it('clears a blocked tag', () => {
-    useUserStore.getState().blockTag('04:AA:BB', 5000);
-    useUserStore.getState().clearBlockedTag('04:AA:BB');
-    expect(useUserStore.getState().isTagBlocked('04:AA:BB')).toBe(false);
-  });
-
-  it('auto-clears expired block on check', () => {
-    // Block with 0 duration (immediately expired)
-    useUserStore.getState().blockTag('04:AA:BB', -1);
-    expect(useUserStore.getState().isTagBlocked('04:AA:BB')).toBe(false);
-    // Should have been cleaned up
-    expect(useUserStore.getState().rfid.blockedTags.has('04:AA:BB')).toBe(false);
-  });
-});
-
-// ====================================================================
-// Duplicate prevention — canProcessTag (3-layer)
+// Duplicate prevention — canProcessTag
 // ====================================================================
 
 describe('canProcessTag (duplicate prevention)', () => {
@@ -765,191 +706,18 @@ describe('canProcessTag (duplicate prevention)', () => {
     useUserStore.getState().recordTagScan('04:AA:BB', { timestamp: Date.now() });
     expect(useUserStore.getState().canProcessTag('04:AA:BB')).toBe(true);
   });
-
-  it('checks student history when tag is mapped (Layer 3)', () => {
-    // Map tag to student and set student as processing with opposite action
-    // canProcessTag calls isValidStudentScan with 'checkin', so we set lastAction to 'checkout'
-    // to simulate an opposite action that should be blocked when processing
-    useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-1');
-    useUserStore.setState(state => ({
-      rfid: {
-        ...state.rfid,
-        studentHistory: new Map([
-          [
-            'student-1',
-            {
-              studentId: 'student-1',
-              lastAction: 'checkout' as const,
-              timestamp: Date.now(),
-              isProcessing: true,
-            },
-          ],
-        ]),
-      },
-    }));
-
-    // Should block because student is processing with opposite action (checkout vs checkin)
-    expect(useUserStore.getState().canProcessTag('04:AA:BB')).toBe(false);
-  });
 });
 
 // ====================================================================
-// Tag-to-student mapping
+// Recent tag scan cache
 // ====================================================================
 
-describe('Tag-to-student mapping', () => {
-  it('maps and retrieves tag to student', () => {
-    useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-123');
-    expect(useUserStore.getState().getCachedStudentId('04:AA:BB')).toBe('student-123');
-  });
-
-  it('returns undefined for unmapped tag', () => {
-    expect(useUserStore.getState().getCachedStudentId('04:XX:YY')).toBeUndefined();
-  });
-
-  it('clearTagScan removes scan, mapping, and student history', () => {
+describe('Recent tag scan cache', () => {
+  it('clearTagScan removes the cached scan', () => {
     useUserStore.getState().recordTagScan('04:AA:BB', { timestamp: Date.now() });
-    useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-123');
-    useUserStore.getState().updateStudentHistory('student-123', 'checkin');
 
     useUserStore.getState().clearTagScan('04:AA:BB');
-    expect(useUserStore.getState().getCachedStudentId('04:AA:BB')).toBeUndefined();
     expect(useUserStore.getState().rfid.recentTagScans.has('04:AA:BB')).toBe(false);
-    expect(useUserStore.getState().rfid.studentHistory.has('student-123')).toBe(false);
-  });
-});
-
-// ====================================================================
-// Student history and scan validation
-// ====================================================================
-
-describe('Student scan validation (Layer 3)', () => {
-  it('allows first scan for a student', () => {
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkin')).toBe(true);
-  });
-
-  it('allows same action when not processing (idempotent)', () => {
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkin')).toBe(true);
-  });
-
-  it('blocks opposite action when processing', () => {
-    useUserStore.setState(state => ({
-      rfid: {
-        ...state.rfid,
-        studentHistory: new Map([
-          [
-            'student-1',
-            {
-              studentId: 'student-1',
-              lastAction: 'checkin' as const,
-              timestamp: Date.now(),
-              isProcessing: true,
-            },
-          ],
-        ]),
-      },
-    }));
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkout')).toBe(false);
-  });
-
-  it('allows opposite action when not processing', () => {
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkout')).toBe(true);
-  });
-
-  it('allows opposite action when processing but expired (>10s)', () => {
-    useUserStore.setState(state => ({
-      rfid: {
-        ...state.rfid,
-        studentHistory: new Map([
-          [
-            'student-1',
-            {
-              studentId: 'student-1',
-              lastAction: 'checkin' as const,
-              timestamp: Date.now() - 15000, // 15s ago
-              isProcessing: true,
-            },
-          ],
-        ]),
-      },
-    }));
-    expect(useUserStore.getState().isValidStudentScan('student-1', 'checkout')).toBe(true);
-  });
-});
-
-// ====================================================================
-// isValidScan (alias for isValidStudentScan)
-// ====================================================================
-
-describe('isValidScan', () => {
-  it('allows first scan', () => {
-    expect(useUserStore.getState().isValidScan('student-1', 'checkin')).toBe(true);
-  });
-
-  it('allows same action (idempotent)', () => {
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
-    expect(useUserStore.getState().isValidScan('student-1', 'checkin')).toBe(true);
-  });
-
-  it('blocks opposite action when processing and recent', () => {
-    useUserStore.setState(state => ({
-      rfid: {
-        ...state.rfid,
-        studentHistory: new Map([
-          [
-            'student-1',
-            {
-              studentId: 'student-1',
-              lastAction: 'checkin' as const,
-              timestamp: Date.now(),
-              isProcessing: true,
-            },
-          ],
-        ]),
-      },
-    }));
-    expect(useUserStore.getState().isValidScan('student-1', 'checkout')).toBe(false);
-  });
-
-  it('allows opposite action when not processing', () => {
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
-    expect(useUserStore.getState().isValidScan('student-1', 'checkout')).toBe(true);
-  });
-});
-
-// ====================================================================
-// Optimistic scans
-// ====================================================================
-
-describe('Optimistic scans', () => {
-  it('adds and removes optimistic scan', () => {
-    useUserStore.getState().addOptimisticScan({
-      id: 'scan-1',
-      tagId: '04:AA:BB',
-      status: 'pending',
-      optimisticAction: 'checkin',
-      optimisticStudentCount: 5,
-      timestamp: Date.now(),
-    });
-    expect(useUserStore.getState().rfid.optimisticScans).toHaveLength(1);
-
-    useUserStore.getState().removeOptimisticScan('scan-1');
-    expect(useUserStore.getState().rfid.optimisticScans).toHaveLength(0);
-  });
-
-  it('updates optimistic scan status', () => {
-    useUserStore.getState().addOptimisticScan({
-      id: 'scan-1',
-      tagId: '04:AA:BB',
-      status: 'pending',
-      optimisticAction: 'checkin',
-      optimisticStudentCount: 5,
-      timestamp: Date.now(),
-    });
-    useUserStore.getState().updateOptimisticScan('scan-1', 'success');
-    expect(useUserStore.getState().rfid.optimisticScans[0].status).toBe('success');
   });
 });
 
@@ -999,24 +767,6 @@ describe('Network status', () => {
 });
 
 // ====================================================================
-// NFC scan control
-// ====================================================================
-
-describe('NFC scan', () => {
-  it('starts and stops NFC scan', () => {
-    useUserStore.getState().startNfcScan();
-    expect(useUserStore.getState().nfcScanActive).toBe(true);
-
-    useUserStore.getState().stopNfcScan();
-    expect(useUserStore.getState().nfcScanActive).toBe(false);
-  });
-
-  // Note: startNfcScan and stopNfcScan use closure-based guards with setTimeout(0)
-  // to prevent re-entrant calls. Testing the guard behavior requires waiting for
-  // the setTimeout to fire between calls, which is done in the start/stop test above.
-});
-
-// ====================================================================
 // clearOldTagScans
 // ====================================================================
 
@@ -1040,96 +790,8 @@ describe('clearOldTagScans', () => {
 describe('Activity management', () => {
   it('sets selected activity', () => {
     const activity = { id: 1, name: 'Fußball AG', category: 'Sport' };
-    useUserStore.getState().setSelectedActivity(activity as ActivityResponse);
+    useUserStore.getState().setSelectedActivity(activity);
     expect(useUserStore.getState().selectedActivity).toEqual(activity);
-  });
-
-  it('initializes activity with room ID', () => {
-    useUserStore.getState().initializeActivity(5);
-    const current = useUserStore.getState().currentActivity;
-    expect(current).not.toBeNull();
-    expect(current!.roomId).toBe(5);
-  });
-
-  it('initializes activity with creator from selectedUser', () => {
-    useUserStore.setState({
-      selectedUser: 'Herr Müller',
-      users: [{ id: 42, name: 'Herr Müller' }],
-    });
-    useUserStore.getState().initializeActivity(5);
-    const current = useUserStore.getState().currentActivity;
-    expect(current!.supervisorId).toBe(42);
-    expect(current!.createdBy).toBe('Herr Müller');
-  });
-
-  it('cancels activity creation', () => {
-    useUserStore.getState().initializeActivity(5);
-    useUserStore.getState().cancelActivityCreation();
-    expect(useUserStore.getState().currentActivity).toBeNull();
-    expect(useUserStore.getState().selectedRoom).toBeNull();
-    expect(useUserStore.getState().selectedSupervisors).toHaveLength(0);
-  });
-
-  it('updates activity field', () => {
-    useUserStore.getState().initializeActivity(5);
-    useUserStore.getState().updateActivityField('name', 'Test Activity');
-    expect(useUserStore.getState().currentActivity!.name).toBe('Test Activity');
-  });
-
-  it('logs specially when updating name field', () => {
-    useUserStore.getState().initializeActivity(5);
-    useUserStore.getState().updateActivityField('name', 'New Name');
-    expect(useUserStore.getState().currentActivity!.name).toBe('New Name');
-  });
-
-  it('does nothing when updating field without current activity', () => {
-    useUserStore.getState().updateActivityField('name', 'Test');
-    expect(useUserStore.getState().currentActivity).toBeNull();
-  });
-});
-
-// ====================================================================
-// createActivity
-// ====================================================================
-
-describe('createActivity', () => {
-  it('creates activity with valid fields', async () => {
-    useUserStore.setState({
-      selectedUser: 'Herr Müller',
-      users: [{ id: 1, name: 'Herr Müller' }],
-      selectedRoom: mockRoom(),
-    });
-    useUserStore.getState().initializeActivity(1);
-    useUserStore.getState().updateActivityField('name', 'Test AG');
-
-    const result = await useUserStore.getState().createActivity();
-
-    expect(result).toBe(true);
-    expect(useUserStore.getState().activities.length).toBeGreaterThan(0);
-    expect(useUserStore.getState().currentActivity).toBeNull();
-    expect(useUserStore.getState().isLoading).toBe(false);
-  });
-
-  it('returns false when required fields are missing', async () => {
-    // No currentActivity set
-    const result = await useUserStore.getState().createActivity();
-
-    expect(result).toBe(false);
-    expect(useUserStore.getState().error).toBeTruthy();
-    expect(useUserStore.getState().isLoading).toBe(false);
-  });
-
-  it('returns false when name is missing', async () => {
-    useUserStore.setState({
-      selectedRoom: mockRoom(),
-    });
-    useUserStore.getState().initializeActivity(1);
-    // Don't set a name (it's initialized as empty string)
-
-    const result = await useUserStore.getState().createActivity();
-
-    expect(result).toBe(false);
-    expect(useUserStore.getState().error).toBe('Bitte fülle alle Pflichtfelder aus');
   });
 });
 
@@ -1163,7 +825,6 @@ describe('fetchActivities', () => {
         staffName: 'Test',
         deviceName: 'Pi-5',
         pin: '',
-        authenticatedAt: new Date(),
       },
     });
 
@@ -1199,236 +860,6 @@ describe('fetchActivities', () => {
     // Both should resolve (second may return deduped promise)
     expect(r1).toEqual(activities);
     expect(r2).toEqual(activities);
-  });
-});
-
-// ====================================================================
-// checkInStudent
-// ====================================================================
-
-describe('checkInStudent', () => {
-  it('checks in a student to an activity', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkInStudent(1, {
-      id: 10,
-      name: 'Max Mustermann',
-      checkOutTime: undefined,
-    });
-
-    expect(result).toBe(true);
-    const activity = useUserStore.getState().activities[0];
-    expect(activity.checkedInStudents).toHaveLength(1);
-    expect(activity.checkedInStudents![0].isCheckedIn).toBe(true);
-  });
-
-  it('returns false when activity not found', async () => {
-    const result = await useUserStore.getState().checkInStudent(999, {
-      id: 10,
-      name: 'Max',
-      checkOutTime: undefined,
-    });
-
-    expect(result).toBe(false);
-    expect(useUserStore.getState().error).toBeTruthy();
-  });
-
-  it('returns false when student already checked in', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [{ id: 10, name: 'Max', isCheckedIn: true }],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkInStudent(1, {
-      id: 10,
-      name: 'Max',
-      checkOutTime: undefined,
-    });
-
-    expect(result).toBe(false);
-  });
-
-  it('re-checks in a previously checked-out student', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [
-            { id: 10, name: 'Max', isCheckedIn: false, checkOutTime: new Date() },
-          ],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkInStudent(1, {
-      id: 10,
-      name: 'Max',
-      checkOutTime: undefined,
-    });
-
-    expect(result).toBe(true);
-    const student = useUserStore.getState().activities[0].checkedInStudents![0];
-    expect(student.isCheckedIn).toBe(true);
-    expect(student.checkOutTime).toBeUndefined();
-  });
-});
-
-// ====================================================================
-// checkOutStudent
-// ====================================================================
-
-describe('checkOutStudent', () => {
-  it('checks out a student from an activity', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [{ id: 10, name: 'Max', isCheckedIn: true }],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkOutStudent(1, 10);
-
-    expect(result).toBe(true);
-    const student = useUserStore.getState().activities[0].checkedInStudents![0];
-    expect(student.isCheckedIn).toBe(false);
-    expect(student.checkOutTime).toBeDefined();
-  });
-
-  it('returns false when activity not found', async () => {
-    const result = await useUserStore.getState().checkOutStudent(999, 10);
-
-    expect(result).toBe(false);
-    expect(useUserStore.getState().error).toBeTruthy();
-  });
-
-  it('returns false when no students are checked in', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkOutStudent(1, 10);
-
-    expect(result).toBe(false);
-  });
-
-  it('returns false when student not checked in', async () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [{ id: 10, name: 'Max', isCheckedIn: false }],
-        },
-      ],
-    });
-
-    const result = await useUserStore.getState().checkOutStudent(1, 10);
-
-    expect(result).toBe(false);
-  });
-});
-
-// ====================================================================
-// getActivityStudents
-// ====================================================================
-
-describe('getActivityStudents', () => {
-  it('returns checked-in students for an activity', () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-          checkedInStudents: [{ id: 10, name: 'Max', isCheckedIn: true }],
-        },
-      ],
-    });
-
-    const students = useUserStore.getState().getActivityStudents(1);
-    expect(students).toHaveLength(1);
-    expect(students[0].name).toBe('Max');
-  });
-
-  it('returns mock students when activity has no checkedInStudents', () => {
-    useUserStore.setState({
-      activities: [
-        {
-          id: 1,
-          name: 'Test AG',
-          category: 'Sport' as never,
-          roomId: 1,
-          supervisorId: 1,
-          createdBy: 'Test',
-          createdAt: new Date(),
-        },
-      ],
-    });
-
-    const students = useUserStore.getState().getActivityStudents(1);
-    // Should return mock students
-    expect(students.length).toBeGreaterThan(0);
-  });
-
-  it('returns mock students when activity not found', () => {
-    const students = useUserStore.getState().getActivityStudents(999);
-    expect(students.length).toBeGreaterThan(0);
   });
 });
 
@@ -1603,7 +1034,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
   });
 
   it('returns false when not authenticated', async () => {
@@ -1617,7 +1048,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
   });
 
   it('validates and restores session successfully', async () => {
@@ -1641,7 +1072,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(true);
+    expect(result).toEqual({ status: 'success' });
     expect(useUserStore.getState().selectedActivity!.id).toBe(10);
     expect(useUserStore.getState().selectedRoom!.id).toBe(5);
     expect(useUserStore.getState().selectedSupervisors).toHaveLength(2);
@@ -1664,7 +1095,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(true);
+    expect(result).toEqual({ status: 'success' });
     expect(useUserStore.getState().selectedSupervisors).toHaveLength(1);
     expect(useUserStore.getState().selectedSupervisors[0].id).toBe(99);
   });
@@ -1683,7 +1114,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
     expect(mockClearLastSession).toHaveBeenCalled();
   });
@@ -1703,7 +1134,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
   });
 
@@ -1728,7 +1159,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(true);
+    expect(result).toEqual({ status: 'success' });
     expect(mockGetTeachers).toHaveBeenCalled();
   });
 
@@ -1751,7 +1182,7 @@ describe('validateAndRecreateSession', () => {
 
     const result = await useUserStore.getState().validateAndRecreateSession();
 
-    expect(result).toBe(false);
+    expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
   });
 
@@ -1774,53 +1205,108 @@ describe('validateAndRecreateSession', () => {
     expect(settings!.last_session).toBeNull();
     expect(settings!.use_last_session).toBe(false);
   });
-});
 
-// ====================================================================
-// clearSessionSettings
-// ====================================================================
-
-describe('clearSessionSettings', () => {
-  it('clears session settings', async () => {
+  it('discards a validation success that resolves after logout', async () => {
+    setAuthenticated();
     useUserStore.setState({
       sessionSettings: {
         use_last_session: true,
         auto_save_enabled: true,
-        last_session: {
-          activity_id: 1,
-          room_id: 1,
-          supervisor_ids: [1],
-          saved_at: 'now',
-          activity_name: 'a',
-          room_name: 'r',
-          supervisor_names: ['s'],
-        },
+        last_session: lastSession,
       },
+      users: [
+        { id: 1, name: 'Herr A' },
+        { id: 2, name: 'Frau B' },
+      ],
     });
-    mockClearLastSession.mockResolvedValueOnce(undefined);
 
-    await useUserStore.getState().clearSessionSettings();
+    let resolveActivities: (activities: ActivityResponse[]) => void = () => {};
+    mockGetActivities.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveActivities = resolve;
+        })
+    );
 
-    const settings = useUserStore.getState().sessionSettings;
-    expect(settings!.last_session).toBeNull();
-    expect(settings!.use_last_session).toBe(false);
-    expect(mockClearLastSession).toHaveBeenCalled();
+    const validation = useUserStore.getState().validateAndRecreateSession();
+    expect(useUserStore.getState().isValidatingLastSession).toBe(true);
+
+    await useUserStore.getState().logout();
+    resolveActivities([mockActivity({ id: 10, name: 'Late activity' })]);
+
+    await expect(validation).resolves.toEqual({ status: 'stale' });
+    expect(useUserStore.getState()).toMatchObject({
+      authenticatedUser: null,
+      selectedActivity: null,
+      selectedRoom: null,
+      selectedSupervisors: [],
+      isValidatingLastSession: false,
+    });
+    expect(mockGetRooms).not.toHaveBeenCalled();
+    expect(mockClearLastSession).not.toHaveBeenCalled();
   });
 
-  it('handles null sessionSettings', async () => {
-    mockClearLastSession.mockResolvedValueOnce(undefined);
+  it('does not clear saved settings when a stale validation fails after logout', async () => {
+    setAuthenticated();
+    const settings: SessionSettings = {
+      use_last_session: true,
+      auto_save_enabled: true,
+      last_session: lastSession,
+    };
+    useUserStore.setState({ sessionSettings: settings });
 
-    await useUserStore.getState().clearSessionSettings();
+    let rejectActivities: (error: unknown) => void = () => {};
+    mockGetActivities.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectActivities = reject;
+        })
+    );
 
-    expect(useUserStore.getState().sessionSettings).toBeNull();
+    const validation = useUserStore.getState().validateAndRecreateSession();
+    await useUserStore.getState().logout();
+    rejectActivities(new Error('Late failure'));
+
+    await expect(validation).resolves.toEqual({ status: 'stale' });
+    expect(useUserStore.getState().sessionSettings).toEqual(settings);
+    expect(useUserStore.getState().error).toBeNull();
+    expect(mockClearLastSession).not.toHaveBeenCalled();
   });
 
-  it('handles error gracefully', async () => {
-    mockClearLastSession.mockRejectedValueOnce(new Error('Clear failed'));
+  it('allows a newer validation to supersede an older request', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      sessionSettings: {
+        use_last_session: true,
+        auto_save_enabled: true,
+        last_session: lastSession,
+      },
+      users: [
+        { id: 1, name: 'Herr A' },
+        { id: 2, name: 'Frau B' },
+      ],
+    });
 
-    await useUserStore.getState().clearSessionSettings();
+    let resolveFirstActivities: (activities: ActivityResponse[]) => void = () => {};
+    mockGetActivities
+      .mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveFirstActivities = resolve;
+          })
+      )
+      .mockResolvedValueOnce([mockActivity({ id: 10, name: 'New activity' })]);
+    mockGetRooms.mockResolvedValueOnce([mockRoom({ id: 5 })]);
 
-    // Should not throw
+    const firstValidation = useUserStore.getState().validateAndRecreateSession();
+    const secondValidation = useUserStore.getState().validateAndRecreateSession();
+
+    await expect(secondValidation).resolves.toEqual({ status: 'success' });
+    resolveFirstActivities([mockActivity({ id: 10, name: 'Old activity' })]);
+    await expect(firstValidation).resolves.toEqual({ status: 'stale' });
+
+    expect(useUserStore.getState().selectedActivity?.name).toBe('New activity');
+    expect(useUserStore.getState().isValidatingLastSession).toBe(false);
   });
 });
 
@@ -1870,14 +1356,14 @@ describe('clearSessionState', () => {
   it('clears session-scoped state', () => {
     useUserStore.setState({
       selectedRoom: { id: 1, name: 'Test', is_occupied: false },
-      selectedActivity: { id: 1, name: 'Test', category: 'Test' } as ActivityResponse,
+      selectedActivity: { id: 1, name: 'Test', category: 'Test' },
       currentSession: {
         active_group_id: 1,
         activity_id: 1,
         device_id: 1,
         start_time: 'now',
         duration: '1h',
-      } as CurrentSession,
+      },
     });
 
     useUserStore.getState().clearSessionState();
@@ -1888,22 +1374,15 @@ describe('clearSessionState', () => {
     expect(state.currentSession).toBeNull();
   });
 
-  it('clears RFID session state but preserves tagToStudentMap', () => {
-    useUserStore.getState().mapTagToStudent('04:AA:BB', 'student-1');
+  it('clears RFID session state', () => {
     useUserStore.getState().addToProcessingQueue('04:CC:DD');
     useUserStore.getState().recordTagScan('04:EE:FF', { timestamp: Date.now() });
-    useUserStore.getState().updateStudentHistory('student-1', 'checkin');
 
     useUserStore.getState().clearSessionState();
 
     const rfid = useUserStore.getState().rfid;
-    // Should preserve
-    expect(rfid.tagToStudentMap.has('04:AA:BB')).toBe(true);
-    // Should clear
     expect(rfid.processingQueue.size).toBe(0);
     expect(rfid.recentTagScans.size).toBe(0);
-    expect(rfid.studentHistory.size).toBe(0);
-    expect(rfid.optimisticScans).toHaveLength(0);
   });
 
   it('clears activeSupervisorTags', () => {
