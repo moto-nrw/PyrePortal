@@ -166,10 +166,10 @@ export interface CurrentSession {
 }
 
 export type StaffClockAction = 'checkin' | 'checkout' | 'break_start' | 'break_end';
-export type StaffClockStateName = 'checked_out' | 'checked_in' | 'on_break';
+type StaffClockStateName = 'checked_out' | 'checked_in' | 'on_break';
 export type WorkSessionStatus = 'present' | 'home_office';
 
-export interface StaffClockSession {
+interface StaffClockSession {
   id: number;
   staff_id: number;
   check_in_time: string;
