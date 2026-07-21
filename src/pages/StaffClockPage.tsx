@@ -378,20 +378,34 @@ function StaffClockPage() {
   };
 
   /**
-   * Fence the card behind the mutation whose outcome stayed unknown, so nothing
-   * touches that employee's state until the outstanding call can no longer
-   * commit behind it. A resolved call is proof enough; a rejected one is not,
-   * so the fence is held for a further settle window in that case.
+   * Fence the card behind an outstanding mutation, so nothing touches that
+   * employee's state while a write for it may still commit.
+   *
+   * Registered before the request is awaited, not after it misses a deadline:
+   * between those two moments a user can walk back to the home view, reopen this
+   * page and rescan the same card, and an unfenced read there would race the
+   * live write. The fence lifts on its own once the call resolves; a rejection
+   * is no proof that nothing was written, so it is held for a further settle
+   * window in that case. The returned function lifts it early, for the one case
+   * that is proof: a structured refusal from the handler.
    */
-  const fenceCard = (tag: string, mutation: Promise<StaffClockState>) => {
-    const settled = mutation.then(
-      () => undefined,
-      () => new Promise<void>(resolve => setTimeout(resolve, INDETERMINATE_SETTLE_MS))
-    );
+  const fenceCard = (tag: string, mutation: Promise<StaffClockState>): (() => void) => {
+    let release: () => void = () => undefined;
+    const released = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const settled = Promise.race([
+      released,
+      mutation.then(
+        () => undefined,
+        () => new Promise<void>(resolve => setTimeout(resolve, INDETERMINATE_SETTLE_MS))
+      ),
+    ]);
     unresolvedMutations.set(tag, settled);
     void settled.then(() => {
       if (unresolvedMutations.get(tag) === settled) unresolvedMutations.delete(tag);
     });
+    return release;
   };
 
   /** Block a read on a card whose previous mutation has not reported back yet. */
@@ -417,6 +431,9 @@ function StaffClockPage() {
       // Hold on to the mutation itself: our deadline does not abort it, so the
       // outstanding call stays the only thing that can report what it did.
       const mutation = api.executeStaffClockAction(pin, command);
+      // Fence the card up front. The request is live from here on, and the page
+      // can be left and reopened before any deadline expires.
+      const releaseFence = fenceCard(command.rfid_tag, mutation);
       let outcome = await settleMutation(mutation, REQUEST_TIMEOUT_MS);
       if (outcome.kind === 'indeterminate') {
         // Give the original call a bounded second chance rather than issuing a
@@ -428,6 +445,10 @@ function StaffClockPage() {
         });
         outcome = await settleMutation(mutation, MUTATION_GRACE_MS);
       }
+
+      // A verdict means nothing can commit behind us any more. Only the
+      // indeterminate case keeps the card fenced.
+      if (outcome.kind !== 'indeterminate') releaseFence();
 
       if (outcome.kind === 'success') {
         setClockState(outcome.state);
@@ -441,7 +462,6 @@ function StaffClockPage() {
       }
 
       if (outcome.kind === 'indeterminate') {
-        fenceCard(command.rfid_tag, mutation);
         discardAfterIndeterminate(command.action);
         return;
       }
@@ -854,11 +874,15 @@ function StaffClockPage() {
       <ModalBase
         isOpen={pendingCommand !== null}
         onClose={() => {
+          // A stamp that is already on its way cannot be taken back. Closing the
+          // dialog now would read as "cancelled" while the write still commits.
+          if (isBusy) return;
           setPendingCommand(null);
           setReason('');
         }}
         size="sm"
         closeOnBackdropClick={!isBusy}
+        closeOnEscapeKey={!isBusy}
       >
         <h2
           style={{

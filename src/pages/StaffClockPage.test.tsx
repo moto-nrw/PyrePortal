@@ -395,6 +395,59 @@ describe('StaffClockPage', () => {
     }
   });
 
+  it('fences a card while its stamp is still in flight, before any deadline', async () => {
+    vi.useFakeTimers();
+    try {
+      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      const view = renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      // Well inside the request deadline: the write is live and undecided.
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+
+      // Leaving and coming back must not open a window for a second stamp.
+      view.unmount();
+      renderPage();
+
+      const readsBefore = mockedApi.getStaffClockState.mock.calls.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(20_000));
+
+      expect(screen.getByText(/vorherige Stempelung wird noch verarbeitet/)).toBeInTheDocument();
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores Escape in the reason dialog while the stamp is in flight', async () => {
+    const user = userEvent.setup();
+    mockedApi.executeStaffClockAction
+      .mockRejectedValueOnce(
+        new ApiError('deviation reason required', 409, 'deviation_reason_required', {
+          deviation_minutes: '22',
+        })
+      )
+      .mockReturnValueOnce(new Promise(() => {}));
+    renderPage();
+    await scanCard(user);
+
+    await user.click(screen.getByRole('button', { name: 'Einstempeln' }));
+    await screen.findByText(/weicht um 22 Minuten/);
+    await user.type(screen.getByLabelText('Begründung'), 'Vertretung übernommen');
+    await user.click(screen.getByRole('button', { name: 'Erneut stempeln' }));
+
+    // The retry is on its way and cannot be recalled, so the native cancel is
+    // refused — closing here would read as "not stamped" while it still commits.
+    const dialog = screen.getByLabelText('Begründung').closest('dialog');
+    const cancelled = dialog?.dispatchEvent(new Event('cancel', { cancelable: true }));
+    expect(cancelled).toBe(false);
+    expect(screen.getByText(/weicht um 22 Minuten/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Begründung')).toHaveValue('Vertretung übernommen');
+  });
+
   it('does not launch a second scan while the first one is pending', async () => {
     const user = userEvent.setup();
     let resolveScan: ((value: { success: true; tag_id: string }) => void) | undefined;
