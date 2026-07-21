@@ -1,6 +1,6 @@
 import { faWifi } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { adapter } from '@platform';
@@ -23,9 +23,26 @@ import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 import { pressHandlers } from '../utils/pressHandlers';
 import { isRfidEnabled } from '../utils/tauriContext';
+import { withTimeout } from '../utils/withTimeout';
 
 const logger = createLogger('StaffClockPage');
 const SCAN_TIMEOUT_MS = 20_000;
+/**
+ * A scan only authorizes an immediate action. On this shared kiosk the scanned
+ * credential is dropped after this much inactivity so nobody can clock a
+ * colleague in or out with a card that was left behind.
+ */
+const SCANNED_TAG_IDLE_TIMEOUT_MS = 45_000;
+const SCAN_TIMEOUT_MESSAGE =
+  'Scanner reagiert nicht mehr. Bitte Scanner neu starten und erneut versuchen.';
+
+/** Scanner-level failure that already carries a German, user-facing message. */
+class ScannerError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ScannerError';
+  }
+}
 
 const stateLabels: Record<StaffClockState['state'], string> = {
   checked_out: 'Ausgestempelt',
@@ -76,9 +93,27 @@ async function scanStaffTag(): Promise<string> {
     return tags[getSecureRandomInt(tags.length)];
   }
 
-  const result = await adapter.scanSingleTag(SCAN_TIMEOUT_MS);
+  // The adapter timeout cannot interrupt a stuck SPI call, so guard on the frontend.
+  let result;
+  try {
+    result = await withTimeout(
+      adapter.scanSingleTag(SCAN_TIMEOUT_MS),
+      SCAN_TIMEOUT_MS,
+      SCAN_TIMEOUT_MESSAGE
+    );
+  } catch (error) {
+    logger.error('Staff tag scan invocation failed', { error: serializeError(error) });
+    throw new ScannerError(
+      error instanceof Error && error.message === SCAN_TIMEOUT_MESSAGE
+        ? SCAN_TIMEOUT_MESSAGE
+        : 'Verbindung zum Scanner unterbrochen. Bitte Scanner neu starten.'
+    );
+  }
+
+  // Adapter errors are English hardware strings ("Scan timed out") — never show them raw.
   if (!result.success || !result.tag_id) {
-    throw new Error(result.error ?? 'RFID-Scan fehlgeschlagen');
+    logger.warn('Staff tag scan returned no tag', { scannerError: result.error });
+    throw new ScannerError('Armband konnte nicht gelesen werden. Bitte erneut versuchen.');
   }
   return result.tag_id;
 }
@@ -140,12 +175,31 @@ function StaffClockPage() {
   const [reason, setReason] = useState('');
   const [reasonPrompt, setReasonPrompt] = useState('');
   const [completedMessage, setCompletedMessage] = useState<string | null>(null);
+  const [idleTick, setIdleTick] = useState(0);
   const requestIdRef = useRef(0);
   const inFlightRef = useRef(false);
 
+  /** Any interaction restarts the credential expiry window. */
+  const registerActivity = useCallback(() => setIdleTick(tick => tick + 1), []);
+
+  // Drop the scanned credential (and the result it revealed) after inactivity.
+  useEffect(() => {
+    if (isBusy || (!scannedTag && !completedMessage)) return;
+    const handle = setTimeout(() => {
+      logger.info('Scanned staff credential expired after inactivity');
+      setScannedTag(null);
+      setClockState(null);
+      setCompletedMessage(null);
+      setPendingCommand(null);
+      setReason('');
+      setSelectedStatus('present');
+    }, SCANNED_TAG_IDLE_TIMEOUT_MS);
+    return () => clearTimeout(handle);
+  }, [scannedTag, completedMessage, isBusy, idleTick]);
+
   const showFailure = (error: unknown) => {
     logger.error('Staff clock operation failed', { error: serializeError(error) });
-    let message = mapApiErrorToGerman(error);
+    let message = error instanceof ScannerError ? error.message : mapApiErrorToGerman(error);
     if (error instanceof ApiError && error.code === 'planned_start_not_reached') {
       const planned = error.details?.planned_start_time;
       if (planned) message = `Einstempeln ist erst ab ${planned} Uhr möglich.`;
@@ -164,6 +218,8 @@ function StaffClockPage() {
       setCompletedMessage(`${actionLabels[command.action]} erfolgreich`);
       setPendingCommand(null);
       setReason('');
+      // A scan authorizes exactly one action; the next one needs a fresh scan.
+      setScannedTag(null);
       logUserAction('Staff clock action completed', { action: command.action });
     } catch (error) {
       if (
@@ -516,8 +572,14 @@ function StaffClockPage() {
                               key={value}
                               type="button"
                               aria-pressed={selected}
-                              onClick={() => setSelectedStatus(value)}
-                              {...pressHandlers()}
+                              // Locked while a check-in is in flight: the command already
+                              // captured the work location, so a late change would lie.
+                              disabled={isBusy}
+                              onClick={() => {
+                                registerActivity();
+                                setSelectedStatus(value);
+                              }}
+                              {...pressHandlers(isBusy)}
                               style={{
                                 flex: 1,
                                 padding: '20px',
@@ -527,7 +589,8 @@ function StaffClockPage() {
                                 border: selected ? '2px solid #83CD2D' : '2px solid #E5E7EB',
                                 backgroundColor: selected ? 'rgba(131,205,45,0.15)' : '#FFFFFF',
                                 color: selected ? '#16A34A' : '#374151',
-                                cursor: 'pointer',
+                                cursor: isBusy ? 'not-allowed' : 'pointer',
+                                opacity: isBusy ? 0.6 : 1,
                                 outline: 'none',
                                 transition: designSystem.transitions.base,
                               }}
@@ -660,7 +723,10 @@ function StaffClockPage() {
         <textarea
           id="staff-clock-reason"
           value={reason}
-          onChange={event => setReason(event.target.value)}
+          onChange={event => {
+            registerActivity();
+            setReason(event.target.value);
+          }}
           maxLength={500}
           autoFocus
           style={{
@@ -688,7 +754,10 @@ function StaffClockPage() {
           <button
             type="button"
             disabled={isBusy}
-            onClick={() => setPendingCommand(null)}
+            onClick={() => {
+              setPendingCommand(null);
+              setReason('');
+            }}
             {...pressHandlers(isBusy)}
             style={{
               height: '60px',

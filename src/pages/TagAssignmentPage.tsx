@@ -18,6 +18,7 @@ import { getSecureRandomInt } from '../utils/crypto';
 import { logNavigation, logUserAction, logError, createLogger } from '../utils/logger';
 import { pressHandlers } from '../utils/pressHandlers';
 import { isRfidEnabled } from '../utils/tauriContext';
+import { withTimeout } from '../utils/withTimeout';
 
 const logger = createLogger('TagAssignmentPage');
 
@@ -37,28 +38,6 @@ const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
 
 // RFID scanner types from Tauri backend
 const SCAN_INVOKE_TIMEOUT_MS = 20_000;
-
-const withTimeout = <T,>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  timeoutMessage: string
-): Promise<T> => {
-  return new Promise<T>((resolve, reject) => {
-    const timeoutHandle = setTimeout(() => {
-      reject(new Error(timeoutMessage));
-    }, timeoutMs);
-
-    promise
-      .then(result => {
-        clearTimeout(timeoutHandle);
-        resolve(result);
-      })
-      .catch(error => {
-        clearTimeout(timeoutHandle);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      });
-  });
-};
 
 /**
  * Tag Assignment Page - Handle RFID tag assignment to students
