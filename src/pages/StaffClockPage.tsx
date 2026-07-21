@@ -73,13 +73,10 @@ const INDETERMINATE_UNKNOWN_MESSAGE =
 const KIOSK_WORK_LOCATION = 'present' as const;
 
 /**
- * How long a card stays fenced after a mutation that ended without a verdict
- * because the request itself failed. A rejected call is not proof that nothing
- * was written — a dropped connection or a 5xx can follow a commit — so the
- * fence outlives the rejection by this much before state may be read again.
- * Bounded, so no card is ever fenced permanently.
+ * Shown whenever a card is dropped mid-flow. The credential only ever
+ * authorizes the action it was scanned for; anything after it needs a new scan.
  */
-const INDETERMINATE_SETTLE_MS = 10_000;
+const RESCAN_HINT = 'Bitte Armband erneut scannen.';
 
 /**
  * When a clock mutation that never reported back is cancelled.
@@ -94,17 +91,25 @@ const INDETERMINATE_SETTLE_MS = 10_000;
  */
 const FENCE_ABORT_MS = 120_000;
 /**
- * How often the kiosk asks the backend what became of a cancelled mutation.
+ * How many state reads the kiosk may spend establishing what became of a
+ * mutation that ended without a verdict.
  *
- * Aborting the silent request is not by itself an answer: it tears down this
+ * Aborting or losing the request is not by itself an answer: it ends this
  * kiosk's connection, but only the backend can say whether the write landed
- * before that. So the card stays fenced until the backend has answered — a
- * state read, which is served after the aborted request has been dealt with and
- * therefore reports the settled truth. Retried, because the one moment the
- * backend is unreachable is the worst moment to conclude anything.
+ * before that. So the card stays fenced until the backend has answered.
  */
-const RECONCILE_ATTEMPTS = 3;
-/** Pause between reconciliation attempts, so a brief outage can pass. */
+const RECONCILE_READS = 3;
+/**
+ * How many consecutive reads must show the state the mutation did NOT produce
+ * before the kiosk concludes that nothing was written.
+ *
+ * One read is not a conclusion: it can be served in the instant before a commit
+ * lands. A second read, taken a full retry gap later, is what turns "not yet
+ * visible" into "not coming". A read that shows the state the action would have
+ * produced is conclusive on its own — that IS the commit.
+ */
+const RECONCILE_QUIET_READS = 2;
+/** Pause between reconciliation reads, so a commit in flight can surface. */
 const RECONCILE_RETRY_MS = 5_000;
 
 /**
@@ -213,44 +218,75 @@ async function settleMutation(
   }
 }
 
+/** The state the backend is in once an action has been applied. */
+const stateAfterAction: Record<StaffClockAction, StaffClockState['state']> = {
+  checkin: 'checked_in',
+  checkout: 'checked_out',
+  break_start: 'on_break',
+  break_end: 'checked_in',
+};
+
 /**
- * Establish, against the backend, what became of a mutation that was cancelled
- * because it never reported back — and only then let its card go.
+ * Establish, against the backend, what became of a mutation that ended without
+ * a verdict — and only then let its card go.
  *
- * The abort ends this kiosk's request; it does not say what the backend did
- * with it. The one party that knows is the backend, so the kiosk asks it. That
- * read is issued after the cancellation, not beside a live write, so its answer
- * is the outcome rather than a snapshot that a pending commit could overtake.
+ * Losing the request (a dropped connection, a 5xx, or the kiosk cancelling a
+ * call that never reported back) says nothing about what the backend did with
+ * it. The one party that knows is the backend, so the kiosk asks it, and reads
+ * the answer against the state the action would have produced:
+ *
+ * - the read shows that state -> the write committed. Conclusive.
+ * - the read shows something else -> the write is not visible. Not conclusive
+ *   on its own, because a commit can land in the very next instant, so this
+ *   has to hold across RECONCILE_QUIET_READS reads a full retry gap apart
+ *   before the kiosk treats it as "nothing was written".
+ *
+ * A failed read decides nothing and resets that agreement — an unreachable
+ * backend is the worst possible moment to conclude anything.
  *
  * The answer is not shown anywhere: the card is long gone from the reader and
  * whoever picks it up next will scan again and get a fresh read. What matters
  * here is only that the backend has spoken before the card is released.
  *
- * Bounded on purpose. If the backend stays silent for every attempt, the fence
- * is released anyway with a loud log — a hallway kiosk that fences a card
- * forever is broken in a way that no employee can clear.
+ * Bounded on purpose. If the backend never gives a usable answer, the fence is
+ * released anyway with a loud log — a hallway kiosk that fences a card forever
+ * is broken in a way that no employee standing at it can clear.
  */
-async function reconcileAfterAbort(reconcile: () => Promise<StaffClockState>): Promise<void> {
-  for (let attempt = 1; attempt <= RECONCILE_ATTEMPTS; attempt++) {
+async function reconcileMutation(
+  read: () => Promise<StaffClockState>,
+  applied: StaffClockState['state']
+): Promise<void> {
+  let quiet = 0;
+  for (let attempt = 1; attempt <= RECONCILE_READS; attempt++) {
     try {
-      const state = await reconcile();
-      logger.warn('Cancelled clock mutation reconciled against the backend', {
-        attempt,
-        state: state.state,
-      });
-      return;
+      const state = await read();
+      if (state.state === applied) {
+        logger.warn('Unconfirmed clock mutation reconciled: the backend applied it', { attempt });
+        return;
+      }
+      quiet += 1;
+      if (quiet >= RECONCILE_QUIET_READS) {
+        logger.warn('Unconfirmed clock mutation reconciled: the backend never applied it', {
+          attempt,
+          state: state.state,
+        });
+        return;
+      }
     } catch (error) {
-      logger.error('Could not reconcile a cancelled clock mutation', {
+      // Decides nothing, and the agreement so far no longer spans an
+      // uninterrupted window of backend answers.
+      quiet = 0;
+      logger.error('Could not reconcile an unconfirmed clock mutation', {
         attempt,
         error: serializeError(error),
       });
-      if (attempt < RECONCILE_ATTEMPTS) {
-        await new Promise(resolve => setTimeout(resolve, RECONCILE_RETRY_MS));
-      }
+    }
+    if (attempt < RECONCILE_READS) {
+      await new Promise(resolve => setTimeout(resolve, RECONCILE_RETRY_MS));
     }
   }
-  logger.error('Releasing a card the backend never reconciled', {
-    attempts: RECONCILE_ATTEMPTS,
+  logger.error('Releasing a card whose stamp the backend never settled', {
+    reads: RECONCILE_READS,
   });
 }
 
@@ -413,26 +449,6 @@ function StaffClockPage() {
   };
 
   /**
-   * Re-read the authoritative state for a still-held card. Used after the server
-   * rejected an action as stale, so the page stops offering it. Only safe while
-   * no mutation is outstanding — a read issued next to an in-flight write can be
-   * answered from before the commit. On failure the card is dropped.
-   */
-  const refreshState = async (pin: string, tag: string, staffId?: number): Promise<void> => {
-    try {
-      const state = await withRequestTimeout(api.getStaffClockState(pin, tag, staffId));
-      setClockState(state);
-    } catch (error) {
-      // Without fresh state every displayed action could be stale — drop the card.
-      logger.warn('Failed to reload staff clock state after conflict', {
-        error: serializeError(error),
-      });
-      setClockState(null);
-      setScannedTag(null);
-    }
-  };
-
-  /**
    * The action may or may not have been applied. Discard everything derived from
    * it: the cached state is possibly stale, and the scanned card must not stay
    * authorized — on this shared kiosk a consumed credential left in place lets
@@ -458,23 +474,24 @@ function StaffClockPage() {
    * Registered before the request is awaited, not after it misses a deadline:
    * between those two moments a user can walk back to the home view, reopen this
    * page and rescan the same card, and an unfenced read there would race the
-   * live write. The fence lifts on its own once the call resolves; a rejection
-   * is no proof that nothing was written, so it is held for a further settle
-   * window in that case. The returned function lifts it early, for the one case
-   * that is proof: a structured refusal from the handler.
+   * live write. The fence lifts on its own once the call answers; the returned
+   * function lifts it for the other case that is proof, a structured refusal
+   * from the handler, which the caller classifies.
    *
-   * A request that never reports back at all cannot lift its own fence. The
-   * kiosk then aborts it and asks the backend what became of it; the fence lifts
-   * on that answer, never on a timer running beside a live write. Cancelling
-   * first is what makes the question answerable: the aborted request is out of
-   * the way by the time the reconciling read is served, so what it returns is
-   * the settled outcome rather than a snapshot taken before the commit.
+   * Every other ending leaves the outcome unknown, and none of them is released
+   * on a timer. A rejection is no proof that nothing was written — a dropped
+   * connection or a 5xx can follow a commit — and a request that never reports
+   * back at all cannot lift its own fence: the kiosk aborts it, so nothing of
+   * its own is still live, and then asks the backend what became of it. In both
+   * cases what lifts the fence is the backend's answer, never a clock running
+   * beside a write that might still land.
    */
   const fenceCard = (
     tag: string,
     mutation: Promise<StaffClockState>,
     abort: () => void,
-    reconcile: () => Promise<StaffClockState>
+    reconcile: () => Promise<StaffClockState>,
+    applied: StaffClockState['state']
   ): (() => void) => {
     let release: () => void = () => undefined;
     const released = new Promise<void>(resolve => {
@@ -489,7 +506,7 @@ function StaffClockPage() {
           abortAfterMs: FENCE_ABORT_MS,
         });
         abort();
-        void reconcileAfterAbort(reconcile).then(resolve);
+        void reconcileMutation(reconcile, applied).then(resolve);
       }, FENCE_ABORT_MS)
     );
     const settled = Promise.race([
@@ -497,7 +514,13 @@ function StaffClockPage() {
       cancelled,
       mutation.then(
         () => undefined,
-        () => new Promise<void>(resolve => setTimeout(resolve, INDETERMINATE_SETTLE_MS))
+        // Same rule the caller applies: a structured refusal means the handler
+        // looked at the command and wrote nothing. Anything else has to be
+        // settled against the backend before the card may be touched again.
+        (error: unknown) =>
+          error instanceof ApiError && error.statusCode < 500
+            ? undefined
+            : reconcileMutation(reconcile, applied)
       ),
     ]);
     unresolvedMutations.set(tag, settled);
@@ -552,7 +575,8 @@ function StaffClockPage() {
             api.getStaffClockState(pin, command.rfid_tag, staffId, readController.signal),
             () => readController.abort()
           );
-        }
+        },
+        stateAfterAction[command.action]
       );
       let outcome = await settleMutation(mutation, REQUEST_TIMEOUT_MS);
       if (outcome.kind === 'indeterminate') {
@@ -601,14 +625,25 @@ function StaffClockPage() {
         return;
       }
 
-      showFailure(error);
-      // The state moved on (web app, other kiosk): the cached allowed_actions
-      // are wrong now, so reload before offering anything else. The mutation has
-      // settled at this point, so this read cannot race it.
+      // The state moved on (web app, other kiosk), so the cached allowed_actions
+      // are wrong. Re-reading them while the card stays authorized would put a
+      // fresh set of actions for that employee on screen without anyone having
+      // scanned — and on a shared kiosk the wristband may simply have been left
+      // lying there. Drop the credential: whoever wants to act next scans, and
+      // gets their read with it.
       if (error instanceof ApiError && error.code === 'invalid_staff_clock_state') {
+        logger.warn('Staff clock action rejected as stale, dropping the cached credential');
         setPendingCommand(null);
-        await refreshState(pin, command.rfid_tag, staffId);
+        setReason('');
+        setCompletedMessage(null);
+        setClockState(null);
+        setScannedTag(null);
+        setErrorMessage(`${mapApiErrorToGerman(error)} ${RESCAN_HINT}`);
+        setShowError(true);
+        return;
       }
+
+      showFailure(error);
     } finally {
       inFlightRef.current = false;
       setIsBusy(false);

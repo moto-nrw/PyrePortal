@@ -190,11 +190,8 @@ describe('StaffClockPage', () => {
     );
   });
 
-  it('reloads the authoritative state when the server rejects a stale action', async () => {
+  it('drops the credential when the server rejects an action as stale', async () => {
     const user = userEvent.setup();
-    mockedApi.getStaffClockState
-      .mockResolvedValueOnce(checkedOutState)
-      .mockResolvedValueOnce(checkedInState);
     mockedApi.executeStaffClockAction.mockRejectedValueOnce(
       new ApiError('invalid state', 409, 'invalid_staff_clock_state')
     );
@@ -203,13 +200,15 @@ describe('StaffClockPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Einstempeln' }));
 
-    expect(
-      await screen.findByText('Diese Aktion passt nicht zum aktuellen Stempelstatus.')
-    ).toBeInTheDocument();
-    await waitFor(() => expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(2));
-    expect(screen.getByText('Eingestempelt')).toBeInTheDocument();
+    expect(await screen.findByText(/Bitte Armband erneut scannen/)).toBeInTheDocument();
+    // Reloading the actions here would put a fresh, usable action set for this
+    // employee on screen without anyone having scanned — and the wristband may
+    // simply be lying on the kiosk. The card goes instead.
+    expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Mara Muster')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Einstempeln' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ausstempeln' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ausstempeln' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Armband scannen' })).toBeEnabled();
   });
 
   it('recovers when a backend request never answers', async () => {
@@ -313,7 +312,7 @@ describe('StaffClockPage', () => {
     }
   });
 
-  it('reads state again once the unconfirmed action finally settles', async () => {
+  it('settles a rejected stamp against the backend before freeing the card', async () => {
     vi.useFakeTimers();
     try {
       let failAction: ((error: Error) => void) | undefined;
@@ -322,9 +321,6 @@ describe('StaffClockPage', () => {
           failAction = reject;
         })
       );
-      mockedApi.getStaffClockState
-        .mockResolvedValueOnce(checkedOutState)
-        .mockResolvedValueOnce(checkedInState);
       renderPage();
 
       fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
@@ -337,15 +333,50 @@ describe('StaffClockPage', () => {
       expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
 
       // The outstanding call reports back — but a rejection is no proof that
-      // nothing was written, so the fence is held for the settle window.
+      // nothing was written, so the backend, not a timer, has to settle it.
       failAction?.(new Error('connection reset'));
       await act(() => vi.advanceTimersByTimeAsync(0));
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(2);
+      // One read showing the pre-stamp state is not an answer: a commit can
+      // still land in the next instant. The card stays fenced.
+      expect(screen.queryByText('Mara Muster')).toBeNull();
 
-      // Window closed: the write can no longer land behind the read.
-      await act(() => vi.advanceTimersByTimeAsync(10_000));
+      // A second read a full gap later, still without the stamp, is — and only
+      // behind it does the held scan get its own read.
+      await act(() => vi.advanceTimersByTimeAsync(5_000));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(4);
+      expect(screen.getByText('Mara Muster')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('frees the card as soon as a reconciling read shows the stamp landed', async () => {
+    vi.useFakeTimers();
+    try {
+      let failAction: ((error: Error) => void) | undefined;
+      mockedApi.executeStaffClockAction.mockReturnValue(
+        new Promise((_resolve, reject) => {
+          failAction = reject;
+        })
+      );
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      // The check-in did commit; only its answer was lost. Seeing the state the
+      // action produces is conclusive on its own — nothing more can land.
+      mockedApi.getStaffClockState.mockResolvedValue(checkedInState);
+      failAction?.(new Error('connection reset'));
+      await act(() => vi.advanceTimersByTimeAsync(0));
 
       expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(2);
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
       expect(screen.getByText('Eingestempelt')).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
@@ -482,13 +513,13 @@ describe('StaffClockPage', () => {
       await act(() => vi.advanceTimersByTimeAsync(120_000));
 
       // What resolves it is the backend, not a timer: the cancelled stamp is
-      // reconciled by a read before the card is handed back.
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 1);
+      // reconciled by reads that agree the check-in never landed.
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 2);
 
       fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
       await act(() => vi.advanceTimersByTimeAsync(0));
 
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 2);
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 3);
       expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
       expect(screen.getByText('Mara Muster')).toBeInTheDocument();
     } finally {
@@ -535,11 +566,19 @@ describe('StaffClockPage', () => {
       await act(() => vi.advanceTimersByTimeAsync(10_000));
       expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort);
 
-      // The backend answers — now, and only now, the held scan goes through.
+      // The backend answers, and the check-in is not there. That alone is not
+      // an answer either — a commit can land in the very next instant — so the
+      // card stays fenced and a second read is taken a full gap later.
       answerReconcile?.(checkedOutState);
       mockedApi.getStaffClockState.mockResolvedValue(checkedOutState);
       await act(() => vi.advanceTimersByTimeAsync(0));
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort + 1);
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort);
+      expect(screen.queryByText('Mara Muster')).toBeNull();
+
+      // Two reads agreeing across the gap settle it — now the held scan goes
+      // through and gets its own read.
+      await act(() => vi.advanceTimersByTimeAsync(5_000));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort + 2);
       expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
     } finally {
       vi.useRealTimers();
