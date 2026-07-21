@@ -15,7 +15,6 @@ import {
   type StaffClockAction,
   type StaffClockCommand,
   type StaffClockState,
-  type WorkSessionStatus,
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
@@ -66,6 +65,37 @@ const TIMEOUT_SENTINEL = '__staff_clock_request_timeout__';
  */
 const INDETERMINATE_UNKNOWN_MESSAGE =
   'Die Stempelung konnte nicht bestätigt werden. Bitte Armband erneut scannen und Status prüfen.';
+/**
+ * Standing at the kiosk is the proof of being on site, so a stamp taken here is
+ * always `present`. Home office is a web-app decision and stays there; offering
+ * it on a hallway reader would only invite a wrong work location.
+ */
+const KIOSK_WORK_LOCATION = 'present' as const;
+
+/**
+ * How long a card stays fenced after a mutation that ended without a verdict
+ * because the request itself failed. A rejected call is not proof that nothing
+ * was written — a dropped connection or a 5xx can follow a commit — so the
+ * fence outlives the rejection by this much before state may be read again.
+ * Bounded, so no card is ever fenced permanently.
+ */
+const INDETERMINATE_SETTLE_MS = 10_000;
+
+/**
+ * Cards whose last clock mutation never reported an outcome, keyed by RFID tag.
+ *
+ * Module scope on purpose: navigating away unmounts the page but does not abort
+ * the outstanding request, so a fence tied to component state would be dropped
+ * while the write is still live and the same card could be rescanned into a
+ * stale read. Keyed per tag so a second card timing out cannot lift the fence
+ * the first one is under. Entries delete themselves once they settle.
+ */
+const unresolvedMutations = new Map<string, Promise<void>>();
+
+/** Test seam: drop every fence so one test's timeout cannot leak into the next. */
+export function __resetUnresolvedMutations(): void {
+  unresolvedMutations.clear();
+}
 
 /** Failure that already carries a German, user-facing message. */
 class LocalizedError extends Error {
@@ -269,7 +299,6 @@ function StaffClockPage() {
   const authenticatedUser = useUserStore(state => state.authenticatedUser);
   const [clockState, setClockState] = useState<StaffClockState | null>(null);
   const [scannedTag, setScannedTag] = useState<string | null>(null);
-  const [selectedStatus, setSelectedStatus] = useState<WorkSessionStatus>('present');
   const [isBusy, setIsBusy] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showError, setShowError] = useState(false);
@@ -280,15 +309,6 @@ function StaffClockPage() {
   const [idleTick, setIdleTick] = useState(0);
   const requestIdRef = useRef(0);
   const inFlightRef = useRef(false);
-  /**
-   * A mutation that left the kiosk without a verdict, remembered per card. The
-   * call was never aborted, so its write can still commit: until it settles, any
-   * state read for that card may be answered from before the commit and would
-   * re-offer an action the employee has effectively already taken — a stalled
-   * checkout committing after a "Pause starten erfolgreich" would silently drop
-   * the rest of the shift.
-   */
-  const unresolvedMutationRef = useRef<{ tag: string; settled: Promise<void> } | null>(null);
 
   /** Any interaction restarts the credential expiry window. */
   const registerActivity = useCallback(() => setIdleTick(tick => tick + 1), []);
@@ -303,7 +323,6 @@ function StaffClockPage() {
       setCompletedMessage(null);
       setPendingCommand(null);
       setReason('');
-      setSelectedStatus('present');
     }, SCANNED_TAG_IDLE_TIMEOUT_MS);
     return () => clearTimeout(handle);
   }, [scannedTag, completedMessage, isBusy, idleTick]);
@@ -329,7 +348,6 @@ function StaffClockPage() {
     try {
       const state = await withRequestTimeout(api.getStaffClockState(pin, tag));
       setClockState(state);
-      setSelectedStatus(state.session?.status ?? 'present');
     } catch (error) {
       // Without fresh state every displayed action could be stale — drop the card.
       logger.warn('Failed to reload staff clock state after conflict', {
@@ -355,34 +373,34 @@ function StaffClockPage() {
     setCompletedMessage(null);
     setClockState(null);
     setScannedTag(null);
-    setSelectedStatus('present');
     setErrorMessage(INDETERMINATE_UNKNOWN_MESSAGE);
     setShowError(true);
   };
 
   /**
    * Fence the card behind the mutation whose outcome stayed unknown, so nothing
-   * touches that employee's state until the outstanding call has settled.
+   * touches that employee's state until the outstanding call can no longer
+   * commit behind it. A resolved call is proof enough; a rejected one is not,
+   * so the fence is held for a further settle window in that case.
    */
   const fenceCard = (tag: string, mutation: Promise<StaffClockState>) => {
     const settled = mutation.then(
       () => undefined,
-      () => undefined
+      () => new Promise<void>(resolve => setTimeout(resolve, INDETERMINATE_SETTLE_MS))
     );
-    const entry = { tag, settled };
-    unresolvedMutationRef.current = entry;
+    unresolvedMutations.set(tag, settled);
     void settled.then(() => {
-      if (unresolvedMutationRef.current === entry) unresolvedMutationRef.current = null;
+      if (unresolvedMutations.get(tag) === settled) unresolvedMutations.delete(tag);
     });
   };
 
   /** Block a read on a card whose previous mutation has not reported back yet. */
   const awaitUnresolvedMutation = async (tag: string): Promise<void> => {
-    const unresolved = unresolvedMutationRef.current;
-    if (unresolved?.tag !== tag) return;
+    const settled = unresolvedMutations.get(tag);
+    if (!settled) return;
     logger.warn('Holding a scan until the unresolved clock mutation settles');
     try {
-      await withTimeout(unresolved.settled, UNRESOLVED_FENCE_MS, UNRESOLVED_FENCE_MESSAGE);
+      await withTimeout(settled, UNRESOLVED_FENCE_MS, UNRESOLVED_FENCE_MESSAGE);
     } catch {
       // Refusing is the honest answer: the write is still out there, and any
       // state shown now could be overtaken by it moments later.
@@ -472,7 +490,6 @@ function StaffClockPage() {
       if (requestId !== requestIdRef.current) return;
       setScannedTag(tag);
       setClockState(state);
-      setSelectedStatus(state.session?.status ?? 'present');
       logUserAction('Staff card scanned', { staffId: state.staff_id });
     } catch (error) {
       if (requestId === requestIdRef.current) showFailure(error);
@@ -489,7 +506,7 @@ function StaffClockPage() {
     void runCommand({
       rfid_tag: scannedTag,
       action,
-      ...(action === 'checkin' ? { status: selectedStatus } : {}),
+      ...(action === 'checkin' ? { status: KIOSK_WORK_LOCATION } : {}),
     });
   };
 
@@ -759,64 +776,6 @@ function StaffClockPage() {
                       Pausenhinweis: Nach §4 ArbZG sind heute mindestens{' '}
                       {clockState.required_break_minutes} Minuten Pause erforderlich.
                     </div>
-                  )}
-
-                  {/* Work location choice before check-in */}
-                  {clockState.state === 'checked_out' && (
-                    <fieldset style={{ border: 'none', padding: 0, margin: '32px 0 0 0' }}>
-                      <legend
-                        style={{
-                          fontSize: '20px',
-                          fontWeight: 600,
-                          color: '#374151',
-                          marginBottom: '14px',
-                          padding: 0,
-                        }}
-                      >
-                        Arbeitsort wählen
-                      </legend>
-                      <div style={{ display: 'flex', gap: '16px' }}>
-                        {(
-                          [
-                            ['present', 'Vor Ort'],
-                            ['home_office', 'Homeoffice'],
-                          ] as const
-                        ).map(([value, label]) => {
-                          const selected = selectedStatus === value;
-                          return (
-                            <button
-                              key={value}
-                              type="button"
-                              aria-pressed={selected}
-                              // Locked while a check-in is in flight: the command already
-                              // captured the work location, so a late change would lie.
-                              disabled={isBusy}
-                              onClick={() => {
-                                registerActivity();
-                                setSelectedStatus(value);
-                              }}
-                              {...pressHandlers(isBusy)}
-                              style={{
-                                flex: 1,
-                                padding: '20px',
-                                fontSize: '22px',
-                                fontWeight: 700,
-                                borderRadius: '16px',
-                                border: selected ? '2px solid #83CD2D' : '2px solid #E5E7EB',
-                                backgroundColor: selected ? 'rgba(131,205,45,0.15)' : '#FFFFFF',
-                                color: selected ? '#16A34A' : '#374151',
-                                cursor: isBusy ? 'not-allowed' : 'pointer',
-                                opacity: isBusy ? 0.6 : 1,
-                                outline: 'none',
-                                transition: designSystem.transitions.base,
-                              }}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </fieldset>
                   )}
 
                   {/* Actions allowed by the server */}

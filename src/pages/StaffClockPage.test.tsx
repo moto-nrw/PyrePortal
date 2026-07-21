@@ -7,7 +7,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, api, type StaffClockState } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
-import StaffClockPage from './StaffClockPage';
+import StaffClockPage, { __resetUnresolvedMutations } from './StaffClockPage';
 
 vi.mock('@platform', () => ({
   adapter: {
@@ -85,6 +85,8 @@ describe('StaffClockPage', () => {
     // resetAllMocks, not clearAllMocks: clearing keeps queued mock*Once
     // implementations alive, so an unconsumed one-shot leaks into the next test.
     vi.resetAllMocks();
+    // Fences outlive the component on purpose, so they also outlive a test.
+    __resetUnresolvedMutations();
     useUserStore.setState({
       authenticatedUser: {
         staffId: 1,
@@ -110,19 +112,22 @@ describe('StaffClockPage', () => {
     expect(screen.getByRole('button', { name: 'Einstempeln' })).toBeInTheDocument();
   });
 
-  it('sends the selected home-office status when checking in', async () => {
+  it('always stamps as present, without offering a work location', async () => {
     const user = userEvent.setup();
     renderPage();
     await scanCard(user);
 
-    await user.click(screen.getByRole('button', { name: 'Homeoffice' }));
+    // Being at the kiosk is the proof of being on site — there is nothing to choose.
+    expect(screen.queryByRole('button', { name: 'Homeoffice' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Arbeitsort wählen')).not.toBeInTheDocument();
+
     await user.click(screen.getByRole('button', { name: 'Einstempeln' }));
 
     await waitFor(() =>
       expect(mockedApi.executeStaffClockAction).toHaveBeenCalledWith('1234', {
         rfid_tag: '04:A1:B2:C3:D4:E5:F6',
         action: 'checkin',
-        status: 'home_office',
+        status: 'present',
       })
     );
     expect(await screen.findByText('Eingestempelt')).toBeInTheDocument();
@@ -316,13 +321,75 @@ describe('StaffClockPage', () => {
       await act(() => vi.advanceTimersByTimeAsync(1_000));
       expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
 
-      // The outstanding call reports back: nothing can commit behind it anymore,
-      // so the waiting scan may now trust what it reads.
+      // The outstanding call reports back — but a rejection is no proof that
+      // nothing was written, so the fence is held for the settle window.
       failAction?.(new Error('connection reset'));
       await act(() => vi.advanceTimersByTimeAsync(0));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
+
+      // Window closed: the write can no longer land behind the read.
+      await act(() => vi.advanceTimersByTimeAsync(10_000));
 
       expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(2);
       expect(screen.getByText('Eingestempelt')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a card fenced when another card also loses its answer', async () => {
+    vi.useFakeTimers();
+    try {
+      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      renderPage();
+
+      // Card A stamps and never hears back.
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      // Card B does the same. Its fence must not lift card A's.
+      mockedScan.mockResolvedValue({ success: true, tag_id: '04:99:88:77:66:55:44' });
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      const readsBefore = mockedApi.getStaffClockState.mock.calls.length;
+      mockedScan.mockResolvedValue({ success: true, tag_id: '04:A1:B2:C3:D4:E5:F6' });
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(20_000));
+
+      expect(screen.getByText(/vorherige Stempelung wird noch verarbeitet/)).toBeInTheDocument();
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the fence after leaving and reopening the page', async () => {
+    vi.useFakeTimers();
+    try {
+      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      const view = renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      // Unmounting does not abort the outstanding write, so the fence has to
+      // survive the trip back to the home view.
+      view.unmount();
+      renderPage();
+
+      const readsBefore = mockedApi.getStaffClockState.mock.calls.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(20_000));
+
+      expect(screen.getByText(/vorherige Stempelung wird noch verarbeitet/)).toBeInTheDocument();
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore);
     } finally {
       vi.useRealTimers();
     }
