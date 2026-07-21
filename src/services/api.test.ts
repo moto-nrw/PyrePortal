@@ -1231,6 +1231,33 @@ describe('api methods', () => {
       expect(options.headers).toMatchObject({ 'X-Staff-PIN': '1234' });
       expect(JSON.parse(options.body as string)).toEqual(command);
     });
+
+    it('carries the scanned employee as X-Staff-ID on reads and stamps', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValue(mockResponse({ status: 'success', data: state }));
+
+      await freshApi.getStaffClockState('1234', 'AABBCCDD', 17);
+      await freshApi.executeStaffClockAction(
+        '1234',
+        { rfid_tag: 'AABBCCDD', action: 'checkin' as const },
+        17
+      );
+
+      for (const call of mockFetch.mock.calls) {
+        const [, options] = call as [string, RequestInit];
+        expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('17');
+      }
+    });
+
+    it('omits X-Staff-ID on the first read, where the employee is still unknown', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', data: state }));
+
+      await freshApi.getStaffClockState('1234', 'AABBCCDD');
+
+      const [, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(options.headers as Record<string, string>).not.toHaveProperty('X-Staff-ID');
+    });
   });
 
   // ------------------------------------------------------------------

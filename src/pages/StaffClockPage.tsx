@@ -82,6 +82,18 @@ const KIOSK_WORK_LOCATION = 'present' as const;
 const INDETERMINATE_SETTLE_MS = 10_000;
 
 /**
+ * Hard ceiling on how long any card stays fenced.
+ *
+ * A request that has neither answered nor failed cannot lift its own fence, so
+ * without this a single hung call would fence that card until the app is
+ * restarted — every later scan of it would burn UNRESOLVED_FENCE_MS and refuse.
+ * A hallway kiosk has nobody to restart it, so the fence expires on its own.
+ * Far beyond any server or proxy deadline: a call still silent after this is
+ * dead, not slow, and can no longer commit behind a read.
+ */
+const FENCE_MAX_MS = 120_000;
+
+/**
  * Cards whose last clock mutation never reported an outcome, keyed by RFID tag.
  *
  * Module scope on purpose: navigating away unmounts the page but does not abort
@@ -344,9 +356,9 @@ function StaffClockPage() {
    * no mutation is outstanding — a read issued next to an in-flight write can be
    * answered from before the commit. On failure the card is dropped.
    */
-  const refreshState = async (pin: string, tag: string): Promise<void> => {
+  const refreshState = async (pin: string, tag: string, staffId?: number): Promise<void> => {
     try {
-      const state = await withRequestTimeout(api.getStaffClockState(pin, tag));
+      const state = await withRequestTimeout(api.getStaffClockState(pin, tag, staffId));
       setClockState(state);
     } catch (error) {
       // Without fresh state every displayed action could be stale — drop the card.
@@ -388,20 +400,33 @@ function StaffClockPage() {
    * is no proof that nothing was written, so it is held for a further settle
    * window in that case. The returned function lifts it early, for the one case
    * that is proof: a structured refusal from the handler.
+   *
+   * A request that never reports back at all cannot lift its own fence, so the
+   * fence also expires after FENCE_MAX_MS — bounded recovery instead of a card
+   * that stays unusable until the kiosk is restarted.
    */
   const fenceCard = (tag: string, mutation: Promise<StaffClockState>): (() => void) => {
     let release: () => void = () => undefined;
     const released = new Promise<void>(resolve => {
       release = resolve;
     });
+    const expired = new Promise<void>(resolve => setTimeout(resolve, FENCE_MAX_MS));
     const settled = Promise.race([
       released,
+      expired,
       mutation.then(
         () => undefined,
         () => new Promise<void>(resolve => setTimeout(resolve, INDETERMINATE_SETTLE_MS))
       ),
     ]);
     unresolvedMutations.set(tag, settled);
+    void expired.then(() => {
+      if (unresolvedMutations.get(tag) === settled) {
+        logger.warn('Clock mutation never reported back, expiring its fence', {
+          fenceMs: FENCE_MAX_MS,
+        });
+      }
+    });
     void settled.then(() => {
       if (unresolvedMutations.get(tag) === settled) unresolvedMutations.delete(tag);
     });
@@ -425,12 +450,16 @@ function StaffClockPage() {
   const runCommand = async (command: StaffClockCommand) => {
     if (!authenticatedUser?.pin || inFlightRef.current) return;
     const pin = authenticatedUser.pin;
+    // The employee being stamped, known from the state read the scan produced.
+    // The kiosk itself has no personal identity — it authenticates with the
+    // shared OGS PIN — so the scanned card is the only actor there is.
+    const staffId = clockState?.staff_id;
     inFlightRef.current = true;
     setIsBusy(true);
     try {
       // Hold on to the mutation itself: our deadline does not abort it, so the
       // outstanding call stays the only thing that can report what it did.
-      const mutation = api.executeStaffClockAction(pin, command);
+      const mutation = api.executeStaffClockAction(pin, command, staffId);
       // Fence the card up front. The request is live from here on, and the page
       // can be left and reopened before any deadline expires.
       const releaseFence = fenceCard(command.rfid_tag, mutation);
@@ -487,7 +516,7 @@ function StaffClockPage() {
       // settled at this point, so this read cannot race it.
       if (error instanceof ApiError && error.code === 'invalid_staff_clock_state') {
         setPendingCommand(null);
-        await refreshState(pin, command.rfid_tag);
+        await refreshState(pin, command.rfid_tag, staffId);
       }
     } finally {
       inFlightRef.current = false;

@@ -124,11 +124,15 @@ describe('StaffClockPage', () => {
     await user.click(screen.getByRole('button', { name: 'Einstempeln' }));
 
     await waitFor(() =>
-      expect(mockedApi.executeStaffClockAction).toHaveBeenCalledWith('1234', {
-        rfid_tag: '04:A1:B2:C3:D4:E5:F6',
-        action: 'checkin',
-        status: 'present',
-      })
+      expect(mockedApi.executeStaffClockAction).toHaveBeenCalledWith(
+        '1234',
+        {
+          rfid_tag: '04:A1:B2:C3:D4:E5:F6',
+          action: 'checkin',
+          status: 'present',
+        },
+        17
+      )
     );
     expect(await screen.findByText('Eingestempelt')).toBeInTheDocument();
     expect(
@@ -167,12 +171,16 @@ describe('StaffClockPage', () => {
     await user.click(screen.getByRole('button', { name: 'Erneut stempeln' }));
 
     await waitFor(() => expect(mockedApi.executeStaffClockAction).toHaveBeenCalledTimes(2));
-    expect(mockedApi.executeStaffClockAction).toHaveBeenLastCalledWith('1234', {
-      rfid_tag: '04:A1:B2:C3:D4:E5:F6',
-      action: 'checkin',
-      status: 'present',
-      reason: 'Vertretung übernommen',
-    });
+    expect(mockedApi.executeStaffClockAction).toHaveBeenLastCalledWith(
+      '1234',
+      {
+        rfid_tag: '04:A1:B2:C3:D4:E5:F6',
+        action: 'checkin',
+        status: 'present',
+        reason: 'Vertretung übernommen',
+      },
+      17
+    );
   });
 
   it('reloads the authoritative state when the server rejects a stale action', async () => {
@@ -446,6 +454,53 @@ describe('StaffClockPage', () => {
     expect(cancelled).toBe(false);
     expect(screen.getByText(/weicht um 22 Minuten/)).toBeInTheDocument();
     expect(screen.getByLabelText('Begründung')).toHaveValue('Vertretung übernommen');
+  });
+
+  it('lifts a fence whose mutation never reports back at all', async () => {
+    vi.useFakeTimers();
+    try {
+      // A call that neither answers nor fails cannot lift its own fence.
+      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      const readsBefore = mockedApi.getStaffClockState.mock.calls.length;
+
+      // The kiosk in the hallway has nobody to restart it, so the fence must
+      // expire by itself rather than burn 20s on every further scan forever.
+      await act(() => vi.advanceTimersByTimeAsync(120_000));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 1);
+      expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
+      expect(screen.getByText('Mara Muster')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('sends the scanned employee as the actor of the stamp', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await scanCard(user);
+
+    // The first read has no actor yet — resolving the tag to a person is what
+    // it is for. The stamp that follows carries the employee it resolved to.
+    expect(mockedApi.getStaffClockState).toHaveBeenCalledWith('1234', '04:A1:B2:C3:D4:E5:F6');
+
+    await user.click(screen.getByRole('button', { name: 'Einstempeln' }));
+
+    expect(mockedApi.executeStaffClockAction).toHaveBeenCalledWith(
+      '1234',
+      { rfid_tag: '04:A1:B2:C3:D4:E5:F6', action: 'checkin', status: 'present' },
+      17
+    );
   });
 
   it('does not launch a second scan while the first one is pending', async () => {

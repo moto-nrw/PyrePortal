@@ -206,26 +206,46 @@ export interface StaffClockCommand {
  * API functions
  */
 export const api = {
-  /** Get the current time-tracking state for a scanned staff card. */
-  async getStaffClockState(pin: string, rfidTag: string): Promise<StaffClockState> {
+  /**
+   * Get the current time-tracking state for a scanned staff card.
+   *
+   * `staffId` is the employee the card belongs to and is sent as X-Staff-ID so
+   * the request carries its actor. It is unknown on the very first read of a
+   * card — resolving the tag to a person is what that read is for — and is
+   * passed on every later read of a card already identified.
+   */
+  async getStaffClockState(
+    pin: string,
+    rfidTag: string,
+    staffId?: number
+  ): Promise<StaffClockState> {
     const response = await apiCall<{ status: string; data: StaffClockState }>(
       '/api/iot/staff-clock/state',
       {
         method: 'POST',
-        headers: buildAuthHeaders(pin),
+        headers: buildAuthHeaders(pin, staffId),
         body: JSON.stringify({ rfid_tag: rfidTag }),
       }
     );
     return response.data;
   },
 
-  /** Execute one NFC staff clock action and return the authoritative new state. */
-  async executeStaffClockAction(pin: string, command: StaffClockCommand): Promise<StaffClockState> {
+  /**
+   * Execute one NFC staff clock action and return the authoritative new state.
+   *
+   * `staffId` is the employee being stamped, taken from the state read that the
+   * scan produced, and travels as X-Staff-ID alongside the command.
+   */
+  async executeStaffClockAction(
+    pin: string,
+    command: StaffClockCommand,
+    staffId?: number
+  ): Promise<StaffClockState> {
     const response = await apiCall<{ status: string; data: StaffClockState }>(
       '/api/iot/staff-clock',
       {
         method: 'POST',
-        headers: buildAuthHeaders(pin),
+        headers: buildAuthHeaders(pin, staffId),
         body: JSON.stringify(command),
       }
     );
