@@ -83,7 +83,9 @@ async function scanCard(user: ReturnType<typeof userEvent.setup>) {
 
 describe('StaffClockPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    // resetAllMocks, not clearAllMocks: clearing keeps queued mock*Once
+    // implementations alive, so an unconsumed one-shot leaks into the next test.
+    vi.resetAllMocks();
     useUserStore.setState({
       authenticatedUser: {
         staffId: 1,
@@ -210,14 +212,17 @@ describe('StaffClockPage', () => {
     }
   });
 
-  it('reconciles a timed-out clock action instead of reporting a failure', async () => {
+  it('accepts a clock answer that arrives inside the grace window', async () => {
     vi.useFakeTimers();
     try {
-      // The POST commits but its answer never arrives — the reload must reveal it.
-      mockedApi.getStaffClockState
-        .mockResolvedValueOnce(checkedOutState)
-        .mockResolvedValueOnce(checkedInState);
-      mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
+      // The POST misses the 15s deadline but still answers within the 10s grace
+      // period — that late answer is authoritative and must be taken as success.
+      let resolveAction: ((state: StaffClockState) => void) | undefined;
+      mockedApi.executeStaffClockAction.mockReturnValue(
+        new Promise(resolve => {
+          resolveAction = resolve;
+        })
+      );
       renderPage();
 
       fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
@@ -225,33 +230,39 @@ describe('StaffClockPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
       await act(() => vi.advanceTimersByTimeAsync(15_000));
 
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(2);
-      expect(screen.getByText(/konnte nicht bestätigt werden/)).toBeInTheDocument();
+      // Still undecided: no verdict is shown and no read is fired beside the
+      // outstanding write, which could return pre-mutation state.
+      expect(screen.queryByText(/konnte nicht bestätigt werden/)).not.toBeInTheDocument();
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
+
+      resolveAction?.(checkedInState);
+      await act(() => vi.advanceTimersByTimeAsync(0));
+
+      expect(screen.getByText('Einstempeln erfolgreich')).toBeInTheDocument();
       expect(screen.getByText('Eingestempelt')).toBeInTheDocument();
-      expect(screen.queryByText('Einstempeln erfolgreich')).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Einstempeln' })).not.toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Ausstempeln' })).toBeEnabled();
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('drops the credential when a timed-out action cannot be reconciled', async () => {
+  it('drops the credential when a clock action is never confirmed', async () => {
     vi.useFakeTimers();
     try {
-      mockedApi.getStaffClockState
-        .mockResolvedValueOnce(checkedOutState)
-        .mockReturnValueOnce(new Promise(() => {}));
       mockedApi.executeStaffClockAction.mockReturnValue(new Promise(() => {}));
       renderPage();
 
       fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
       await act(() => vi.advanceTimersByTimeAsync(0));
       fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
-      await act(() => vi.advanceTimersByTimeAsync(30_000));
+      // 15s deadline plus the 10s grace period, after which the outcome stays unknown.
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
 
       expect(screen.getByText(/Armband erneut scannen und Status prüfen/)).toBeInTheDocument();
       expect(screen.queryByText('Mara Muster')).not.toBeInTheDocument();
+      expect(screen.queryByText('Einstempeln erfolgreich')).not.toBeInTheDocument();
+      // No reconciling read: it could race the write that is still outstanding.
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('button', { name: 'Armband scannen' })).toBeEnabled();
     } finally {
       vi.useRealTimers();
