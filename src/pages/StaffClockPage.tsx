@@ -1,3 +1,5 @@
+import { faWifi } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,6 +21,7 @@ import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
+import { pressHandlers } from '../utils/pressHandlers';
 import { isRfidEnabled } from '../utils/tauriContext';
 
 const logger = createLogger('StaffClockPage');
@@ -35,6 +38,21 @@ const actionLabels: Record<StaffClockAction, string> = {
   checkout: 'Ausstempeln',
   break_start: 'Pause starten',
   break_end: 'Pause beenden',
+};
+
+/** Pill colors per state chip, aligned with the app's badge tints. */
+const statePillStyles: Record<StaffClockState['state'], { background: string; color: string }> = {
+  checked_out: { background: '#F3F4F6', color: '#374151' },
+  checked_in: { background: 'rgba(131,205,45,0.15)', color: '#16A34A' },
+  on_break: { background: '#FEF3C7', color: '#B45309' },
+};
+
+/** Action button appearance following the existing pill-button language. */
+const actionButtonStyles: Record<StaffClockAction, { background: string; boxShadow: string }> = {
+  checkin: { background: designSystem.gradients.greenRight, boxShadow: designSystem.shadows.green },
+  break_start: { background: '#F59E0B', boxShadow: '0 8px 40px rgba(245,158,11,0.3)' },
+  break_end: { background: designSystem.gradients.blueRight, boxShadow: designSystem.shadows.blue },
+  checkout: { background: '#EF4444', boxShadow: '0 8px 40px rgba(239,68,68,0.3)' },
 };
 
 function formatMinutes(minutes: number): string {
@@ -63,6 +81,50 @@ async function scanStaffTag(): Promise<string> {
     throw new Error(result.error ?? 'RFID-Scan fehlgeschlagen');
   }
   return result.tag_id;
+}
+
+/** Large pill CTA used across the kiosk (TagAssignment, session flows). */
+function PillButton({
+  label,
+  onClick,
+  disabled,
+  background,
+  boxShadow,
+  minWidth,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  background: string;
+  boxShadow: string;
+  minWidth?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      {...pressHandlers(disabled)}
+      style={{
+        height: '68px',
+        padding: '0 40px',
+        minWidth,
+        fontSize: '24px',
+        fontWeight: 700,
+        color: '#FFFFFF',
+        background: disabled ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)' : background,
+        border: 'none',
+        borderRadius: designSystem.borderRadius.full,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        outline: 'none',
+        boxShadow: disabled ? 'none' : boxShadow,
+        opacity: disabled ? 0.6 : 1,
+        transition: designSystem.transitions.base,
+      }}
+    >
+      {label}
+    </button>
+  );
 }
 
 function StaffClockPage() {
@@ -173,157 +235,370 @@ function StaffClockPage() {
 
   return (
     <BackgroundWrapper>
-      <div className="h-screen w-screen overflow-auto p-8">
-        <div className="fixed left-5 top-5 z-50">
+      <div
+        style={{
+          height: '100vh',
+          width: '100vw',
+          overflow: 'auto',
+          padding: '32px',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div style={{ position: 'absolute', top: '20px', left: '20px', zIndex: 10 }}>
           <BackButton onClick={handleBack} disabled={isBusy} />
         </div>
 
-        <header className="mx-auto mb-10 mt-4 max-w-4xl text-center">
-          <h1 className="m-0 text-5xl font-bold text-gray-900">Mitarbeiter-Stempeln</h1>
-          <p className="mt-3 text-xl text-gray-500">Persönliches Armband an den Leser halten</p>
-        </header>
+        {/* Title */}
+        <h1
+          style={{
+            fontSize: '56px',
+            fontWeight: 700,
+            lineHeight: 1.2,
+            marginTop: '40px',
+            marginBottom: '12px',
+            textAlign: 'center',
+            color: '#111827',
+          }}
+        >
+          Mitarbeiter-Stempeln
+        </h1>
+        <p
+          style={{
+            fontSize: '22px',
+            color: '#6B7280',
+            textAlign: 'center',
+            margin: '0 0 40px 0',
+          }}
+        >
+          Persönliches Armband an den Leser halten
+        </p>
 
-        <main className="mx-auto max-w-4xl">
+        {/* Main content */}
+        <div
+          style={{
+            flex: 1,
+            display: 'flex',
+            alignItems: clockState ? 'flex-start' : 'center',
+            justifyContent: 'center',
+          }}
+        >
           {!clockState ? (
-            <button
-              type="button"
-              aria-label="Armband scannen"
-              onClick={() => void handleScan()}
-              disabled={isBusy}
-              className="rounded-4xl mx-auto flex min-h-80 w-full max-w-2xl flex-col items-center justify-center gap-6 border-2 border-blue-100 bg-white p-12 text-gray-900 shadow-xl disabled:cursor-wait disabled:opacity-70"
-            >
-              <span className="flex h-28 w-28 items-center justify-center rounded-full bg-blue-50 text-6xl">
-                ◉
-              </span>
-              <span className="text-3xl font-bold">
-                {isBusy ? 'Armband wird gelesen …' : 'Armband scannen'}
-              </span>
-            </button>
+            /* Initial state: prompt + scan CTA, mirrors TagAssignmentPage */
+            <div style={{ textAlign: 'center', paddingBottom: '80px' }}>
+              <div
+                style={{
+                  width: '140px',
+                  height: '140px',
+                  backgroundColor: '#E6EFFF',
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: '0 auto 40px',
+                }}
+              >
+                <FontAwesomeIcon
+                  icon={faWifi}
+                  size="5x"
+                  style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
+                />
+              </div>
+
+              <p
+                style={{
+                  fontSize: '24px',
+                  color: '#374151',
+                  marginBottom: '40px',
+                  lineHeight: 1.4,
+                }}
+              >
+                Drücken Sie den Knopf und halten Sie
+                <br />
+                das persönliche Armband an das Lesegerät
+              </p>
+
+              <PillButton
+                label={isBusy ? 'Armband wird gelesen …' : 'Armband scannen'}
+                onClick={() => void handleScan()}
+                disabled={isBusy}
+                background={designSystem.gradients.blueRight}
+                boxShadow={designSystem.shadows.blue}
+                minWidth="360px"
+              />
+            </div>
           ) : (
+            /* Result card: glassmorphism surface like the app's cards */
             <section
-              className="rounded-4xl border border-gray-200 bg-white p-10 text-left"
-              style={{ boxShadow: designSystem.shadows.card }}
+              style={{
+                width: '100%',
+                maxWidth: '820px',
+                background: designSystem.glass.backgroundStrong,
+                backdropFilter: designSystem.glass.blur,
+                WebkitBackdropFilter: designSystem.glass.blur,
+                border: '1px solid rgba(229,231,235,0.5)',
+                borderRadius: '32px',
+                boxShadow: designSystem.shadows.card,
+                padding: '40px 48px',
+                textAlign: 'left',
+              }}
             >
-              <div className="flex flex-wrap items-start justify-between gap-5 border-b border-gray-100 pb-7">
+              {/* Card header: name + state pill */}
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: '20px',
+                  borderBottom: '1px solid #F3F4F6',
+                  paddingBottom: '28px',
+                }}
+              >
                 <div>
-                  <p className="m-0 text-lg text-gray-500">Mitarbeitende/r</p>
-                  <h2 className="mb-0 mt-1 text-4xl font-bold text-gray-900">
+                  <p style={{ margin: 0, fontSize: '18px', color: '#6B7280' }}>Mitarbeitende/r</p>
+                  <h2
+                    style={{
+                      margin: '4px 0 0 0',
+                      fontSize: '40px',
+                      fontWeight: 700,
+                      color: '#1F2937',
+                    }}
+                  >
                     {clockState.staff_name}
                   </h2>
                 </div>
                 <span
-                  className={`rounded-full px-6 py-3 text-xl font-bold ${
-                    clockState.state === 'checked_out'
-                      ? 'bg-gray-100 text-gray-700'
-                      : clockState.state === 'on_break'
-                        ? 'bg-amber-100 text-amber-800'
-                        : 'bg-green-100 text-green-800'
-                  }`}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: designSystem.borderRadius.full,
+                    fontSize: '20px',
+                    fontWeight: 700,
+                    ...statePillStyles[clockState.state],
+                  }}
                 >
                   {stateLabels[clockState.state]}
                 </span>
               </div>
 
               {completedMessage ? (
-                <div className="flex flex-col items-center gap-5 py-10 text-center">
-                  <span
-                    className="flex h-24 w-24 items-center justify-center rounded-full bg-green-100 text-5xl font-bold text-green-700"
+                /* Success state after an executed action */
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '20px',
+                    padding: '48px 0 16px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '96px',
+                      height: '96px',
+                      backgroundColor: 'rgba(131,205,45,0.15)',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
                     aria-hidden="true"
                   >
-                    ✓
-                  </span>
-                  <p className="m-0 text-3xl font-bold text-gray-900">{completedMessage}</p>
-                  <p className="m-0 text-lg text-gray-500">
+                    <svg
+                      width="48"
+                      height="48"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#16A34A"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '32px', fontWeight: 700, color: '#1F2937' }}>
+                    {completedMessage}
+                  </p>
+                  <p style={{ margin: 0, fontSize: '20px', color: '#6B7280' }}>
                     Für die nächste Aktion muss das persönliche Armband erneut gescannt werden.
                   </p>
-                  <button
-                    type="button"
-                    disabled={isBusy}
-                    onClick={() => void handleScan()}
-                    className="mt-3 min-h-20 rounded-2xl bg-blue-600 px-8 py-4 text-xl font-bold text-white disabled:opacity-60"
-                  >
-                    Nächstes Armband scannen
-                  </button>
+                  <div style={{ marginTop: '16px' }}>
+                    <PillButton
+                      label="Nächstes Armband scannen"
+                      onClick={() => void handleScan()}
+                      disabled={isBusy}
+                      background={designSystem.gradients.blueRight}
+                      boxShadow={designSystem.shadows.blue}
+                    />
+                  </div>
                 </div>
               ) : (
                 <>
+                  {/* Today's totals */}
                   {clockState.state !== 'checked_out' && (
-                    <div className="my-7 grid grid-cols-2 gap-4">
-                      <div className="rounded-2xl bg-gray-50 p-5">
-                        <p className="m-0 text-gray-500">Arbeitszeit heute</p>
-                        <p className="mb-0 mt-1 text-2xl font-bold">
-                          {formatMinutes(clockState.net_minutes)}
-                        </p>
-                      </div>
-                      <div className="rounded-2xl bg-gray-50 p-5">
-                        <p className="m-0 text-gray-500">Pause heute</p>
-                        <p className="mb-0 mt-1 text-2xl font-bold">
-                          {formatMinutes(clockState.break_minutes)}
-                        </p>
-                      </div>
+                    <div style={{ display: 'flex', gap: '16px', margin: '28px 0 0 0' }}>
+                      {(
+                        [
+                          ['Arbeitszeit heute', clockState.net_minutes],
+                          ['Pause heute', clockState.break_minutes],
+                        ] as const
+                      ).map(([label, minutes]) => (
+                        <div
+                          key={label}
+                          style={{
+                            flex: 1,
+                            backgroundColor: '#F9FAFB',
+                            border: '1px solid #E5E7EB',
+                            borderRadius: '16px',
+                            padding: '20px 24px',
+                          }}
+                        >
+                          <p style={{ margin: 0, fontSize: '17px', color: '#6B7280' }}>{label}</p>
+                          <p
+                            style={{
+                              margin: '6px 0 0 0',
+                              fontSize: '30px',
+                              fontWeight: 700,
+                              color: '#1F2937',
+                            }}
+                          >
+                            {formatMinutes(minutes)}
+                          </p>
+                        </div>
+                      ))}
                     </div>
                   )}
 
+                  {/* ArbZG break hint */}
                   {clockState.required_break_minutes > 0 && !clockState.is_break_compliant && (
-                    <div className="my-6 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-lg text-amber-900">
+                    <div
+                      style={{
+                        marginTop: '20px',
+                        backgroundColor: '#FEF3C7',
+                        border: '1px solid #FDE68A',
+                        borderRadius: '16px',
+                        padding: '16px 20px',
+                        fontSize: '19px',
+                        color: '#92400E',
+                      }}
+                    >
                       Pausenhinweis: Nach §4 ArbZG sind heute mindestens{' '}
                       {clockState.required_break_minutes} Minuten Pause erforderlich.
                     </div>
                   )}
 
+                  {/* Work location choice before check-in */}
                   {clockState.state === 'checked_out' && (
-                    <fieldset className="my-8">
-                      <legend className="mb-3 text-xl font-semibold text-gray-800">
+                    <fieldset style={{ border: 'none', padding: 0, margin: '32px 0 0 0' }}>
+                      <legend
+                        style={{
+                          fontSize: '20px',
+                          fontWeight: 600,
+                          color: '#374151',
+                          marginBottom: '14px',
+                          padding: 0,
+                        }}
+                      >
                         Arbeitsort wählen
                       </legend>
-                      <div className="grid grid-cols-2 gap-4">
+                      <div style={{ display: 'flex', gap: '16px' }}>
                         {(
                           [
                             ['present', 'Vor Ort'],
                             ['home_office', 'Homeoffice'],
                           ] as const
-                        ).map(([value, label]) => (
-                          <button
-                            key={value}
-                            type="button"
-                            aria-pressed={selectedStatus === value}
-                            onClick={() => setSelectedStatus(value)}
-                            className={`rounded-2xl border-2 p-5 text-xl font-bold ${
-                              selectedStatus === value
-                                ? 'border-blue-500 bg-blue-50 text-blue-800'
-                                : 'border-gray-200 bg-white text-gray-700'
-                            }`}
-                          >
-                            {label}
-                          </button>
-                        ))}
+                        ).map(([value, label]) => {
+                          const selected = selectedStatus === value;
+                          return (
+                            <button
+                              key={value}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => setSelectedStatus(value)}
+                              {...pressHandlers()}
+                              style={{
+                                flex: 1,
+                                padding: '20px',
+                                fontSize: '22px',
+                                fontWeight: 700,
+                                borderRadius: '16px',
+                                border: selected ? '2px solid #83CD2D' : '2px solid #E5E7EB',
+                                backgroundColor: selected ? 'rgba(131,205,45,0.15)' : '#FFFFFF',
+                                color: selected ? '#16A34A' : '#374151',
+                                cursor: 'pointer',
+                                outline: 'none',
+                                transition: designSystem.transitions.base,
+                              }}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
                       </div>
                     </fieldset>
                   )}
 
-                  <div className="mt-8 grid grid-cols-2 gap-4">
+                  {/* Actions allowed by the server */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '16px',
+                      marginTop: '36px',
+                    }}
+                  >
                     {clockState.allowed_actions.map(action => (
-                      <button
-                        key={action}
-                        type="button"
-                        disabled={isBusy}
-                        onClick={() => handleAction(action)}
-                        className={`min-h-24 rounded-2xl px-6 py-5 text-2xl font-bold text-white disabled:opacity-60 ${
-                          action === 'checkout'
-                            ? 'bg-red-500'
-                            : action === 'break_start'
-                              ? 'bg-amber-500'
-                              : 'bg-green-600'
-                        }`}
-                      >
-                        {isBusy ? 'Wird gespeichert …' : actionLabels[action]}
-                      </button>
+                      <div key={action} style={{ flex: '1 1 240px', display: 'flex' }}>
+                        <button
+                          type="button"
+                          disabled={isBusy}
+                          onClick={() => handleAction(action)}
+                          {...pressHandlers(isBusy)}
+                          style={{
+                            flex: 1,
+                            height: '68px',
+                            fontSize: '24px',
+                            fontWeight: 700,
+                            color: '#FFFFFF',
+                            background: isBusy
+                              ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                              : actionButtonStyles[action].background,
+                            border: 'none',
+                            borderRadius: designSystem.borderRadius.full,
+                            cursor: isBusy ? 'not-allowed' : 'pointer',
+                            outline: 'none',
+                            boxShadow: isBusy ? 'none' : actionButtonStyles[action].boxShadow,
+                            opacity: isBusy ? 0.6 : 1,
+                            transition: designSystem.transitions.base,
+                          }}
+                        >
+                          {isBusy ? 'Wird gespeichert …' : actionLabels[action]}
+                        </button>
+                      </div>
                     ))}
+                  </div>
+                  <div style={{ marginTop: '16px', display: 'flex' }}>
                     <button
                       type="button"
                       disabled={isBusy}
                       onClick={() => void handleScan()}
-                      className="min-h-24 rounded-2xl border-2 border-gray-200 bg-white px-6 py-5 text-xl font-bold text-gray-700 disabled:opacity-60"
+                      {...pressHandlers(isBusy)}
+                      style={{
+                        flex: 1,
+                        height: '64px',
+                        fontSize: '22px',
+                        fontWeight: 600,
+                        color: '#374151',
+                        backgroundColor: '#FFFFFF',
+                        border: '2px solid #E5E7EB',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: isBusy ? 'not-allowed' : 'pointer',
+                        outline: 'none',
+                        opacity: isBusy ? 0.6 : 1,
+                        transition: designSystem.transitions.base,
+                      }}
                     >
                       Anderes Armband scannen
                     </button>
@@ -332,11 +607,12 @@ function StaffClockPage() {
               )}
             </section>
           )}
-        </main>
+        </div>
       </div>
 
       <ErrorModal isOpen={showError} onClose={() => setShowError(false)} message={errorMessage} />
 
+      {/* Reason dialog for deviation / reopen conflicts */}
       <ModalBase
         isOpen={pendingCommand !== null}
         onClose={() => {
@@ -346,11 +622,38 @@ function StaffClockPage() {
         size="sm"
         closeOnBackdropClick={!isBusy}
       >
-        <h2 className="mt-0 text-2xl font-bold text-gray-900">Begründung erforderlich</h2>
-        <p className="text-lg text-gray-600">{reasonPrompt}</p>
+        <h2
+          style={{
+            margin: '0 0 12px 0',
+            fontSize: '32px',
+            fontWeight: 700,
+            color: '#111827',
+            textAlign: 'center',
+          }}
+        >
+          Begründung erforderlich
+        </h2>
+        <p
+          style={{
+            margin: '0 0 24px 0',
+            fontSize: '20px',
+            color: '#4B5563',
+            textAlign: 'center',
+            lineHeight: 1.4,
+          }}
+        >
+          {reasonPrompt}
+        </p>
         <label
-          className="block text-left text-lg font-semibold text-gray-800"
           htmlFor="staff-clock-reason"
+          style={{
+            display: 'block',
+            textAlign: 'left',
+            fontSize: '18px',
+            fontWeight: 600,
+            color: '#374151',
+            marginBottom: '8px',
+          }}
         >
           Begründung
         </label>
@@ -358,16 +661,49 @@ function StaffClockPage() {
           id="staff-clock-reason"
           value={reason}
           onChange={event => setReason(event.target.value)}
-          className="mt-2 min-h-28 w-full rounded-xl border-2 border-gray-200 p-3 text-lg"
           maxLength={500}
           autoFocus
+          style={{
+            width: '100%',
+            minHeight: '120px',
+            border: '2px solid #E5E7EB',
+            borderRadius: '16px',
+            padding: '16px',
+            fontSize: '19px',
+            fontFamily: 'inherit',
+            color: '#1F2937',
+            outline: 'none',
+            resize: 'vertical',
+            boxSizing: 'border-box',
+          }}
         />
-        <div className="mt-6 flex justify-end gap-3">
+        <div
+          style={{
+            marginTop: '28px',
+            display: 'flex',
+            justifyContent: 'center',
+            gap: '16px',
+          }}
+        >
           <button
             type="button"
             disabled={isBusy}
             onClick={() => setPendingCommand(null)}
-            className="rounded-xl border border-gray-300 px-5 py-3 text-lg font-semibold"
+            {...pressHandlers(isBusy)}
+            style={{
+              height: '60px',
+              padding: '0 32px',
+              whiteSpace: 'nowrap',
+              fontSize: '20px',
+              fontWeight: 600,
+              color: '#374151',
+              backgroundColor: '#FFFFFF',
+              border: '2px solid #E5E7EB',
+              borderRadius: designSystem.borderRadius.full,
+              cursor: isBusy ? 'not-allowed' : 'pointer',
+              outline: 'none',
+              transition: designSystem.transitions.base,
+            }}
           >
             Abbrechen
           </button>
@@ -375,7 +711,26 @@ function StaffClockPage() {
             type="button"
             disabled={isBusy || reason.trim().length === 0}
             onClick={handleReasonSubmit}
-            className="rounded-xl bg-blue-600 px-5 py-3 text-lg font-semibold text-white disabled:opacity-50"
+            {...pressHandlers(isBusy || reason.trim().length === 0)}
+            style={{
+              height: '60px',
+              padding: '0 40px',
+              whiteSpace: 'nowrap',
+              fontSize: '20px',
+              fontWeight: 700,
+              color: '#FFFFFF',
+              background:
+                isBusy || reason.trim().length === 0
+                  ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                  : designSystem.gradients.blueRight,
+              border: 'none',
+              borderRadius: designSystem.borderRadius.full,
+              cursor: isBusy || reason.trim().length === 0 ? 'not-allowed' : 'pointer',
+              outline: 'none',
+              boxShadow: isBusy || reason.trim().length === 0 ? 'none' : designSystem.shadows.blue,
+              opacity: isBusy || reason.trim().length === 0 ? 0.6 : 1,
+              transition: designSystem.transitions.base,
+            }}
           >
             Erneut stempeln
           </button>

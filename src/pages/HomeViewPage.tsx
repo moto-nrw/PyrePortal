@@ -738,9 +738,10 @@ function HomeViewPage() {
                 gap: '24px',
                 padding: '28px 36px',
                 backgroundColor: '#FFFFFF',
-                border: '2px solid #BFDBFE',
+                border: '2px solid #E5E7EB',
                 borderRadius: '28px',
                 cursor: 'pointer',
+                outline: 'none',
                 transition: 'all 300ms ease-out',
                 transform: touchedButton === 'staff-clock' ? 'scale(0.98)' : 'scale(1)',
                 boxShadow:
@@ -754,16 +755,26 @@ function HomeViewPage() {
                   width: '76px',
                   height: '76px',
                   borderRadius: '50%',
-                  backgroundColor: '#EFF6FF',
+                  backgroundColor: '#DBEAFE',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  fontSize: '42px',
-                  color: '#2563EB',
                 }}
                 aria-hidden="true"
               >
-                ◷
+                <svg
+                  width="44"
+                  height="44"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#2563EB"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
               </span>
               <span style={{ textAlign: 'left' }}>
                 <span
