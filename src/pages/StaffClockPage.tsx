@@ -44,13 +44,22 @@ const SCAN_TIMEOUT_MESSAGE =
 const REQUEST_TIMEOUT_MS = 15_000;
 const REQUEST_TIMEOUT_MESSAGE = 'Server antwortet nicht. Bitte erneut versuchen.';
 /**
- * A timed-out clock action is indeterminate, not failed: the request may have
- * committed with only the response lost. Never claim it did not happen.
+ * Extra time granted to a clock mutation that missed its deadline. The request
+ * was never aborted, so it is still the only source that can say whether the
+ * action committed — reading state from a second request while it is in flight
+ * would race the commit. Bounded so a backend that never answers cannot trap
+ * the kiosk for longer than REQUEST_TIMEOUT_MS + this.
  */
-const INDETERMINATE_RELOADED_MESSAGE =
-  'Zeitüberschreitung: Die Stempelung konnte nicht bestätigt werden. Bitte den angezeigten Status prüfen.';
+const MUTATION_GRACE_MS = 10_000;
+/** Internal marker distinguishing our own deadline from a backend error. */
+const TIMEOUT_SENTINEL = '__staff_clock_request_timeout__';
+/**
+ * A clock action whose outcome is unknown is indeterminate, not failed: the
+ * request may have committed with only the response lost. Never claim it did
+ * not happen, and never leave the scanned card authorized afterwards.
+ */
 const INDETERMINATE_UNKNOWN_MESSAGE =
-  'Zeitüberschreitung: Die Stempelung konnte nicht bestätigt werden. Bitte Armband erneut scannen und Status prüfen.';
+  'Die Stempelung konnte nicht bestätigt werden. Bitte Armband erneut scannen und Status prüfen.';
 
 /** Failure that already carries a German, user-facing message. */
 class LocalizedError extends Error {
@@ -89,6 +98,49 @@ async function withRequestTimeout<T>(promise: Promise<T>): Promise<T> {
       throw new RequestTimeoutError();
     }
     throw error;
+  }
+}
+
+/**
+ * What a clock mutation is known to have done.
+ *
+ * `indeterminate` is the honest answer whenever the request left the kiosk but
+ * no verdict came back — a missed deadline, a dropped connection, an
+ * unparseable body, a server-side fault. In all of those the write may have
+ * been applied server-side while only the answer was lost.
+ */
+type MutationOutcome =
+  | { kind: 'success'; state: StaffClockState }
+  | { kind: 'failed'; error: unknown }
+  | { kind: 'indeterminate' };
+
+/**
+ * Wait up to `timeoutMs` for a clock mutation and classify how it ended.
+ *
+ * Safe to call repeatedly on the same promise: the call is never aborted, so
+ * awaiting it again is how the kiosk learns the real outcome after its own
+ * deadline expired.
+ */
+async function settleMutation(
+  mutation: Promise<StaffClockState>,
+  timeoutMs: number
+): Promise<MutationOutcome> {
+  try {
+    return { kind: 'success', state: await withTimeout(mutation, timeoutMs, TIMEOUT_SENTINEL) };
+  } catch (error) {
+    if (error instanceof Error && error.message === TIMEOUT_SENTINEL) {
+      return { kind: 'indeterminate' };
+    }
+    // A structured client error means the handler examined the command and
+    // refused it, so nothing was written. Everything else — transport failure,
+    // unparseable success body, 5xx — leaves the outcome unknown.
+    if (error instanceof ApiError && error.statusCode < 500) {
+      return { kind: 'failed', error };
+    }
+    logger.warn('Staff clock mutation failed with an indeterminate outcome', {
+      error: serializeError(error),
+    });
+    return { kind: 'indeterminate' };
   }
 }
 
@@ -258,15 +310,15 @@ function StaffClockPage() {
 
   /**
    * Re-read the authoritative state for a still-held card. Used after the server
-   * rejected an action as stale, so the page stops offering it. Returns whether
-   * the reload succeeded; on failure the card is dropped.
+   * rejected an action as stale, so the page stops offering it. Only safe while
+   * no mutation is outstanding — a read issued next to an in-flight write can be
+   * answered from before the commit. On failure the card is dropped.
    */
-  const refreshState = async (pin: string, tag: string): Promise<boolean> => {
+  const refreshState = async (pin: string, tag: string): Promise<void> => {
     try {
       const state = await withRequestTimeout(api.getStaffClockState(pin, tag));
       setClockState(state);
       setSelectedStatus(state.session?.status ?? 'present');
-      return true;
     } catch (error) {
       // Without fresh state every displayed action could be stale — drop the card.
       logger.warn('Failed to reload staff clock state after conflict', {
@@ -274,8 +326,27 @@ function StaffClockPage() {
       });
       setClockState(null);
       setScannedTag(null);
-      return false;
     }
+  };
+
+  /**
+   * The action may or may not have been applied. Discard everything derived from
+   * it: the cached state is possibly stale, and the scanned card must not stay
+   * authorized — on this shared kiosk a consumed credential left in place lets
+   * the next person at the reader trigger a further action without scanning.
+   */
+  const discardAfterIndeterminate = (action: StaffClockAction) => {
+    logger.warn('Staff clock action outcome unknown, dropping cached state and credential', {
+      action,
+    });
+    setPendingCommand(null);
+    setReason('');
+    setCompletedMessage(null);
+    setClockState(null);
+    setScannedTag(null);
+    setSelectedStatus('present');
+    setErrorMessage(INDETERMINATE_UNKNOWN_MESSAGE);
+    setShowError(true);
   };
 
   const runCommand = async (command: StaffClockCommand) => {
@@ -284,15 +355,38 @@ function StaffClockPage() {
     inFlightRef.current = true;
     setIsBusy(true);
     try {
-      const nextState = await withRequestTimeout(api.executeStaffClockAction(pin, command));
-      setClockState(nextState);
-      setCompletedMessage(`${actionLabels[command.action]} erfolgreich`);
-      setPendingCommand(null);
-      setReason('');
-      // A scan authorizes exactly one action; the next one needs a fresh scan.
-      setScannedTag(null);
-      logUserAction('Staff clock action completed', { action: command.action });
-    } catch (error) {
+      // Hold on to the mutation itself: our deadline does not abort it, so the
+      // outstanding call stays the only thing that can report what it did.
+      const mutation = api.executeStaffClockAction(pin, command);
+      let outcome = await settleMutation(mutation, REQUEST_TIMEOUT_MS);
+      if (outcome.kind === 'indeterminate') {
+        // Give the original call a bounded second chance rather than issuing a
+        // read beside it — a state GET sent now can return the pre-mutation
+        // state moments before the write commits, and the page would present
+        // that as authoritative.
+        logger.warn('Staff clock action missed its deadline, awaiting the outstanding request', {
+          action: command.action,
+        });
+        outcome = await settleMutation(mutation, MUTATION_GRACE_MS);
+      }
+
+      if (outcome.kind === 'success') {
+        setClockState(outcome.state);
+        setCompletedMessage(`${actionLabels[command.action]} erfolgreich`);
+        setPendingCommand(null);
+        setReason('');
+        // A scan authorizes exactly one action; the next one needs a fresh scan.
+        setScannedTag(null);
+        logUserAction('Staff clock action completed', { action: command.action });
+        return;
+      }
+
+      if (outcome.kind === 'indeterminate') {
+        discardAfterIndeterminate(command.action);
+        return;
+      }
+
+      const error = outcome.error;
       if (
         error instanceof ApiError &&
         (error.code === 'deviation_reason_required' || error.code === 'reopen_status_conflict')
@@ -304,30 +398,16 @@ function StaffClockPage() {
             : `Die Stempelzeit weicht${minutes ? ` um ${minutes} Minuten` : ''} vom Dienstplan ab. Bitte begründen.`
         );
         setPendingCommand(command);
-      } else if (error instanceof RequestTimeoutError) {
-        // The request was never aborted, so the mutation may well have committed
-        // with only the answer lost. Reconcile against the server before any
-        // control is enabled again instead of reporting a failure that may be a
-        // lie — and if even the reload fails, drop the card rather than offer
-        // actions derived from a state we can no longer trust.
-        logger.warn('Staff clock action timed out with unknown outcome', {
-          action: command.action,
-        });
+        return;
+      }
+
+      showFailure(error);
+      // The state moved on (web app, other kiosk): the cached allowed_actions
+      // are wrong now, so reload before offering anything else. The mutation has
+      // settled at this point, so this read cannot race it.
+      if (error instanceof ApiError && error.code === 'invalid_staff_clock_state') {
         setPendingCommand(null);
-        setReason('');
-        const reconciled = await refreshState(pin, command.rfid_tag);
-        setErrorMessage(
-          reconciled ? INDETERMINATE_RELOADED_MESSAGE : INDETERMINATE_UNKNOWN_MESSAGE
-        );
-        setShowError(true);
-      } else {
-        showFailure(error);
-        // The state moved on (web app, other kiosk, lost response): the cached
-        // allowed_actions are wrong now, so reload before offering anything else.
-        if (error instanceof ApiError && error.code === 'invalid_staff_clock_state') {
-          setPendingCommand(null);
-          await refreshState(pin, command.rfid_tag);
-        }
+        await refreshState(pin, command.rfid_tag);
       }
     } finally {
       inFlightRef.current = false;
