@@ -554,17 +554,24 @@ describe('StaffClockPage', () => {
           })
       );
 
-      // At the ceiling the stamp is cancelled first, then reconciled — the card
-      // is never released by a timer running beside a live write.
+      // At the ceiling the stamp is cancelled first. Nothing is asked yet: a
+      // read taken beside a request that is still coming apart would describe a
+      // moment, not an outcome.
       await act(() => vi.advanceTimersByTimeAsync(95_001));
       expect(stampSignal?.aborted).toBe(true);
       const readsAfterAbort = mockedApi.getStaffClockState.mock.calls.length;
+      expect(readsAfterAbort).toBe(1);
+
+      // Only once the cancelled call has had its bounded chance to come apart
+      // does the single reconciliation path start asking.
+      await act(() => vi.advanceTimersByTimeAsync(5_001));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort + 1);
 
       // Cancelling is not an answer. While the backend has not spoken, no scan
       // of this card gets through to a read.
       fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
       await act(() => vi.advanceTimersByTimeAsync(10_000));
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort);
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort + 1);
 
       // The backend answers, and the check-in is not there. That alone is not
       // an answer either — a commit can land in the very next instant — so the
@@ -572,13 +579,13 @@ describe('StaffClockPage', () => {
       answerReconcile?.(checkedOutState);
       mockedApi.getStaffClockState.mockResolvedValue(checkedOutState);
       await act(() => vi.advanceTimersByTimeAsync(0));
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort);
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort + 1);
       expect(screen.queryByText('Mara Muster')).toBeNull();
 
       // Two reads agreeing across the gap settle it — now the held scan goes
       // through and gets its own read.
       await act(() => vi.advanceTimersByTimeAsync(5_000));
-      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort + 2);
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsAfterAbort + 3);
       expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -600,9 +607,10 @@ describe('StaffClockPage', () => {
       mockedApi.getStaffClockState.mockReturnValue(new Promise(() => {}));
       await act(() => vi.advanceTimersByTimeAsync(95_001));
 
-      // Three bounded attempts, then the card is handed back anyway: a hallway
-      // kiosk that fences a card forever is broken for everyone behind it.
-      await act(() => vi.advanceTimersByTimeAsync(55_001));
+      // The teardown wait, then three bounded attempts, then the card is handed
+      // back anyway: a hallway kiosk that fences a card forever is broken for
+      // everyone behind it.
+      await act(() => vi.advanceTimersByTimeAsync(60_001));
       expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(4);
 
       mockedApi.getStaffClockState.mockResolvedValue(checkedOutState);
@@ -610,6 +618,41 @@ describe('StaffClockPage', () => {
       await act(() => vi.advanceTimersByTimeAsync(0));
       expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
       expect(screen.getByText('Mara Muster')).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reconciles a cancelled stamp on exactly one path', async () => {
+    vi.useFakeTimers();
+    try {
+      // A stamp that answers its abort, which is the normal case: the cancelled
+      // call rejects. That rejection and the timer that caused it must not both
+      // pick up the reconciliation and put two loops on the same card.
+      mockedApi.executeStaffClockAction.mockImplementation(
+        (_pin, _command, _staffId, signal) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener('abort', () => reject(new Error('aborted')));
+          })
+      );
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      const readsBefore = mockedApi.getStaffClockState.mock.calls.length;
+      mockedApi.getStaffClockState.mockResolvedValue(checkedOutState);
+
+      // The abort tears the call down at once, so reconciliation starts here —
+      // once, not once per party that noticed the cancellation.
+      await act(() => vi.advanceTimersByTimeAsync(95_001));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 1);
+
+      // And one read per gap after that, until the card is settled.
+      await act(() => vi.advanceTimersByTimeAsync(5_000));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 2);
     } finally {
       vi.useRealTimers();
     }

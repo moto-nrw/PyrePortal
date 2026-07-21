@@ -91,6 +91,17 @@ const RESCAN_HINT = 'Bitte Armband erneut scannen.';
  */
 const FENCE_ABORT_MS = 120_000;
 /**
+ * How long the kiosk waits for a cancelled stamp to actually come apart at this
+ * end before it starts asking the backend what became of it.
+ *
+ * A read issued next to a request that is still live describes a moment, not an
+ * outcome. Aborting and reading in the same breath would produce exactly that,
+ * so the cancelled call is given a bounded chance to reject first. Bounded
+ * because a call that ignores its own abort would otherwise fence the card for
+ * good.
+ */
+const ABORT_SETTLE_MS = 5_000;
+/**
  * How many state reads the kiosk may spend establishing what became of a
  * mutation that ended without a verdict.
  *
@@ -497,35 +508,54 @@ function StaffClockPage() {
     const released = new Promise<void>(resolve => {
       release = resolve;
     });
-    let live = true;
-    // Not a race against the request — it ends the request first, then asks.
-    const cancelled = new Promise<void>(resolve =>
-      setTimeout(() => {
-        if (!live) return;
+
+    // One owner, start to finish. How the request ends decides what happens
+    // next, and only this sequence ever reconciles — an abort used to hand the
+    // same job to both the timer that fired it and the rejection it provoked,
+    // which put two reconciliation loops on one card.
+    const settled = (async () => {
+      const ending = await Promise.race([
+        released.then(() => 'released' as const),
+        mutation.then(
+          () => 'answered' as const,
+          // Same rule the caller applies: a structured refusal means the handler
+          // looked at the command and wrote nothing. Anything else has to be
+          // settled against the backend before the card may be touched again.
+          (error: unknown) =>
+            error instanceof ApiError && error.statusCode < 500
+              ? ('refused' as const)
+              : ('lost' as const)
+        ),
+        new Promise<'silent'>(resolve => setTimeout(() => resolve('silent'), FENCE_ABORT_MS)),
+      ]);
+
+      if (ending === 'released' || ending === 'answered' || ending === 'refused') return;
+
+      if (ending === 'silent') {
         logger.warn('Clock mutation never reported back, cancelling it to reconcile its card', {
           abortAfterMs: FENCE_ABORT_MS,
         });
         abort();
-        void reconcileMutation(reconcile, applied).then(resolve);
-      }, FENCE_ABORT_MS)
-    );
-    const settled = Promise.race([
-      released,
-      cancelled,
-      mutation.then(
-        () => undefined,
-        // Same rule the caller applies: a structured refusal means the handler
-        // looked at the command and wrote nothing. Anything else has to be
-        // settled against the backend before the card may be touched again.
-        (error: unknown) =>
-          error instanceof ApiError && error.statusCode < 500
-            ? undefined
-            : reconcileMutation(reconcile, applied)
-      ),
-    ]);
+        // Ask only once nothing of ours is in flight any more. The cancelled
+        // call normally rejects here; a call that ignores its abort must not
+        // fence the card forever, so the wait is bounded.
+        await withTimeout(
+          mutation.then(
+            () => undefined,
+            () => undefined
+          ),
+          ABORT_SETTLE_MS,
+          TIMEOUT_SENTINEL
+        ).catch(() =>
+          logger.error('Cancelled clock mutation did not come apart, reconciling anyway')
+        );
+      }
+
+      await reconcileMutation(reconcile, applied);
+    })();
+
     unresolvedMutations.set(tag, settled);
     void settled.then(() => {
-      live = false;
       if (unresolvedMutations.get(tag) === settled) unresolvedMutations.delete(tag);
     });
     return release;
