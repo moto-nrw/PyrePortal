@@ -11,6 +11,7 @@ import HomeViewPage from './pages/HomeViewPage';
 import LandingPage from './pages/LandingPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
+import StaffClockPage from './pages/StaffClockPage';
 import StaffSelectionPage from './pages/StaffSelectionPage';
 import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
@@ -96,6 +97,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <TagAssignmentPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/staff-clock"
+              element={
+                <ProtectedRoute>
+                  <StaffClockPage />
                 </ProtectedRoute>
               }
             />

@@ -320,6 +320,19 @@ describe('mapApiErrorToGerman', () => {
     );
   });
 
+  it.each([
+    ['invalid_rfid_tag', 'Das gelesene Armband ist ungültig. Bitte erneut scannen.'],
+    ['rfid_tag_not_found', 'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.'],
+    [
+      'rfid_tag_not_staff',
+      'Dieses Armband gehört keinem Mitarbeitenden. Bitte das persönliche Armband verwenden.',
+    ],
+    ['deviation_reason_required', 'Für diese Abweichung vom Dienstplan ist eine Begründung nötig.'],
+    ['invalid_staff_clock_state', 'Diese Aktion passt nicht zum aktuellen Stempelstatus.'],
+  ])('maps staff-clock code %s without parsing its message', (code, expected) => {
+    expect(mapApiErrorToGerman(new ApiError('opaque backend message', 409, code))).toBe(expected);
+  });
+
   it('handles ApiError with activity capacity details', () => {
     const error = new ApiError('Activity capacity exceeded', 409, 'ACTIVITY_CAPACITY_EXCEEDED', {
       activity_name: 'Fußball AG',
@@ -1209,6 +1222,52 @@ describe('api methods', () => {
           }),
         })
       );
+    });
+  });
+
+  describe('staff clock API', () => {
+    const state = {
+      staff_id: 17,
+      staff_name: 'Mara Muster',
+      state: 'checked_out' as const,
+      allowed_actions: ['checkin' as const],
+      net_minutes: 0,
+      break_minutes: 0,
+      required_break_minutes: 0,
+      is_break_compliant: true,
+    };
+
+    it('loads state using device auth, PIN, and the scanned tag', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', data: state }));
+
+      await expect(freshApi.getStaffClockState('1234', 'AABBCCDD')).resolves.toEqual(state);
+
+      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/api/iot/staff-clock/state');
+      expect(options.method).toBe('POST');
+      expect(options.headers).toMatchObject({ 'X-Staff-PIN': '1234' });
+      expect(JSON.parse(options.body as string)).toEqual({ rfid_tag: 'AABBCCDD' });
+    });
+
+    it('posts the complete action command without changing its fields', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', data: state }));
+      const command = {
+        rfid_tag: 'AABBCCDD',
+        action: 'checkin' as const,
+        status: 'home_office' as const,
+        reason: 'Vertretung',
+      };
+
+      await freshApi.executeStaffClockAction('1234', command);
+
+      const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
+      expect(url).toContain('/api/iot/staff-clock');
+      expect(url).not.toContain('/state');
+      expect(options.method).toBe('POST');
+      expect(options.headers).toMatchObject({ 'X-Staff-PIN': '1234' });
+      expect(JSON.parse(options.body as string)).toEqual(command);
     });
   });
 

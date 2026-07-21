@@ -238,6 +238,12 @@ function HomeViewPage() {
     void navigate('/team-management');
   };
 
+  const handleStaffClock = () => {
+    setTouchedButton(null);
+    logNavigation('Home View', '/staff-clock');
+    void navigate('/staff-clock');
+  };
+
   // Helper to show error and close confirm modal
   const showRecreationError = (message: string) => {
     setErrorMessage(message);
@@ -716,6 +722,62 @@ function HomeViewPage() {
                 </div>
               </button>
             </div>
+
+            <button
+              type="button"
+              onClick={handleStaffClock}
+              onTouchStart={() => setTouchedButton('staff-clock')}
+              onTouchEnd={() => setTouchedButton(null)}
+              onTouchCancel={() => setTouchedButton(null)}
+              style={{
+                width: '100%',
+                minHeight: '148px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '24px',
+                padding: '28px 36px',
+                backgroundColor: '#FFFFFF',
+                border: '2px solid #BFDBFE',
+                borderRadius: '28px',
+                cursor: 'pointer',
+                transition: 'all 300ms ease-out',
+                transform: touchedButton === 'staff-clock' ? 'scale(0.98)' : 'scale(1)',
+                boxShadow:
+                  touchedButton === 'staff-clock'
+                    ? '0 4px 12px rgba(0, 0, 0, 0.1)'
+                    : '0 8px 30px rgba(0, 0, 0, 0.12)',
+              }}
+            >
+              <span
+                style={{
+                  width: '76px',
+                  height: '76px',
+                  borderRadius: '50%',
+                  backgroundColor: '#EFF6FF',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '42px',
+                  color: '#2563EB',
+                }}
+                aria-hidden="true"
+              >
+                ◷
+              </span>
+              <span style={{ textAlign: 'left' }}>
+                <span
+                  style={{ display: 'block', fontSize: '28px', fontWeight: 700, color: '#1F2937' }}
+                >
+                  Mitarbeiter-Stempeln
+                </span>
+                <span
+                  style={{ display: 'block', marginTop: '4px', fontSize: '18px', color: '#6B7280' }}
+                >
+                  Ein- und ausstempeln oder Pause erfassen
+                </span>
+              </span>
+            </button>
           </div>
         </div>
 

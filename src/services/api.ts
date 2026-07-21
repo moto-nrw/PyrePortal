@@ -28,6 +28,16 @@ interface ApiErrorResponse {
     activity_name?: string;
     current_participants?: number;
     max_participants?: number;
+    // Staff clock conflict fields
+    session_id?: string;
+    existing_status?: WorkSessionStatus;
+    requested_status?: WorkSessionStatus;
+    planned_start_time?: string;
+    current_time?: string;
+    action?: string;
+    planned_time?: string;
+    actual_time?: string;
+    deviation_minutes?: string;
   };
 }
 
@@ -125,6 +135,14 @@ const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   ],
   ['student RFID tag required for pickup query', 'Bitte Schüler-Armband scannen.'],
   ['RFID parameter is required', 'RFID-Tag fehlt in der Anfrage.'],
+
+  // Staff time tracking RFID errors
+  ['invalid RFID tag', 'Das gelesene Armband ist ungültig. Bitte erneut scannen.'],
+  ['RFID tag is inactive', 'Dieses Armband ist deaktiviert. Bitte an die Leitung wenden.'],
+  [
+    'RFID tag is not assigned to staff',
+    'Dieses Armband gehört keinem Mitarbeitenden. Bitte das persönliche Armband verwenden.',
+  ],
 
   // 6. ATTENDANCE/VISIT ERRORS (404)
   ['no active visit found for student', 'Kein aktiver Besuch für diesen Schüler gefunden.'],
@@ -275,6 +293,22 @@ export function mapApiErrorToGerman(error: unknown): string {
   // Room capacity exceeded
   if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
     return formatRoomCapacityError(error.details);
+  }
+
+  const staffClockMessages: Record<string, string> = {
+    invalid_staff_clock_request: 'Die Stempel-Anfrage ist ungültig. Bitte erneut versuchen.',
+    invalid_rfid_tag: 'Das gelesene Armband ist ungültig. Bitte erneut scannen.',
+    rfid_tag_not_found: 'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.',
+    rfid_tag_inactive: 'Dieses Armband ist deaktiviert. Bitte an die Leitung wenden.',
+    rfid_tag_not_staff:
+      'Dieses Armband gehört keinem Mitarbeitenden. Bitte das persönliche Armband verwenden.',
+    reopen_status_conflict: 'Der Arbeitsort wurde geändert. Bitte eine Begründung eingeben.',
+    planned_start_not_reached: 'Einstempeln ist vor dem geplanten Dienstbeginn nicht möglich.',
+    deviation_reason_required: 'Für diese Abweichung vom Dienstplan ist eine Begründung nötig.',
+    invalid_staff_clock_state: 'Diese Aktion passt nicht zum aktuellen Stempelstatus.',
+  };
+  if (error.code && staffClockMessages[error.code]) {
+    return staffClockMessages[error.code];
   }
 
   // Fall back to message-based mapping
@@ -741,10 +775,79 @@ export interface CurrentSession {
   supervisors?: SupervisorInfo[];
 }
 
+export type StaffClockAction = 'checkin' | 'checkout' | 'break_start' | 'break_end';
+export type StaffClockStateName = 'checked_out' | 'checked_in' | 'on_break';
+export type WorkSessionStatus = 'present' | 'home_office';
+
+export interface StaffClockSession {
+  id: number;
+  staff_id: number;
+  check_in_time: string;
+  check_out_time?: string;
+  status: WorkSessionStatus;
+  source: 'app' | 'nfc';
+}
+
+export interface StaffClockState {
+  staff_id: number;
+  staff_name: string;
+  state: StaffClockStateName;
+  allowed_actions: StaffClockAction[];
+  session?: StaffClockSession;
+  active_break?: {
+    id: number;
+    started_at: string;
+  };
+  net_minutes: number;
+  break_minutes: number;
+  required_break_minutes: number;
+  is_break_compliant: boolean;
+}
+
+export interface StaffClockCommand {
+  rfid_tag: string;
+  action: StaffClockAction;
+  status?: WorkSessionStatus;
+  reason?: string;
+  planned_duration_minutes?: number;
+}
+
 /**
  * API functions
  */
 export const api = {
+  /** Get the current time-tracking state for a scanned staff card. */
+  async getStaffClockState(pin: string, rfidTag: string): Promise<StaffClockState> {
+    const response = await apiCall<{ status: string; data: StaffClockState }>(
+      '/api/iot/staff-clock/state',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+        },
+        body: JSON.stringify({ rfid_tag: rfidTag }),
+      }
+    );
+    return response.data;
+  },
+
+  /** Execute one NFC staff clock action and return the authoritative new state. */
+  async executeStaffClockAction(pin: string, command: StaffClockCommand): Promise<StaffClockState> {
+    const response = await apiCall<{ status: string; data: StaffClockState }>(
+      '/api/iot/staff-clock',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${DEVICE_API_KEY}`,
+          'X-Staff-PIN': pin,
+        },
+        body: JSON.stringify(command),
+      }
+    );
+    return response.data;
+  },
+
   /**
    * Get teachers list (device authenticated)
    * Endpoint: GET /api/iot/teachers
