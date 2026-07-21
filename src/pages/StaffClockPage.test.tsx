@@ -107,7 +107,12 @@ describe('StaffClockPage', () => {
     await scanCard(user);
 
     expect(mockedScan).toHaveBeenCalledWith(20_000);
-    expect(mockedApi.getStaffClockState).toHaveBeenCalledWith('1234', '04:A1:B2:C3:D4:E5:F6');
+    expect(mockedApi.getStaffClockState).toHaveBeenCalledWith(
+      '1234',
+      '04:A1:B2:C3:D4:E5:F6',
+      undefined,
+      expect.any(AbortSignal)
+    );
     expect(screen.getByText('Ausgestempelt')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Einstempeln' })).toBeInTheDocument();
   });
@@ -131,7 +136,8 @@ describe('StaffClockPage', () => {
           action: 'checkin',
           status: 'present',
         },
-        17
+        17,
+        expect.any(AbortSignal)
       )
     );
     expect(await screen.findByText('Eingestempelt')).toBeInTheDocument();
@@ -179,7 +185,8 @@ describe('StaffClockPage', () => {
         status: 'present',
         reason: 'Vertretung übernommen',
       },
-      17
+      17,
+      expect.any(AbortSignal)
     );
   });
 
@@ -485,6 +492,72 @@ describe('StaffClockPage', () => {
     }
   });
 
+  it('cancels a silent mutation before it unfences the card', async () => {
+    vi.useFakeTimers();
+    try {
+      let stampSignal: AbortSignal | undefined;
+      mockedApi.executeStaffClockAction.mockImplementation((_pin, _command, _staffId, signal) => {
+        stampSignal = signal;
+        return new Promise(() => {});
+      });
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(0));
+      fireEvent.click(screen.getByRole('button', { name: 'Einstempeln' }));
+      await act(() => vi.advanceTimersByTimeAsync(25_000));
+
+      expect(stampSignal?.aborted).toBe(false);
+
+      // The fence is not simply dropped at the ceiling: the write is ended
+      // first, so nothing can commit behind the read that follows.
+      await act(() => vi.advanceTimersByTimeAsync(95_001));
+      expect(stampSignal?.aborted).toBe(true);
+
+      // Still fenced while the abort propagates.
+      const readsBefore = mockedApi.getStaffClockState.mock.calls.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(1_000));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore);
+
+      // Once it has, that held scan goes through — bounded recovery, and the
+      // card was never read while a stamp for it was still live.
+      await act(() => vi.advanceTimersByTimeAsync(10_000));
+      expect(mockedApi.getStaffClockState).toHaveBeenCalledTimes(readsBefore + 1);
+      expect(screen.queryByText(/vorherige Stempelung wird noch verarbeitet/)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('drops the scan when its state read times out, and cancels that read', async () => {
+    vi.useFakeTimers();
+    try {
+      let readSignal: AbortSignal | undefined;
+      mockedApi.getStaffClockState.mockImplementation((_pin, _tag, _staffId, signal) => {
+        readSignal = signal;
+        return new Promise(() => {});
+      });
+      renderPage();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Armband scannen' }));
+      await act(() => vi.advanceTimersByTimeAsync(15_000));
+
+      // Nothing was written by a read, so waiting for it is pointless — and its
+      // answer would describe a card that is no longer at the reader.
+      expect(readSignal?.aborted).toBe(true);
+      expect(screen.getByText(/Server antwortet nicht/)).toBeInTheDocument();
+
+      // The scan authorized nothing: no name, no actions, no held credential.
+      await act(() => vi.advanceTimersByTimeAsync(60_000));
+      expect(screen.queryByText('Mara Muster')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Einstempeln' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Armband scannen' })).toBeEnabled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('sends the scanned employee as the actor of the stamp', async () => {
     const user = userEvent.setup();
     renderPage();
@@ -492,14 +565,20 @@ describe('StaffClockPage', () => {
 
     // The first read has no actor yet — resolving the tag to a person is what
     // it is for. The stamp that follows carries the employee it resolved to.
-    expect(mockedApi.getStaffClockState).toHaveBeenCalledWith('1234', '04:A1:B2:C3:D4:E5:F6');
+    expect(mockedApi.getStaffClockState).toHaveBeenCalledWith(
+      '1234',
+      '04:A1:B2:C3:D4:E5:F6',
+      undefined,
+      expect.any(AbortSignal)
+    );
 
     await user.click(screen.getByRole('button', { name: 'Einstempeln' }));
 
     expect(mockedApi.executeStaffClockAction).toHaveBeenCalledWith(
       '1234',
       { rfid_tag: '04:A1:B2:C3:D4:E5:F6', action: 'checkin', status: 'present' },
-      17
+      17,
+      expect.any(AbortSignal)
     );
   });
 

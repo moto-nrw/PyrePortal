@@ -213,11 +213,16 @@ export const api = {
    * the request carries its actor. It is unknown on the very first read of a
    * card — resolving the tag to a person is what that read is for — and is
    * passed on every later read of a card already identified.
+   *
+   * `signal` lets the caller cancel the read. A kiosk deadline that expires
+   * without cancelling would leave the request live, and its answer describes a
+   * card that may no longer be at the reader.
    */
   async getStaffClockState(
     pin: string,
     rfidTag: string,
-    staffId?: number
+    staffId?: number,
+    signal?: AbortSignal
   ): Promise<StaffClockState> {
     const response = await apiCall<{ status: string; data: StaffClockState }>(
       '/api/iot/staff-clock/state',
@@ -225,6 +230,7 @@ export const api = {
         method: 'POST',
         headers: buildAuthHeaders(pin, staffId),
         body: JSON.stringify({ rfid_tag: rfidTag }),
+        ...(signal && { signal }),
       }
     );
     return response.data;
@@ -235,11 +241,16 @@ export const api = {
    *
    * `staffId` is the employee being stamped, taken from the state read that the
    * scan produced, and travels as X-Staff-ID alongside the command.
+   *
+   * `signal` cancels the command. The caller waits for this request far beyond
+   * its own deadline — it is the only thing that can say what was written — so
+   * cancelling is the sole way to end a call that never answers.
    */
   async executeStaffClockAction(
     pin: string,
     command: StaffClockCommand,
-    staffId?: number
+    staffId?: number,
+    signal?: AbortSignal
   ): Promise<StaffClockState> {
     const response = await apiCall<{ status: string; data: StaffClockState }>(
       '/api/iot/staff-clock',
@@ -247,6 +258,7 @@ export const api = {
         method: 'POST',
         headers: buildAuthHeaders(pin, staffId),
         body: JSON.stringify(command),
+        ...(signal && { signal }),
       }
     );
     return response.data;

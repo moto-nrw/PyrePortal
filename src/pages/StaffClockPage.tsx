@@ -82,16 +82,25 @@ const KIOSK_WORK_LOCATION = 'present' as const;
 const INDETERMINATE_SETTLE_MS = 10_000;
 
 /**
- * Hard ceiling on how long any card stays fenced.
+ * When a clock mutation that never reported back is cancelled.
  *
  * A request that has neither answered nor failed cannot lift its own fence, so
- * without this a single hung call would fence that card until the app is
- * restarted — every later scan of it would burn UNRESOLVED_FENCE_MS and refuse.
- * A hallway kiosk has nobody to restart it, so the fence expires on its own.
- * Far beyond any server or proxy deadline: a call still silent after this is
- * dead, not slow, and can no longer commit behind a read.
+ * without an upper bound a single hung call would fence that card until the app
+ * is restarted — every later scan of it would burn UNRESOLVED_FENCE_MS and
+ * refuse. A hallway kiosk has nobody to restart it. Waiting out the silence is
+ * not enough on its own: an un-aborted request stays live and can still commit,
+ * so the kiosk aborts it here instead of merely ceasing to wait. Far beyond any
+ * server or proxy deadline, so this only ever hits calls that are already dead.
  */
-const FENCE_MAX_MS = 120_000;
+const FENCE_ABORT_MS = 120_000;
+/**
+ * Grace after aborting a silent mutation, before its card is unfenced.
+ *
+ * The abort tears down the request, so nothing from this kiosk is on its way to
+ * the backend afterwards; this window only covers the abort propagating. If the
+ * aborted call rejects sooner — the normal case — the fence lifts then.
+ */
+const FENCE_ABORT_SETTLE_MS = 5_000;
 
 /**
  * Cards whose last clock mutation never reported an outcome, keyed by RFID tag.
@@ -136,13 +145,20 @@ class RequestTimeoutError extends LocalizedError {
   }
 }
 
-/** Reject a stalled backend call so the page becomes operable again. */
-async function withRequestTimeout<T>(promise: Promise<T>): Promise<T> {
+/**
+ * Reject a stalled backend call so the page becomes operable again.
+ *
+ * `abort` cancels the underlying request on the way out. Only pass it for reads:
+ * giving up on a read is harmless, while a mutation must never be cancelled at
+ * its deadline — it is the only thing that can still report what it wrote.
+ */
+async function withRequestTimeout<T>(promise: Promise<T>, abort?: () => void): Promise<T> {
   try {
     return await withTimeout(promise, REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MESSAGE);
   } catch (error) {
     if (error instanceof Error && error.message === REQUEST_TIMEOUT_MESSAGE) {
       logger.error('Staff clock request timed out');
+      abort?.();
       throw new RequestTimeoutError();
     }
     throw error;
@@ -401,33 +417,45 @@ function StaffClockPage() {
    * window in that case. The returned function lifts it early, for the one case
    * that is proof: a structured refusal from the handler.
    *
-   * A request that never reports back at all cannot lift its own fence, so the
-   * fence also expires after FENCE_MAX_MS — bounded recovery instead of a card
-   * that stays unusable until the kiosk is restarted.
+   * A request that never reports back at all cannot lift its own fence. Rather
+   * than dropping the fence while that call is still live — it could commit
+   * right behind the next read — the kiosk aborts the request at
+   * FENCE_ABORT_MS and unfences once the abort has taken effect. Cancelling is
+   * what makes the recovery bounded and still safe: after it, no stamp from this
+   * kiosk is in flight for that card.
    */
-  const fenceCard = (tag: string, mutation: Promise<StaffClockState>): (() => void) => {
+  const fenceCard = (
+    tag: string,
+    mutation: Promise<StaffClockState>,
+    abort: () => void
+  ): (() => void) => {
     let release: () => void = () => undefined;
     const released = new Promise<void>(resolve => {
       release = resolve;
     });
-    const expired = new Promise<void>(resolve => setTimeout(resolve, FENCE_MAX_MS));
+    let live = true;
+    // Not a race against the request — it ends the request first, then waits.
+    const cancelled = new Promise<void>(resolve =>
+      setTimeout(() => {
+        if (!live) return;
+        logger.warn('Clock mutation never reported back, aborting it to unfence its card', {
+          abortAfterMs: FENCE_ABORT_MS,
+        });
+        abort();
+        setTimeout(resolve, FENCE_ABORT_SETTLE_MS);
+      }, FENCE_ABORT_MS)
+    );
     const settled = Promise.race([
       released,
-      expired,
+      cancelled,
       mutation.then(
         () => undefined,
         () => new Promise<void>(resolve => setTimeout(resolve, INDETERMINATE_SETTLE_MS))
       ),
     ]);
     unresolvedMutations.set(tag, settled);
-    void expired.then(() => {
-      if (unresolvedMutations.get(tag) === settled) {
-        logger.warn('Clock mutation never reported back, expiring its fence', {
-          fenceMs: FENCE_MAX_MS,
-        });
-      }
-    });
     void settled.then(() => {
+      live = false;
       if (unresolvedMutations.get(tag) === settled) unresolvedMutations.delete(tag);
     });
     return release;
@@ -459,10 +487,13 @@ function StaffClockPage() {
     try {
       // Hold on to the mutation itself: our deadline does not abort it, so the
       // outstanding call stays the only thing that can report what it did.
-      const mutation = api.executeStaffClockAction(pin, command, staffId);
+      const controller = new AbortController();
+      const mutation = api.executeStaffClockAction(pin, command, staffId, controller.signal);
       // Fence the card up front. The request is live from here on, and the page
-      // can be left and reopened before any deadline expires.
-      const releaseFence = fenceCard(command.rfid_tag, mutation);
+      // can be left and reopened before any deadline expires. The fence owns the
+      // abort: it is the only place allowed to end this call, and only once
+      // waiting for an answer has become pointless.
+      const releaseFence = fenceCard(command.rfid_tag, mutation, () => controller.abort());
       let outcome = await settleMutation(mutation, REQUEST_TIMEOUT_MS);
       if (outcome.kind === 'indeterminate') {
         // Give the original call a bounded second chance rather than issuing a
@@ -528,22 +559,41 @@ function StaffClockPage() {
     if (!authenticatedUser?.pin || inFlightRef.current) return;
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
+    // Set when this run retires its own id below, so the page is still released.
+    let selfInvalidated = false;
     inFlightRef.current = true;
     setIsBusy(true);
     setClockState(null);
     setCompletedMessage(null);
+    setScannedTag(null);
     try {
       const tag = await scanStaffTag();
       await awaitUnresolvedMutation(tag);
-      const state = await withRequestTimeout(api.getStaffClockState(authenticatedUser.pin, tag));
+      // A read that misses its deadline is cancelled outright: its answer would
+      // describe a card that is no longer at the reader, and nothing was written
+      // by it, so there is nothing to wait for.
+      const controller = new AbortController();
+      const state = await withRequestTimeout(
+        api.getStaffClockState(authenticatedUser.pin, tag, undefined, controller.signal),
+        () => controller.abort()
+      );
       if (requestId !== requestIdRef.current) return;
       setScannedTag(tag);
       setClockState(state);
       logUserAction('Staff card scanned', { staffId: state.staff_id });
     } catch (error) {
-      if (requestId === requestIdRef.current) showFailure(error);
+      // Already abandoned (back button): that run owns nothing on this page.
+      if (requestId !== requestIdRef.current) return;
+      // The scan produced no usable state, so it authorizes nothing. Retire its
+      // id and drop the credential, so neither a late answer nor a card left on
+      // the reader can revive this run for whoever stands there next.
+      requestIdRef.current += 1;
+      selfInvalidated = true;
+      setScannedTag(null);
+      setClockState(null);
+      showFailure(error);
     } finally {
-      if (requestId === requestIdRef.current) {
+      if (selfInvalidated || requestId === requestIdRef.current) {
         inFlightRef.current = false;
         setIsBusy(false);
       }
