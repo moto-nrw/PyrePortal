@@ -93,6 +93,18 @@ exports[`ERROR_MESSAGE_MAPPINGS backend contract > keeps all patterns and German
     "RFID-Tag fehlt in der Anfrage.",
   ],
   [
+    "invalid RFID tag",
+    "Das gelesene Armband ist ungültig. Bitte erneut scannen.",
+  ],
+  [
+    "RFID tag is inactive",
+    "Dieses Armband ist deaktiviert. Bitte an die Leitung wenden.",
+  ],
+  [
+    "RFID tag is not assigned to staff",
+    "Dieses Armband gehört keinem Mitarbeitenden. Bitte das persönliche Armband verwenden.",
+  ],
+  [
     "student has no attendance record for today",
     "Schüler wurde heute noch nicht eingecheckt.",
   ],
