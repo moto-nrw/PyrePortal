@@ -43,6 +43,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       roomId: destination === 'schulhof' ? schulhofRoomId : wcRoomId,
       state: checkoutDestinationState,
       pin: authenticatedUser.pin,
+      staffId: authenticatedUser.staffId,
       recentTagScans,
     });
 

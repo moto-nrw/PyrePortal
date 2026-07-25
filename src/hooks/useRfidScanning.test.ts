@@ -682,7 +682,8 @@ describe('useRfidScanning', () => {
           action: 'checkin',
           room_id: 10,
         }),
-        '1234'
+        '1234',
+        1
       );
     });
 
@@ -1539,7 +1540,8 @@ describe('useRfidScanning', () => {
 
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
-        '1234'
+        '1234',
+        1
       );
     });
 
@@ -1603,11 +1605,13 @@ describe('useRfidScanning', () => {
       expect(mockedProcessRfidScan).toHaveBeenCalledTimes(2);
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
-        '1234'
+        '1234',
+        1
       );
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:11:22:33:44:55:66' }),
-        '1234'
+        '1234',
+        1
       );
     });
   });
@@ -1913,7 +1917,8 @@ describe('useRfidScanning', () => {
 
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         { student_rfid: MOCK_TAG, action: 'checkin', room_id: 10 },
-        '1234'
+        '1234',
+        1
       );
 
       await act(async () => {

@@ -640,7 +640,8 @@ export const api = {
       action: 'checkin' | 'checkout';
       room_id: number;
     },
-    pin: string
+    pin: string,
+    staffId?: number
   ): Promise<RfidScanResult> {
     const response = await apiCall<{
       data: RfidScanResult;
@@ -648,7 +649,9 @@ export const api = {
       status: string;
     }>('/api/iot/checkin', {
       method: 'POST',
-      headers: buildAuthHeaders(pin),
+      // staffId (X-Staff-ID) attributes the scan to the logged-in staff member
+      // so the backend can mark them present (project-phoenix #1439).
+      headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
       body: JSON.stringify(scanData),
     });
 
@@ -711,7 +714,8 @@ export const api = {
     pin: string,
     rfid: string,
     action: 'confirm' | 'cancel' | 'confirm_daily_checkout',
-    destination?: 'zuhause' | 'unterwegs'
+    destination?: 'zuhause' | 'unterwegs',
+    staffId?: number
   ): Promise<AttendanceToggleResponse> {
     try {
       const body: { rfid: string; action: string; destination?: string } = {
@@ -726,7 +730,9 @@ export const api = {
 
       const response = await apiCall<AttendanceToggleResponse>('/api/iot/attendance/toggle', {
         method: 'POST',
-        headers: buildAuthHeaders(pin),
+        // staffId (X-Staff-ID) attributes the toggle to the logged-in staff
+        // member so the backend can mark them present (project-phoenix #1439).
+        headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
         body: JSON.stringify(body),
       });
 

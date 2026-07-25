@@ -527,7 +527,8 @@ export function useActivityScanningPage() {
         authenticatedUser.pin,
         checkoutDestinationState.rfid,
         'confirm_daily_checkout',
-        'zuhause'
+        'zuhause',
+        authenticatedUser.staffId
       );
       logger.info('Daily checkout confirmed');
       feedbackVisitIdRef.current = currentScan?.visit_id ?? null;

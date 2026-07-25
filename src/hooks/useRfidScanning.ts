@@ -193,7 +193,8 @@ export const useRfidScanning = () => {
         // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
           { student_rfid: tagId, action: 'checkin', room_id: freshRoom.id },
-          freshUser.pin
+          freshUser.pin,
+          freshUser.staffId
         );
 
         logger.info('RFID scan completed via server', {

@@ -91,6 +91,7 @@ describe('checkInToDestinationRoom', () => {
         roomId: 9,
         state: makeState(),
         pin: '1234',
+        staffId: 7,
         recentTagScans: new Map(),
       });
 
@@ -100,7 +101,8 @@ describe('checkInToDestinationRoom', () => {
           action: 'checkin',
           room_id: 9,
         },
-        '1234'
+        '1234',
+        7
       );
       expect(result).toEqual({
         ...serverResult,
@@ -115,6 +117,7 @@ describe('checkInToDestinationRoom', () => {
         roomId: 11,
         state: makeState(),
         pin: '1234',
+        staffId: 7,
         recentTagScans: new Map(),
       });
 
@@ -124,7 +127,8 @@ describe('checkInToDestinationRoom', () => {
           action: 'checkin',
           room_id: 11,
         },
-        '1234'
+        '1234',
+        7
       );
       expect(result).toEqual({
         ...serverResult,
