@@ -27,6 +27,28 @@ export interface AuthenticatedUser {
   pin: string; // Store PIN for subsequent API calls
 }
 
+/**
+ * Resolve the staff member who can safely receive attribution for a kiosk action.
+ *
+ * Global-PIN logins have no staff identity (`staffId: 0`). In that flow, a sole
+ * selected supervisor is unambiguous. Multiple supervisors require an explicit
+ * acting-person choice, so no ID is inferred.
+ */
+export function resolveStaffAttributionId(
+  authenticatedUser: AuthenticatedUser,
+  selectedSupervisors: readonly User[]
+): number | undefined {
+  if (authenticatedUser.staffId > 0) {
+    return authenticatedUser.staffId;
+  }
+
+  if (selectedSupervisors.length === 1 && selectedSupervisors[0].id > 0) {
+    return selectedSupervisors[0].id;
+  }
+
+  return undefined;
+}
+
 export const createAuthSlice = (set: SetState<UserState>, get: GetState<UserState>) => ({
   // Initial state
   users: [] as User[],

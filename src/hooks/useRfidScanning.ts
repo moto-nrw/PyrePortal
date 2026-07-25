@@ -19,6 +19,7 @@ import {
   runPickupQuery,
   updateSessionActivityQuietly,
 } from '../services/scanProcessor';
+import { resolveStaffAttributionId } from '../store/slices/authSlice';
 import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
 
@@ -104,6 +105,7 @@ export const useRfidScanning = () => {
       const freshRoom = currentState.selectedRoom;
       const freshUser = currentState.authenticatedUser;
       const freshSession = currentState.currentSession;
+      const freshSupervisors = currentState.selectedSupervisors;
       const freshRfid = currentState.rfid;
 
       // Validate authentication state
@@ -193,7 +195,8 @@ export const useRfidScanning = () => {
         // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
           { student_rfid: tagId, action: 'checkin', room_id: freshRoom.id },
-          freshUser.pin
+          freshUser.pin,
+          resolveStaffAttributionId(freshUser, freshSupervisors)
         );
 
         logger.info('RFID scan completed via server', {
