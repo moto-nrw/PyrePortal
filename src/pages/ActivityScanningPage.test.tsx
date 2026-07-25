@@ -75,8 +75,8 @@ const defaultRfidState = {
 
 const defaultStoreState = {
   authenticatedUser: {
-    staffId: 1,
-    staffName: 'Test User',
+    staffId: 0,
+    staffName: 'OGS Device',
     deviceName: 'Test Device',
     pin: '1234',
   },

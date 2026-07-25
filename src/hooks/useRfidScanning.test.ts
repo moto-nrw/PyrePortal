@@ -660,6 +660,11 @@ describe('useRfidScanning', () => {
     });
 
     it('calls processRfidScan with correct payload', async () => {
+      setAuthenticated('1234', 0, 'OGS Device');
+      useUserStore.setState({
+        selectedSupervisors: [{ id: 7, name: 'Frau Schmidt' }],
+      });
+
       const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
@@ -683,7 +688,33 @@ describe('useRfidScanning', () => {
           room_id: 10,
         }),
         '1234',
-        1
+        7
+      );
+    });
+
+    it('does not infer an acting staff member from multiple selected supervisors', async () => {
+      setAuthenticated('1234', 0, 'OGS Device');
+      useUserStore.setState({
+        selectedSupervisors: [
+          { id: 7, name: 'Frau Schmidt' },
+          { id: 8, name: 'Herr Müller' },
+        ],
+      });
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+      await triggerMockScanAndDrain();
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'checkin',
+          room_id: 10,
+        }),
+        '1234',
+        undefined
       );
     });
 
