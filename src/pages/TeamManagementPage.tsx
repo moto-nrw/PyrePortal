@@ -239,7 +239,7 @@ function TeamManagementPage() {
             backgroundColor:
               selectedSupervisors.length === 0 || isSaving
                 ? designSystem.gray[400]
-                : designSystem.brand.green,
+                : designSystem.flat.primary,
             border: 'none',
             borderRadius: designSystem.borderRadius.full,
             cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',
@@ -251,25 +251,25 @@ function TeamManagementPage() {
           }}
           onMouseEnter={e => {
             if (selectedSupervisors.length > 0 && !isSaving) {
-              e.currentTarget.style.backgroundColor = designSystem.brand.greenHover;
+              e.currentTarget.style.backgroundColor = designSystem.flat.primaryHover;
             }
           }}
           onMouseLeave={e => {
             if (selectedSupervisors.length > 0 && !isSaving) {
-              e.currentTarget.style.backgroundColor = designSystem.brand.green;
+              e.currentTarget.style.backgroundColor = designSystem.flat.primary;
             }
           }}
           onTouchStart={e => {
             if (selectedSupervisors.length > 0 && !isSaving) {
               e.currentTarget.style.transform = designSystem.scales.active;
-              e.currentTarget.style.backgroundColor = designSystem.brand.greenActive;
+              e.currentTarget.style.backgroundColor = designSystem.flat.primaryHover;
               e.currentTarget.style.boxShadow = designSystem.shadows.button;
             }
           }}
           onTouchEnd={e => {
             if (selectedSupervisors.length > 0 && !isSaving) {
               e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.backgroundColor = designSystem.brand.green;
+              e.currentTarget.style.backgroundColor = designSystem.flat.primary;
               e.currentTarget.style.boxShadow = designSystem.shadows.md;
             }
           }}

@@ -315,7 +315,7 @@ function StudentSelectionPage() {
     padding: '0 20px',
     borderRadius: designSystem.borderRadius.full,
     border: active ? 'none' : `1px solid ${designSystem.gray[200]}`,
-    background: active ? designSystem.brand.blue : designSystem.surface.background,
+    background: active ? designSystem.pastel.blue.accent : designSystem.surface.background,
     color: active ? designSystem.colors.white : designSystem.gray[700],
     fontSize: '17px',
     fontWeight: 600,
@@ -530,12 +530,12 @@ function StudentSelectionPage() {
                 disabled={!selectedEntityId || isSaving}
                 onMouseEnter={e => {
                   if (!(!selectedEntityId || isSaving)) {
-                    e.currentTarget.style.background = designSystem.flat.successHover;
+                    e.currentTarget.style.background = designSystem.flat.primaryHover;
                   }
                 }}
                 onMouseLeave={e => {
                   if (!(!selectedEntityId || isSaving)) {
-                    e.currentTarget.style.background = designSystem.flat.success;
+                    e.currentTarget.style.background = designSystem.flat.primary;
                   }
                 }}
                 style={{
@@ -547,7 +547,7 @@ function StudentSelectionPage() {
                   background:
                     !selectedEntityId || isSaving
                       ? designSystem.gray[400]
-                      : designSystem.flat.success,
+                      : designSystem.flat.primary,
                   border: 'none',
                   borderRadius: designSystem.borderRadius.full,
                   cursor: !selectedEntityId || isSaving ? 'not-allowed' : 'pointer',

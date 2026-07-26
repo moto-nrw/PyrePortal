@@ -351,7 +351,8 @@ describe('ActivityScanningPage', () => {
     const modalContainer = dialog?.firstElementChild;
     const clockIcon = dialog?.querySelector('svg[data-icon=\"clock\"]');
 
-    expect(modalContainer).toHaveStyle('background-color: #5080D8');
+    // Pickup query modal uses the pastel blue family surface (design-review v2)
+    expect(modalContainer).toHaveStyle('background-color: #E8EFFA');
     expect(clockIcon).not.toBeNull();
   });
 

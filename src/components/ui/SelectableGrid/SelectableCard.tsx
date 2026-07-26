@@ -22,7 +22,7 @@ function getColors(
 
   if (isSelected) {
     return {
-      iconColor: designSystem.colors.primaryGreen,
+      iconColor: designSystem.entityColors.selected.icon,
       backgroundColor: designSystem.entityColors.selected.background,
     };
   }
@@ -75,7 +75,7 @@ export const SelectableCard = memo(function SelectableCard({
         height: '160px',
         backgroundColor: designSystem.colors.white,
         border: isSelected
-          ? `3px solid ${designSystem.colors.primaryGreen}`
+          ? `3px solid ${designSystem.entityColors.selected.icon}`
           : `2px solid ${designSystem.colors.border}`,
         borderRadius: designSystem.borderRadius.xl,
         cursor: isDisabled ? 'not-allowed' : 'pointer',
@@ -103,7 +103,7 @@ export const SelectableCard = memo(function SelectableCard({
             height: '24px',
             borderRadius: '50%',
             backgroundColor: isSelected
-              ? designSystem.colors.primaryGreen
+              ? designSystem.entityColors.selected.icon
               : designSystem.colors.border,
             display: 'flex',
             alignItems: 'center',
@@ -165,9 +165,7 @@ export const SelectableCard = memo(function SelectableCard({
             padding: '4px 12px',
             borderRadius: designSystem.borderRadius.full,
             backgroundColor:
-              badgeColor === 'blue'
-                ? designSystem.brand.bluePillBg
-                : designSystem.brand.greenPillBg,
+              badgeColor === 'blue' ? designSystem.brand.bluePillBg : designSystem.brand.greenTint,
             color:
               badgeColor === 'blue' ? designSystem.brand.blueText : designSystem.brand.greenText,
             fontWeight: 600,

@@ -68,7 +68,7 @@ const BackButton: React.FC<BackButtonProps> = ({
   ariaLabel,
   disabled,
 }) => {
-  const strokeColor = color === 'blue' ? '#5080d8' : '#374151';
+  const strokeColor = color === 'blue' ? '#3558A8' : '#374151';
 
   const renderIcon = () => {
     if (customIcon) return customIcon;

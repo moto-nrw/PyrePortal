@@ -17,10 +17,6 @@ export const designSystem = {
 
   // Shadow System (phoenix flat surfaces)
   shadows: {
-    // Legacy colored glows (DEPRECATED - kept until pages migrate off gradient buttons)
-    green: '0 8px 40px rgb(131,205,45,0.3)',
-    blue: '0 8px 40px rgb(80,128,216,0.3)',
-
     // Component-specific shadows
     button: '0 4px 14px 0 rgba(0,0,0,0.1)',
 
@@ -28,7 +24,6 @@ export const designSystem = {
     sm: '0 2px 4px rgba(0,0,0,0.1)', // surface / content-surface (shadow-sm)
     md: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1)', // raised button
     hoverElevate: '0 3px 10px rgba(15,23,42,0.045), 0 0 0 1px rgba(15,23,42,0.045)',
-    modal: '0 25px 50px -12px rgba(0,0,0,0.25), 0 8px 16px -8px rgba(80,128,216,0.15)',
   },
 
   // Glassmorphism Effects (blur retained for modal chrome; glass surfaces deprecated for flat)
@@ -53,25 +48,35 @@ export const designSystem = {
 
   // Brand shades (phoenix location-helper + globals.css)
   brand: {
-    // Green (success / confirm semantics + status badges) - ALWAYS uppercase #83CD2D
-    green: '#83CD2D',
-    greenHover: '#74B827',
-    greenActive: '#669F21',
-    greenText: '#4A7A15', // accessible green text on white
-    greenTintGhostHover: '#F0F9E4',
-    greenTintGhostActive: '#E4F3D3',
-    greenPillBg: 'rgba(131,205,45,0.15)',
-    // Blue (secondary action)
-    blue: '#5080D8',
-    blueHover: '#4A70C8',
-    blueText: '#3A5FA8', // accessible dark blue text on white / blue pill tint
-    bluePillBg: 'rgba(80, 128, 216, 0.15)',
-    // Red (danger / home)
-    red: '#FF3130',
-    redPillBg: 'rgba(255,49,48,0.15)',
+    // Green - unified pastel pair only (design review: no bright #83CD2D accents)
+    greenText: '#3F6F12', // accessible green text on white (pastel family accent)
+    greenTint: '#EDF8E0', // solid pastel tint (icon circles, pills) per design-review v2
+    // Blue (secondary action) - unified on the pastel modal blue accent
+    blue: '#3558A8',
+    blueHover: '#2A4685',
+    blueText: '#3558A8', // accessible dark blue text on white / blue pill tint
+    bluePillBg: 'rgba(53, 88, 168, 0.12)',
+    // Red (danger / home) - unified on the pastel modal red accent
+    red: '#CC2626',
+    redPillBg: 'rgba(204, 38, 38, 0.12)',
     // Primary interactive accent is gray-900, NOT green (Florian's rule)
     primary: '#111827',
     primaryHover: '#1F2937',
+  },
+
+  /**
+   * Pastel modal families (design-review v2, PR #385).
+   * Each family is a two-tone pair on a pastel surface:
+   * bg = modal surface, tint = icon circle / bar track, accent = icon, heading,
+   * body text and bar fill. Values sampled from the approved v2 review state.
+   */
+  pastel: {
+    green: { bg: '#ECF7DF', tint: '#D9EFBE', accent: '#3F6F12' },
+    orange: { bg: '#FEEEDB', tint: '#FEDBCA', accent: '#8A5600' },
+    red: { bg: '#FFE6E6', tint: '#FFCCCC', accent: '#CC2626' },
+    blue: { bg: '#E8EFFA', tint: '#CFDDF4', accent: '#3558A8' },
+    purple: { bg: '#EFE7FD', tint: '#DFCEFA', accent: '#6D28D9' },
+    amber: { bg: '#FBF4DC', tint: '#F6E7B8', accent: '#92710B' },
   },
 
   // Status hues (location / attendance semantics)
@@ -105,7 +110,7 @@ export const designSystem = {
     background: 'linear-gradient(135deg, rgba(255,255,255,0.95) 0%, rgba(248,250,252,0.98) 100%)',
     border: '1px solid rgba(229,231,235,0.5)',
     blur: 'blur(20px)',
-    shadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 8px 16px -8px rgba(80,128,216,0.15)',
+    shadow: '0 25px 50px -12px rgba(0,0,0,0.25), 0 8px 16px -8px rgba(53,88,168,0.15)',
     backdrop: 'rgba(0,0,0,0.4)',
   },
 
@@ -125,23 +130,14 @@ export const designSystem = {
   flat: {
     primary: '#111827', // gray-900 primary CTA
     primaryHover: '#1F2937',
-    action: '#5080D8', // blue action
-    actionHover: '#4A70C8',
-    success: '#83CD2D', // green confirm/success
-    successHover: '#74B827',
-    successActive: '#669F21',
-    danger: '#FF3130',
-    dangerHover: '#DC2626',
+    action: '#3558A8', // blue action (pastel modal blue accent)
+    actionHover: '#2A4685',
+    danger: '#CC2626', // unified modal red (pastel family accent)
+    dangerHover: '#B91C1C',
   },
 
   // Color System
   colors: {
-    // Primary brand colors
-    primaryGreen: '#83CD2D',
-
-    // Semantic colors
-    info: '#3B82F6',
-
     // Text colors
     textDark: '#111827',
     textSecondary: '#374151',
@@ -161,33 +157,34 @@ export const designSystem = {
 
   /**
    * Entity-specific colors for SelectableCard icons.
-   * Each entity type has an icon color and a background tint (15% opacity).
+   * Design-review v2: unselected entity icons are neutral gray across all
+   * entity types; color only marks the selected state (pastel green pair).
    */
   entityColors: {
-    /** Staff/Supervisor selection - orange theme */
+    /** Staff/Supervisor selection - neutral gray */
     staff: {
-      icon: '#e57a00',
-      background: 'rgba(229,122,0,0.15)',
+      icon: '#6B7280',
+      background: '#F3F4F6',
     },
-    /** Person/Team/Student selection - blue theme */
+    /** Person/Team/Student selection - neutral gray */
     person: {
-      icon: '#2563EB',
-      background: 'rgba(37,99,235,0.15)',
+      icon: '#6B7280',
+      background: '#F3F4F6',
     },
-    /** Activity selection - red theme */
+    /** Activity selection - neutral gray */
     activity: {
-      icon: '#e02020',
-      background: 'rgba(224,32,32,0.15)',
+      icon: '#6B7280',
+      background: '#F3F4F6',
     },
-    /** Room selection - indigo theme */
+    /** Room selection - neutral gray */
     room: {
-      icon: '#4f46e5',
-      background: 'rgba(79,70,229,0.15)',
+      icon: '#6B7280',
+      background: '#F3F4F6',
     },
-    /** Selected state (all entities) - green theme */
+    /** Selected state (all entities) - pastel green pair */
     selected: {
-      icon: '#16A34A',
-      background: 'rgba(131,205,45,0.15)',
+      icon: '#3F6F12',
+      background: '#EDF8E0',
     },
     /** Disabled/Occupied state - gray theme */
     disabled: {
@@ -195,17 +192,6 @@ export const designSystem = {
       background: '#F3F4F6',
     },
   },
-
-  // Gradient Definitions
-  // DEPRECATED: Florian's design system is flat. Use `flat.*` / `brand.*` instead.
-  // Retained until all pages migrate off gradient buttons/chips.
-  gradients: {
-    greenRight: 'linear-gradient(to right, #83CD2D, #70B525)',
-    blueRight: 'linear-gradient(to right, #5080D8, #4A70C8)',
-  },
-
-  // Background bubble colors (DEPRECATED: dotted background replaced the bubble canvas)
-  bubbleColors: ['#FF8080', '#80D8FF', '#A5D6A7', '#FFA726'],
 
   // Animation & Transitions
   transitions: {

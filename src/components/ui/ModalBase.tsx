@@ -291,6 +291,7 @@ export function ModalBase({
             color={indicatorColor}
             trackColor={indicatorTrackColor}
             borderRadius={sizePreset.borderRadius}
+            inset
           />
         )}
       </div>

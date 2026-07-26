@@ -15,8 +15,8 @@ interface ModalActionButtonsProps {
    * Semantic confirm color override. Prop name kept for backward compatibility
    * (it no longer carries a CSS gradient — modal buttons are flat, §4b).
    * Default confirm is gray-900 (#111827). Pass a brand hex ONLY where the
-   * action's meaning demands it: destructive → #DC2626 (red-600), positive
-   * confirm → #83CD2D (green). Everything else stays the gray-900 default.
+   * action's meaning demands it: destructive → #CC2626 (unified modal red).
+   * Everything else stays the gray-900 default.
    */
   confirmGradient?: string;
   /**
@@ -31,10 +31,8 @@ const confirmPressColor = (base: string): string => {
   switch (base) {
     case designSystem.brand.primary: // gray-900
       return designSystem.brand.primaryHover; // #1F2937
-    case designSystem.flat.success: // green
-      return designSystem.flat.successHover; // #74B827
-    case designSystem.flat.dangerHover: // red-600 (#DC2626)
-      return '#B91C1C'; // red-700
+    case designSystem.flat.danger: // unified modal red (#CC2626)
+      return designSystem.flat.dangerHover; // #B91C1C
     default:
       return base;
   }

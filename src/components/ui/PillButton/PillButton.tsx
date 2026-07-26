@@ -52,9 +52,9 @@ const secondaryColors = {
     touchBackground: designSystem.gray[50],
   },
   blue: {
-    color: '#5080D8',
-    border: '1px solid rgba(80, 128, 216, 0.3)',
-    touchBackground: 'rgba(80, 128, 216, 0.1)',
+    color: '#3558A8',
+    border: '1px solid rgba(53, 88, 168, 0.3)',
+    touchBackground: 'rgba(53, 88, 168, 0.1)',
   },
 };
 
@@ -69,9 +69,9 @@ const ghostColors = {
     touchBackground: designSystem.gray[100],
   },
   blue: {
-    color: '#5080D8',
-    touchColor: '#4A70C8',
-    touchBackground: 'rgba(80, 128, 216, 0.1)',
+    color: '#3558A8',
+    touchColor: '#2A4685',
+    touchBackground: 'rgba(53, 88, 168, 0.1)',
   },
 };
 

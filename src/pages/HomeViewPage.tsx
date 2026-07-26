@@ -1,11 +1,14 @@
-import { faWifi } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { LastSessionToggle } from '../components/LastSessionToggle';
-import { ErrorModal, ModalBase, ModalActionButtons } from '../components/ui';
+import {
+  ContactlessPaymentIcon,
+  ErrorModal,
+  ModalBase,
+  ModalActionButtons,
+} from '../components/ui';
 import {
   api,
   formatRoomName,
@@ -71,7 +74,13 @@ function getActivityIcon(
 ): React.ReactNode {
   if (currentSession) {
     return (
-      <svg width="52" height="52" viewBox="0 0 24 24" fill={designSystem.brand.green} stroke="none">
+      <svg
+        width="52"
+        height="52"
+        viewBox="0 0 24 24"
+        fill={designSystem.pastel.green.accent}
+        stroke="none"
+      >
         <path d="M8 5v14l11-7z" />
       </svg>
     );
@@ -83,7 +92,7 @@ function getActivityIcon(
         height="52"
         viewBox="0 0 24 24"
         fill="none"
-        stroke={designSystem.brand.green}
+        stroke={designSystem.pastel.green.accent}
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -101,7 +110,7 @@ function getActivityIcon(
       height="44"
       viewBox="0 0 24 24"
       fill="none"
-      stroke={designSystem.brand.green}
+      stroke={designSystem.pastel.green.accent}
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
@@ -376,11 +385,10 @@ function HomeViewPage() {
               justifyContent: 'center',
               gap: '12px',
               padding: '0 32px',
-              // Mirror of the "Abmelden" corner button: white pill, blue accent
-              // border + text + icon, blue-tinted press. Not a solid blue fill.
+              // Neutral white pill with gray icon/text (design-review v2)
               backgroundColor:
-                touchedButton === 'tag' ? 'rgba(80, 128, 216, 0.1)' : designSystem.colors.white,
-              border: `1px solid ${designSystem.brand.blue}`,
+                touchedButton === 'tag' ? designSystem.gray[100] : designSystem.colors.white,
+              border: `1px solid ${designSystem.gray[200]}`,
               borderRadius: '34px',
               cursor: 'pointer',
               transition: designSystem.transitions.base,
@@ -389,16 +397,12 @@ function HomeViewPage() {
               transform: touchedButton === 'tag' ? designSystem.scales.activeSmall : 'scale(1)',
             }}
           >
-            <FontAwesomeIcon
-              icon={faWifi}
-              size="xl"
-              style={{ color: designSystem.brand.blue, transform: 'rotate(90deg)' }}
-            />
+            <ContactlessPaymentIcon size={28} color={designSystem.gray[700]} />
             <span
               style={{
                 fontSize: '20px',
                 fontWeight: 600,
-                color: designSystem.brand.blue,
+                color: designSystem.gray[700],
               }}
             >
               {texts.tagAssignmentButton}
@@ -435,10 +439,8 @@ function HomeViewPage() {
               gap: '12px',
               padding: '0 32px',
               backgroundColor:
-                touchedButton === 'logout'
-                  ? designSystem.brand.redPillBg
-                  : designSystem.colors.white,
-              border: `1px solid ${designSystem.brand.red}`,
+                touchedButton === 'logout' ? designSystem.pastel.red.bg : designSystem.colors.white,
+              border: `1px solid ${designSystem.pastel.red.accent}`,
               borderRadius: '34px',
               cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
               transition: designSystem.transitions.base,
@@ -453,7 +455,7 @@ function HomeViewPage() {
               height="28"
               viewBox="0 0 24 24"
               fill="none"
-              stroke={designSystem.brand.red}
+              stroke={designSystem.pastel.red.accent}
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -466,7 +468,7 @@ function HomeViewPage() {
               style={{
                 fontSize: '20px',
                 fontWeight: 600,
-                color: designSystem.brand.red,
+                color: designSystem.pastel.red.accent,
               }}
             >
               {currentSession && !isNavigatingToScanning
@@ -550,7 +552,7 @@ function HomeViewPage() {
                     style={{
                       width: '88px',
                       height: '88px',
-                      backgroundColor: designSystem.brand.greenPillBg,
+                      backgroundColor: designSystem.brand.greenTint,
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -631,7 +633,7 @@ function HomeViewPage() {
                           <span
                             style={{
                               fontSize: '13px',
-                              backgroundColor: designSystem.brand.greenPillBg,
+                              backgroundColor: designSystem.brand.greenTint,
                               color: designSystem.brand.greenText,
                               padding: '4px 12px',
                               borderRadius: designSystem.borderRadius.full,
@@ -693,7 +695,7 @@ function HomeViewPage() {
                     style={{
                       width: '88px',
                       height: '88px',
-                      backgroundColor: 'rgba(124, 58, 237, 0.15)',
+                      backgroundColor: designSystem.gray[100],
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -706,7 +708,7 @@ function HomeViewPage() {
                       height="44"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke={designSystem.status.excused}
+                      stroke={designSystem.gray[500]}
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -772,24 +774,23 @@ function HomeViewPage() {
         backgroundColor={designSystem.colors.white}
         closeOnBackdropClick={!isValidatingLastSession && !isNavigatingToScanning}
       >
-        {/* Success Icon */}
+        {/* Success Icon - pastel green pair (design-review v2) */}
         <div
           style={{
             width: '64px',
             height: '64px',
-            background: designSystem.flat.success,
+            background: designSystem.brand.greenTint,
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             margin: '0 auto 24px auto',
-            boxShadow: designSystem.shadows.md,
           }}
         >
           <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
             <path
               d="M5 12l5 5L20 7"
-              stroke="white"
+              stroke={designSystem.pastel.green.accent}
               strokeWidth="3"
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -874,7 +875,6 @@ function HomeViewPage() {
           isLoading={isValidatingLastSession || isNavigatingToScanning}
           confirmLabel={texts.recreationConfirmButton}
           loadingLabel={texts.recreationLoadingButton}
-          confirmGradient={designSystem.flat.success}
         />
       </ModalBase>
 
@@ -917,8 +917,8 @@ function HomeViewPage() {
           onCancel={() => setShowEndSessionModal(false)}
           onConfirm={handleConfirmEndSession}
           confirmLabel={texts.endSessionConfirmButton}
-          // destructive end-session → red-600 (#DC2626), §4b
-          confirmGradient={designSystem.flat.dangerHover}
+          // destructive end-session → unified modal red (#CC2626), §4b
+          confirmGradient={designSystem.flat.danger}
         />
       </ModalBase>
     </BackgroundWrapper>

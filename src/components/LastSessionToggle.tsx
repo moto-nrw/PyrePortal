@@ -67,7 +67,7 @@ export const LastSessionToggle: React.FC = () => {
               position: 'relative',
               width: '48px',
               height: '28px',
-              backgroundColor: isEnabled ? '#83CD2D' : '#E5E7EB',
+              backgroundColor: isEnabled ? '#3F6F12' : '#E5E7EB',
               borderRadius: '9999px',
               transition: 'background-color 200ms ease-out',
               boxShadow: 'inset 0 2px 4px rgba(0, 0, 0, 0.1)',
