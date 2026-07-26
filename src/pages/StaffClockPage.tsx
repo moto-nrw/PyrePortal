@@ -1,11 +1,9 @@
-import { faWifi } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { adapter } from '@platform';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal, ModalBase } from '../components/ui';
+import { ContactlessPaymentIcon, ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { isRealScanningEnabled } from '../platform/adapter';
 import {
@@ -806,7 +804,7 @@ function StaffClockPage() {
                 style={{
                   width: '140px',
                   height: '140px',
-                  backgroundColor: '#E6EFFF',
+                  backgroundColor: designSystem.pastel.blue.bg,
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
@@ -814,11 +812,7 @@ function StaffClockPage() {
                   margin: '0 auto 40px',
                 }}
               >
-                <FontAwesomeIcon
-                  icon={faWifi}
-                  size="5x"
-                  style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
-                />
+                <ContactlessPaymentIcon size={84} color={designSystem.brand.blue} />
               </div>
 
               <p

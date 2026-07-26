@@ -773,7 +773,7 @@ function HomeViewPage() {
                   width: '76px',
                   height: '76px',
                   borderRadius: '50%',
-                  backgroundColor: '#DBEAFE',
+                  backgroundColor: designSystem.brand.bluePillBg,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -785,7 +785,7 @@ function HomeViewPage() {
                   height="44"
                   viewBox="0 0 24 24"
                   fill="none"
-                  stroke="#2563EB"
+                  stroke={designSystem.brand.blue}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
