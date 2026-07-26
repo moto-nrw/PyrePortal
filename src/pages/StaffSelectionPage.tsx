@@ -11,6 +11,7 @@ import { PillButton } from '../components/ui/PillButton';
 import { useFrozenSortOrder } from '../hooks/useFrozenSortOrder';
 import { usePagination } from '../hooks/usePagination';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction } from '../utils/logger';
 
 /** User-facing German UI copy for this page */
@@ -150,7 +151,9 @@ function StaffSelectionPage() {
         canGoNext={canGoNext}
       />
 
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+      <div
+        style={{ display: 'flex', justifyContent: 'center', marginTop: designSystem.spacing.lg }}
+      >
         <PillButton
           variant="primary"
           onClick={handleContinue}

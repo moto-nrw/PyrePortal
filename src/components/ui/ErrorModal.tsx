@@ -26,7 +26,7 @@ export const ErrorModal: React.FC<ErrorModalProps> = ({
     backgroundColor={designSystem.colors.white}
     timeout={autoCloseDelay}
   >
-    <div style={{ marginBottom: designSystem.spacing.lg, color: '#DC2626' }}>
+    <div style={{ marginBottom: designSystem.spacing.lg, color: designSystem.pastel.red.accent }}>
       <FontAwesomeIcon icon={faCircleXmark} style={{ fontSize: '3rem' }} />
     </div>
     <h2

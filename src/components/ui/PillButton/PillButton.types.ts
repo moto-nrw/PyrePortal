@@ -8,9 +8,9 @@ export interface PillButtonProps {
   icon?: ReactNode;
 
   /** Button variant - determines color scheme */
-  variant: 'primary' | 'action' | 'secondary';
+  variant: 'primary' | 'action' | 'secondary' | 'ghost';
 
-  /** Color accent for secondary variant only */
+  /** Color accent for the secondary and ghost variants */
   color?: 'blue' | 'gray';
 
   /** Disabled state */

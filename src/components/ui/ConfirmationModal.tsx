@@ -36,18 +36,17 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     backdropBlur="6px"
     closeOnBackdropClick={!isLoading}
   >
-    {/* Header Icon */}
+    {/* Header Icon - pastel green pair (design-review v2) */}
     <div
       style={{
         width: '64px',
         height: '64px',
-        background: 'linear-gradient(to right, #83cd2d, #6ba529)',
+        background: designSystem.brand.greenTint,
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         margin: '0 auto 24px auto',
-        boxShadow: '0 8px 32px rgba(131, 205, 45, 0.3)',
       }}
     >
       <svg
@@ -55,7 +54,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         height="32"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#FFFFFF"
+        stroke={designSystem.pastel.green.accent}
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -80,7 +79,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     {/* Activity Details Card */}
     <div
       style={{
-        backgroundColor: '#F8FAFC',
+        backgroundColor: designSystem.gray[50],
         borderRadius: designSystem.borderRadius.lg,
         padding: '20px',
         marginBottom: '20px',
@@ -111,7 +110,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#14B8A6"
+            stroke="#374151"
             strokeWidth="2"
           >
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -145,7 +144,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#4f46e5"
+            stroke="#374151"
             strokeWidth="2"
           >
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
@@ -219,7 +218,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               height="16"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#14B8A6"
+              stroke="#374151"
               strokeWidth="2"
             >
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />

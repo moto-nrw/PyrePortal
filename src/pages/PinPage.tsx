@@ -8,6 +8,7 @@ import { ErrorModal } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { api, type PinValidationResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { designSystem } from '../styles/designSystem';
 import {
   createLogger,
   logNavigation,
@@ -35,6 +36,11 @@ interface NumpadButtonProps {
   readonly children: React.ReactNode;
 }
 
+// FROZEN by PinPage.test.tsx: press scale(0.95), clear-btn press bg #F3F4F6,
+// resting boxShadow '0 3px 8px rgba(0, 0, 0, 0.1)'. Keep exact rendered values.
+const NUMPAD_SHADOW = '0 3px 8px rgba(0, 0, 0, 0.1)';
+const NUMPAD_SHADOW_PRESSED = '0 1px 2px rgba(0, 0, 0, 0.1)';
+
 function NumpadButton({ onClick, isAction = false, children }: NumpadButtonProps) {
   return (
     <button
@@ -45,31 +51,39 @@ function NumpadButton({ onClick, isAction = false, children }: NumpadButtonProps
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: isAction ? '#F9FAFB' : '#FFFFFF',
-        border: isAction ? '3px solid #D1D5DB' : '3px solid #E5E7EB',
-        borderRadius: '24px',
+        backgroundColor: isAction ? designSystem.gray[50] : designSystem.surface.background,
+        border: isAction
+          ? `3px solid ${designSystem.gray[300]}`
+          : `3px solid ${designSystem.gray[200]}`,
+        borderRadius: designSystem.borderRadius.xl,
         fontSize: isAction ? '42px' : '50px',
         fontWeight: 700,
-        color: isAction ? '#6B7280' : '#111827',
+        color: isAction ? designSystem.gray[500] : designSystem.gray[900],
         cursor: 'pointer',
-        transition: 'all 150ms ease-out',
+        transition: designSystem.transitions.base,
         outline: 'none',
-        boxShadow: '0 3px 8px rgba(0, 0, 0, 0.1)',
+        boxShadow: NUMPAD_SHADOW,
       }}
       onPointerDown={e => {
-        e.currentTarget.style.transform = 'scale(0.95)';
-        e.currentTarget.style.backgroundColor = isAction ? '#F3F4F6' : '#F9FAFB';
-        e.currentTarget.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.1)';
+        e.currentTarget.style.transform = designSystem.scales.activeSmall;
+        e.currentTarget.style.backgroundColor = isAction
+          ? designSystem.gray[100]
+          : designSystem.gray[50];
+        e.currentTarget.style.boxShadow = NUMPAD_SHADOW_PRESSED;
       }}
       onPointerUp={e => {
         e.currentTarget.style.transform = '';
-        e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
-        e.currentTarget.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.1)';
+        e.currentTarget.style.backgroundColor = isAction
+          ? designSystem.gray[50]
+          : designSystem.surface.background;
+        e.currentTarget.style.boxShadow = NUMPAD_SHADOW;
       }}
       onPointerLeave={e => {
         e.currentTarget.style.transform = '';
-        e.currentTarget.style.backgroundColor = isAction ? '#F9FAFB' : '#FFFFFF';
-        e.currentTarget.style.boxShadow = '0 3px 8px rgba(0, 0, 0, 0.1)';
+        e.currentTarget.style.backgroundColor = isAction
+          ? designSystem.gray[50]
+          : designSystem.surface.background;
+        e.currentTarget.style.boxShadow = NUMPAD_SHADOW;
       }}
     >
       {children}
@@ -280,7 +294,7 @@ function PinPage() {
                 margin: '0 0 8px 0',
                 lineHeight: 1.2,
                 fontWeight: 700,
-                color: '#111827',
+                color: designSystem.gray[900],
               }}
             >
               {texts.title}
@@ -291,7 +305,7 @@ function PinPage() {
               style={{
                 fontSize: '18px',
                 margin: 0,
-                color: '#6B7280',
+                color: designSystem.gray[500],
                 fontWeight: 500,
               }}
             >
@@ -309,9 +323,9 @@ function PinPage() {
                 alignItems: 'center',
                 gap: isLoading ? '0px' : '20px',
                 padding: '16px 24px',
-                backgroundColor: '#F9FAFB',
-                borderRadius: '16px',
-                border: `2px solid ${isLoading ? '#5080D8' : '#E5E7EB'}`,
+                backgroundColor: designSystem.gray[50],
+                borderRadius: designSystem.borderRadius.lg,
+                border: `2px solid ${isLoading ? designSystem.gray[400] : designSystem.gray[200]}`,
                 width: 'fit-content',
                 margin: '0 auto 12px auto',
                 transition: 'all 300ms ease-out',
@@ -324,8 +338,8 @@ function PinPage() {
                   style={{
                     width: '24px',
                     height: '24px',
-                    border: '3px solid #E5E7EB',
-                    borderTopColor: '#5080D8',
+                    border: `3px solid ${designSystem.gray[200]}`,
+                    borderTopColor: designSystem.gray[900],
                     borderRadius: '50%',
                     animation: 'spin 0.8s linear infinite',
                   }}
@@ -338,8 +352,9 @@ function PinPage() {
                       width: '24px',
                       height: '24px',
                       borderRadius: '50%',
-                      transition: 'all 200ms ease-out',
-                      backgroundColor: i < pin.length ? '#111827' : '#E5E7EB',
+                      transition: designSystem.transitions.base,
+                      backgroundColor:
+                        i < pin.length ? designSystem.gray[900] : designSystem.gray[200],
                       transform: i < pin.length ? 'scale(1.15)' : 'scale(1)',
                     }}
                   />

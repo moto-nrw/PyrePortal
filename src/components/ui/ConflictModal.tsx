@@ -35,18 +35,17 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     backgroundColor="#FFFFFF"
     closeOnBackdropClick={!isLoading}
   >
-    {/* Warning Icon */}
+    {/* Warning Icon - pastel amber pair (design-review v2) */}
     <div
       style={{
         width: '64px',
         height: '64px',
-        background: 'linear-gradient(to right, #F59E0B, #EAB308)',
+        background: designSystem.pastel.amber.tint,
         borderRadius: '50%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         margin: '0 auto 24px auto',
-        boxShadow: '0 8px 32px rgba(245, 158, 11, 0.3)',
       }}
     >
       <svg
@@ -54,7 +53,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
         height="32"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#FFFFFF"
+        stroke={designSystem.pastel.amber.accent}
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -92,17 +91,17 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     {/* Activity Details Card */}
     <div
       style={{
-        backgroundColor: '#FEF3C7',
+        backgroundColor: '#F9FAFB',
         borderRadius: designSystem.borderRadius.lg,
         padding: '24px',
         marginBottom: '32px',
-        border: '1px solid #FCD34D',
+        border: '1px solid #E5E7EB',
       }}
     >
       <div
         style={{
           fontSize: '14px',
-          color: '#92400E',
+          color: '#6B7280',
           marginBottom: '8px',
           fontWeight: 600,
           textTransform: 'uppercase',
@@ -136,7 +135,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
             height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#14B8A6"
+            stroke="#374151"
             strokeWidth="2"
           >
             <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
@@ -170,7 +169,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
             height="20"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#f87C10"
+            stroke="#374151"
             strokeWidth="2"
           >
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z" />
@@ -185,18 +184,18 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     {/* Supervisors */}
     <div
       style={{
-        backgroundColor: '#F0F9FF',
+        backgroundColor: '#F9FAFB',
         borderRadius: designSystem.borderRadius.lg,
         padding: '20px',
         marginBottom: '32px',
-        border: '1px solid #BAE6FD',
+        border: '1px solid #E5E7EB',
       }}
     >
       <div
         style={{
           fontSize: '14px',
           fontWeight: 600,
-          color: '#0369A1',
+          color: '#6B7280',
           marginBottom: '12px',
           textTransform: 'uppercase',
           letterSpacing: '0.5px',
@@ -221,7 +220,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
               fontSize: '14px',
               fontWeight: 500,
               color: '#1F2937',
-              border: '1px solid #E0E7FF',
+              border: '1px solid #E5E7EB',
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
@@ -232,7 +231,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
               height="16"
               viewBox="0 0 24 24"
               fill="none"
-              stroke="#14B8A6"
+              stroke="#374151"
               strokeWidth="2"
             >
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
@@ -247,8 +246,8 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
     {/* Warning Message */}
     <div
       style={{
-        backgroundColor: '#FEF2F2',
-        border: '1px solid #FECACA',
+        backgroundColor: designSystem.pastel.red.bg,
+        border: `1px solid ${designSystem.pastel.red.tint}`,
         borderRadius: designSystem.borderRadius.md,
         padding: '16px',
         marginBottom: '32px',
@@ -257,7 +256,7 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
       <div
         style={{
           fontSize: '14px',
-          color: '#DC2626',
+          color: designSystem.pastel.red.accent,
           fontWeight: 600,
           textAlign: 'center',
         }}
@@ -272,8 +271,8 @@ export const ConflictModal: React.FC<ConflictModalProps> = ({
       isLoading={isLoading}
       confirmLabel="Trotzdem starten"
       loadingLabel="Starte..."
-      confirmGradient="linear-gradient(to right, #DC2626, #B91C1C)"
-      confirmShadow="0 4px 14px 0 rgba(220, 38, 38, 0.4)"
+      // destructive takeover → unified modal red (#CC2626), §4b
+      confirmGradient={designSystem.flat.danger}
     />
   </ModalBase>
 );

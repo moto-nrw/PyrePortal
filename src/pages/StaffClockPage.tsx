@@ -1,11 +1,9 @@
-import { faWifi } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { adapter } from '@platform';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal, ModalBase } from '../components/ui';
+import { ContactlessPaymentIcon, ErrorModal, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { isRealScanningEnabled } from '../platform/adapter';
 import {
@@ -317,16 +315,19 @@ const actionLabels: Record<StaffClockAction, string> = {
 /** Pill colors per state chip, aligned with the app's badge tints. */
 const statePillStyles: Record<StaffClockState['state'], { background: string; color: string }> = {
   checked_out: { background: '#F3F4F6', color: '#374151' },
-  checked_in: { background: 'rgba(131,205,45,0.15)', color: '#16A34A' },
+  checked_in: {
+    background: designSystem.brand.greenTint,
+    color: designSystem.brand.greenText,
+  },
   on_break: { background: '#FEF3C7', color: '#B45309' },
 };
 
 /** Action button appearance following the existing pill-button language. */
 const actionButtonStyles: Record<StaffClockAction, { background: string; boxShadow: string }> = {
-  checkin: { background: designSystem.gradients.greenRight, boxShadow: designSystem.shadows.green },
-  break_start: { background: '#F59E0B', boxShadow: '0 8px 40px rgba(245,158,11,0.3)' },
-  break_end: { background: designSystem.gradients.blueRight, boxShadow: designSystem.shadows.blue },
-  checkout: { background: '#EF4444', boxShadow: '0 8px 40px rgba(239,68,68,0.3)' },
+  checkin: { background: designSystem.flat.primary, boxShadow: designSystem.shadows.md },
+  break_start: { background: '#F59E0B', boxShadow: designSystem.shadows.md },
+  break_end: { background: designSystem.flat.action, boxShadow: designSystem.shadows.md },
+  checkout: { background: designSystem.flat.danger, boxShadow: designSystem.shadows.md },
 };
 
 function formatMinutes(minutes: number): string {
@@ -400,7 +401,7 @@ function PillButton({
         fontSize: '24px',
         fontWeight: 700,
         color: '#FFFFFF',
-        background: disabled ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)' : background,
+        background: disabled ? designSystem.gray[400] : background,
         border: 'none',
         borderRadius: designSystem.borderRadius.full,
         cursor: disabled ? 'not-allowed' : 'pointer',
@@ -803,7 +804,7 @@ function StaffClockPage() {
                 style={{
                   width: '140px',
                   height: '140px',
-                  backgroundColor: '#E6EFFF',
+                  backgroundColor: designSystem.pastel.blue.bg,
                   borderRadius: '50%',
                   display: 'flex',
                   alignItems: 'center',
@@ -811,11 +812,7 @@ function StaffClockPage() {
                   margin: '0 auto 40px',
                 }}
               >
-                <FontAwesomeIcon
-                  icon={faWifi}
-                  size="5x"
-                  style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
-                />
+                <ContactlessPaymentIcon size={84} color={designSystem.brand.blue} />
               </div>
 
               <p
@@ -835,8 +832,8 @@ function StaffClockPage() {
                 label={isBusy ? 'Armband wird gelesen …' : 'Armband scannen'}
                 onClick={() => void handleScan()}
                 disabled={isBusy}
-                background={designSystem.gradients.blueRight}
-                boxShadow={designSystem.shadows.blue}
+                background={designSystem.flat.action}
+                boxShadow={designSystem.shadows.md}
                 minWidth="360px"
               />
             </div>
@@ -910,7 +907,7 @@ function StaffClockPage() {
                     style={{
                       width: '96px',
                       height: '96px',
-                      backgroundColor: 'rgba(131,205,45,0.15)',
+                      backgroundColor: designSystem.brand.greenTint,
                       borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
@@ -923,7 +920,7 @@ function StaffClockPage() {
                       height="48"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#16A34A"
+                      stroke={designSystem.brand.greenText}
                       strokeWidth="3"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -942,8 +939,8 @@ function StaffClockPage() {
                       label="Nächstes Armband scannen"
                       onClick={() => void handleScan()}
                       disabled={isBusy}
-                      background={designSystem.gradients.blueRight}
-                      boxShadow={designSystem.shadows.blue}
+                      background={designSystem.flat.action}
+                      boxShadow={designSystem.shadows.md}
                     />
                   </div>
                 </div>
@@ -1025,7 +1022,7 @@ function StaffClockPage() {
                             fontWeight: 700,
                             color: '#FFFFFF',
                             background: isBusy
-                              ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
+                              ? designSystem.gray[400]
                               : actionButtonStyles[action].background,
                             border: 'none',
                             borderRadius: designSystem.borderRadius.full,
@@ -1193,13 +1190,13 @@ function StaffClockPage() {
               color: '#FFFFFF',
               background:
                 isBusy || reason.trim().length === 0
-                  ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                  : designSystem.gradients.blueRight,
+                  ? designSystem.gray[400]
+                  : designSystem.flat.primary,
               border: 'none',
               borderRadius: designSystem.borderRadius.full,
               cursor: isBusy || reason.trim().length === 0 ? 'not-allowed' : 'pointer',
               outline: 'none',
-              boxShadow: isBusy || reason.trim().length === 0 ? 'none' : designSystem.shadows.blue,
+              boxShadow: isBusy || reason.trim().length === 0 ? 'none' : designSystem.shadows.md,
               opacity: isBusy || reason.trim().length === 0 ? 0.6 : 1,
               transition: designSystem.transitions.base,
             }}

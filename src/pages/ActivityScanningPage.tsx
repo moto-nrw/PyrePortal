@@ -10,10 +10,11 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ModalBase } from '../components/ui';
+import { HouseLineIcon, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { useActivityScanningPage } from '../hooks/pages/useActivityScanningPage';
 import { formatRoomName, type DailyFeedbackRating } from '../services/api';
+import { designSystem } from '../styles/designSystem';
 
 /** User-facing German UI copy for this page */
 const texts = {
@@ -48,31 +49,21 @@ const texts = {
   destinationQuestionHeading: (firstName: string) => `Wohin geht ${firstName}?`,
 } as const;
 
-// Feedback button color schemes: green (positive), yellow (neutral), red (negative)
+// Feedback modal is white; the three emojis carry the only color accents
+// (pastel family accents: green, amber, red).
 const FEEDBACK_BUTTON_COLORS = {
-  positive: {
-    background: 'rgba(16, 185, 129, 0.3)', // Green with transparency
-    border: 'rgba(16, 185, 129, 0.7)',
-    hoverBackground: 'rgba(16, 185, 129, 0.5)',
-  },
-  neutral: {
-    background: 'rgba(245, 158, 11, 0.3)', // Yellow/amber with transparency
-    border: 'rgba(245, 158, 11, 0.7)',
-    hoverBackground: 'rgba(245, 158, 11, 0.5)',
-  },
-  negative: {
-    background: 'rgba(239, 68, 68, 0.3)', // Red with transparency
-    border: 'rgba(239, 68, 68, 0.7)',
-    hoverBackground: 'rgba(239, 68, 68, 0.5)',
-  },
+  positive: designSystem.pastel.green.accent,
+  neutral: designSystem.pastel.amber.accent,
+  negative: designSystem.pastel.red.accent,
 } as const;
 
 // Button style constants for consistent styling (matching Check In/Check Out modal patterns)
 const FEEDBACK_BUTTON_STYLES = {
   base: {
     borderRadius: '20px',
-    color: '#FFFFFF',
-    padding: '24px 32px',
+    backgroundColor: designSystem.colors.white,
+    color: designSystem.gray[700],
+    padding: '24px 0',
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
@@ -81,9 +72,12 @@ const FEEDBACK_BUTTON_STYLES = {
     alignItems: 'center' as const,
     justifyContent: 'center' as const,
     gap: '12px',
-    minWidth: '140px',
+    // Fixed width keeps all three buttons the same size regardless of label
+    // (168px x3 + 2x24px gap fits the lg modal content width without wrapping)
+    width: '168px',
     borderWidth: '3px',
     borderStyle: 'solid' as const,
+    borderColor: designSystem.gray[200],
   },
   hover: {
     transform: 'scale(1.05)',
@@ -95,10 +89,7 @@ const FEEDBACK_BUTTON_STYLES = {
 
 const DESTINATION_BUTTON_STYLES = {
   base: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    border: '3px solid rgba(255, 255, 255, 0.5)',
     borderRadius: '20px',
-    color: '#FFFFFF',
     fontSize: '32px',
     fontWeight: 700,
     padding: '28px 36px',
@@ -109,31 +100,52 @@ const DESTINATION_BUTTON_STYLES = {
     aspectRatio: '5 / 4',
   },
   hover: {
-    backgroundColor: 'rgba(255, 255, 255, 0.35)',
     transform: 'scale(1.05)',
   },
   normal: {
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     transform: 'scale(1)',
   },
 };
 
-/** Color presets for destination buttons matching their modal colors */
+/** Color presets for destination buttons on the pastel checkout modal:
+ *  Raumwechsel is a neutral white card; the location shortcuts use their
+ *  pastel family (tint surface + accent icon/label). */
 const DESTINATION_COLORS = {
-  default: { bg: 'rgba(255, 255, 255, 0.25)', bgHover: 'rgba(255, 255, 255, 0.35)' },
-  schulhof: { bg: 'rgba(245, 158, 11, 0.5)', bgHover: 'rgba(245, 158, 11, 0.65)' },
-  toilette: { bg: 'rgba(96, 165, 250, 0.85)', bgHover: 'rgba(96, 165, 250, 0.95)' },
-  destructive: { bg: 'rgba(220, 38, 38, 0.5)', bgHover: 'rgba(220, 38, 38, 0.65)' },
+  default: {
+    bg: designSystem.colors.white,
+    bgHover: designSystem.gray[50],
+    border: designSystem.gray[300],
+    accent: designSystem.gray[800],
+  },
+  schulhof: {
+    bg: designSystem.pastel.amber.bg,
+    bgHover: designSystem.pastel.amber.tint,
+    border: '#EDCC7B',
+    accent: designSystem.pastel.amber.accent,
+  },
+  toilette: {
+    bg: designSystem.pastel.blue.bg,
+    bgHover: designSystem.pastel.blue.tint,
+    border: designSystem.pastel.blue.tint,
+    accent: designSystem.pastel.blue.accent,
+  },
+  destructive: {
+    bg: designSystem.pastel.orange.tint,
+    bgHover: '#FECDB6',
+    border: '#FEA095',
+    accent: designSystem.pastel.red.accent,
+  },
 };
 
-// Static SVG icons hoisted out of render path to avoid per-render allocation on Pi
+// Static SVG icons hoisted out of render path to avoid per-render allocation on Pi.
+// stroke/fill use currentColor so each destination button tints its own icon.
 const ICON_RAUMWECHSEL = (
   <svg
     width="48"
     height="48"
     viewBox="0 0 24 24"
     fill="none"
-    stroke="white"
+    stroke="currentColor"
     strokeWidth="2.5"
     strokeLinecap="round"
     strokeLinejoin="round"
@@ -150,7 +162,7 @@ const ICON_SCHULHOF = (
     height="48"
     viewBox="0 0 64 64"
     fill="none"
-    stroke="#FFFFFF"
+    stroke="currentColor"
     strokeWidth="2.5"
     strokeLinecap="round"
     strokeLinejoin="round"
@@ -170,24 +182,12 @@ const ICON_SCHULHOF = (
     {/* Right chain */}
     <line x1="40" y1="8" x2="42" y2="40" />
     {/* Seat */}
-    <rect x="19" y="40" width="26" height="4" rx="2" fill="#FFFFFF" />
+    <rect x="19" y="40" width="26" height="4" rx="2" fill="currentColor" />
   </svg>
 );
 
-const ICON_NACH_HAUSE = (
-  <svg
-    width="48"
-    height="48"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="white"
-    strokeWidth="2.2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-  </svg>
-);
+// Phosphor house-line, tinted via currentColor
+const ICON_NACH_HAUSE = <HouseLineIcon size={48} color="currentColor" />;
 
 /** Reusable destination button for checkout modal */
 function DestinationButton({
@@ -209,10 +209,8 @@ function DestinationButton({
       style={{
         ...DESTINATION_BUTTON_STYLES.base,
         backgroundColor: colors.bg,
-        border:
-          colorScheme !== 'default'
-            ? '3px solid rgba(255, 255, 255, 0.6)'
-            : DESTINATION_BUTTON_STYLES.base.border,
+        border: `3px solid ${colors.border}`,
+        color: colors.accent,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -233,7 +231,7 @@ function DestinationButton({
       }}
     >
       {icon}
-      <span style={{ fontSize: '24px', fontWeight: 800, color: '#FFFFFF' }}>{label}</span>
+      <span style={{ fontSize: '24px', fontWeight: 800 }}>{label}</span>
     </button>
   );
 }
@@ -282,12 +280,40 @@ const ActivityScanningPage: React.FC = () => {
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-100 p-4">
-        <div className="text-center">
-          <p className="text-lg text-gray-600">{texts.noActivitySelected}</p>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: designSystem.gray[50],
+          padding: '16px',
+        }}
+      >
+        <div style={{ textAlign: 'center' }}>
+          <p style={{ fontSize: '20px', color: designSystem.gray[500] }}>
+            {texts.noActivitySelected}
+          </p>
           <button
             onClick={() => navigate('/home')}
-            className="mt-4 rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+            style={{
+              marginTop: '16px',
+              borderRadius: designSystem.borderRadius.md,
+              backgroundColor: designSystem.flat.primary,
+              color: designSystem.colors.white,
+              border: 'none',
+              padding: '16px 24px',
+              fontSize: '18px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: designSystem.transitions.base,
+            }}
+            onPointerEnter={e => {
+              e.currentTarget.style.backgroundColor = designSystem.flat.primaryHover;
+            }}
+            onPointerLeave={e => {
+              e.currentTarget.style.backgroundColor = designSystem.flat.primary;
+            }}
           >
             {texts.backToHomeButton}
           </button>
@@ -295,6 +321,28 @@ const ActivityScanningPage: React.FC = () => {
       </div>
     );
   }
+
+  // Pastel two-tone family for the current scan-modal state (design-review v2):
+  // bg = modal surface, tint = icon circle / bar track, accent = icon + text + bar.
+  const scanFamily = (() => {
+    if (isPickupQueryVisualState) return designSystem.pastel.blue;
+    if (checkoutDestinationState?.showingFarewell) return designSystem.pastel.purple;
+    if ((currentScan as { isSchulhof?: boolean } | null)?.isSchulhof)
+      return designSystem.pastel.amber;
+    if ((currentScan as { isToilette?: boolean } | null)?.isToilette)
+      return designSystem.pastel.blue;
+    if (currentScan?.action === 'supervisor_authenticated') return designSystem.pastel.blue;
+    if ((currentScan as { showAsError?: boolean } | null)?.showAsError)
+      return designSystem.pastel.red;
+    if ((currentScan as { isInfo?: boolean } | null)?.isInfo) return designSystem.pastel.purple;
+    return currentScan?.action === 'checked_in' || currentScan?.action === 'transferred'
+      ? designSystem.pastel.green
+      : designSystem.pastel.orange;
+  })();
+
+  // The feedback prompt is the exception: white modal, neutral chrome, and the
+  // three emojis carry the only color accents.
+  const modalTextColor = showFeedbackPrompt ? designSystem.gray[900] : scanFamily.accent;
 
   // Helper function to render modal content area - extracted to avoid nested ternaries
   const renderModalContent = () => {
@@ -304,7 +352,7 @@ const ActivityScanningPage: React.FC = () => {
           <div
             style={{
               fontSize: '28px',
-              color: 'rgba(255, 255, 255, 0.95)',
+              color: modalTextColor,
               fontWeight: 600,
               position: 'relative',
               zIndex: 2,
@@ -322,7 +370,7 @@ const ActivityScanningPage: React.FC = () => {
         <div
           style={{
             fontSize: '28px',
-            color: 'rgba(255, 255, 255, 0.95)',
+            color: modalTextColor,
             fontWeight: 600,
             position: 'relative',
             zIndex: 2,
@@ -356,36 +404,33 @@ const ActivityScanningPage: React.FC = () => {
             }}
           >
             {feedbackButtons.map(({ rating, icon, label }) => {
-              const colorScheme = FEEDBACK_BUTTON_COLORS[rating];
+              const emojiColor = FEEDBACK_BUTTON_COLORS[rating];
               return (
                 <button
                   key={rating}
                   onClick={() => handleFeedbackSubmit(rating)}
-                  style={{
-                    ...FEEDBACK_BUTTON_STYLES.base,
-                    backgroundColor: colorScheme.background,
-                    borderColor: colorScheme.border,
-                  }}
+                  style={FEEDBACK_BUTTON_STYLES.base}
                   onPointerDown={e => {
-                    e.currentTarget.style.backgroundColor = colorScheme.hoverBackground;
+                    e.currentTarget.style.backgroundColor = designSystem.gray[50];
                     e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
                   }}
                   onPointerUp={e => {
-                    e.currentTarget.style.backgroundColor = colorScheme.background;
+                    e.currentTarget.style.backgroundColor = designSystem.colors.white;
                     e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
                   }}
                   onPointerLeave={e => {
-                    e.currentTarget.style.backgroundColor = colorScheme.background;
+                    e.currentTarget.style.backgroundColor = designSystem.colors.white;
                     e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
                   }}
                 >
-                  {/* Icon sized appropriately within button */}
+                  {/* The emoji is the only color accent on the white modal */}
                   <FontAwesomeIcon
                     icon={icon}
                     style={{
                       fontSize: '56px',
                       width: '64px',
                       height: '64px',
+                      color: emojiColor,
                     }}
                   />
                   <span style={{ fontSize: '20px', fontWeight: 700 }}>{label}</span>
@@ -440,7 +485,7 @@ const ActivityScanningPage: React.FC = () => {
                 icon: (
                   <FontAwesomeIcon
                     icon={faRestroom}
-                    style={{ fontSize: '48px', color: '#FFFFFF' }}
+                    style={{ fontSize: '48px', color: 'currentColor' }}
                   />
                 ),
                 onClick: () => void handleDestinationSelect('toilette'),
@@ -499,7 +544,7 @@ const ActivityScanningPage: React.FC = () => {
       <div
         style={{
           fontSize: '28px',
-          color: 'rgba(255, 255, 255, 0.95)',
+          color: modalTextColor,
           fontWeight: 600,
           position: 'relative',
           zIndex: 2,
@@ -679,14 +724,14 @@ const ActivityScanningPage: React.FC = () => {
               height: '76px',
               borderRadius: '50%',
               border: 'none',
-              backgroundColor: pickupQueryButtonDisabled ? 'rgba(80, 128, 216, 0.35)' : '#5080D8',
-              color: '#FFFFFF',
+              backgroundColor: pickupQueryButtonDisabled
+                ? designSystem.gray[400]
+                : designSystem.gray[900],
+              color: designSystem.colors.white,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: pickupQueryButtonDisabled
-                ? 'none'
-                : '0 12px 24px rgba(80, 128, 216, 0.28)',
+              boxShadow: pickupQueryButtonDisabled ? 'none' : designSystem.shadows.md,
               cursor: pickupQueryButtonDisabled ? 'not-allowed' : 'pointer',
               transition:
                 'transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease',
@@ -728,7 +773,7 @@ const ActivityScanningPage: React.FC = () => {
                 style={{
                   fontSize: '56px',
                   fontWeight: 700,
-                  color: '#111827',
+                  color: designSystem.gray[900],
                   margin: 0,
                   lineHeight: 1.2,
                 }}
@@ -738,7 +783,7 @@ const ActivityScanningPage: React.FC = () => {
               <p
                 style={{
                   fontSize: '32px',
-                  color: '#6B7280',
+                  color: designSystem.gray[500],
                   margin: 0,
                   fontWeight: 500,
                 }}
@@ -762,8 +807,11 @@ const ActivityScanningPage: React.FC = () => {
                 style={{
                   fontSize: '220px',
                   fontWeight: 800,
-                  color: '#83cd2d',
+                  // Darker pastel-family green (design review: modal green tone,
+                  // not the bright brand green)
+                  color: designSystem.pastel.green.accent,
                   lineHeight: 1,
+                  fontVariantNumeric: 'tabular-nums',
                   marginTop: '-12px',
                   opacity: processingQueueSize > 0 ? 0 : 1,
                 }}
@@ -776,8 +824,7 @@ const ActivityScanningPage: React.FC = () => {
                   width: '140px',
                   height: '140px',
                   borderRadius: '50%',
-                  background:
-                    'conic-gradient(from 0deg, transparent 0%, #5080D8 50%, #83CD2D 100%)',
+                  background: `conic-gradient(from 0deg, ${designSystem.gray[200]} 0%, ${designSystem.gray[900]} 100%)`,
                   mask: 'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
                   WebkitMask:
                     'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
@@ -810,23 +857,9 @@ const ActivityScanningPage: React.FC = () => {
                 : 'lg'
               : 'lg'
           }
-          backgroundColor={(() => {
-            if (isPickupQueryVisualState) return '#5080D8';
-            // "nach Hause" flow states (farewell, feedback) use blue
-            if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) return '#6366f1';
-            // Check for Schulhof check-in (special yellow)
-            if ((currentScan as { isSchulhof?: boolean } | null)?.isSchulhof) return '#F59E0B'; // Yellow for Schulhof
-            if ((currentScan as { isToilette?: boolean } | null)?.isToilette) return '#60A5FA'; // Blue for Toilette
-            // Check for supervisor authentication
-            if (currentScan?.action === 'supervisor_authenticated') return '#3B82F6'; // Blue for supervisor
-            // Check for error or info states
-            if ((currentScan as { showAsError?: boolean } | null)?.showAsError) return '#ef4444'; // Red for errors
-            if ((currentScan as { isInfo?: boolean } | null)?.isInfo) return '#6366f1'; // Blue for info
-            // Original logic for success states
-            return currentScan?.action === 'checked_in' || currentScan?.action === 'transferred'
-              ? '#83cd2d'
-              : '#f87C10';
-          })()}
+          backgroundColor={showFeedbackPrompt ? designSystem.colors.white : scanFamily.bg}
+          timeoutColor={showFeedbackPrompt ? undefined : scanFamily.accent}
+          timeoutTrackColor={showFeedbackPrompt ? undefined : scanFamily.tint}
           timeout={modalTimeoutDuration}
           timeoutResetKey={
             isPickupQueryPromptOpen
@@ -847,20 +880,6 @@ const ActivityScanningPage: React.FC = () => {
           closeOnBackdropClick={!shouldKeepPickupQueryModalOpen}
           closeOnEscapeKey={!shouldKeepPickupQueryModalOpen}
         >
-          {/* Background pattern for visual interest */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              background:
-                'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-              pointerEvents: 'none',
-            }}
-          />
-
           {/* Icon container with background circle - hidden during checkout destination selection (but visible during feedback) */}
           {(isPickupQueryPromptOpen ||
             showFeedbackPrompt ||
@@ -873,7 +892,7 @@ const ActivityScanningPage: React.FC = () => {
               style={{
                 width: '120px',
                 height: '120px',
-                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                backgroundColor: showFeedbackPrompt ? designSystem.gray[100] : scanFamily.tint,
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -888,25 +907,18 @@ const ActivityScanningPage: React.FC = () => {
                   return (
                     <FontAwesomeIcon
                       icon={faClock}
-                      style={{ fontSize: '72px', color: '#FFFFFF' }}
+                      style={{ fontSize: '72px', color: scanFamily.accent }}
                     />
                   );
                 }
-                // "nach Hause" flow - Home icon for farewell and feedback states
+                // "nach Hause" flow - Phosphor house-line for farewell and feedback
+                // states; on the white feedback modal it stays neutral gray.
                 if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
                   return (
-                    <svg
-                      width="80"
-                      height="80"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="white"
-                      strokeWidth="2.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                    </svg>
+                    <HouseLineIcon
+                      size={80}
+                      color={showFeedbackPrompt ? designSystem.gray[700] : scanFamily.accent}
+                    />
                   );
                 }
                 // Supervisor authentication icon
@@ -917,7 +929,7 @@ const ActivityScanningPage: React.FC = () => {
                       height="80"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="white"
+                      stroke={scanFamily.accent}
                       strokeWidth="2.5"
                     >
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -935,7 +947,7 @@ const ActivityScanningPage: React.FC = () => {
                       height="80"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="white"
+                      stroke={scanFamily.accent}
                       strokeWidth="3"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -953,7 +965,7 @@ const ActivityScanningPage: React.FC = () => {
                       height="80"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="white"
+                      stroke={scanFamily.accent}
                       strokeWidth="2.5"
                     >
                       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
@@ -971,7 +983,7 @@ const ActivityScanningPage: React.FC = () => {
                     height="80"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="white"
+                    stroke={scanFamily.accent}
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -984,7 +996,7 @@ const ActivityScanningPage: React.FC = () => {
                     height="80"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="white"
+                    stroke={scanFamily.accent}
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1003,7 +1015,7 @@ const ActivityScanningPage: React.FC = () => {
               fontSize: '48px',
               fontWeight: 800,
               marginBottom: '24px',
-              color: '#FFFFFF',
+              color: modalTextColor,
               lineHeight: 1.2,
               position: 'relative',
               zIndex: 2,
