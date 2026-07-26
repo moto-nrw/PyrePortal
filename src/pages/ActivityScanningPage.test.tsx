@@ -75,8 +75,8 @@ const defaultRfidState = {
 
 const defaultStoreState = {
   authenticatedUser: {
-    staffId: 1,
-    staffName: 'Test User',
+    staffId: 0,
+    staffName: 'OGS Device',
     deviceName: 'Test Device',
     pin: '1234',
   },
@@ -759,7 +759,8 @@ describe('ActivityScanningPage', () => {
     await waitFor(() => {
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 99 },
-        '1234'
+        '1234',
+        1
       );
     });
   });
@@ -874,7 +875,8 @@ describe('ActivityScanningPage', () => {
     await waitFor(() => {
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 88 },
-        '1234'
+        '1234',
+        1
       );
     });
   });
@@ -917,7 +919,8 @@ describe('ActivityScanningPage', () => {
     await waitFor(() => {
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 88 },
-        '1234'
+        '1234',
+        1
       );
     });
   });
@@ -1022,7 +1025,8 @@ describe('ActivityScanningPage', () => {
         '1234',
         '04:AA:BB:CC:DD:EE:FF',
         'confirm_daily_checkout',
-        'zuhause'
+        'zuhause',
+        1
       );
     });
 

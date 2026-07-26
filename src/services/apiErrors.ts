@@ -25,6 +25,10 @@ export interface ApiErrorResponse {
     student_id?: number;
     existing_visit_id?: number;
     entry_time?: string;
+    // Staff clock conflict fields (project-phoenix #1654). The backend sends
+    // more of them; only the two the kiosk renders are declared.
+    planned_start_time?: string;
+    deviation_minutes?: string;
   };
 }
 
@@ -117,6 +121,14 @@ export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   ],
   ['student RFID tag required for pickup query', 'Bitte Schüler-Armband scannen.'],
   ['RFID parameter is required', 'RFID-Tag fehlt in der Anfrage.'],
+
+  // Staff time tracking RFID errors (project-phoenix #1654)
+  ['invalid RFID tag', 'Das gelesene Armband ist ungültig. Bitte erneut scannen.'],
+  ['RFID tag is inactive', 'Dieses Armband ist deaktiviert. Bitte an die Leitung wenden.'],
+  [
+    'RFID tag is not assigned to staff',
+    'Dieses Armband gehört keinem Mitarbeitenden. Bitte das persönliche Armband verwenden.',
+  ],
 
   // 6. ATTENDANCE/VISIT ERRORS (404)
   ['student has no attendance record for today', 'Schüler wurde heute noch nicht eingecheckt.'],
@@ -286,6 +298,23 @@ function formatStudentAlreadyActiveError(details: Record<string, unknown>): stri
 }
 
 /**
+ * German copy for the staff clock error codes the kiosk can provoke
+ * (project-phoenix backend/api/iot/staffclock/errors.go).
+ */
+const STAFF_CLOCK_MESSAGES: Readonly<Record<string, string>> = {
+  invalid_staff_clock_request: 'Die Stempel-Anfrage ist ungültig. Bitte erneut versuchen.',
+  invalid_rfid_tag: 'Das gelesene Armband ist ungültig. Bitte erneut scannen.',
+  rfid_tag_not_found: 'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.',
+  rfid_tag_inactive: 'Dieses Armband ist deaktiviert. Bitte an die Leitung wenden.',
+  rfid_tag_not_staff:
+    'Dieses Armband gehört keinem Mitarbeitenden. Bitte das persönliche Armband verwenden.',
+  reopen_status_conflict: 'Der Arbeitsort wurde geändert. Bitte eine Begründung eingeben.',
+  planned_start_not_reached: 'Einstempeln ist vor dem geplanten Dienstbeginn nicht möglich.',
+  deviation_reason_required: 'Für diese Abweichung vom Dienstplan ist eine Begründung nötig.',
+  invalid_staff_clock_state: 'Diese Aktion passt nicht zum aktuellen Stempelstatus.',
+};
+
+/**
  * Map API errors to German user-friendly messages with rich details support
  * Handles structured error responses (e.g., capacity errors with room/activity details)
  */
@@ -309,6 +338,12 @@ export function mapApiErrorToGerman(error: unknown): string {
   // Duplicate active visit (Issue #844)
   if (error.code === 'STUDENT_ALREADY_ACTIVE' && error.details) {
     return formatStudentAlreadyActiveError(error.details);
+  }
+
+  // Staff clock errors carry stable codes (project-phoenix #1654), so they are
+  // matched on the code rather than on the message text.
+  if (error.code && STAFF_CLOCK_MESSAGES[error.code]) {
+    return STAFF_CLOCK_MESSAGES[error.code];
   }
 
   // Fall back to message-based mapping

@@ -165,10 +165,105 @@ export interface CurrentSession {
   supervisors?: SupervisorInfo[];
 }
 
+export type StaffClockAction = 'checkin' | 'checkout' | 'break_start' | 'break_end';
+type StaffClockStateName = 'checked_out' | 'checked_in' | 'on_break';
+type WorkSessionStatus = 'present' | 'home_office';
+
+interface StaffClockSession {
+  id: number;
+  staff_id: number;
+  check_in_time: string;
+  check_out_time?: string;
+  status: WorkSessionStatus;
+  source: 'app' | 'nfc';
+}
+
+export interface StaffClockState {
+  staff_id: number;
+  staff_name: string;
+  state: StaffClockStateName;
+  allowed_actions: StaffClockAction[];
+  session?: StaffClockSession;
+  active_break?: {
+    id: number;
+    started_at: string;
+  };
+  net_minutes: number;
+  break_minutes: number;
+  required_break_minutes: number;
+  is_break_compliant: boolean;
+}
+
+export interface StaffClockCommand {
+  rfid_tag: string;
+  action: StaffClockAction;
+  status?: WorkSessionStatus;
+  reason?: string;
+  planned_duration_minutes?: number;
+}
+
 /**
  * API functions
  */
 export const api = {
+  /**
+   * Get the current time-tracking state for a scanned staff card.
+   *
+   * `staffId` is the employee the card belongs to and is sent as X-Staff-ID so
+   * the request carries its actor. It is unknown on the very first read of a
+   * card — resolving the tag to a person is what that read is for — and is
+   * passed on every later read of a card already identified.
+   *
+   * `signal` lets the caller cancel the read. A kiosk deadline that expires
+   * without cancelling would leave the request live, and its answer describes a
+   * card that may no longer be at the reader.
+   */
+  async getStaffClockState(
+    pin: string,
+    rfidTag: string,
+    staffId?: number,
+    signal?: AbortSignal
+  ): Promise<StaffClockState> {
+    const response = await apiCall<{ status: string; data: StaffClockState }>(
+      '/api/iot/staff-clock/state',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(pin, staffId),
+        body: JSON.stringify({ rfid_tag: rfidTag }),
+        ...(signal && { signal }),
+      }
+    );
+    return response.data;
+  },
+
+  /**
+   * Execute one NFC staff clock action and return the authoritative new state.
+   *
+   * `staffId` is the employee being stamped, taken from the state read that the
+   * scan produced, and travels as X-Staff-ID alongside the command.
+   *
+   * `signal` cancels the command. The caller waits for this request far beyond
+   * its own deadline — it is the only thing that can say what was written — so
+   * cancelling is the sole way to end a call that never answers.
+   */
+  async executeStaffClockAction(
+    pin: string,
+    command: StaffClockCommand,
+    staffId?: number,
+    signal?: AbortSignal
+  ): Promise<StaffClockState> {
+    const response = await apiCall<{ status: string; data: StaffClockState }>(
+      '/api/iot/staff-clock',
+      {
+        method: 'POST',
+        headers: buildAuthHeaders(pin, staffId),
+        body: JSON.stringify(command),
+        ...(signal && { signal }),
+      }
+    );
+    return response.data;
+  },
+
   /**
    * Get teachers list (device authenticated)
    * Endpoint: GET /api/iot/teachers
@@ -545,7 +640,8 @@ export const api = {
       action: 'checkin' | 'checkout';
       room_id: number;
     },
-    pin: string
+    pin: string,
+    staffId?: number
   ): Promise<RfidScanResult> {
     const response = await apiCall<{
       data: RfidScanResult;
@@ -553,7 +649,9 @@ export const api = {
       status: string;
     }>('/api/iot/checkin', {
       method: 'POST',
-      headers: buildAuthHeaders(pin),
+      // staffId (X-Staff-ID) attributes the scan to the logged-in staff member
+      // so the backend can mark them present (project-phoenix #1439).
+      headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
       body: JSON.stringify(scanData),
     });
 
@@ -616,7 +714,8 @@ export const api = {
     pin: string,
     rfid: string,
     action: 'confirm' | 'cancel' | 'confirm_daily_checkout',
-    destination?: 'zuhause' | 'unterwegs'
+    destination?: 'zuhause' | 'unterwegs',
+    staffId?: number
   ): Promise<AttendanceToggleResponse> {
     try {
       const body: { rfid: string; action: string; destination?: string } = {
@@ -631,7 +730,9 @@ export const api = {
 
       const response = await apiCall<AttendanceToggleResponse>('/api/iot/attendance/toggle', {
         method: 'POST',
-        headers: buildAuthHeaders(pin),
+        // staffId (X-Staff-ID) attributes the toggle to the logged-in staff
+        // member so the backend can mark them present (project-phoenix #1439).
+        headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
         body: JSON.stringify(body),
       });
 

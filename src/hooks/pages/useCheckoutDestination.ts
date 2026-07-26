@@ -4,6 +4,7 @@ import {
   checkInToDestinationRoom,
   type CheckoutDestinationState,
 } from '../../services/checkoutDestinationService';
+import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 
 export type CheckoutDestination = 'schulhof' | 'raumwechsel' | 'toilette';
@@ -21,7 +22,7 @@ interface UseCheckoutDestinationParams {
  * the background checkout sync of the triggering scan before checking in.
  */
 export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckoutDestinationParams) {
-  const { authenticatedUser, setScanResult, showScanModal } = useUserStore();
+  const { authenticatedUser, selectedSupervisors, setScanResult, showScanModal } = useUserStore();
   const { recentTagScans } = useUserStore(state => state.rfid);
 
   // State for checkout destination selection (unified: Raumwechsel, Schulhof, nach Hause)
@@ -43,6 +44,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       roomId: destination === 'schulhof' ? schulhofRoomId : wcRoomId,
       state: checkoutDestinationState,
       pin: authenticatedUser.pin,
+      staffId: resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
       recentTagScans,
     });
 

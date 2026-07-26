@@ -146,6 +146,15 @@ describe('HomeViewPage', () => {
     expect(screen.getByText('Team anpassen')).toBeInTheDocument();
   });
 
+  it('opens staff time tracking from the menu', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByText('Mitarbeiter-Stempeln'));
+
+    expect(mockNavigate).toHaveBeenCalledWith('/staff-clock');
+  });
+
   it('shows logout button when no session', () => {
     renderPage();
     expect(screen.getByText('Abmelden')).toBeInTheDocument();

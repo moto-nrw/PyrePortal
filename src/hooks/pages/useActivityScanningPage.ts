@@ -18,6 +18,7 @@ import {
   type DeviceConfig,
   type Room,
 } from '../../services/api';
+import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 import { createLogger, serializeError } from '../../utils/logger';
 import { useRfidScanning } from '../useRfidScanning';
@@ -53,6 +54,7 @@ export function useActivityScanningPage() {
     authenticatedUser,
     rfid,
     currentSession,
+    selectedSupervisors,
     fetchCurrentSession,
   } = useUserStore();
 
@@ -527,7 +529,8 @@ export function useActivityScanningPage() {
         authenticatedUser.pin,
         checkoutDestinationState.rfid,
         'confirm_daily_checkout',
-        'zuhause'
+        'zuhause',
+        resolveStaffAttributionId(authenticatedUser, selectedSupervisors)
       );
       logger.info('Daily checkout confirmed');
       feedbackVisitIdRef.current = currentScan?.visit_id ?? null;

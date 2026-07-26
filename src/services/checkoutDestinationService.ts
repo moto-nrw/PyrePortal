@@ -66,6 +66,7 @@ export interface CheckInToDestinationParams {
   roomId: number | null;
   state: CheckoutDestinationState;
   pin: string;
+  staffId?: number;
   recentTagScans: Map<string, RecentTagScan>;
 }
 
@@ -82,7 +83,7 @@ export interface CheckInToDestinationParams {
 export const checkInToDestinationRoom = async (
   params: CheckInToDestinationParams
 ): Promise<RfidScanResult> => {
-  const { destination, roomId, state, pin, recentTagScans } = params;
+  const { destination, roomId, state, pin, staffId, recentTagScans } = params;
   const config = DESTINATION_ROOM_CONFIGS[destination];
 
   if (!roomId) {
@@ -120,7 +121,8 @@ export const checkInToDestinationRoom = async (
         action: 'checkin',
         room_id: roomId,
       },
-      pin
+      pin,
+      staffId
     );
 
     logger.info(`${config.logLabel} check-in successful`, {
