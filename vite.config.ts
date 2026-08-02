@@ -10,7 +10,8 @@ const pkg = JSON.parse(readFileSync('./package.json', 'utf-8')) as { version: st
 
 // BUILD_TARGET determines which platform adapter is bundled.
 // Set via CLI env var (e.g. BUILD_TARGET=gkt pnpm run build).
-// Tauri sets BUILD_TARGET=tauri via tauri.conf.json beforeDevCommand/beforeBuildCommand.
+// The retired Tauri configuration still sets BUILD_TARGET=tauri while its
+// legacy source remains in the repository. Do not use it for new work.
 // Defaults to 'browser' for plain `pnpm run dev`.
 const buildTarget = process.env.BUILD_TARGET || 'browser';
 
@@ -39,11 +40,8 @@ export default defineConfig(async () => ({
     },
   },
 
-  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-  //
-  // 1. prevent vite from obscuring rust errors
+  // Keep the fixed port used by kiosk testing and the retired Tauri config.
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
   server: {
     port: 1420,
     strictPort: true,
@@ -56,7 +54,7 @@ export default defineConfig(async () => ({
         }
       : undefined,
     watch: {
-      // 3. tell vite to ignore watching `src-tauri`
+      // Ignore the retired Rust source.
       ignored: ['**/src-tauri/**'],
     },
   },

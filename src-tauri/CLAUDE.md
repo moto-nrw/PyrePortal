@@ -1,14 +1,14 @@
-# Rust Backend - Tauri Commands
+# Legacy Tauri Backend
 
-This directory contains the Rust backend for the local Mac/mock PyrePortal app, providing configuration, file persistence, and logging.
+This directory contains the retired Rust/Tauri backend. PyrePortal no longer ships or supports a Tauri app.
 
 ## Target Scope
 
-This Tauri code is retained for local Mac/mock app usage. Do not add production deployment work here.
+Do not add features, development workflows or release work here. Limit changes to removing the legacy target or keeping the existing source safe while it remains in the repository.
 
 - GKT/GKTL is the production deployment path and uses the frontend GKT adapter with `system.js`.
-- Browser and Tauri Mac/mock are local development targets.
-- Raspberry Pi/Balena and Tauri production deployment are retired.
+- Browser mock is the local development target.
+- Raspberry Pi/Balena and Tauri are retired targets.
 - RFID scanning has no Rust backend: all mock scanning happens in the frontend (`src/dev/mockScanSource.ts` via the `useRfidScanning` hook). The retired MFRC522 hardware path and the Rust mock scan service have been removed.
 
 ## File Structure
@@ -141,7 +141,7 @@ cargo test -- --nocapture  # Show println! output
 
 Dev-only: `tempfile`, `tokio` (for `#[tokio::test]`), `tauri` with the `test` feature.
 
-## Development Commands
+## Legacy Validation Commands
 
 ```bash
 # Check syntax/types (fast)
@@ -153,7 +153,6 @@ cargo clippy
 # Format
 cargo fmt
 
-# Build
-cargo build                 # Debug
-cargo build --release      # Release (local only, no production Tauri builds)
+# Compile the legacy target when maintenance requires it
+cargo build
 ```
