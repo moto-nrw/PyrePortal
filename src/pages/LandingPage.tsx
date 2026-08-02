@@ -26,7 +26,7 @@ function LandingPage() {
     void navigate('/pin');
   };
 
-  // Handle application restart via the platform adapter (the local Tauri app exits the process)
+  // Handle application restart through the active platform adapter.
   const handleRestart = () => {
     logger.info('User requested application restart from landing page');
     logUserAction('restart_app');

@@ -11,20 +11,19 @@ PyrePortal is part of a three-repo system. All repos live side-by-side (`../`):
 | **project-phoenix** (`../project-phoenix/`) | Go backend + Next.js frontend | Provides `/api/iot/*` endpoints. Source of truth for all students, staff, rooms, sessions, tags. |
 | **moto-balenaOS** (`../moto-balenaOS/`)     | Retired deployment layer      | Legacy Raspberry Pi/Balena target. Do not add new PyrePortal work for this target.               |
 
-**If the backend changes**: Error messages in `src/services/api.ts` are hardcoded mappings from backend error strings to German UI text. Backend error text changes break the mapping silently; users see generic fallback messages instead of specific messages.
+**If the backend changes**: Error messages in `src/services/apiErrors.ts` are hardcoded mappings from backend error strings to German UI text. Backend error text changes break the mapping silently; users see generic fallback messages instead of specific messages.
 
 ## Project Overview
 
-PyrePortal is a web kiosk frontend for German after-school care (OGS). Staff use NFC/RFID wristbands for student check-in/check-out, rooms, activities, and attendance.
+PyrePortal is a web kiosk frontend for German after-school care (OGS). Staff use NFC/RFID wristbands for student attendance, room changes, activities, tag assignment, pickup-time lookup, and staff time tracking.
 
 Supported targets:
 
 - **GKT/GKTL**: production target. NFC comes from the GKT `system.js` bridge.
 - **Wedge**: kiosk target for iPads/tablets with a USB NFC reader in keyboard-emulation mode. See `docs/wedge-reader-setup.md`.
 - **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
-- **Tauri Mac/mock app**: local development target for launching the mock frontend as a desktop app.
 
-The Raspberry Pi/Balena deployment path and Tauri production deployment are retired. Tauri is retained only for local Mac/mock app usage and is not a production release target.
+The Raspberry Pi/Balena and Tauri targets are retired. They are not supported development or release targets. Legacy Tauri source may remain while it is being removed; do not extend it.
 
 ## Development Commands
 
@@ -39,7 +38,7 @@ pnpm run test         # Vitest
 pnpm run format       # Auto-format with Prettier
 ```
 
-Do not add new CI, release, or deployment work for Raspberry Pi, Balena, or Tauri production targets.
+Do not add new CI, release, or deployment work for Raspberry Pi, Balena, or Tauri targets.
 
 ## Critical Architecture Patterns
 
@@ -79,7 +78,8 @@ RFID hardware and browser mocks can emit duplicate scan events. Defense in depth
 - `BUILD_TARGET=gkt`: production GKT adapter.
 - `BUILD_TARGET=wedge`: keyboard-wedge adapter for tablets with USB NFC readers.
 - default/browser: browser mock adapter.
-- `BUILD_TARGET=tauri`: local Mac/mock app adapter. Keep this path limited to local mock-app support.
+
+`BUILD_TARGET=tauri` and `src/platform/tauri` are legacy code, not supported targets. Do not add behavior to them.
 
 New platform behavior should go through the adapter interface instead of branching throughout UI code.
 
@@ -115,25 +115,29 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,...
 
 ### Authentication Pattern
 
-All relevant requests use:
+Every API request uses the device bearer token. Staff-authenticated requests add the PIN, and staff-scoped requests add the staff ID when available:
 
 ```typescript
 headers: {
   'Authorization': `Bearer ${DEVICE_API_KEY}`,
-  'X-Staff-PIN': pin,
-  'X-Staff-ID': staffId.toString()
+  ...(pin !== undefined && { 'X-Staff-PIN': pin }),
+  ...(staffId !== undefined && { 'X-Staff-ID': staffId.toString() })
 }
 ```
 
 ### Key Endpoints
 
-| Endpoint                         | Purpose                | Auth         |
-| -------------------------------- | ---------------------- | ------------ |
-| `GET /api/iot/teachers`          | Fetch staff list       | Device only  |
-| `POST /api/iot/ping`             | Validate global PIN    | Device + PIN |
-| `POST /api/iot/checkin`          | Process RFID scan      | Device + PIN |
-| `POST /api/iot/session/start`    | Start activity session | Device + PIN |
-| `POST /api/iot/session/activity` | Prevent timeout        | Device + PIN |
+| Endpoint                          | Purpose                | Auth         |
+| --------------------------------- | ---------------------- | ------------ |
+| `GET /api/iot/teachers`           | Fetch staff list       | Device only  |
+| `POST /api/iot/ping`              | Validate global PIN    | Device + PIN |
+| `POST /api/iot/checkin`           | Process RFID scan      | Device + PIN |
+| `POST /api/iot/pickup-query`      | Fetch pickup details   | Device + PIN |
+| `POST /api/iot/session/start`     | Start activity session | Device + PIN |
+| `POST /api/iot/session/activity`  | Prevent timeout        | Device + PIN |
+| `POST /api/iot/staff-clock/state` | Read staff clock state | Device + PIN |
+| `POST /api/iot/staff-clock`       | Record staff time      | Device + PIN |
+| `GET /api/iot/config`             | Fetch device settings  | Device only  |
 
 ## Releasing
 
@@ -161,8 +165,9 @@ Key rules:
 Prefer the platform adapter boundary:
 
 - GKT-specific native behavior belongs in `src/platform/gkt`.
+- Wedge-specific behavior belongs in `src/platform/wedge`.
 - Browser/mock behavior belongs in `src/platform/browser`.
-- Tauri behavior belongs in `src/platform/tauri` only when it supports local Mac/mock app usage. Do not add Tauri production behavior.
+- Do not add Tauri behavior; the adapter is legacy code awaiting removal.
 
 ## Working with RFID
 
@@ -179,8 +184,6 @@ The GKT scan path can be tested locally without a device: run `BUILD_TARGET=gkt 
 ```js
 SYSTEM.onNfcScanned({ uid: '04:D6:94:82:97:6A:80', eventSource: 'NFC', eventNumber: 1 });
 ```
-
-The local Tauri Mac/mock app is launched with `pnpm dlx @tauri-apps/cli dev` (no repo script; the CLI devDependency was removed with the retired Tauri release tooling). See "Testing Locally" in README.md for the full test loop including staging.
 
 Hook usage:
 

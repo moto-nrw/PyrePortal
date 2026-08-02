@@ -6,7 +6,7 @@
 
 `package.json` is the release version source for PyrePortal.
 
-The retired Raspberry Pi/Balena deployment files and Tauri production settings are not release sources anymore. Do not block GKT releases on `Cargo.toml` or `tauri.conf.json` version values. Tauri is retained for local Mac/mock app usage only.
+The retired Raspberry Pi/Balena and Tauri files are not release sources. Do not block GKT releases on `Cargo.toml` or `tauri.conf.json` version values.
 
 ## Validation
 
@@ -33,6 +33,6 @@ The production workflow creates a metadata-only GitHub release with generated no
 ## Rules
 
 - GKT/GKTL is the production deployment path.
-- Do not create new Raspberry Pi, Balena, or Tauri production release steps.
+- Do not create Raspberry Pi, Balena, or Tauri release steps.
 - Never commit secrets, API keys, `.env` files, PINs, or credentials. This repo is public.
 - The version is exposed to the frontend via the Vite build and shown in the app UI.
