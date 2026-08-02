@@ -1,10 +1,13 @@
-import { faWifi } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ErrorModal, ModalBase } from '../components/ui';
+import {
+  ContactlessPaymentIcon,
+  ErrorModal,
+  ModalActionButtons,
+  ModalBase,
+} from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import RfidProcessingIndicator from '../components/ui/RfidProcessingIndicator';
 import { getAssignedPerson, useTagAssignmentScan } from '../hooks/useTagAssignmentScan';
@@ -185,7 +188,7 @@ function TagAssignmentPage() {
               marginTop: '40px',
               marginBottom: '20px',
               textAlign: 'center',
-              color: '#111827',
+              color: designSystem.gray[900],
             }}
           >
             {texts.title}
@@ -199,29 +202,17 @@ function TagAssignmentPage() {
             isOpen={showScanner}
             onClose={cancelScan}
             size="md"
-            backgroundColor="#5080D8"
+            backgroundColor={designSystem.pastel.blue.bg}
+            timeoutColor={designSystem.pastel.blue.accent}
+            timeoutTrackColor={designSystem.pastel.blue.tint}
             timeout={18000}
           >
-            {/* Background pattern */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                background:
-                  'radial-gradient(circle at top right, rgba(255,255,255,0.2) 0%, transparent 50%)',
-                pointerEvents: 'none',
-              }}
-            />
-
             {/* Icon container */}
             <div
               style={{
                 width: '120px',
                 height: '120px',
-                backgroundColor: 'rgba(255, 255, 255, 0.3)',
+                backgroundColor: designSystem.pastel.blue.tint,
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -231,11 +222,7 @@ function TagAssignmentPage() {
                 zIndex: 2,
               }}
             >
-              <FontAwesomeIcon
-                icon={faWifi}
-                size="4x"
-                style={{ color: 'white', transform: 'rotate(90deg)' }}
-              />
+              <ContactlessPaymentIcon size={72} color={designSystem.pastel.blue.accent} />
             </div>
 
             <h2
@@ -243,7 +230,7 @@ function TagAssignmentPage() {
                 fontSize: '36px',
                 fontWeight: 700,
                 marginBottom: '16px',
-                color: '#FFFFFF',
+                color: designSystem.pastel.blue.accent,
                 position: 'relative',
                 zIndex: 2,
               }}
@@ -253,7 +240,7 @@ function TagAssignmentPage() {
             <p
               style={{
                 fontSize: '20px',
-                color: 'rgba(255, 255, 255, 0.9)',
+                color: designSystem.pastel.blue.accent,
                 marginBottom: '32px',
                 position: 'relative',
                 zIndex: 2,
@@ -269,13 +256,13 @@ function TagAssignmentPage() {
                 padding: '12px 32px',
                 fontSize: '18px',
                 fontWeight: 600,
-                backgroundColor: 'rgba(255, 255, 255, 0.2)',
-                color: 'white',
-                border: '2px solid rgba(255, 255, 255, 0.3)',
-                borderRadius: '24px',
+                backgroundColor: designSystem.colors.white,
+                color: designSystem.gray[700],
+                border: `1px solid ${designSystem.gray[300]}`,
+                borderRadius: designSystem.borderRadius.xl,
                 cursor: 'pointer',
                 outline: 'none',
-                transition: 'all 200ms',
+                transition: designSystem.transitions.base,
                 position: 'relative',
                 zIndex: 2,
               }}
@@ -300,7 +287,7 @@ function TagAssignmentPage() {
                   style={{
                     width: '140px',
                     height: '140px',
-                    backgroundColor: '#E6EFFF',
+                    backgroundColor: designSystem.pastel.blue.bg,
                     borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
@@ -308,11 +295,7 @@ function TagAssignmentPage() {
                     margin: '0 auto 40px',
                   }}
                 >
-                  <FontAwesomeIcon
-                    icon={faWifi}
-                    size="5x"
-                    style={{ color: '#5080D8', transform: 'rotate(90deg)' }}
-                  />
+                  <ContactlessPaymentIcon size={84} color={designSystem.brand.blue} />
                 </div>
 
                 <p
@@ -336,16 +319,17 @@ function TagAssignmentPage() {
                     padding: '0 64px',
                     fontSize: '24px',
                     fontWeight: 700,
-                    color: '#FFFFFF',
-                    background: isScanStartDisabled
-                      ? 'linear-gradient(to right, #9CA3AF, #9CA3AF)'
-                      : designSystem.gradients.blueRight,
+                    color: designSystem.colors.white,
+                    backgroundColor: isScanStartDisabled
+                      ? designSystem.gray[400]
+                      : designSystem.flat.primary,
                     border: 'none',
                     borderRadius: designSystem.borderRadius.full,
                     cursor: isScanStartDisabled ? 'not-allowed' : 'pointer',
                     outline: 'none',
-                    boxShadow: isScanStartDisabled ? 'none' : designSystem.shadows.blue,
+                    boxShadow: isScanStartDisabled ? 'none' : designSystem.shadows.md,
                     opacity: isScanStartDisabled ? 0.6 : 1,
+                    transition: designSystem.transitions.base,
                   }}
                   onTouchStart={e => {
                     if (!isScanStartDisabled) {
@@ -356,7 +340,7 @@ function TagAssignmentPage() {
                   onTouchEnd={e => {
                     if (!isScanStartDisabled) {
                       e.currentTarget.style.transform = 'scale(1)';
-                      e.currentTarget.style.boxShadow = designSystem.shadows.blue;
+                      e.currentTarget.style.boxShadow = designSystem.shadows.md;
                     }
                   }}
                 >
@@ -372,8 +356,8 @@ function TagAssignmentPage() {
                   style={{
                     width: '80px',
                     height: '80px',
-                    border: '4px solid #E5E7EB',
-                    borderTopColor: '#5080D8',
+                    border: `4px solid ${designSystem.gray[200]}`,
+                    borderTopColor: designSystem.gray[900],
                     borderRadius: '50%',
                     margin: '0 auto 32px',
                   }}
@@ -396,12 +380,12 @@ function TagAssignmentPage() {
                 {/* Tag Display Card - modern clean style */}
                 <div
                   style={{
-                    backgroundColor: '#FFFFFF',
-                    border: '2px solid #E5E7EB',
-                    borderRadius: '24px',
+                    backgroundColor: designSystem.surface.background,
+                    border: `1px solid ${designSystem.surface.border}`,
+                    borderRadius: designSystem.surface.borderRadius,
                     padding: '24px',
                     textAlign: 'center',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                    boxShadow: designSystem.surface.shadow,
                     marginBottom: '24px',
                   }}
                 >
@@ -413,7 +397,7 @@ function TagAssignmentPage() {
                       justifyContent: 'center',
                       gap: '8px',
                       marginBottom: '12px',
-                      color: '#83CD2D',
+                      color: designSystem.brand.greenText,
                       fontSize: '22px',
                       fontWeight: 700,
                     }}
@@ -423,7 +407,7 @@ function TagAssignmentPage() {
                       height="20"
                       viewBox="0 0 24 24"
                       fill="none"
-                      stroke="#83CD2D"
+                      stroke={designSystem.brand.greenText}
                       strokeWidth="3"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -441,7 +425,7 @@ function TagAssignmentPage() {
                         <p
                           style={{
                             fontSize: '16px',
-                            color: '#6B7280',
+                            color: designSystem.gray[500],
                             marginBottom: '8px',
                           }}
                         >
@@ -451,7 +435,7 @@ function TagAssignmentPage() {
                           style={{
                             fontSize: '24px',
                             fontWeight: 700,
-                            color: '#1F2937',
+                            color: designSystem.gray[800],
                             marginBottom: '4px',
                           }}
                         >
@@ -460,7 +444,7 @@ function TagAssignmentPage() {
                         <p
                           style={{
                             fontSize: '18px',
-                            color: '#6B7280',
+                            color: designSystem.gray[500],
                           }}
                         >
                           {tagAssignment.person_type === 'staff'
@@ -472,9 +456,9 @@ function TagAssignmentPage() {
                   })() ?? (
                     <div
                       style={{
-                        backgroundColor: '#F9FAFB',
-                        border: '1px solid #E5E7EB',
-                        borderRadius: '16px',
+                        backgroundColor: designSystem.gray[50],
+                        border: `1px solid ${designSystem.gray[200]}`,
+                        borderRadius: designSystem.borderRadius.md,
                         padding: '12px 16px',
                         display: 'flex',
                         alignItems: 'center',
@@ -487,7 +471,7 @@ function TagAssignmentPage() {
                         height="22"
                         viewBox="0 0 24 24"
                         fill="none"
-                        stroke="#9CA3AF"
+                        stroke={designSystem.gray[400]}
                         strokeWidth="2.2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -496,7 +480,9 @@ function TagAssignmentPage() {
                         <line x1="12" y1="8" x2="12" y2="12" />
                         <line x1="12" y1="16" x2="12.01" y2="16" />
                       </svg>
-                      <span style={{ fontSize: '16px', color: '#6B7280', fontWeight: 600 }}>
+                      <span
+                        style={{ fontSize: '16px', color: designSystem.gray[500], fontWeight: 600 }}
+                      >
                         {texts.tagNotAssigned}
                       </span>
                     </div>
@@ -526,15 +512,19 @@ function TagAssignmentPage() {
                       style={{
                         flex: 1,
                         height: '68px',
-                        fontSize: '24px',
+                        // 20px + nowrap keeps "Anderer Person zuweisen" on one line
+                        // inside the flex:1 half-width action button.
+                        fontSize: '20px',
                         fontWeight: 700,
-                        color: '#FFFFFF',
-                        background: designSystem.gradients.blueRight,
+                        whiteSpace: 'nowrap',
+                        color: designSystem.colors.white,
+                        backgroundColor: designSystem.flat.primary,
                         border: 'none',
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
-                        boxShadow: designSystem.shadows.blue,
+                        boxShadow: designSystem.shadows.md,
+                        transition: designSystem.transitions.base,
                       }}
                       onTouchStart={e => {
                         e.currentTarget.style.transform = designSystem.scales.active;
@@ -542,7 +532,7 @@ function TagAssignmentPage() {
                       }}
                       onTouchEnd={e => {
                         e.currentTarget.style.transform = 'scale(1)';
-                        e.currentTarget.style.boxShadow = designSystem.shadows.blue;
+                        e.currentTarget.style.boxShadow = designSystem.shadows.md;
                       }}
                     >
                       {tagAssignment.assigned ? texts.reassignButton : texts.selectPersonButton}
@@ -552,22 +542,25 @@ function TagAssignmentPage() {
                       style={{
                         flex: 1,
                         height: '68px',
-                        fontSize: '24px',
+                        // Match the sibling reassign button so the action row is even.
+                        fontSize: '20px',
                         fontWeight: 700,
-                        backgroundColor: '#FFFFFF',
-                        color: '#374151',
-                        border: '2px solid #E5E7EB',
+                        whiteSpace: 'nowrap',
+                        backgroundColor: designSystem.colors.white,
+                        color: designSystem.gray[700],
+                        border: `1px solid ${designSystem.gray[300]}`,
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
+                        transition: designSystem.transitions.base,
                       }}
                       onTouchStart={e => {
-                        e.currentTarget.style.backgroundColor = '#F9FAFB';
-                        e.currentTarget.style.borderColor = '#D1D5DB';
+                        e.currentTarget.style.backgroundColor = designSystem.gray[50];
+                        e.currentTarget.style.borderColor = designSystem.gray[400];
                       }}
                       onTouchEnd={e => {
-                        e.currentTarget.style.backgroundColor = '#FFFFFF';
-                        e.currentTarget.style.borderColor = '#E5E7EB';
+                        e.currentTarget.style.backgroundColor = designSystem.colors.white;
+                        e.currentTarget.style.borderColor = designSystem.gray[300];
                       }}
                     >
                       {texts.newScanButton}
@@ -584,14 +577,15 @@ function TagAssignmentPage() {
                         fontSize: '20px',
                         fontWeight: 600,
                         backgroundColor: 'transparent',
-                        color: '#EF4444',
-                        border: '2px solid #FCA5A5',
+                        color: designSystem.pastel.red.accent,
+                        border: '2px solid rgba(204, 38, 38, 0.3)',
                         borderRadius: designSystem.borderRadius.full,
                         cursor: 'pointer',
                         outline: 'none',
+                        transition: designSystem.transitions.base,
                       }}
                       onTouchStart={e => {
-                        e.currentTarget.style.backgroundColor = '#FEF2F2';
+                        e.currentTarget.style.backgroundColor = designSystem.pastel.red.bg;
                       }}
                       onTouchEnd={e => {
                         e.currentTarget.style.backgroundColor = 'transparent';
@@ -611,7 +605,7 @@ function TagAssignmentPage() {
                   style={{
                     width: '120px',
                     height: '120px',
-                    backgroundColor: '#E7F7DF',
+                    backgroundColor: designSystem.brand.greenTint,
                     borderRadius: '50%',
                     display: 'flex',
                     alignItems: 'center',
@@ -624,7 +618,7 @@ function TagAssignmentPage() {
                     height="60"
                     viewBox="0 0 24 24"
                     fill="none"
-                    stroke="#83cd2d"
+                    stroke={designSystem.brand.greenText}
                     strokeWidth="3"
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -637,7 +631,7 @@ function TagAssignmentPage() {
                     fontSize: '32px',
                     fontWeight: 700,
                     marginBottom: '16px',
-                    color: '#83cd2d',
+                    color: designSystem.brand.greenText,
                   }}
                 >
                   {texts.successHeading}
@@ -645,7 +639,7 @@ function TagAssignmentPage() {
                 <p
                   style={{
                     fontSize: '20px',
-                    color: '#6B7280',
+                    color: designSystem.gray[500],
                     marginBottom: '48px',
                     lineHeight: 1.5,
                   }}
@@ -667,14 +661,14 @@ function TagAssignmentPage() {
                       padding: '0 40px',
                       fontSize: '20px',
                       fontWeight: 600,
-                      backgroundColor: '#5080D8',
-                      color: 'white',
+                      backgroundColor: designSystem.flat.primary,
+                      color: designSystem.colors.white,
                       border: 'none',
-                      borderRadius: '34px',
+                      borderRadius: designSystem.borderRadius.full,
                       cursor: 'pointer',
                       outline: 'none',
-                      transition: 'all 200ms',
-                      boxShadow: '0 4px 16px rgba(80, 128, 216, 0.3)',
+                      transition: designSystem.transitions.base,
+                      boxShadow: designSystem.shadows.md,
                     }}
                   >
                     {texts.scanAnotherButton}
@@ -687,13 +681,13 @@ function TagAssignmentPage() {
                       padding: '0 40px',
                       fontSize: '20px',
                       fontWeight: 600,
-                      backgroundColor: 'white',
-                      color: '#374151',
-                      border: '2px solid #E5E7EB',
-                      borderRadius: '34px',
+                      backgroundColor: designSystem.colors.white,
+                      color: designSystem.gray[700],
+                      border: `1px solid ${designSystem.gray[300]}`,
+                      borderRadius: designSystem.borderRadius.full,
                       cursor: 'pointer',
                       outline: 'none',
-                      transition: 'all 200ms',
+                      transition: designSystem.transitions.base,
                     }}
                   >
                     {texts.backButton}
@@ -712,7 +706,7 @@ function TagAssignmentPage() {
           if (!isUnassigning) closeUnassignConfirm();
         }}
         size="sm"
-        backgroundColor="#FFFFFF"
+        backgroundColor={designSystem.colors.white}
       >
         <div style={{ textAlign: 'center' }}>
           {/* X close icon */}
@@ -721,7 +715,7 @@ function TagAssignmentPage() {
             height="48"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#EF4444"
+            stroke={designSystem.pastel.red.accent}
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -736,7 +730,7 @@ function TagAssignmentPage() {
             style={{
               fontSize: '28px',
               fontWeight: 700,
-              color: '#111827',
+              color: designSystem.gray[900],
               marginBottom: '12px',
             }}
           >
@@ -745,19 +739,21 @@ function TagAssignmentPage() {
           <p
             style={{
               fontSize: '18px',
-              color: '#6B7280',
+              color: designSystem.gray[500],
               lineHeight: 1.5,
               marginBottom: '8px',
             }}
           >
             {texts.unassignConfirmPrefix}{' '}
-            <strong style={{ color: '#111827' }}>{getAssignedPerson(tagAssignment)?.name}</strong>{' '}
+            <strong style={{ color: designSystem.gray[900] }}>
+              {getAssignedPerson(tagAssignment)?.name}
+            </strong>{' '}
             {texts.unassignConfirmSuffix}
           </p>
           <p
             style={{
               fontSize: '16px',
-              color: '#9CA3AF',
+              color: designSystem.gray[400],
               lineHeight: 1.5,
               marginBottom: '32px',
             }}
@@ -765,50 +761,16 @@ function TagAssignmentPage() {
             {texts.unassignConfirmHint}
           </p>
 
-          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-            <button
-              onClick={unassignTag}
-              disabled={isUnassigning}
-              {...pressHandlers(isUnassigning)}
-              style={{
-                height: '52px',
-                padding: '0 32px',
-                fontSize: '18px',
-                fontWeight: 700,
-                backgroundColor: isUnassigning ? '#FCA5A5' : '#EF4444',
-                color: '#FFFFFF',
-                border: 'none',
-                borderRadius: designSystem.borderRadius.full,
-                cursor: isUnassigning ? 'not-allowed' : 'pointer',
-                outline: 'none',
-                transition: 'all 200ms',
-                opacity: isUnassigning ? 0.7 : 1,
-              }}
-            >
-              {isUnassigning ? texts.unassigningButton : texts.confirmUnassignButton}
-            </button>
-            <button
-              onClick={closeUnassignConfirm}
-              disabled={isUnassigning}
-              {...pressHandlers(isUnassigning)}
-              style={{
-                height: '52px',
-                padding: '0 32px',
-                fontSize: '18px',
-                fontWeight: 700,
-                backgroundColor: '#FFFFFF',
-                color: '#374151',
-                border: '2px solid #E5E7EB',
-                borderRadius: designSystem.borderRadius.full,
-                cursor: isUnassigning ? 'not-allowed' : 'pointer',
-                outline: 'none',
-                transition: 'all 200ms',
-                opacity: isUnassigning ? 0.5 : 1,
-              }}
-            >
-              {texts.cancelButton}
-            </button>
-          </div>
+          <ModalActionButtons
+            onCancel={closeUnassignConfirm}
+            onConfirm={unassignTag}
+            isLoading={isUnassigning}
+            cancelLabel={texts.cancelButton}
+            confirmLabel={texts.confirmUnassignButton}
+            loadingLabel={texts.unassigningButton}
+            // destructive tag freigeben → unified modal red (#CC2626), §4b
+            confirmGradient={designSystem.flat.danger}
+          />
         </div>
       </ModalBase>
 

@@ -1,80 +1,75 @@
 # PyrePortal
 
-![PyrePortal](docs/img/moto_transparent_200.png)
+<img src="docs/img/moto-logo-mit-schriftzug.png" alt="moto" width="400">
 
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev)
-[![TypeScript](https://img.shields.io/badge/typescript-5.9-blue)](https://www.typescriptlang.org)
-[![Version](https://img.shields.io/badge/version-1.3.3-green)](package.json)
+[![TypeScript](https://img.shields.io/badge/typescript-6-blue)](https://www.typescriptlang.org)
+[![Version](https://img.shields.io/github/package-json/v/moto-nrw/PyrePortal)](package.json)
 
-PyrePortal is the web kiosk frontend for German after-school care (OGS). Staff use NFC/RFID wristbands to check students in and out, pick rooms, run activities, and track attendance from a kiosk device.
+PyrePortal is moto's browser-based kiosk for German after-school care (OGS). Staff use NFC/RFID wristbands to manage attendance, rooms, activities and staff working time.
 
-## Supported Targets
+## Runtime Targets
 
-- **GKT/GKTL kiosk devices**: production target. NFC is provided by the GKT system bridge via `system.js`.
-- **Wedge (iPad/tablet + USB NFC reader)**: kiosk target for tablets with a USB NFC reader in keyboard-emulation mode (e.g. ACS ACR1552U-MF). See [docs/wedge-reader-setup.md](docs/wedge-reader-setup.md).
-- **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
-- **Tauri Mac/mock app**: local development target for launching the mock frontend as a desktop app.
+| Target       | Status                        | RFID source                           |
+| ------------ | ----------------------------- | ------------------------------------- |
+| **GKT/GKTL** | Production                    | GKT `system.js` bridge                |
+| **Wedge**    | Tablet build; hosting pending | USB reader in keyboard-emulation mode |
+| **Browser**  | Local development             | Frontend-generated mock scans         |
 
-The old Raspberry Pi/Balena deployment path and Tauri production deployment are retired. Tauri is retained only for local Mac/mock app usage and is not a production release target.
+The Raspberry Pi/Balena and Tauri targets are retired. They are not supported development or release targets. Legacy source may remain in the repository while it is being removed, but new work must target GKT, Wedge or the browser mock.
 
-## What It Does
+## Features
 
-- **RFID check-in/check-out**: scan a wristband and the server records the student's arrival or departure.
-- **PIN authentication**: staff unlock the kiosk with a shared OGS PIN or individual teacher PIN.
-- **Room and activity management**: choose a room, start an activity session, assign supervisors, and see live occupancy.
-- **Attendance tracking**: view student status, toggle check-in/check-out, and submit daily feedback.
-- **RFID tag assignment**: pair wristbands to students or staff directly from the kiosk UI.
-- **Network-aware UI**: shows connection quality and German-language error messages.
+- PIN-based staff authentication
+- Student check-in, check-out and room changes by RFID
+- Activity sessions, room selection and supervisor teams
+- RFID tag assignment for students and staff
+- Staff time tracking by RFID
+- Pickup-time lookup and optional daily feedback
+- Network status monitoring and German user-facing errors
 
 ## Architecture
 
 ```mermaid
 flowchart TB
-    subgraph "PyrePortal Frontend"
-        UI[React UI] --> Store[Zustand Store]
-        UI --> Platform[Platform Adapter]
-        Platform --> GKT[GKT NFC bridge]
-        Platform --> Mock[Browser mock scanner]
-        Platform --> Tauri[Tauri Mac/mock app]
+    subgraph "PyrePortal"
+        UI[React UI] --> Store[Zustand store]
+        UI --> Adapter[Platform adapter]
+        Adapter --> GKT[GKT NFC bridge]
+        Adapter --> Wedge[Keyboard-wedge reader]
+        Adapter --> Browser[Browser mock scanner]
     end
 
-    subgraph "Project Phoenix"
-        Server[Backend Server] --> DB[(Database)]
-    end
-
-    UI -->|REST API| Server
+    UI -->|REST API| API[Project Phoenix API]
+    API --> DB[(PostgreSQL)]
 ```
 
-| Layer              | Role                                                             |
-| ------------------ | ---------------------------------------------------------------- |
-| React + TypeScript | UI, routing, state, RFID scanning flow                           |
-| Platform adapters  | GKT NFC bridge, browser mock, and Tauri Mac/mock implementations |
-| Project Phoenix    | Source of truth for students, staff, rooms, visits               |
+The frontend follows three rules:
 
-### Key Design Decisions
+1. **The server is authoritative.** RFID actions complete on the Project Phoenix backend before the UI shows a result.
+2. **Platform code stays behind adapters.** `BUILD_TARGET` selects the GKT, Wedge or browser implementation at build time.
+3. **Duplicate scans are rejected at multiple layers.** The store tracks in-flight tags, and the scanning hook rejects duplicate adapter events.
 
-1. **Server-first RFID scans.** Every scan hits the backend before the UI reacts. No local student cache.
-2. **Platform adapters.** `BUILD_TARGET=gkt` bundles the production GKT adapter; plain browser builds use the browser mock adapter; `BUILD_TARGET=tauri` is for the local Mac/mock app.
-3. **Two-level auth on every request.** Device API key (`Authorization: Bearer ...`) plus staff PIN (`X-Staff-PIN` header).
-4. **Backend-owned data.** Project Phoenix is the source of truth for rooms, sessions, attendance, and tag assignments.
+Project Phoenix is the source of truth for students, staff, rooms, sessions, attendance and RFID assignments.
 
 ## Tech Stack
 
-| Component  | Technology   | Version |
-| ---------- | ------------ | ------- |
-| Frontend   | React        | 19      |
-| Language   | TypeScript   | 5.9     |
-| State      | Zustand      | 5       |
-| Routing    | React Router | 7       |
-| Styling    | TailwindCSS  | 4       |
-| Build Tool | Vite         | 8       |
+| Part     | Technology                                  |
+| -------- | ------------------------------------------- |
+| UI       | React 19, React Router 7                    |
+| Language | TypeScript 6                                |
+| State    | Zustand 5                                   |
+| Styling  | Tailwind CSS 4, moto design system          |
+| Build    | Vite 8                                      |
+| Tests    | Vitest 4, React Testing Library, Playwright |
 
-## Getting Started
+## Development
 
-### Prerequisites
+### Requirements
 
-- [Node.js](https://nodejs.org/) v18+
-- pnpm 10+
+- Node.js 22.12 or newer
+- pnpm 10
+- A local [Project Phoenix](https://github.com/moto-nrw/project-phoenix) backend for end-to-end flows
 
 ### Setup
 
@@ -82,9 +77,11 @@ flowchart TB
 git clone git@github.com:moto-nrw/PyrePortal.git
 cd PyrePortal
 pnpm install
+cp .env.example .env
+pnpm run dev
 ```
 
-Create a `.env` file in the project root for local browser development:
+The browser build reads these local settings:
 
 ```bash
 VITE_API_BASE_URL=http://localhost:8080
@@ -92,160 +89,55 @@ VITE_DEVICE_API_KEY=your_dev_device_key
 VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80
 ```
 
-GKT deployments pass the device API key through the kiosk URL (`?key=...`) and bake the API base URL into the GKT build.
+Mock tags must exist in the connected Project Phoenix database.
 
-### Run
+### Commands
 
-```bash
-pnpm run dev
-```
+| Command                | Purpose                                |
+| ---------------------- | -------------------------------------- |
+| `pnpm run dev`         | Start browser/mock development         |
+| `pnpm run dev:wedge`   | Start local Wedge development          |
+| `pnpm run build:gkt`   | Build the production GKT bundle        |
+| `pnpm run build:wedge` | Build the Wedge bundle                 |
+| `pnpm run build`       | Build the browser/mock bundle          |
+| `pnpm run check`       | Run ESLint and TypeScript checks       |
+| `pnpm run test`        | Run Vitest                             |
+| `pnpm run screenshots` | Capture the Playwright screenshot flow |
+| `pnpm run format`      | Format supported files with Prettier   |
 
-### Testing Locally
+### Test the GKT Adapter Locally
 
-Four stages, from fastest feedback to closest-to-production:
-
-1. **Browser mock (daily loop).** Run the Phoenix backend locally (`../project-phoenix`, port 8080), then `pnpm run dev`. Mock RFID scans fire automatically every 5-10 seconds from `VITE_MOCK_RFID_TAGS`; those tags must exist in the backend data.
-
-2. **GKT adapter without a device.** The production scan path can be tested locally:
-
-   ```bash
-   BUILD_TARGET=gkt VITE_API_BASE_URL=http://localhost:8080 pnpm run dev
-   ```
-
-   Open `http://localhost:1420/?key=<device-api-key>`. The dev server injects `system.js`, which falls back to `console.log` when the native `GKTKiosk` object is missing. Simulate a hardware NFC scan from the browser DevTools console:
-
-   ```js
-   SYSTEM.onNfcScanned({ uid: '04:D6:94:82:97:6A:80', eventSource: 'NFC', eventNumber: 1 });
-   ```
-
-   This exercises the real production code path: GKT adapter, payload normalization, server round-trip.
-
-3. **Tauri Mac/mock app** (only needed when touching Rust or the platform adapters):
-
-   ```bash
-   pnpm dlx @tauri-apps/cli dev
-   ```
-
-   There is no repo script for this; the Tauri CLI tooling was removed when Tauri stopped being a release target.
-
-4. **Staging.** Merging to `development` auto-deploys the GKT staging environment (`deploy-gkt.yml`). Production deploys only on pushes to `main`, so verify on staging before merging `development` into `main`.
-
-### Build
+Run the real GKT frontend path against a local backend:
 
 ```bash
-pnpm run build:gkt    # Production GKT bundle
-pnpm run build:wedge  # Production wedge bundle (tablet + USB NFC reader)
-pnpm run build        # Browser/mock bundle
+BUILD_TARGET=gkt VITE_API_BASE_URL=http://localhost:8080 pnpm run dev
 ```
 
-### Code Quality
+Open `http://localhost:1420/?key=<device-api-key>`, then simulate a scan in the browser console:
 
-```bash
-pnpm run check        # ESLint + TypeScript
-pnpm run test         # Vitest
-pnpm run format       # Prettier auto-format
+```js
+SYSTEM.onNfcScanned({ uid: '04:D6:94:82:97:6A:80', eventSource: 'NFC', eventNumber: 1 });
 ```
 
-## API Endpoints
+This exercises `system.js`, the GKT adapter and the server round-trip without a kiosk device.
 
-PyrePortal talks to the Project Phoenix backend over REST. All requests carry device and staff credentials.
+## Backend Integration
 
-| Endpoint                     | Method | Purpose                   |
-| ---------------------------- | ------ | ------------------------- |
-| `/api/iot/teachers`          | GET    | Fetch staff list          |
-| `/api/iot/ping`              | POST   | Validate global PIN       |
-| `/api/iot/activities`        | GET    | Today's activities        |
-| `/api/iot/rooms/available`   | GET    | Available rooms           |
-| `/api/iot/checkin`           | POST   | RFID check-in/check-out   |
-| `/api/iot/session/start`     | POST   | Start activity session    |
-| `/api/iot/session/end`       | POST   | End session               |
-| `/api/iot/session/current`   | GET    | Current session info      |
-| `/api/iot/session/activity`  | POST   | Prevent session timeout   |
-| `/api/iot/students`          | GET    | Students by teacher       |
-| `/api/iot/rfid/:tagId`       | GET    | Check tag assignment      |
-| `/api/students/:id/rfid`     | POST   | Assign tag to student     |
-| `/api/iot/staff/:id/rfid`    | POST   | Assign tag to staff       |
-| `/api/iot/attendance/toggle` | POST   | Toggle check-in/check-out |
-| `/api/iot/feedback`          | POST   | Submit daily feedback     |
-| `/health`                    | GET    | Server health check       |
+PyrePortal calls the Project Phoenix `/api/iot/*` API. Device requests use a bearer API key; staff actions also send the active PIN and staff ID when available:
 
-## Usage
-
-<details>
-<summary>Staff Authentication</summary>
-
-Enter your PIN on the login screen. PyrePortal validates it against the backend and grants access.
-
-![Login Screen](docs/img/placeholder_nfc_scan.png)
-
-</details>
-
-<details>
-<summary>Room Selection</summary>
-
-Pick a room after logging in. Each room shows its current status:
-
-- ![Occupied](docs/img/checked_in.png) Occupied
-- ![Available](docs/img/checked_out.png) Available
-
-Room types include:
-
-- ![School Yard](docs/img/school_yard_icon.png) School Yard
-- ![Toilet](docs/img/toilet_icon.png) Toilet
-
-</details>
-
-<details>
-<summary>Activities and Feedback</summary>
-
-Start an activity, assign supervisors, and scan students in. At checkout, staff can leave daily feedback:
-
-- ![Positive](docs/img/positive_smiley1.png) Positive
-- ![Neutral](docs/img/neutral_smiley1.png) Neutral
-- ![Negative](docs/img/negative_smiley1.png) Negative
-
-</details>
-
-## Troubleshooting
-
-<details>
-<summary>Common Issues</summary>
-
-### App won't start
-
-- Check local `.env` for `VITE_API_BASE_URL` and `VITE_DEVICE_API_KEY`.
-- For GKT, confirm the kiosk URL contains `?key=...`.
-- Confirm the backend is reachable: `curl http://localhost:8080/health`.
-
-### Build errors
-
-```bash
-rm -rf node_modules dist
-pnpm install
-pnpm run build:gkt
+```http
+Authorization: Bearer <device-api-key>
+X-Staff-PIN: <pin>
+X-Staff-ID: <staff-id>
 ```
 
-### RFID/NFC not working
+The API client and response types live in [`src/services/api.ts`](src/services/api.ts). Backend error strings are mapped to German UI messages in [`src/services/apiErrors.ts`](src/services/apiErrors.ts); changing backend text can change which message users see.
 
-- Browser development uses mock scans from `VITE_MOCK_RFID_TAGS`.
-- GKT devices receive NFC scans through the `SYSTEM.registerNfc` bridge.
-- Check browser console logs for scanner initialization and scan events.
+## Documentation
 
-### API connection fails
-
-- Confirm Project Phoenix is running.
-- Check the device API key matches what the server expects.
-
-</details>
-
-## Roadmap
-
-- [ ] Attendance analytics dashboard
-- [ ] Session timeout UI warnings
-- [ ] Offline mode with retry queue
-- [ ] Multi-language support
-- [ ] Biometric authentication
-- [ ] Mobile companion app
+- [Wedge reader setup](docs/wedge-reader-setup.md): hardware, reader configuration, local testing and rollout
+- [Screenshot and video tooling](screenshots/README.md): deterministic Playwright capture flow
+- [Contributor guidance](CLAUDE.md): repository architecture and implementation rules
 
 ## License
 

@@ -22,7 +22,7 @@ function getColors(
 
   if (isSelected) {
     return {
-      iconColor: designSystem.colors.primaryGreen,
+      iconColor: designSystem.entityColors.selected.icon,
       backgroundColor: designSystem.entityColors.selected.background,
     };
   }
@@ -75,7 +75,7 @@ export const SelectableCard = memo(function SelectableCard({
         height: '160px',
         backgroundColor: designSystem.colors.white,
         border: isSelected
-          ? `3px solid ${designSystem.colors.primaryGreen}`
+          ? `3px solid ${designSystem.entityColors.selected.icon}`
           : `2px solid ${designSystem.colors.border}`,
         borderRadius: designSystem.borderRadius.xl,
         cursor: isDisabled ? 'not-allowed' : 'pointer',
@@ -87,10 +87,8 @@ export const SelectableCard = memo(function SelectableCard({
         justifyContent: 'center',
         gap: badge ? '12px' : '16px',
         position: 'relative',
-        transition: 'all 150ms ease-out',
-        boxShadow: isSelected
-          ? '0 8px 30px rgba(131, 205, 45, 0.2)'
-          : '0 4px 12px rgba(0, 0, 0, 0.08)',
+        transition: designSystem.transitions.base,
+        boxShadow: designSystem.surface.shadow,
         opacity: isDisabled ? 0.6 : 1,
       }}
     >
@@ -105,7 +103,7 @@ export const SelectableCard = memo(function SelectableCard({
             height: '24px',
             borderRadius: '50%',
             backgroundColor: isSelected
-              ? designSystem.colors.primaryGreen
+              ? designSystem.entityColors.selected.icon
               : designSystem.colors.border,
             display: 'flex',
             alignItems: 'center',
@@ -148,7 +146,7 @@ export const SelectableCard = memo(function SelectableCard({
       <span
         style={{
           fontSize: '18px',
-          fontWeight: 700,
+          fontWeight: 600,
           lineHeight: '1.2',
           maxWidth: '100%',
           wordBreak: 'break-word',
@@ -165,10 +163,11 @@ export const SelectableCard = memo(function SelectableCard({
           style={{
             fontSize: '12px',
             padding: '4px 12px',
-            borderRadius: designSystem.borderRadius.md,
+            borderRadius: designSystem.borderRadius.full,
             backgroundColor:
-              badgeColor === 'blue' ? designSystem.colors.info : designSystem.colors.primaryGreen,
-            color: designSystem.colors.white,
+              badgeColor === 'blue' ? designSystem.brand.bluePillBg : designSystem.brand.greenTint,
+            color:
+              badgeColor === 'blue' ? designSystem.brand.blueText : designSystem.brand.greenText,
             fontWeight: 600,
           }}
         >

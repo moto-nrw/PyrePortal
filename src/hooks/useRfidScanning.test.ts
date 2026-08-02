@@ -660,6 +660,11 @@ describe('useRfidScanning', () => {
     });
 
     it('calls processRfidScan with correct payload', async () => {
+      setAuthenticated('1234', 0, 'OGS Device');
+      useUserStore.setState({
+        selectedSupervisors: [{ id: 7, name: 'Frau Schmidt' }],
+      });
+
       const { result } = renderHook(() => useRfidScanning());
 
       await act(async () => {
@@ -682,7 +687,34 @@ describe('useRfidScanning', () => {
           action: 'checkin',
           room_id: 10,
         }),
-        '1234'
+        '1234',
+        7
+      );
+    });
+
+    it('does not infer an acting staff member from multiple selected supervisors', async () => {
+      setAuthenticated('1234', 0, 'OGS Device');
+      useUserStore.setState({
+        selectedSupervisors: [
+          { id: 7, name: 'Frau Schmidt' },
+          { id: 8, name: 'Herr Müller' },
+        ],
+      });
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+      await triggerMockScanAndDrain();
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'checkin',
+          room_id: 10,
+        }),
+        '1234',
+        undefined
       );
     });
 
@@ -1539,7 +1571,8 @@ describe('useRfidScanning', () => {
 
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
-        '1234'
+        '1234',
+        1
       );
     });
 
@@ -1603,11 +1636,13 @@ describe('useRfidScanning', () => {
       expect(mockedProcessRfidScan).toHaveBeenCalledTimes(2);
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
-        '1234'
+        '1234',
+        1
       );
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:11:22:33:44:55:66' }),
-        '1234'
+        '1234',
+        1
       );
     });
   });
@@ -1913,7 +1948,8 @@ describe('useRfidScanning', () => {
 
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         { student_rfid: MOCK_TAG, action: 'checkin', room_id: 10 },
-        '1234'
+        '1234',
+        1
       );
 
       await act(async () => {

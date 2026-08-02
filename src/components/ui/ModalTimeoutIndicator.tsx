@@ -15,6 +15,9 @@ interface ModalTimeoutIndicatorProps {
   trackColor?: string;
   /** Border radius of the modal container (for matching corners) */
   borderRadius?: string;
+  /** Inset pill style: floats inside the modal with side margins and fully
+   *  rounded corners instead of hugging the container edge (design-review v2) */
+  inset?: boolean;
 }
 
 /**
@@ -41,6 +44,7 @@ export const ModalTimeoutIndicator: React.FC<ModalTimeoutIndicatorProps> = ({
   color = 'rgba(255, 255, 255, 0.9)',
   trackColor = 'rgba(255, 255, 255, 0.2)',
   borderRadius = '32px',
+  inset = false,
 }) => {
   // State to trigger animation after mount (avoids flash)
   const [shouldAnimate, setShouldAnimate] = useState(false);
@@ -59,30 +63,45 @@ export const ModalTimeoutIndicator: React.FC<ModalTimeoutIndicatorProps> = ({
     }
   }, [isActive]);
 
-  const containerStyle: React.CSSProperties = {
-    position: 'absolute',
-    [position]: 0,
-    left: 0,
-    right: 0,
-    height: `${height}px`,
-    backgroundColor: trackColor,
-    overflow: 'hidden',
-    // Match modal border radius
-    borderRadius:
-      position === 'top'
-        ? `${borderRadius} ${borderRadius} 0 0`
-        : `0 0 ${borderRadius} ${borderRadius}`,
-  };
+  const containerStyle: React.CSSProperties = inset
+    ? {
+        position: 'absolute',
+        [position]: '20px',
+        left: '40px',
+        right: '40px',
+        height: `${height}px`,
+        backgroundColor: trackColor,
+        overflow: 'hidden',
+        borderRadius: '9999px',
+      }
+    : {
+        position: 'absolute',
+        [position]: 0,
+        left: 0,
+        right: 0,
+        height: `${height}px`,
+        backgroundColor: trackColor,
+        overflow: 'hidden',
+        // Match modal border radius
+        borderRadius:
+          position === 'top'
+            ? `${borderRadius} ${borderRadius} 0 0`
+            : `0 0 ${borderRadius} ${borderRadius}`,
+      };
 
   const barStyle: React.CSSProperties = {
     height: '100%',
     backgroundColor: color,
+    borderRadius: inset ? '9999px' : undefined,
+    // Inset pill: fill is centered so it drains symmetrically from both sides
+    // toward the middle (design-review v2 animation)
+    margin: inset ? '0 auto' : undefined,
     // Start at 100%, animate to 0%
     width: shouldAnimate ? '0%' : '100%',
     // Linear transition over the full duration
     transition: shouldAnimate ? `width ${duration}ms linear` : 'none',
-    // Add subtle glow effect
-    boxShadow: `0 0 ${height}px ${color}`,
+    // Flat inset pill has no glow (design-review v2)
+    boxShadow: inset ? undefined : `0 0 ${height}px ${color}`,
   };
 
   return (

@@ -3,6 +3,7 @@ export { ModalBase } from './ModalBase';
 export { ModalActionButtons } from './ModalActionButtons';
 export { ErrorModal } from './ErrorModal';
 export { SuccessModal } from './SuccessModal';
+export { ContactlessPaymentIcon, HouseLineIcon } from './PhosphorIcons';
 
 // Selection grid components
 export { SelectableGrid, SelectableCard } from './SelectableGrid';

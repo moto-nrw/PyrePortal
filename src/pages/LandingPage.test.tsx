@@ -156,16 +156,16 @@ describe('LandingPage', () => {
     expect(button.style.color).toBe('#FFFFFF');
   });
 
-  it('renders the welcome heading with gradient styling', () => {
+  it('renders the welcome heading with solid gray styling (no gradient)', () => {
     render(
       <MemoryRouter>
         <LandingPage />
       </MemoryRouter>
     );
     const heading = screen.getByText('Willkommen bei moto!');
-    // The heading should have the gradient class
-    expect(heading.className).toContain('bg-gradient-to-r');
-    expect(heading.className).toContain('bg-clip-text');
+    // Design-review v2: solid gray-900 heading, gradient removed
+    expect(heading.className).toContain('text-[#111827]');
+    expect(heading.className).not.toContain('bg-gradient-to-r');
   });
 
   // --- handleRestart tests ---

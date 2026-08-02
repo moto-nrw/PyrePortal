@@ -1783,6 +1783,27 @@ describe('api methods', () => {
         })
       );
     });
+
+    it('sends X-Staff-ID when a staff member was resolved', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({
+          status: 'success',
+          data: { student_id: 1, student_name: 'Test', action: 'checked_in' },
+          message: 'ok',
+        })
+      );
+
+      await freshApi.processRfidScan(
+        { student_rfid: 'AA:BB:CC', action: 'checkin', room_id: 5 },
+        '1234',
+        7
+      );
+
+      const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('7');
+    });
   });
 
   // ------------------------------------------------------------------
@@ -1889,6 +1910,23 @@ describe('api methods', () => {
       };
       expect(body.destination).toBe('zuhause');
       expect(body.action).toBe('confirm_daily_checkout');
+    });
+
+    it('sends X-Staff-ID when a staff member was resolved', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({
+          status: 'success',
+          data: { action: 'checked_out' },
+          message: 'ok',
+        })
+      );
+
+      await freshApi.toggleAttendance('1234', 'AA:BB:CC', 'confirm', undefined, 7);
+
+      const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('7');
     });
 
     it('maps 404 error to toggle-specific German message', async () => {

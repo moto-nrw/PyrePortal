@@ -235,27 +235,42 @@ function TeamManagementPage() {
             padding: '0 64px',
             fontSize: '24px',
             fontWeight: 700,
-            color: '#FFFFFF',
-            backgroundColor: selectedSupervisors.length === 0 || isSaving ? '#9CA3AF' : '#83CD2D',
+            color: designSystem.colors.white,
+            backgroundColor:
+              selectedSupervisors.length === 0 || isSaving
+                ? designSystem.gray[400]
+                : designSystem.flat.primary,
             border: 'none',
-            borderRadius: '9999px',
+            borderRadius: designSystem.borderRadius.full,
             cursor: selectedSupervisors.length === 0 || isSaving ? 'not-allowed' : 'pointer',
             transition: designSystem.transitions.base,
             outline: 'none',
             boxShadow:
-              selectedSupervisors.length === 0 || isSaving ? 'none' : designSystem.shadows.green,
+              selectedSupervisors.length === 0 || isSaving ? 'none' : designSystem.shadows.md,
             opacity: selectedSupervisors.length === 0 || isSaving ? 0.6 : 1,
+          }}
+          onMouseEnter={e => {
+            if (selectedSupervisors.length > 0 && !isSaving) {
+              e.currentTarget.style.backgroundColor = designSystem.flat.primaryHover;
+            }
+          }}
+          onMouseLeave={e => {
+            if (selectedSupervisors.length > 0 && !isSaving) {
+              e.currentTarget.style.backgroundColor = designSystem.flat.primary;
+            }
           }}
           onTouchStart={e => {
             if (selectedSupervisors.length > 0 && !isSaving) {
               e.currentTarget.style.transform = designSystem.scales.active;
+              e.currentTarget.style.backgroundColor = designSystem.flat.primaryHover;
               e.currentTarget.style.boxShadow = designSystem.shadows.button;
             }
           }}
           onTouchEnd={e => {
             if (selectedSupervisors.length > 0 && !isSaving) {
               e.currentTarget.style.transform = 'scale(1)';
-              e.currentTarget.style.boxShadow = designSystem.shadows.green;
+              e.currentTarget.style.backgroundColor = designSystem.flat.primary;
+              e.currentTarget.style.boxShadow = designSystem.shadows.md;
             }
           }}
         >

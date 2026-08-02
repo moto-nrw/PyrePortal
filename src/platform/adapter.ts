@@ -1,7 +1,8 @@
 /**
  * Platform Adapter Interface
  *
- * Each build target (tauri, gkt, browser) implements this interface.
+ * Each supported build target (GKT, Wedge, browser) implements this interface.
+ * The Tauri implementation is retired legacy code awaiting removal.
  * Vite resolves `@platform` to the correct directory based on BUILD_TARGET.
  */
 
@@ -15,7 +16,7 @@ type Platform = 'tauri' | 'gkt' | 'browser' | 'wedge';
  * True when the current platform uses real NFC/RFID hardware (not mock).
  * - GKT: always real (NFC via system.js)
  * - Wedge: always real (USB reader in keyboard-emulation mode)
- * - Browser and Tauri Mac/mock app: mock
+ * - Browser: mock
  */
 export const isRealScanningEnabled = (): boolean =>
   adapter.platform === 'gkt' || adapter.platform === 'wedge';
@@ -40,7 +41,7 @@ export interface PlatformAdapter {
   scanSingleTag(timeoutMs: number): Promise<{ success: boolean; tag_id?: string; error?: string }>;
 
   // --- Configuration ---
-  /** Async config init (Tauri: loads from Rust backend, others: no-op) */
+  /** Async config init (legacy Tauri loads from Rust; supported targets are no-ops) */
   loadConfig(): Promise<void>;
   getApiBaseUrl(): string;
   getDeviceApiKey(): string;

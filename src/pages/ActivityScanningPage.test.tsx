@@ -75,8 +75,8 @@ const defaultRfidState = {
 
 const defaultStoreState = {
   authenticatedUser: {
-    staffId: 1,
-    staffName: 'Test User',
+    staffId: 0,
+    staffName: 'OGS Device',
     deviceName: 'Test Device',
     pin: '1234',
   },
@@ -351,7 +351,8 @@ describe('ActivityScanningPage', () => {
     const modalContainer = dialog?.firstElementChild;
     const clockIcon = dialog?.querySelector('svg[data-icon=\"clock\"]');
 
-    expect(modalContainer).toHaveStyle('background-color: #5080D8');
+    // Pickup query modal uses the pastel blue family surface (design-review v2)
+    expect(modalContainer).toHaveStyle('background-color: #E8EFFA');
     expect(clockIcon).not.toBeNull();
   });
 
@@ -758,7 +759,8 @@ describe('ActivityScanningPage', () => {
     await waitFor(() => {
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 99 },
-        '1234'
+        '1234',
+        1
       );
     });
   });
@@ -873,7 +875,8 @@ describe('ActivityScanningPage', () => {
     await waitFor(() => {
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 88 },
-        '1234'
+        '1234',
+        1
       );
     });
   });
@@ -916,7 +919,8 @@ describe('ActivityScanningPage', () => {
     await waitFor(() => {
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 88 },
-        '1234'
+        '1234',
+        1
       );
     });
   });
@@ -1021,7 +1025,8 @@ describe('ActivityScanningPage', () => {
         '1234',
         '04:AA:BB:CC:DD:EE:FF',
         'confirm_daily_checkout',
-        'zuhause'
+        'zuhause',
+        1
       );
     });
 
