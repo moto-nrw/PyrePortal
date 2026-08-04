@@ -23,7 +23,7 @@ Supported targets:
 - **Wedge**: kiosk target for iPads/tablets with a USB NFC reader in keyboard-emulation mode. See `docs/wedge-reader-setup.md`.
 - **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
 
-The Raspberry Pi/Balena and Tauri targets are retired. They are not supported development or release targets. Legacy Tauri source may remain while it is being removed; do not extend it.
+The Raspberry Pi/Balena and Tauri targets are retired. They are not supported development or release targets. The Tauri source has been removed from the repository; do not reintroduce it.
 
 ## Development Commands
 
@@ -78,8 +78,6 @@ RFID hardware and browser mocks can emit duplicate scan events. Defense in depth
 - `BUILD_TARGET=gkt`: production GKT adapter.
 - `BUILD_TARGET=wedge`: keyboard-wedge adapter for tablets with USB NFC readers.
 - default/browser: browser mock adapter.
-
-`BUILD_TARGET=tauri` and `src/platform/tauri` are legacy code, not supported targets. Do not add behavior to them.
 
 New platform behavior should go through the adapter interface instead of branching throughout UI code.
 
@@ -167,7 +165,6 @@ Prefer the platform adapter boundary:
 - GKT-specific native behavior belongs in `src/platform/gkt`.
 - Wedge-specific behavior belongs in `src/platform/wedge`.
 - Browser/mock behavior belongs in `src/platform/browser`.
-- Do not add Tauri behavior; the adapter is legacy code awaiting removal.
 
 ## Working with RFID
 
