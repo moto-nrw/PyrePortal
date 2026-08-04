@@ -1,6 +1,6 @@
 import { adapter } from '@platform';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ContactlessPaymentIcon, ErrorModal, ModalBase } from '../components/ui';

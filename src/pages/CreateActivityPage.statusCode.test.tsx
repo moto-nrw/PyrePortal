@@ -1,5 +1,5 @@
 import { render, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { ApiError, type ActivityResponse } from '../services/api';
@@ -8,11 +8,11 @@ import { useUserStore } from '../store/userStore';
 import CreateActivityPage from './CreateActivityPage';
 
 // ---------------------------------------------------------------------------
-// Mock react-router-dom to intercept navigate calls
+// Mock react-router to intercept navigate calls
 // ---------------------------------------------------------------------------
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
