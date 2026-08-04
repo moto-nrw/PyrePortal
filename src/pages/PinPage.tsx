@@ -1,7 +1,7 @@
 import { faDeleteLeft } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
 import { ErrorModal } from '../components/ui';
