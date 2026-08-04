@@ -16,7 +16,7 @@ PyrePortal is moto's browser-based kiosk for German after-school care (OGS). Sta
 | **Wedge**    | Tablet build; hosting pending | USB reader in keyboard-emulation mode |
 | **Browser**  | Local development             | Frontend-generated mock scans         |
 
-The Raspberry Pi/Balena and Tauri targets are retired. They are not supported development or release targets. Legacy source may remain in the repository while it is being removed, but new work must target GKT, Wedge or the browser mock.
+The Raspberry Pi/Balena and Tauri targets are retired. They are not supported development or release targets, and the Tauri source has been removed. New work must target GKT, Wedge or the browser mock.
 
 ## Features
 

@@ -27,7 +27,6 @@ This directory contains the React/TypeScript frontend for PyrePortal.
 - GKT production behavior belongs in `platform/gkt`.
 - Wedge reader behavior belongs in `platform/wedge`.
 - Browser mock behavior belongs in `platform/browser`.
-- The retired Tauri adapter in `platform/tauri` is legacy code awaiting removal. Do not add behavior there.
 
 ### Import Order
 

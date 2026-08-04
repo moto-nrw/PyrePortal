@@ -6,7 +6,7 @@
 
 `package.json` is the release version source for PyrePortal.
 
-The retired Raspberry Pi/Balena and Tauri files are not release sources. Do not block GKT releases on `Cargo.toml` or `tauri.conf.json` version values.
+No other file carries a release-relevant version. The retired Tauri version files (`Cargo.toml`, `tauri.conf.json`) have been removed from the repository, so there is nothing to keep in sync.
 
 ## Validation
 
