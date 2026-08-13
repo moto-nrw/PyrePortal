@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with this repository.
 
+## Agent skills
+
+### Issue tracker
+
+Track issues in this repository's GitHub Issues. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the five default triage labels. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Use the single-context domain-doc layout. See `docs/agents/domain.md`.
+
 ## Ecosystem
 
 PyrePortal is part of a three-repo system. All repos live side-by-side (`../`):
