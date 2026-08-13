@@ -137,6 +137,12 @@ const DESTINATION_COLORS = {
   },
 };
 
+const ROOM_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
+
+function getRoomFrameColor(color: string | undefined): string {
+  return color && ROOM_COLOR_PATTERN.test(color) ? color : designSystem.gray[300];
+}
+
 // Static SVG icons hoisted out of render path to avoid per-render allocation on Pi.
 // stroke/fill use currentColor so each destination button tints its own icon.
 const ICON_RAUMWECHSEL = (
@@ -276,6 +282,8 @@ const ActivityScanningPage: React.FC = () => {
     handleModalTimeout,
     handleAnmelden,
   } = useActivityScanningPage();
+
+  const roomFrameColor = getRoomFrameColor(selectedRoom?.color);
 
   // Guard clause - if data is missing, show loading or error state
   if (!selectedActivity || !selectedRoom || !authenticatedUser) {
@@ -672,169 +680,192 @@ const ActivityScanningPage: React.FC = () => {
     <>
       <BackgroundWrapper>
         <div
+          data-testid="room-color-frame"
           style={{
             width: '100vw',
             height: '100vh',
-            padding: '16px',
-            display: 'flex',
-            flexDirection: 'column',
-            position: 'relative',
+            padding: '22px',
+            backgroundColor: roomFrameColor,
           }}
         >
-          {/* Anmelden Button - Top Right */}
-          <div
-            style={{
-              position: 'absolute',
-              top: '20px',
-              right: '20px',
-              zIndex: 10,
-            }}
-          >
-            <BackButton
-              onClick={handleAnmelden}
-              text={texts.loginButton}
-              customIcon={
-                <svg
-                  width="28"
-                  height="28"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#374151"
-                  strokeWidth="2.5"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              }
-              ariaLabel={texts.loginAriaLabel}
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={handlePickupQueryClick}
-            disabled={pickupQueryButtonDisabled}
-            aria-label={texts.pickupQueryAriaLabel}
-            style={{
-              position: 'absolute',
-              top: '20px',
-              left: '20px',
-              zIndex: 10,
-              width: '76px',
-              height: '76px',
-              borderRadius: '50%',
-              border: 'none',
-              backgroundColor: pickupQueryButtonDisabled
-                ? designSystem.gray[400]
-                : designSystem.gray[900],
-              color: designSystem.colors.white,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: pickupQueryButtonDisabled ? 'none' : designSystem.shadows.md,
-              cursor: pickupQueryButtonDisabled ? 'not-allowed' : 'pointer',
-              transition:
-                'transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease',
-              opacity: pickupQueryButtonDisabled ? 0.7 : 1,
-            }}
-            onPointerDown={e => {
-              if (pickupQueryButtonDisabled) return;
-              e.currentTarget.style.transform = 'scale(0.96)';
-            }}
-            onPointerUp={e => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-            onPointerLeave={e => {
-              e.currentTarget.style.transform = 'scale(1)';
-            }}
-          >
-            <FontAwesomeIcon icon={faClock} style={{ fontSize: '34px' }} />
-          </button>
-
           <div
             style={{
               width: '100%',
               height: '100%',
-              display: 'flex',
-              flexDirection: 'column',
-              position: 'relative',
-              padding: '24px',
+              padding: '18px',
+              borderRadius: '34px',
+              backgroundColor: 'rgba(255, 255, 255, 0.38)',
             }}
           >
-            {/* Header Section */}
             <div
+              data-testid="room-color-content"
               style={{
-                textAlign: 'center',
-                marginTop: '40px',
-                marginBottom: '20px',
-              }}
-            >
-              <h1
-                style={{
-                  fontSize: '56px',
-                  fontWeight: 700,
-                  color: designSystem.gray[900],
-                  margin: 0,
-                  lineHeight: 1.2,
-                }}
-              >
-                {selectedActivity.name}
-              </h1>
-              <p
-                style={{
-                  fontSize: '32px',
-                  color: designSystem.gray[500],
-                  margin: 0,
-                  fontWeight: 500,
-                }}
-              >
-                {selectedRoom?.name || texts.unknownRoom}
-              </p>
-            </div>
-
-            {/* Main Student Count Display / RFID Processing Spinner (cross-fade) */}
-            <div
-              style={{
+                width: '100%',
+                height: '100%',
                 display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                textAlign: 'center',
-                flex: 1,
+                flexDirection: 'column',
                 position: 'relative',
+                overflow: 'hidden',
+                borderRadius: '20px',
+                backgroundColor: designSystem.colors.white,
               }}
             >
-              <div
-                style={{
-                  fontSize: '220px',
-                  fontWeight: 800,
-                  // Darker pastel-family green (design review: modal green tone,
-                  // not the bright brand green)
-                  color: designSystem.pastel.green.accent,
-                  lineHeight: 1,
-                  fontVariantNumeric: 'tabular-nums',
-                  marginTop: '-12px',
-                  opacity: processingQueueSize > 0 ? 0 : 1,
-                }}
-              >
-                {studentCount ?? 0}
-              </div>
+              {/* Anmelden Button - Top Right */}
               <div
                 style={{
                   position: 'absolute',
-                  width: '140px',
-                  height: '140px',
-                  borderRadius: '50%',
-                  background: `conic-gradient(from 0deg, ${designSystem.gray[200]} 0%, ${designSystem.gray[900]} 100%)`,
-                  mask: 'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
-                  WebkitMask:
-                    'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
-                  animation:
-                    processingQueueSize > 0 ? 'rfid-center-spin 0.8s linear infinite' : 'none',
-                  transition: 'opacity 0.3s ease',
-                  opacity: processingQueueSize > 0 ? 1 : 0,
-                  pointerEvents: 'none',
+                  top: '20px',
+                  right: '20px',
+                  zIndex: 10,
                 }}
-              />
+              >
+                <BackButton
+                  onClick={handleAnmelden}
+                  text={texts.loginButton}
+                  customIcon={
+                    <svg
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="#374151"
+                      strokeWidth="2.5"
+                    >
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  }
+                  ariaLabel={texts.loginAriaLabel}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handlePickupQueryClick}
+                disabled={pickupQueryButtonDisabled}
+                aria-label={texts.pickupQueryAriaLabel}
+                style={{
+                  position: 'absolute',
+                  top: '20px',
+                  left: '20px',
+                  zIndex: 10,
+                  width: '76px',
+                  height: '76px',
+                  borderRadius: '50%',
+                  border: 'none',
+                  backgroundColor: pickupQueryButtonDisabled
+                    ? designSystem.gray[400]
+                    : designSystem.gray[900],
+                  color: designSystem.colors.white,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: pickupQueryButtonDisabled ? 'none' : designSystem.shadows.md,
+                  cursor: pickupQueryButtonDisabled ? 'not-allowed' : 'pointer',
+                  transition:
+                    'transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease',
+                  opacity: pickupQueryButtonDisabled ? 0.7 : 1,
+                }}
+                onPointerDown={e => {
+                  if (pickupQueryButtonDisabled) return;
+                  e.currentTarget.style.transform = 'scale(0.96)';
+                }}
+                onPointerUp={e => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+                onPointerLeave={e => {
+                  e.currentTarget.style.transform = 'scale(1)';
+                }}
+              >
+                <FontAwesomeIcon icon={faClock} style={{ fontSize: '34px' }} />
+              </button>
+
+              <div
+                style={{
+                  width: '100%',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  padding: '24px',
+                }}
+              >
+                {/* Header Section */}
+                <div
+                  style={{
+                    textAlign: 'center',
+                    marginTop: '40px',
+                    marginBottom: '20px',
+                  }}
+                >
+                  <h1
+                    style={{
+                      fontSize: '56px',
+                      fontWeight: 700,
+                      color: designSystem.gray[900],
+                      margin: 0,
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {selectedActivity.name}
+                  </h1>
+                  <p
+                    style={{
+                      fontSize: '32px',
+                      color: designSystem.gray[500],
+                      margin: 0,
+                      fontWeight: 500,
+                    }}
+                  >
+                    {selectedRoom?.name || texts.unknownRoom}
+                  </p>
+                </div>
+
+                {/* Main Student Count Display / RFID Processing Spinner (cross-fade) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    textAlign: 'center',
+                    flex: 1,
+                    position: 'relative',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '220px',
+                      fontWeight: 800,
+                      // Darker pastel-family green (design review: modal green tone,
+                      // not the bright brand green)
+                      color: designSystem.pastel.green.accent,
+                      lineHeight: 1,
+                      fontVariantNumeric: 'tabular-nums',
+                      marginTop: '-12px',
+                      opacity: processingQueueSize > 0 ? 0 : 1,
+                    }}
+                  >
+                    {studentCount ?? 0}
+                  </div>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      width: '140px',
+                      height: '140px',
+                      borderRadius: '50%',
+                      background: `conic-gradient(from 0deg, ${designSystem.gray[200]} 0%, ${designSystem.gray[900]} 100%)`,
+                      mask: 'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
+                      WebkitMask:
+                        'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
+                      animation:
+                        processingQueueSize > 0 ? 'rfid-center-spin 0.8s linear infinite' : 'none',
+                      transition: 'opacity 0.3s ease',
+                      opacity: processingQueueSize > 0 ? 1 : 0,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>

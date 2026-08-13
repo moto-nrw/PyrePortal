@@ -162,6 +162,53 @@ describe('ActivityScanningPage', () => {
     expect(screen.getByText('Raum 101')).toBeInTheDocument();
   });
 
+  it('uses a light selected room color for the waiting-screen frame', () => {
+    useUserStore.setState({
+      selectedRoom: { ...defaultStoreState.selectedRoom, color: '#F4D35E' },
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({
+      backgroundColor: '#F4D35E',
+    });
+  });
+
+  it('uses a dark selected room color without recoloring the waiting-screen content', () => {
+    useUserStore.setState({
+      selectedRoom: { ...defaultStoreState.selectedRoom, color: '#2457A6' },
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({
+      backgroundColor: '#2457A6',
+    });
+    expect(screen.getByTestId('room-color-content')).toHaveStyle({
+      backgroundColor: '#FFFFFF',
+    });
+  });
+
+  it('uses the neutral frame when the selected room has no color', () => {
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({
+      backgroundColor: '#D1D5DB',
+    });
+  });
+
+  it('uses the neutral frame when the selected room color is invalid', () => {
+    useUserStore.setState({
+      selectedRoom: { ...defaultStoreState.selectedRoom, color: 'not-a-color' },
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({
+      backgroundColor: '#D1D5DB',
+    });
+  });
+
   it('shows a different activity name when store is updated', () => {
     useUserStore.setState({
       selectedActivity: { ...defaultStoreState.selectedActivity, name: 'Hausaufgabenbetreuung' },
