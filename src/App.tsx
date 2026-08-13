@@ -6,6 +6,7 @@ import { RfidServiceInitializer } from './components/RfidServiceInitializer';
 import NetworkStatus from './components/ui/NetworkStatus';
 import { useNetworkStatus } from './hooks/useNetworkStatus';
 import ActivityScanningPage from './pages/ActivityScanningPage';
+import ActivityScanningRoomFramePrototype from './pages/ActivityScanningRoomFramePrototype';
 import CreateActivityPage from './pages/CreateActivityPage';
 import HomeViewPage from './pages/HomeViewPage';
 import LandingPage from './pages/LandingPage';
@@ -76,6 +77,12 @@ function App() {
             {/* Public routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/pin" element={<PinPage />} />
+            {!import.meta.env.PROD && (
+              <Route
+                path="/prototype/room-frame"
+                element={<ActivityScanningRoomFramePrototype />}
+              />
+            )}
 
             {/* Protected routes - require authentication */}
             <Route
