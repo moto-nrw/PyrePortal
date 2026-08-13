@@ -102,13 +102,14 @@ export const SessionHistoryPanel: React.FC<SessionHistoryPanelProps> = ({
               type="button"
               onClick={() => void clearSessionHistory()}
               style={{
-                fontSize: '16px',
+                fontSize: '18px',
                 fontWeight: 600,
                 color: designSystem.pastel.red.accent,
                 backgroundColor: 'transparent',
                 border: 'none',
                 cursor: 'pointer',
-                padding: '8px 12px',
+                minHeight: '48px',
+                padding: '12px 16px',
                 borderRadius: designSystem.borderRadius.full,
               }}
             >
@@ -181,8 +182,9 @@ export const SessionHistoryPanel: React.FC<SessionHistoryPanelProps> = ({
                   aria-label={texts.removeEntryLabel}
                   onClick={() => void removeSessionHistoryEntry(entry)}
                   style={{
-                    width: '48px',
-                    height: '48px',
+                    width: '60px',
+                    height: '60px',
+                    flexShrink: 0,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -193,7 +195,7 @@ export const SessionHistoryPanel: React.FC<SessionHistoryPanelProps> = ({
                     cursor: 'pointer',
                   }}
                 >
-                  <FontAwesomeIcon icon={faXmark} style={{ fontSize: '18px' }} />
+                  <FontAwesomeIcon icon={faXmark} style={{ fontSize: '24px' }} />
                 </button>
               </div>
             ))}
