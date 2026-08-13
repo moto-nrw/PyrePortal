@@ -139,8 +139,8 @@ const DESTINATION_COLORS = {
 
 const ROOM_COLOR_PATTERN = /^#[0-9A-Fa-f]{6}$/;
 
-function getRoomFrameColor(color: string | undefined): string {
-  return color && ROOM_COLOR_PATTERN.test(color) ? color : designSystem.gray[300];
+function getRoomFrameColor(color: string | undefined): string | undefined {
+  return color && ROOM_COLOR_PATTERN.test(color) ? color : undefined;
 }
 
 // Static SVG icons hoisted out of render path to avoid per-render allocation on Pi.
@@ -684,17 +684,18 @@ const ActivityScanningPage: React.FC = () => {
           style={{
             width: '100vw',
             height: '100vh',
-            padding: '22px',
+            padding: roomFrameColor ? '22px' : '16px',
             backgroundColor: roomFrameColor,
           }}
         >
           <div
+            data-testid="room-color-inset"
             style={{
               width: '100%',
               height: '100%',
-              padding: '18px',
-              borderRadius: '34px',
-              backgroundColor: 'rgba(255, 255, 255, 0.38)',
+              padding: roomFrameColor ? '18px' : 0,
+              borderRadius: roomFrameColor ? '34px' : 0,
+              backgroundColor: roomFrameColor ? 'rgba(255, 255, 255, 0.38)' : undefined,
             }}
           >
             <div
@@ -706,8 +707,8 @@ const ActivityScanningPage: React.FC = () => {
                 flexDirection: 'column',
                 position: 'relative',
                 overflow: 'hidden',
-                borderRadius: '20px',
-                backgroundColor: designSystem.colors.white,
+                borderRadius: roomFrameColor ? '20px' : 0,
+                backgroundColor: roomFrameColor ? designSystem.colors.white : undefined,
               }}
             >
               {/* Anmelden Button - Top Right */}

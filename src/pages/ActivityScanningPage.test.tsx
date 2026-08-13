@@ -189,24 +189,22 @@ describe('ActivityScanningPage', () => {
     });
   });
 
-  it('uses the neutral frame when the selected room has no color', () => {
+  it('does not show a room-color frame when the selected room has no color', () => {
     renderPage();
 
-    expect(screen.getByTestId('room-color-frame')).toHaveStyle({
-      backgroundColor: '#D1D5DB',
-    });
+    expect(screen.getByTestId('room-color-frame').style.backgroundColor).toBe('');
+    expect(screen.getByTestId('room-color-inset')).toHaveStyle({ padding: '0px' });
   });
 
-  it('uses the neutral frame when the selected room color is invalid', () => {
+  it('does not show a room-color frame when the selected room color is invalid', () => {
     useUserStore.setState({
       selectedRoom: { ...defaultStoreState.selectedRoom, color: 'not-a-color' },
     });
 
     renderPage();
 
-    expect(screen.getByTestId('room-color-frame')).toHaveStyle({
-      backgroundColor: '#D1D5DB',
-    });
+    expect(screen.getByTestId('room-color-frame').style.backgroundColor).toBe('');
+    expect(screen.getByTestId('room-color-inset')).toHaveStyle({ padding: '0px' });
   });
 
   it('shows a different activity name when store is updated', () => {
