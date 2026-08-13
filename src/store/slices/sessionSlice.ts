@@ -300,6 +300,9 @@ const SESSION_INITIAL_STATE = {
 export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserState>) => {
   // Race guard for session recreation: stale async responses are discarded
   const recreationTracker = createSessionRequestTracker();
+  // Separate guard for fetchCurrentSession so a late room/activity lookup
+  // cannot repopulate session state after logout or a newer fetch.
+  const currentSessionFetchTracker = createSessionRequestTracker();
 
   return {
     // Initial state
@@ -315,9 +318,10 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
 
     setCurrentSession: (session: CurrentSession) => set({ currentSession: session }),
 
-    // Invalidate all in-flight recreation requests (e.g. on logout)
+    // Invalidate all in-flight recreation and current-session fetches (e.g. on logout)
     invalidateSessionRecreation: () => {
       recreationTracker.invalidate();
+      currentSessionFetchTracker.invalidate();
       set({ isValidatingLastSession: false });
     },
 
@@ -378,6 +382,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
     },
 
     fetchCurrentSession: async () => {
+      const requestId = currentSessionFetchTracker.begin();
       const { authenticatedUser } = get();
 
       if (!authenticatedUser?.pin) {
@@ -385,9 +390,26 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         return;
       }
 
+      const isFetchStillCurrent = (): boolean => {
+        if (!currentSessionFetchTracker.isCurrent(requestId)) {
+          return false;
+        }
+
+        const currentUser = get().authenticatedUser;
+        return (
+          currentUser?.pin === authenticatedUser.pin &&
+          currentUser.staffId === authenticatedUser.staffId
+        );
+      };
+
       try {
         storeLogger.info('Fetching current session for device');
         const session = await api.getCurrentSession(authenticatedUser.pin);
+
+        if (!isFetchStillCurrent()) {
+          storeLogger.warn('Discarding stale fetchCurrentSession result');
+          return;
+        }
 
         if (!session) {
           storeLogger.debug('No active session found for device, clearing session state');
@@ -418,6 +440,11 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           get().rooms,
           authenticatedUser.pin
         );
+
+        if (!isFetchStillCurrent()) {
+          storeLogger.warn('Discarding stale fetchCurrentSession result after room lookup');
+          return;
+        }
 
         // Guard: Don't overwrite selectedRoom if user just manually selected a room
         // This prevents stale server data from reverting a recent room switch.

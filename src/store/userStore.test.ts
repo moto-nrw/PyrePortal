@@ -621,6 +621,82 @@ describe('fetchCurrentSession', () => {
       is_occupied: true,
     });
   });
+
+  it('discards a late room lookup after logout', async () => {
+    setAuthenticated();
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+
+    let resolveRooms: (rooms: Room[]) => void = () => undefined;
+    mockGetRooms.mockImplementationOnce(
+      () =>
+        new Promise<Room[]>(resolve => {
+          resolveRooms = resolve;
+        })
+    );
+
+    const fetchPromise = useUserStore.getState().fetchCurrentSession();
+    await vi.waitFor(() => {
+      expect(mockGetRooms).toHaveBeenCalled();
+    });
+
+    await useUserStore.getState().logout();
+    resolveRooms([mockRoom({ id: 5, name: 'Turnhalle', color: '#F4D35E' })]);
+    await fetchPromise;
+
+    const state = useUserStore.getState();
+    expect(state.authenticatedUser).toBeNull();
+    expect(state.currentSession).toBeNull();
+    expect(state.selectedRoom).toBeNull();
+    expect(state.selectedActivity).toBeNull();
+    expect(state.selectedSupervisors).toHaveLength(0);
+  });
+
+  it('does not clear a newer login when a stale fetch finds no session', async () => {
+    setAuthenticated();
+    mockGetCurrentSession.mockImplementationOnce(
+      () =>
+        new Promise<CurrentSession | null>(resolve => {
+          queueMicrotask(() => resolve(null));
+        })
+    );
+
+    const fetchPromise = useUserStore.getState().fetchCurrentSession();
+    await useUserStore.getState().logout();
+    useUserStore.getState().setAuthenticatedUser({
+      staffId: 2,
+      staffName: 'Herr Müller',
+      deviceName: 'Pi-5',
+      pin: '5678',
+    });
+    useUserStore.setState({
+      currentSession: {
+        active_group_id: 9,
+        activity_id: 3,
+        device_id: 1,
+        start_time: 'now',
+        duration: '1h',
+      },
+      selectedRoom: mockRoom({ id: 3, name: 'Raum B' }),
+    });
+    await fetchPromise;
+
+    const state = useUserStore.getState();
+    expect(state.authenticatedUser?.staffId).toBe(2);
+    expect(state.currentSession?.active_group_id).toBe(9);
+    expect(state.selectedRoom?.id).toBe(3);
+  });
 });
 
 // ====================================================================
