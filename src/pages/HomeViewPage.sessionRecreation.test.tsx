@@ -33,11 +33,16 @@ vi.mock('../services/api', async () => {
       ...actual.api,
       startSession: vi.fn(),
       endSession: vi.fn().mockResolvedValue(undefined),
+      getActivities: vi.fn(),
+      getRooms: vi.fn(),
     },
   };
 });
 
 const mockedApi = vi.mocked(api);
+
+// Real store action, captured before any test overrides it via setState
+const realValidateAndRecreateSession = useUserStore.getState().validateAndRecreateSession;
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -359,5 +364,57 @@ describe('HomeViewPage session recreation behavior', () => {
 
     expect(useUserStore.getState().currentSession).toBeNull();
     expect(saveLastSessionData).not.toHaveBeenCalled();
+  });
+
+  // =========================================================================
+  // Server-deleted activity: entry disappears from the visible history list
+  // =========================================================================
+
+  it('removes a server-deleted activity from the history list after failed validation', async () => {
+    const deletedEntry = historyEntry; // activity_id 10, no longer on the server
+    const validEntry: SessionHistoryEntry = {
+      activity_id: 11,
+      room_id: 7,
+      supervisor_ids: [1],
+      saved_at: '2026-03-13T14:00:00Z',
+      activity_name: 'Fußball AG',
+      room_name: 'Turnhalle',
+      supervisor_names: ['Frau Müller'],
+    };
+
+    useUserStore.setState({
+      sessionSettings: { auto_save_enabled: true, session_history: [deletedEntry, validEntry] },
+      validateAndRecreateSession: realValidateAndRecreateSession,
+    });
+    // Server only knows the valid activity; entry 10 was deleted
+    mockedApi.getActivities.mockResolvedValue([
+      { id: 11, name: 'Fußball AG', category: 'Betreuung' },
+    ] as never);
+    mockedApi.getRooms.mockResolvedValue([
+      testRoom,
+      { id: 7, name: 'Turnhalle', is_occupied: false },
+    ] as never);
+
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
+    const deletedRow = await screen.findByText(/Raum A · /);
+    await user.click(deletedRow.closest('button')!);
+
+    // Specific German error message is shown
+    await waitFor(() => {
+      expect(screen.getByText(/nicht mehr verfügbar/)).toBeInTheDocument();
+    });
+
+    // Only the invalid entry was removed from the persisted history
+    expect(
+      useUserStore.getState().sessionSettings?.session_history.map(e => e.activity_id)
+    ).toEqual([11]);
+
+    // Reopening the panel shows the valid entry but not the deleted one
+    await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
+    expect(await screen.findByText(/Turnhalle · /)).toBeInTheDocument();
+    expect(screen.queryByText(/Raum A · /)).not.toBeInTheDocument();
   });
 });

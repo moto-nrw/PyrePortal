@@ -5,7 +5,7 @@ import {
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 
 import { formatRoomName } from '../services/api';
 import type { SessionHistoryEntry } from '../services/sessionStorage';
@@ -47,6 +47,28 @@ export const SessionHistoryPanel: React.FC<SessionHistoryPanelProps> = ({
 
   const history = sessionSettings?.session_history ?? [];
 
+  // Custom always-visible scroll indicator: Chromium ignores
+  // ::-webkit-scrollbar styling and overlay scrollbars stay hidden on touch,
+  // so the thumb is rendered manually and synced via onScroll.
+  const listRef = useRef<HTMLDivElement>(null);
+  const [thumb, setThumb] = useState<{ top: number; height: number } | null>(null);
+
+  const updateThumb = useCallback(() => {
+    const el = listRef.current;
+    if (!el || el.scrollHeight <= el.clientHeight) {
+      setThumb(null);
+      return;
+    }
+    const height = Math.max((el.clientHeight / el.scrollHeight) * el.clientHeight, 40);
+    const maxTop = el.clientHeight - height;
+    const top = (el.scrollTop / (el.scrollHeight - el.clientHeight)) * maxTop;
+    setThumb({ top, height });
+  }, []);
+
+  useEffect(() => {
+    if (isExpanded) updateThumb();
+  }, [isExpanded, history.length, updateThumb]);
+
   if (history.length === 0) return null;
 
   const handleSelect = (entry: SessionHistoryEntry) => {
@@ -72,8 +94,6 @@ export const SessionHistoryPanel: React.FC<SessionHistoryPanelProps> = ({
         <div
           style={{
             width: '480px',
-            maxHeight: '60vh',
-            overflowY: 'auto',
             backgroundColor: designSystem.surface.background,
             border: `1px solid ${designSystem.surface.border}`,
             borderRadius: designSystem.surface.borderRadius,
@@ -118,87 +138,129 @@ export const SessionHistoryPanel: React.FC<SessionHistoryPanelProps> = ({
             </button>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {history.map(entry => (
-              <div
-                key={`${entry.activity_id}-${entry.room_id}-${entry.supervisor_ids.join('-')}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => handleSelect(entry)}
-                  disabled={disabled}
+          <div style={{ position: 'relative' }}>
+            <div
+              ref={listRef}
+              onScroll={updateThumb}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                maxHeight: 'calc(60vh - 100px)',
+                overflowY: 'auto',
+                // Hide the native (overlay) scrollbar; the custom thumb below
+                // is the visible affordance.
+                scrollbarWidth: 'none',
+                paddingRight: thumb ? '16px' : 0,
+              }}
+            >
+              {history.map(entry => (
+                <div
+                  key={`${entry.activity_id}-${entry.room_id}-${entry.supervisor_ids.join('-')}`}
                   style={{
-                    flex: 1,
-                    textAlign: 'left',
-                    backgroundColor: designSystem.colors.white,
-                    border: `1px solid ${designSystem.gray[200]}`,
-                    borderRadius: designSystem.borderRadius.lg,
-                    padding: '14px 16px',
-                    cursor: disabled ? 'not-allowed' : 'pointer',
-                    opacity: disabled ? 0.6 : 1,
-                    transition: designSystem.transitions.base,
-                    minHeight: '64px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
                   }}
                 >
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(entry)}
+                    disabled={disabled}
                     style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      justifyContent: 'space-between',
-                      gap: '12px',
+                      flex: 1,
+                      textAlign: 'left',
+                      backgroundColor: designSystem.colors.white,
+                      border: `1px solid ${designSystem.gray[200]}`,
+                      borderRadius: designSystem.borderRadius.lg,
+                      padding: '14px 16px',
+                      cursor: disabled ? 'not-allowed' : 'pointer',
+                      opacity: disabled ? 0.6 : 1,
+                      transition: designSystem.transitions.base,
+                      minHeight: '64px',
                     }}
                   >
                     <span
                       style={{
-                        fontSize: '18px',
-                        fontWeight: 600,
-                        color: designSystem.gray[900],
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'space-between',
+                        gap: '12px',
                       }}
                     >
-                      {entry.activity_name}
+                      <span
+                        style={{
+                          fontSize: '18px',
+                          fontWeight: 600,
+                          color: designSystem.gray[900],
+                        }}
+                      >
+                        {entry.activity_name}
+                      </span>
+                      <span style={{ fontSize: '14px', color: designSystem.gray[500] }}>
+                        {formatLastUsed(entry.saved_at)}
+                      </span>
                     </span>
-                    <span style={{ fontSize: '14px', color: designSystem.gray[500] }}>
-                      {formatLastUsed(entry.saved_at)}
+                    <span
+                      style={{
+                        display: 'block',
+                        marginTop: '4px',
+                        fontSize: '15px',
+                        color: designSystem.gray[500],
+                      }}
+                    >
+                      {formatRoomName(entry.room_name)} · {entry.supervisor_names.join(', ')}
                     </span>
-                  </span>
-                  <span
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={texts.removeEntryLabel}
+                    onClick={() => void removeSessionHistoryEntry(entry)}
                     style={{
-                      display: 'block',
-                      marginTop: '4px',
-                      fontSize: '15px',
+                      width: '60px',
+                      height: '60px',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: designSystem.colors.white,
+                      border: `1px solid ${designSystem.gray[200]}`,
+                      borderRadius: designSystem.borderRadius.full,
                       color: designSystem.gray[500],
+                      cursor: 'pointer',
                     }}
                   >
-                    {formatRoomName(entry.room_name)} · {entry.supervisor_names.join(', ')}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  aria-label={texts.removeEntryLabel}
-                  onClick={() => void removeSessionHistoryEntry(entry)}
+                    <FontAwesomeIcon icon={faXmark} style={{ fontSize: '24px' }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {thumb && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  right: 0,
+                  width: '8px',
+                  height: '100%',
+                  backgroundColor: designSystem.gray[100],
+                  borderRadius: designSystem.borderRadius.full,
+                }}
+              >
+                <div
                   style={{
-                    width: '60px',
-                    height: '60px',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: designSystem.colors.white,
-                    border: `1px solid ${designSystem.gray[200]}`,
+                    position: 'absolute',
+                    top: `${thumb.top}px`,
+                    width: '100%',
+                    height: `${thumb.height}px`,
+                    backgroundColor: designSystem.gray[400],
                     borderRadius: designSystem.borderRadius.full,
-                    color: designSystem.gray[500],
-                    cursor: 'pointer',
                   }}
-                >
-                  <FontAwesomeIcon icon={faXmark} style={{ fontSize: '24px' }} />
-                </button>
+                />
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}
