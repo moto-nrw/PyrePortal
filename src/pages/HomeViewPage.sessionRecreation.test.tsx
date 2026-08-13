@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { api, type CurrentSession } from '../services/api';
-import type { SessionSettings } from '../services/sessionStorage';
+import type { SessionHistoryEntry, SessionSettings } from '../services/sessionStorage';
 import { useUserStore } from '../store/userStore';
 
 import HomeViewPage from './HomeViewPage';
@@ -49,18 +49,19 @@ const baseUser = {
   pin: '1234',
 };
 
-const sessionSettingsWithLastSession: SessionSettings = {
-  use_last_session: true,
+const historyEntry: SessionHistoryEntry = {
+  activity_id: 10,
+  room_id: 5,
+  supervisor_ids: [1, 2],
+  saved_at: '2026-03-14T15:00:00Z',
+  activity_name: 'Hausaufgaben',
+  room_name: 'Raum A',
+  supervisor_names: ['Frau Müller', 'Herr Schmidt'],
+};
+
+const sessionSettingsWithHistory: SessionSettings = {
   auto_save_enabled: true,
-  last_session: {
-    activity_id: 10,
-    room_id: 5,
-    supervisor_ids: [1, 2],
-    saved_at: '2026-03-14T15:00:00Z',
-    activity_name: 'Hausaufgaben',
-    room_name: 'Raum A',
-    supervisor_names: ['Frau Müller', 'Herr Schmidt'],
-  },
+  session_history: [historyEntry],
 };
 
 const testActivity = { id: 10, name: 'Hausaufgaben', category: 'Betreuung' };
@@ -84,12 +85,20 @@ function renderPage() {
   );
 }
 
-/** Open the recreation confirmation modal and click its confirm button */
-async function confirmRecreation(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByText('Aufsicht wiederholen'));
+/** Expand the history panel, select the saved combination and wait for the modal */
+async function openRecreationConfirm(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
+  // Scope to the panel row: the modal keeps a hidden copy of the activity name
+  const entryRow = await screen.findByText(/Raum A · /);
+  await user.click(entryRow.closest('button')!);
   await waitFor(() => {
     expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
   });
+}
+
+/** Open the recreation confirmation modal and click its confirm button */
+async function confirmRecreation(user: ReturnType<typeof userEvent.setup>) {
+  await openRecreationConfirm(user);
   const startButtons = screen.getAllByText('Aufsicht starten');
   await user.click(startButtons[startButtons.length - 1]);
 }
@@ -102,7 +111,7 @@ describe('HomeViewPage session recreation behavior', () => {
     useUserStore.setState({
       authenticatedUser: baseUser,
       currentSession: null,
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       isValidatingLastSession: false,
       error: null,
       selectedActivity: testActivity,
@@ -116,6 +125,8 @@ describe('HomeViewPage session recreation behavior', () => {
       logout: vi.fn(() => Promise.resolve()),
       validateAndRecreateSession: vi.fn(() => Promise.resolve({ status: 'success' as const })),
       saveLastSessionData: vi.fn(() => Promise.resolve()),
+      removeSessionHistoryEntry: vi.fn(() => Promise.resolve()),
+      clearSessionHistory: vi.fn(() => Promise.resolve()),
     });
   });
 
@@ -292,10 +303,7 @@ describe('HomeViewPage session recreation behavior', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
+    await openRecreationConfirm(user);
 
     const startButtons = screen.getAllByText('Aufsicht starten');
     const confirmButton = startButtons[startButtons.length - 1].closest('button');

@@ -94,9 +94,8 @@ describe('BrowserAdapter', () => {
   describe('session storage', () => {
     it('saves and loads session settings via localStorage', async () => {
       const settings = {
-        use_last_session: true,
         auto_save_enabled: true,
-        last_session: null,
+        session_history: [],
       };
 
       await adapter.saveSessionSettings(settings);
@@ -111,9 +110,8 @@ describe('BrowserAdapter', () => {
 
     it('clears session from localStorage', async () => {
       await adapter.saveSessionSettings({
-        use_last_session: true,
         auto_save_enabled: true,
-        last_session: null,
+        session_history: [],
       });
       await adapter.clearLastSession();
       const loaded = await adapter.loadSessionSettings();
@@ -122,17 +120,18 @@ describe('BrowserAdapter', () => {
 
     it('persists complex session data', async () => {
       const settings = {
-        use_last_session: true,
         auto_save_enabled: true,
-        last_session: {
-          activity_id: 1,
-          room_id: 2,
-          supervisor_ids: [3, 4],
-          saved_at: '2026-03-23T10:00:00Z',
-          activity_name: 'Art',
-          room_name: 'Room A',
-          supervisor_names: ['Teacher A', 'Teacher B'],
-        },
+        session_history: [
+          {
+            activity_id: 1,
+            room_id: 2,
+            supervisor_ids: [3, 4],
+            saved_at: '2026-03-23T10:00:00Z',
+            activity_name: 'Art',
+            room_name: 'Room A',
+            supervisor_names: ['Teacher A', 'Teacher B'],
+          },
+        ],
       };
 
       await adapter.saveSessionSettings(settings);

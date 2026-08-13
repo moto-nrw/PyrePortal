@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { LastSessionToggle } from '../components/LastSessionToggle';
+import { SessionHistoryPanel } from '../components/SessionHistoryPanel';
 import {
   ContactlessPaymentIcon,
   ErrorModal,
@@ -11,13 +11,12 @@ import {
 } from '../components/ui';
 import {
   api,
-  formatRoomName,
   getNetworkErrorMessage,
   isNetworkRelatedError,
   mapServerErrorToGerman,
   type CurrentSession,
 } from '../services/api';
-import type { SessionSettings } from '../services/sessionStorage';
+import type { SessionHistoryEntry } from '../services/sessionStorage';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
@@ -28,12 +27,8 @@ const logger = createLogger('HomeViewPage');
 const texts = {
   recreationErrorFallback: 'Fehler beim Starten der Aktivität',
   activityFallback: 'Aktivität',
-  repeatSessionHeading: 'Aufsicht wiederholen',
   startSessionHeading: 'Aufsicht starten',
   continueSubtitle: 'Fortsetzen',
-  supervisorCountMismatch: (selected: number, saved: number) =>
-    `${selected} Betreuer (gespeichert: ${saved})`,
-  supervisorCount: (count: number) => `${count} Betreuer`,
   validationFailedFallback:
     'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.',
   incompleteSessionDataError:
@@ -68,10 +63,7 @@ function formatRecreationError(error: unknown): string {
 }
 
 /** Get appropriate activity icon based on session state */
-function getActivityIcon(
-  currentSession: CurrentSession | null,
-  sessionSettings: SessionSettings | null
-): React.ReactNode {
+function getActivityIcon(currentSession: CurrentSession | null): React.ReactNode {
   if (currentSession) {
     return (
       <svg
@@ -82,25 +74,6 @@ function getActivityIcon(
         stroke="none"
       >
         <path d="M8 5v14l11-7z" />
-      </svg>
-    );
-  }
-  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return (
-      <svg
-        width="52"
-        height="52"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke={designSystem.pastel.green.accent}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-        <path d="M21 3v5h-5" />
-        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-        <path d="M3 21v-5h5" />
       </svg>
     );
   }
@@ -122,50 +95,16 @@ function getActivityIcon(
 }
 
 /** Get activity heading text based on session state */
-function getActivityHeading(
-  currentSession: CurrentSession | null,
-  sessionSettings: SessionSettings | null
-): string {
+function getActivityHeading(currentSession: CurrentSession | null): string {
   if (currentSession) {
     return currentSession.activity_name ?? texts.activityFallback;
-  }
-  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return texts.repeatSessionHeading;
   }
   return texts.startSessionHeading;
 }
 
 /** Get activity subtitle text based on session state */
-function getActivitySubtitle(
-  currentSession: CurrentSession | null,
-  sessionSettings: SessionSettings | null
-): string {
-  if (currentSession) {
-    return texts.continueSubtitle;
-  }
-  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return sessionSettings.last_session.activity_name;
-  }
-  return '';
-}
-
-/** Get supervisor count label for saved session display */
-function getSupervisorCountLabel(
-  sessionSettings: SessionSettings | null,
-  selectedSupervisorsCount: number
-): string {
-  if (!sessionSettings?.last_session) {
-    return '';
-  }
-  const savedCount = sessionSettings.last_session.supervisor_names.length;
-
-  if (selectedSupervisorsCount > 0 && selectedSupervisorsCount !== savedCount) {
-    return texts.supervisorCountMismatch(selectedSupervisorsCount, savedCount);
-  }
-  if (selectedSupervisorsCount > 0) {
-    return texts.supervisorCount(selectedSupervisorsCount);
-  }
-  return texts.supervisorCount(savedCount);
+function getActivitySubtitle(currentSession: CurrentSession | null): string {
+  return currentSession ? texts.continueSubtitle : '';
 }
 
 // ============================================================================
@@ -178,8 +117,6 @@ function HomeViewPage() {
     currentSession,
     logout,
     fetchCurrentSession,
-    selectedSupervisors,
-    sessionSettings,
     loadSessionSettings,
     validateAndRecreateSession,
     isValidatingLastSession,
@@ -193,6 +130,7 @@ function HomeViewPage() {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
+  const [pendingEntry, setPendingEntry] = useState<SessionHistoryEntry | null>(null);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -246,10 +184,14 @@ function HomeViewPage() {
     void navigate('/tag-assignment');
   };
 
-  // Helper to handle last session recreation attempt
-  const attemptSessionRecreation = async () => {
-    logUserAction('Attempting to recreate last session');
-    const outcome = await validateAndRecreateSession();
+  // Helper to handle history entry recreation attempt
+  const handleHistorySelect = async (entry: SessionHistoryEntry) => {
+    logUserAction('Attempting to recreate session from history', {
+      activityId: entry.activity_id,
+      roomId: entry.room_id,
+    });
+    setPendingEntry(entry);
+    const outcome = await validateAndRecreateSession(entry);
 
     if (!isMountedRef.current || outcome.status === 'stale') {
       return;
@@ -266,16 +208,9 @@ function HomeViewPage() {
     setShowConfirmModal(false);
   };
 
-  const handleStartActivity = async () => {
-    const shouldRecreateLastSession =
-      sessionSettings?.use_last_session && sessionSettings.last_session;
-
-    if (shouldRecreateLastSession) {
-      await attemptSessionRecreation();
-    } else {
-      logNavigation('Home View', '/activity-selection');
-      void navigate('/activity-selection');
-    }
+  const handleStartActivity = () => {
+    logNavigation('Home View', '/activity-selection');
+    void navigate('/activity-selection');
   };
 
   const handleContinueActivity = () => {
@@ -307,7 +242,7 @@ function HomeViewPage() {
   };
 
   const handleConfirmRecreation = async () => {
-    if (!authenticatedUser || !sessionSettings?.last_session) return;
+    if (!authenticatedUser || !pendingEntry) return;
     // Only one recreation request may be in flight; a duplicate submit would
     // mark the first request stale and then fail with a 409 conflict.
     if (isNavigatingToScanning) return;
@@ -566,7 +501,7 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    {getActivityIcon(currentSession, sessionSettings)}
+                    {getActivityIcon(currentSession)}
                   </div>
 
                   <h3
@@ -578,7 +513,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {getActivityHeading(currentSession, sessionSettings)}
+                    {getActivityHeading(currentSession)}
                   </h3>
                   <p
                     style={{
@@ -588,84 +523,8 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {getActivitySubtitle(currentSession, sessionSettings)}
+                    {getActivitySubtitle(currentSession)}
                   </p>
-
-                  {/* Show room and supervisor info for saved session */}
-                  {!currentSession &&
-                    sessionSettings?.use_last_session &&
-                    sessionSettings.last_session && (
-                      <div
-                        style={{
-                          marginTop: '16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px',
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '8px',
-                            justifyContent: 'center',
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              backgroundColor: designSystem.brand.bluePillBg,
-                              color: designSystem.brand.blue,
-                              padding: '4px 12px',
-                              borderRadius: designSystem.borderRadius.full,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                            }}
-                          >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                            >
-                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                              <circle cx="12" cy="10" r="3" />
-                            </svg>
-                            {formatRoomName(sessionSettings.last_session.room_name)}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              backgroundColor: designSystem.brand.greenTint,
-                              color: designSystem.brand.greenText,
-                              padding: '4px 12px',
-                              borderRadius: designSystem.borderRadius.full,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                            }}
-                          >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                            >
-                              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                              <circle cx="9" cy="7" r="4" />
-                              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                            </svg>
-                            {getSupervisorCountLabel(sessionSettings, selectedSupervisors.length)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
                 </div>
               </button>
 
@@ -810,8 +669,13 @@ function HomeViewPage() {
           </div>
         </div>
 
-        {/* Last Session Toggle - only show when no current session */}
-        {!currentSession && <LastSessionToggle />}
+        {/* Session history panel - only show when no current session */}
+        {!currentSession && (
+          <SessionHistoryPanel
+            onSelect={entry => void handleHistorySelect(entry)}
+            disabled={isValidatingLastSession}
+          />
+        )}
       </div>
 
       {/* Add animation keyframes */}
@@ -841,7 +705,7 @@ function HomeViewPage() {
 
       {/* Confirmation Modal for Recreation */}
       <ModalBase
-        isOpen={showConfirmModal && !!sessionSettings?.last_session}
+        isOpen={showConfirmModal && !!pendingEntry}
         onClose={() => setShowConfirmModal(false)}
         size="sm"
         backgroundColor={designSystem.colors.white}

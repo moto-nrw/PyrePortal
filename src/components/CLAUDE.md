@@ -20,7 +20,7 @@
 ### Feature Components (Root)
 
 - `background-wrapper.tsx` and `animated-background.tsx` - Shared page background wrapper and canvas animation.
-- `LastSessionToggle.tsx` - Toggle to reuse previous session settings.
+- `SessionHistoryPanel.tsx` - Expandable history of recent session combinations for quick restart.
 - `ProtectedRoute.tsx` - Auth/condition guard for routed pages.
 - `RfidServiceInitializer.tsx` - Initializes the active platform RFID service on app startup.
 

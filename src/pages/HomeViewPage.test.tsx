@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 
 import { api, type CurrentSession } from '../services/api';
-import type { SessionSettings } from '../services/sessionStorage';
+import type { SessionHistoryEntry, SessionSettings } from '../services/sessionStorage';
 import { useUserStore } from '../store/userStore';
 
 import HomeViewPage from './HomeViewPage';
@@ -73,19 +73,21 @@ const activeSession: CurrentSession = {
   active_students: 12,
 };
 
-/** Session settings fixture with a saved last session */
-const sessionSettingsWithLastSession: SessionSettings = {
-  use_last_session: true,
+/** History entry fixture for the saved session combination */
+const historyEntry: SessionHistoryEntry = {
+  activity_id: 10,
+  room_id: 5,
+  supervisor_ids: [1, 2],
+  saved_at: '2026-03-14T15:00:00Z',
+  activity_name: 'Hausaufgaben',
+  room_name: 'Raum A',
+  supervisor_names: ['Frau Müller', 'Herr Schmidt'],
+};
+
+/** Session settings fixture with one saved history entry */
+const sessionSettingsWithHistory: SessionSettings = {
   auto_save_enabled: true,
-  last_session: {
-    activity_id: 10,
-    room_id: 5,
-    supervisor_ids: [1, 2],
-    saved_at: '2026-03-14T15:00:00Z',
-    activity_name: 'Hausaufgaben',
-    room_name: 'Raum A',
-    supervisor_names: ['Frau Müller', 'Herr Schmidt'],
-  },
+  session_history: [historyEntry],
 };
 
 /** Activity fixture matching ActivityResponse shape */
@@ -100,6 +102,28 @@ function renderPage() {
       <HomeViewPage />
     </MemoryRouter>
   );
+}
+
+/** Expand the history panel and select the saved combination */
+async function selectHistoryEntry(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
+  // Scope to the panel row: the modal keeps a hidden copy of the activity name
+  const entryRow = await screen.findByText(/Raum A · /);
+  await user.click(entryRow.closest('button')!);
+}
+
+/** Select the history entry and wait for the recreation confirmation modal */
+async function openRecreationConfirm(user: ReturnType<typeof userEvent.setup>) {
+  await selectHistoryEntry(user);
+  await waitFor(() => {
+    expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
+  });
+}
+
+/** Click the confirm button inside the recreation modal ("Aufsicht starten") */
+async function clickModalConfirm(user: ReturnType<typeof userEvent.setup>) {
+  const startButtons = screen.getAllByText('Aufsicht starten');
+  await user.click(startButtons[startButtons.length - 1]);
 }
 
 describe('HomeViewPage', () => {
@@ -119,6 +143,8 @@ describe('HomeViewPage', () => {
       logout: vi.fn(() => Promise.resolve()),
       validateAndRecreateSession: vi.fn(() => Promise.resolve({ status: 'error' as const })),
       saveLastSessionData: vi.fn(() => Promise.resolve()),
+      removeSessionHistoryEntry: vi.fn(() => Promise.resolve()),
+      clearSessionHistory: vi.fn(() => Promise.resolve()),
     });
   });
 
@@ -185,40 +211,49 @@ describe('HomeViewPage', () => {
     expect(screen.getByText('Fortsetzen')).toBeInTheDocument();
   });
 
-  it('shows "Aufsicht wiederholen" when last session is saved and toggle is on', () => {
-    useUserStore.setState({ sessionSettings: sessionSettingsWithLastSession });
+  it('shows the history panel button when a session history exists', () => {
+    useUserStore.setState({ sessionSettings: sessionSettingsWithHistory });
     renderPage();
-    expect(screen.getByText('Aufsicht wiederholen')).toBeInTheDocument();
-    expect(screen.getByText('Hausaufgaben')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Letzte Aufsichten' })).toBeInTheDocument();
+    // The entries themselves are only visible once the panel is expanded
+    expect(screen.queryByText('Hausaufgaben')).not.toBeInTheDocument();
   });
 
-  it('shows room name and supervisor count for saved last session', () => {
-    useUserStore.setState({ sessionSettings: sessionSettingsWithLastSession });
+  it('shows activity, room and supervisors of a saved combination in the panel', async () => {
+    const user = userEvent.setup();
+    useUserStore.setState({ sessionSettings: sessionSettingsWithHistory });
     renderPage();
-    expect(screen.getByText('Raum A')).toBeInTheDocument();
-    expect(screen.getByText('2 Betreuer')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
+
+    expect(await screen.findByText('Hausaufgaben')).toBeInTheDocument();
+    expect(screen.getByText(/Raum A · Frau Müller, Herr Schmidt/)).toBeInTheDocument();
   });
 
-  it('shows adjusted supervisor count when selectedSupervisors differs from saved', () => {
+  it('does not show the history panel when a current session exists', () => {
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
-      selectedSupervisors: [
-        { id: 1, name: 'Frau Müller', staffId: 1, staffName: 'Frau Müller' },
-        { id: 2, name: 'Herr Schmidt', staffId: 2, staffName: 'Herr Schmidt' },
-        { id: 3, name: 'Herr Becker', staffId: 3, staffName: 'Herr Becker' },
-      ] as never[],
+      currentSession: activeSession,
+      sessionSettings: sessionSettingsWithHistory,
     });
     renderPage();
-    expect(screen.getByText('3 Betreuer (gespeichert: 2)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Letzte Aufsichten' })).not.toBeInTheDocument();
+  });
+
+  it('does not show the history panel when the session history is empty', () => {
+    useUserStore.setState({
+      sessionSettings: { auto_save_enabled: true, session_history: [] },
+    });
+    renderPage();
+    expect(screen.queryByRole('button', { name: 'Letzte Aufsichten' })).not.toBeInTheDocument();
   });
 
   it('disables activity button when isValidatingLastSession is true', () => {
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       isValidatingLastSession: true,
     });
     renderPage();
-    const activityButton = screen.getByText('Aufsicht wiederholen').closest('button');
+    const activityButton = screen.getAllByText('Aufsicht starten')[0].closest('button');
     expect(activityButton).toBeDisabled();
   });
 
@@ -229,17 +264,16 @@ describe('HomeViewPage', () => {
     expect(screen.getByText('Abmelden').closest('button')).toBeDisabled();
   });
 
-  it('does not show "Aufsicht wiederholen" when use_last_session is false', () => {
-    useUserStore.setState({
-      sessionSettings: {
-        ...sessionSettingsWithLastSession,
-        use_last_session: false,
-      },
-    });
+  it('main card always starts a new session even when a history exists', async () => {
+    const user = userEvent.setup();
+    useUserStore.setState({ sessionSettings: sessionSettingsWithHistory });
     renderPage();
-    expect(screen.queryByText('Aufsicht wiederholen')).not.toBeInTheDocument();
-    const elements = screen.getAllByText('Aufsicht starten');
-    expect(elements.length).toBeGreaterThanOrEqual(1);
+
+    const headings = screen.getAllByText('Aufsicht starten');
+    expect(headings.length).toBeGreaterThanOrEqual(1);
+
+    await user.click(headings[0]);
+    expect(mockNavigate).toHaveBeenCalledWith('/activity-selection');
   });
 
   it('fetches current session and loads settings on mount', () => {
@@ -393,26 +427,27 @@ describe('HomeViewPage', () => {
   // Session recreation (last session) tests
   // =========================================================================
 
-  it('clicking activity with saved last session triggers validateAndRecreateSession', async () => {
+  it('selecting a history entry triggers validateAndRecreateSession with that entry', async () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => Promise.resolve({ status: 'error' as const }));
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
+    await selectHistoryEntry(user);
     await waitFor(() => {
       expect(validateMock).toHaveBeenCalledOnce();
     });
+    expect(validateMock).toHaveBeenCalledWith(expect.objectContaining({ activity_id: 10 }));
   });
 
   it('successful validation shows confirmation modal', async () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -423,10 +458,7 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
+    await openRecreationConfirm(user);
   });
 
   it('failed validation shows error modal with store error', async () => {
@@ -436,12 +468,12 @@ describe('HomeViewPage', () => {
       return Promise.resolve({ status: 'error' as const });
     });
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
+    await selectHistoryEntry(user);
     await waitFor(() => {
       expect(screen.getByText('Aktivität nicht gefunden')).toBeInTheDocument();
     });
@@ -454,12 +486,12 @@ describe('HomeViewPage', () => {
       return Promise.resolve({ status: 'error' as const });
     });
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
+    await selectHistoryEntry(user);
     await waitFor(() => {
       expect(
         screen.getByText(
@@ -476,7 +508,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       fetchCurrentSession,
       saveLastSessionData,
@@ -490,7 +522,7 @@ describe('HomeViewPage', () => {
     renderPage();
 
     // Click to trigger recreation
-    await user.click(screen.getByText('Aufsicht wiederholen'));
+    await selectHistoryEntry(user);
 
     // Wait for confirmation modal
     await waitFor(() => {
@@ -498,9 +530,7 @@ describe('HomeViewPage', () => {
     });
 
     // Click confirm button ("Aufsicht starten" in the modal)
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    // The last one is in the confirmation modal
-    await user.click(startButtons[startButtons.length - 1]);
+    await clickModalConfirm(user);
 
     await waitFor(() => {
       expect(mockedApi.startSession).toHaveBeenCalledWith('1234', {
@@ -519,7 +549,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       saveLastSessionData: vi.fn(() => Promise.resolve()),
       selectedActivity: testActivity,
@@ -528,14 +558,13 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
+    await selectHistoryEntry(user);
 
     await waitFor(() => {
       expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
     });
 
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await clickModalConfirm(user);
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/nfc-scanning');
@@ -557,7 +586,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: null,
       selectedRoom: testRoom,
@@ -565,14 +594,13 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
+    await selectHistoryEntry(user);
 
     await waitFor(() => {
       expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
     });
 
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await clickModalConfirm(user);
 
     await waitFor(() => {
       expect(
@@ -588,7 +616,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: null,
@@ -596,13 +624,8 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await openRecreationConfirm(user);
+    await clickModalConfirm(user);
 
     await waitFor(() => {
       expect(
@@ -618,7 +641,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -626,13 +649,8 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await openRecreationConfirm(user);
+    await clickModalConfirm(user);
 
     await waitFor(() => {
       expect(
@@ -649,7 +667,7 @@ describe('HomeViewPage', () => {
     mockedApi.startSession.mockRejectedValueOnce(new Error('Server error'));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -657,13 +675,8 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await openRecreationConfirm(user);
+    await clickModalConfirm(user);
 
     // Error modal should appear with the mapped error message
     await waitFor(() => {
@@ -680,7 +693,7 @@ describe('HomeViewPage', () => {
     mockedApi.startSession.mockRejectedValueOnce(networkError);
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -688,13 +701,8 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await openRecreationConfirm(user);
+    await clickModalConfirm(user);
 
     await waitFor(() => {
       expect(
@@ -710,7 +718,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -718,11 +726,7 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
+    await openRecreationConfirm(user);
     // Click Abbrechen in the confirmation modal
     const cancelButtons = screen.getAllByText('Abbrechen');
     await user.click(cancelButtons[0]);
@@ -737,7 +741,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -746,17 +750,12 @@ describe('HomeViewPage', () => {
     renderPage();
 
     // Trigger confirm modal
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
+    await openRecreationConfirm(user);
     // Now set authenticatedUser to null before clicking confirm
     // This won't cause redirect since we're already rendered
     useUserStore.setState({ authenticatedUser: null });
 
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await clickModalConfirm(user);
 
     // api.startSession should NOT be called due to early return
     expect(mockedApi.startSession).not.toHaveBeenCalled();
@@ -771,7 +770,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -782,11 +781,7 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
+    await openRecreationConfirm(user);
     // Check modal content
     expect(screen.getByText('Raum:')).toBeInTheDocument();
     expect(screen.getByText('Betreuer:')).toBeInTheDocument();
@@ -798,7 +793,7 @@ describe('HomeViewPage', () => {
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -806,11 +801,7 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
+    await openRecreationConfirm(user);
     // Set validating state
     useUserStore.setState({ isValidatingLastSession: true });
 
@@ -888,39 +879,44 @@ describe('HomeViewPage', () => {
     expect(screen.getByText('Aktivität')).toBeInTheDocument();
   });
 
-  it('shows empty subtitle for saved session activity_name', () => {
-    useUserStore.setState({ sessionSettings: sessionSettingsWithLastSession });
+  it('main card keeps the start heading while a history entry exists', () => {
+    useUserStore.setState({ sessionSettings: sessionSettingsWithHistory });
     renderPage();
-    // The subtitle should show the activity name from the saved session
-    // It appears as text in the card
-    const subtitleElements = screen.getAllByText('Hausaufgaben');
-    expect(subtitleElements.length).toBeGreaterThanOrEqual(1);
+    // The saved combination lives in the collapsed panel, not on the card
+    expect(screen.getAllByText('Aufsicht starten').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('Fortsetzen')).not.toBeInTheDocument();
   });
 
-  it('getSupervisorCountLabel returns empty when no last_session', () => {
+  it('deletes a single history entry from the panel', async () => {
+    const user = userEvent.setup();
+    const removeSessionHistoryEntry = vi.fn(() => Promise.resolve());
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: null,
-      },
+      sessionSettings: sessionSettingsWithHistory,
+      removeSessionHistoryEntry,
     });
     renderPage();
-    // No supervisor count label should appear since there's no last_session
-    expect(screen.queryByText(/Betreuer/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
+    await user.click(await screen.findByRole('button', { name: 'Eintrag löschen' }));
+
+    expect(removeSessionHistoryEntry).toHaveBeenCalledWith(
+      expect.objectContaining({ activity_id: 10 })
+    );
   });
 
-  it('shows same supervisor count when selected matches saved count', () => {
+  it('clears the whole history from the panel', async () => {
+    const user = userEvent.setup();
+    const clearSessionHistory = vi.fn(() => Promise.resolve());
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
-      selectedSupervisors: [
-        { id: 1, name: 'Frau Müller' },
-        { id: 2, name: 'Herr Schmidt' },
-      ] as never[],
+      sessionSettings: sessionSettingsWithHistory,
+      clearSessionHistory,
     });
     renderPage();
-    // 2 selected == 2 saved, so just shows "2 Betreuer"
-    expect(screen.getByText('2 Betreuer')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
+    await user.click(await screen.findByText('Alle löschen'));
+
+    expect(clearSessionHistory).toHaveBeenCalledOnce();
   });
 
   // =========================================================================
@@ -934,29 +930,29 @@ describe('HomeViewPage', () => {
       return Promise.resolve({ status: 'error' as const });
     });
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
     });
     renderPage();
 
     // Trigger error modal
-    await user.click(screen.getByText('Aufsicht wiederholen'));
+    await selectHistoryEntry(user);
     await waitFor(() => {
       expect(screen.getByText('Test error message')).toBeInTheDocument();
     });
   });
 
   // =========================================================================
-  // handleConfirmRecreation with missing sessionSettings.last_session
+  // handleConfirmRecreation uses the pending entry, not the stored history
   // =========================================================================
 
-  it('handleConfirmRecreation returns early when sessionSettings.last_session is null', async () => {
+  it('confirms the pending entry even after the history was cleared meanwhile', async () => {
     const user = userEvent.setup();
     const validateMock = vi.fn(() => Promise.resolve({ status: 'success' as const }));
 
-    // First render with valid last_session to show the confirm modal
+    // First render with a history entry to show the confirm modal
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -964,21 +960,22 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
-    // Clear sessionSettings before clicking confirm
+    await openRecreationConfirm(user);
+    // Clear the stored history before clicking confirm
     useUserStore.setState({
-      sessionSettings: { use_last_session: true, auto_save_enabled: true, last_session: null },
+      sessionSettings: { auto_save_enabled: true, session_history: [] },
     });
 
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await clickModalConfirm(user);
 
-    // Should return early, not call startSession
-    expect(mockedApi.startSession).not.toHaveBeenCalled();
+    // The selected entry is already pending, so the start request still goes out
+    await waitFor(() => {
+      expect(mockedApi.startSession).toHaveBeenCalledWith('1234', {
+        activity_id: 10,
+        room_id: 5,
+        supervisor_ids: [1],
+      });
+    });
   });
 
   // =========================================================================
@@ -991,7 +988,7 @@ describe('HomeViewPage', () => {
     mockedApi.startSession.mockRejectedValueOnce('string error');
 
     useUserStore.setState({
-      sessionSettings: sessionSettingsWithLastSession,
+      sessionSettings: sessionSettingsWithHistory,
       validateAndRecreateSession: validateMock,
       selectedActivity: testActivity,
       selectedRoom: testRoom,
@@ -999,13 +996,8 @@ describe('HomeViewPage', () => {
     });
     renderPage();
 
-    await user.click(screen.getByText('Aufsicht wiederholen'));
-    await waitFor(() => {
-      expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
-    });
-
-    const startButtons = screen.getAllByText('Aufsicht starten');
-    await user.click(startButtons[startButtons.length - 1]);
+    await openRecreationConfirm(user);
+    await clickModalConfirm(user);
 
     // Should show the fallback German error message
     await waitFor(() => {
