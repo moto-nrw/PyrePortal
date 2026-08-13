@@ -514,6 +514,113 @@ describe('fetchCurrentSession', () => {
 
     expect(useUserStore.getState().selectedActivity).toBeNull();
   });
+
+  it('restores room color from the rooms API when resuming a session', async () => {
+    setAuthenticated();
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+    mockGetRooms.mockResolvedValueOnce([
+      mockRoom({ id: 5, name: 'Turnhalle', color: '#F4D35E', is_occupied: false }),
+    ]);
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(mockGetRooms).toHaveBeenCalledWith('1234');
+    expect(useUserStore.getState().selectedRoom).toEqual({
+      id: 5,
+      name: 'Turnhalle',
+      color: '#F4D35E',
+      is_occupied: true,
+    });
+  });
+
+  it('restores room color from cached rooms without fetching', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      rooms: [mockRoom({ id: 5, name: 'Turnhalle', color: '#2457A6' })],
+    });
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(mockGetRooms).not.toHaveBeenCalled();
+    expect(useUserStore.getState().selectedRoom!.color).toBe('#2457A6');
+  });
+
+  it('fills missing selected room color from cached rooms when IDs match', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      selectedRoom: mockRoom({ id: 5, name: 'Turnhalle' }),
+      rooms: [mockRoom({ id: 5, name: 'Turnhalle', color: '#AABBCC' })],
+    });
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(mockGetRooms).not.toHaveBeenCalled();
+    expect(useUserStore.getState().selectedRoom!.color).toBe('#AABBCC');
+  });
+
+  it('keeps a fallback room when the rooms API fails during resume', async () => {
+    setAuthenticated();
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+    mockGetRooms.mockRejectedValueOnce(new Error('Server error'));
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(useUserStore.getState().selectedRoom).toEqual({
+      id: 5,
+      name: 'Turnhalle',
+      is_occupied: true,
+    });
+  });
 });
 
 // ====================================================================

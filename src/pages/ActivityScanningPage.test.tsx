@@ -193,7 +193,18 @@ describe('ActivityScanningPage', () => {
     renderPage();
 
     expect(screen.getByTestId('room-color-frame').style.backgroundColor).toBe('');
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({ padding: '0px' });
     expect(screen.getByTestId('room-color-inset')).toHaveStyle({ padding: '0px' });
+  });
+
+  it('keeps the unframed waiting screen flush to the viewport', () => {
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({ padding: '0px' });
+    expect(screen.getByLabelText('Abholzeit abfragen')).toHaveStyle({
+      top: '20px',
+      left: '20px',
+    });
   });
 
   it('does not show a room-color frame when the selected room color is invalid', () => {

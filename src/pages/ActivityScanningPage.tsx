@@ -684,7 +684,7 @@ const ActivityScanningPage: React.FC = () => {
           style={{
             width: '100vw',
             height: '100vh',
-            padding: roomFrameColor ? '22px' : '16px',
+            padding: roomFrameColor ? '22px' : 0,
             backgroundColor: roomFrameColor,
           }}
         >

@@ -147,9 +147,10 @@ const resolveSessionActivity = async (
 };
 
 /**
- * Creates room object from session data if available.
+ * Creates a fallback room object when full data is unavailable.
+ * Used during session restoration when the rooms API call fails or returns no match.
  */
-const createSessionRoom = (session: CurrentSession): Room | null => {
+const createFallbackRoom = (session: CurrentSession): Room | null => {
   if (!session.room_id || !session.room_name) {
     return null;
   }
@@ -159,6 +160,90 @@ const createSessionRoom = (session: CurrentSession): Room | null => {
     name: session.room_name,
     is_occupied: true, // Current session room is always occupied
   };
+};
+
+/**
+ * Fetches room data from API during session restoration.
+ * Returns the matching room or a fallback if not found.
+ */
+const fetchRoomForSession = async (session: CurrentSession, pin: string): Promise<Room | null> => {
+  const fallback = createFallbackRoom(session);
+  if (!fallback) {
+    return null;
+  }
+
+  try {
+    storeLogger.debug('Fetching rooms to restore complete session room data', {
+      roomId: session.room_id,
+    });
+
+    const rooms = await api.getRooms(pin);
+    const matchingRoom = rooms.find(room => room.id === session.room_id);
+
+    if (matchingRoom) {
+      storeLogger.info('Session room restored from API with complete data', {
+        roomId: matchingRoom.id,
+        roomName: matchingRoom.name,
+        hasColor: Boolean(matchingRoom.color),
+      });
+      return {
+        ...matchingRoom,
+        name: session.room_name ?? matchingRoom.name,
+        is_occupied: true,
+      };
+    }
+
+    storeLogger.warn(
+      'Room not found in API response during session restoration, using fallback with limited data',
+      {
+        roomId: session.room_id,
+        availableRoomIds: rooms.map(room => room.id),
+      }
+    );
+    return fallback;
+  } catch (error) {
+    storeLogger.error('Failed to fetch rooms during session restoration, using fallback', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      roomId: session.room_id,
+    });
+    return fallback;
+  }
+};
+
+/**
+ * Resolves room data for session restoration.
+ * Uses the current selection or cached rooms when available, otherwise fetches from API.
+ */
+const resolveSessionRoom = async (
+  session: CurrentSession,
+  currentSelectedRoom: Room | null,
+  currentRooms: Room[],
+  pin: string
+): Promise<Room | null> => {
+  if (!session.room_id || !session.room_name) {
+    return null;
+  }
+
+  const cachedRoom = currentRooms.find(room => room.id === session.room_id);
+
+  if (currentSelectedRoom?.id === session.room_id) {
+    return {
+      ...currentSelectedRoom,
+      ...(cachedRoom?.color ? { color: cachedRoom.color } : {}),
+      name: session.room_name,
+      is_occupied: true,
+    };
+  }
+
+  if (cachedRoom) {
+    return {
+      ...cachedRoom,
+      name: session.room_name,
+      is_occupied: true,
+    };
+  }
+
+  return fetchRoomForSession(session, pin);
 };
 
 /**
@@ -327,7 +412,12 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           authenticatedUser.pin,
           authenticatedUser.staffName
         );
-        const sessionRoom = createSessionRoom(session);
+        const sessionRoom = await resolveSessionRoom(
+          session,
+          get().selectedRoom,
+          get().rooms,
+          authenticatedUser.pin
+        );
 
         // Guard: Don't overwrite selectedRoom if user just manually selected a room
         // This prevents stale server data from reverting a recent room switch.
