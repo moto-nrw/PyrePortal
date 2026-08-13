@@ -59,13 +59,16 @@ function migrateSettings(settings: SessionSettings): {
   settings: SessionSettings;
   migrated: boolean;
 } {
-  const history = Array.isArray(settings.session_history) ? settings.session_history : [];
+  const history = Array.isArray(settings.session_history)
+    ? settings.session_history.slice(0, SESSION_HISTORY_LIMIT)
+    : [];
   const legacyEntry = settings.last_session ?? null;
 
   const migratedHistory = legacyEntry ? upsertHistoryEntry(history, legacyEntry) : history;
   const migrated =
     legacyEntry !== null ||
     !Array.isArray(settings.session_history) ||
+    settings.session_history.length > SESSION_HISTORY_LIMIT ||
     settings.use_last_session !== undefined;
 
   return {

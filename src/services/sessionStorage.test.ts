@@ -114,6 +114,22 @@ describe('loadSessionSettings migration', () => {
     expect(result).toEqual({ auto_save_enabled: true, session_history: [] });
   });
 
+  it('caps an oversized stored history at the limit and persists the trimmed version', async () => {
+    const oversized = Array.from({ length: SESSION_HISTORY_LIMIT + 5 }, (_, i) =>
+      makeEntry({ activity_id: i + 1 })
+    );
+    mockAdapter.loadSessionSettings.mockResolvedValueOnce({
+      auto_save_enabled: true,
+      session_history: oversized,
+    });
+
+    const result = await loadSessionSettings();
+
+    expect(result!.session_history).toHaveLength(SESSION_HISTORY_LIMIT);
+    expect(result!.session_history.map(e => e.activity_id)).toEqual([1, 2, 3, 4, 5]);
+    expect(mockAdapter.saveSessionSettings).toHaveBeenCalledWith(result);
+  });
+
   it('does not duplicate a legacy entry already present in the history', async () => {
     const entry = makeEntry();
     mockAdapter.loadSessionSettings.mockResolvedValueOnce({
