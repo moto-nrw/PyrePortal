@@ -212,7 +212,8 @@ const fetchRoomForSession = async (session: CurrentSession, pin: string): Promis
 
 /**
  * Resolves room data for session restoration.
- * Uses the current selection or cached rooms when available, otherwise fetches from API.
+ * Prefers a selected or cached room that already has a color; otherwise fetches
+ * so a previous colorless fallback does not stick for the rest of the session.
  */
 const resolveSessionRoom = async (
   session: CurrentSession,
@@ -226,7 +227,7 @@ const resolveSessionRoom = async (
 
   const cachedRoom = currentRooms.find(room => room.id === session.room_id);
 
-  if (currentSelectedRoom?.id === session.room_id) {
+  if (currentSelectedRoom?.id === session.room_id && currentSelectedRoom.color) {
     return {
       ...currentSelectedRoom,
       ...(cachedRoom?.color ? { color: cachedRoom.color } : {}),
@@ -235,7 +236,7 @@ const resolveSessionRoom = async (
     };
   }
 
-  if (cachedRoom) {
+  if (cachedRoom?.color) {
     return {
       ...cachedRoom,
       name: session.room_name,
