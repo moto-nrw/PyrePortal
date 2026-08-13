@@ -126,7 +126,9 @@ describe('loadSessionSettings migration', () => {
     const result = await loadSessionSettings();
 
     expect(result!.session_history).toHaveLength(SESSION_HISTORY_LIMIT);
-    expect(result!.session_history.map(e => e.activity_id)).toEqual([1, 2, 3, 4, 5]);
+    expect(result!.session_history.map(e => e.activity_id)).toEqual(
+      Array.from({ length: SESSION_HISTORY_LIMIT }, (_, i) => i + 1)
+    );
     expect(mockAdapter.saveSessionSettings).toHaveBeenCalledWith(result);
   });
 

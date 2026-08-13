@@ -9,7 +9,7 @@ import { createLogger, serializeError } from '../utils/logger';
 
 const logger = createLogger('SessionStorage');
 
-export const SESSION_HISTORY_LIMIT = 5;
+export const SESSION_HISTORY_LIMIT = 10;
 
 export interface SessionHistoryEntry {
   activity_id: number;
