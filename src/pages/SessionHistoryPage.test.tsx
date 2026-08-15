@@ -222,7 +222,7 @@ describe('SessionHistoryPage', () => {
   // Pagination
   // =========================================================================
 
-  it('paginates the history with five entries per page', async () => {
+  it('paginates the history with four entries per page', async () => {
     const user = userEvent.setup();
     const entries = [0, 1, 2, 3, 4, 5].map(makeEntry);
     useUserStore.setState({
@@ -230,12 +230,13 @@ describe('SessionHistoryPage', () => {
     });
     renderPage();
 
-    // First page shows the first five entries, the sixth is on page two
+    // First page shows the first four entries, the rest is on page two
     expect(screen.getByText('Aktivität 0')).toBeInTheDocument();
-    expect(screen.getByText('Aktivität 4')).toBeInTheDocument();
-    expect(screen.queryByText('Aktivität 5')).not.toBeInTheDocument();
+    expect(screen.getByText('Aktivität 3')).toBeInTheDocument();
+    expect(screen.queryByText('Aktivität 4')).not.toBeInTheDocument();
 
     await user.click(screen.getByText('Nächste'));
+    expect(screen.getByText('Aktivität 4')).toBeInTheDocument();
     expect(screen.getByText('Aktivität 5')).toBeInTheDocument();
     expect(screen.queryByText('Aktivität 0')).not.toBeInTheDocument();
   });

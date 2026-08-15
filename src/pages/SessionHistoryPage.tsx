@@ -44,7 +44,9 @@ const texts = {
   loadingButton: 'Starte...',
 } as const;
 
-const ENTRIES_PER_PAGE = 5;
+// 4 rows keep pagination and "Alle löschen" inside the 800px kiosk
+// viewport without scrolling.
+const ENTRIES_PER_PAGE = 4;
 
 /** Format session recreation error message for display */
 function formatRecreationError(error: unknown): string {
