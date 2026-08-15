@@ -193,7 +193,10 @@ function HomeViewPage() {
 
   return (
     <BackgroundWrapper>
-      <div className="h-screen w-screen overflow-auto p-8">
+      <div
+        className="h-screen w-screen overflow-auto p-8"
+        style={{ display: 'flex', flexDirection: 'column' }}
+      >
         {/* NFC Scan button - Top Left */}
         <div
           style={{
@@ -304,12 +307,15 @@ function HomeViewPage() {
           </button>
         </div>
 
-        {/* Welcome Header - Larger for Accessibility */}
+        {/* Welcome Header - vertically centered with the 68px corner pills
+            (pills sit at top: 20px) */}
         <div
           style={{
-            textAlign: 'center',
-            marginTop: '40px',
-            marginBottom: '48px',
+            marginTop: '20px',
+            height: '68px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <h1
@@ -325,13 +331,15 @@ function HomeViewPage() {
           </h1>
         </div>
 
-        {/* Main Content - Positioned Higher */}
+        {/* Main Content - centered between header row and footer row
+            (footer pill: 68px high, 20px from the bottom) */}
         <div
           style={{
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             justifyContent: 'center',
-            paddingTop: '60px',
+            flex: 1,
+            marginBottom: '88px',
           }}
         >
           <div style={{ width: '100%', maxWidth: '800px' }}>
