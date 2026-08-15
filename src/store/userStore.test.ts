@@ -2,15 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   api,
+  isNetworkRelatedError,
   type ActivityResponse,
   type CurrentSession,
   type Room,
   type Teacher,
 } from '../services/api';
 import {
-  clearLastSession,
   loadSessionSettings,
   saveSessionSettings,
+  type SessionHistoryEntry,
   type SessionSettings,
 } from '../services/sessionStorage';
 
@@ -31,13 +32,18 @@ vi.mock('../services/api', () => ({
   },
   mapServerErrorToGerman: vi.fn((msg: string) => msg),
   isNetworkRelatedError: vi.fn(() => false),
+  getNetworkErrorMessage: vi.fn(() => 'Netzwerkfehler'),
 }));
 
-vi.mock('../services/sessionStorage', () => ({
-  saveSessionSettings: vi.fn(() => Promise.resolve()),
-  loadSessionSettings: vi.fn(() => Promise.resolve(null)),
-  clearLastSession: vi.fn(() => Promise.resolve()),
-}));
+vi.mock('../services/sessionStorage', async importActual => {
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
+  const actual = await importActual<typeof import('../services/sessionStorage')>();
+  return {
+    ...actual,
+    saveSessionSettings: vi.fn(() => Promise.resolve()),
+    loadSessionSettings: vi.fn(() => Promise.resolve(null)),
+  };
+});
 
 // ====================================================================
 // Helper: reset store between tests
@@ -127,7 +133,6 @@ const mockEndSession = vi.mocked(api.endSession);
 const mockSubmitDailyFeedback = vi.mocked(api.submitDailyFeedback);
 const mockLoadSessionSettings = vi.mocked(loadSessionSettings);
 const mockSaveSessionSettings = vi.mocked(saveSessionSettings);
-const mockClearLastSession = vi.mocked(clearLastSession);
 
 beforeEach(() => {
   resetStore();
@@ -514,6 +519,242 @@ describe('fetchCurrentSession', () => {
 
     expect(useUserStore.getState().selectedActivity).toBeNull();
   });
+
+  it('restores room color from the rooms API when resuming a session', async () => {
+    setAuthenticated();
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+    mockGetRooms.mockResolvedValueOnce([
+      mockRoom({ id: 5, name: 'Turnhalle', color: '#F4D35E', is_occupied: false }),
+    ]);
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(mockGetRooms).toHaveBeenCalledWith('1234');
+    expect(useUserStore.getState().selectedRoom).toEqual({
+      id: 5,
+      name: 'Turnhalle',
+      color: '#F4D35E',
+      is_occupied: true,
+    });
+  });
+
+  it('restores room color from cached rooms without fetching', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      rooms: [mockRoom({ id: 5, name: 'Turnhalle', color: '#2457A6' })],
+    });
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(mockGetRooms).not.toHaveBeenCalled();
+    expect(useUserStore.getState().selectedRoom!.color).toBe('#2457A6');
+  });
+
+  it('fills missing selected room color from cached rooms when IDs match', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      selectedRoom: mockRoom({ id: 5, name: 'Turnhalle' }),
+      rooms: [mockRoom({ id: 5, name: 'Turnhalle', color: '#AABBCC' })],
+    });
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(mockGetRooms).not.toHaveBeenCalled();
+    expect(useUserStore.getState().selectedRoom!.color).toBe('#AABBCC');
+  });
+
+  it('does not refetch rooms when the selected room already has a color', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      selectedRoom: mockRoom({ id: 5, name: 'Turnhalle', color: '#112233' }),
+    });
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(mockGetRooms).not.toHaveBeenCalled();
+    expect(useUserStore.getState().selectedRoom!.color).toBe('#112233');
+  });
+
+  it('retries the rooms lookup when the selected room is missing its color', async () => {
+    setAuthenticated();
+    useUserStore.setState({
+      selectedRoom: mockRoom({ id: 5, name: 'Turnhalle' }),
+    });
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+    mockGetRooms.mockResolvedValueOnce([
+      mockRoom({ id: 5, name: 'Turnhalle', color: '#F4D35E', is_occupied: true }),
+    ]);
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(mockGetRooms).toHaveBeenCalledWith('1234');
+    expect(useUserStore.getState().selectedRoom!.color).toBe('#F4D35E');
+  });
+
+  it('keeps a fallback room when the rooms API fails during resume', async () => {
+    setAuthenticated();
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+    mockGetRooms.mockRejectedValueOnce(new Error('Server error'));
+
+    await useUserStore.getState().fetchCurrentSession();
+
+    expect(useUserStore.getState().selectedRoom).toEqual({
+      id: 5,
+      name: 'Turnhalle',
+      is_occupied: true,
+    });
+  });
+
+  it('discards a late room lookup after logout', async () => {
+    setAuthenticated();
+    const session: CurrentSession = {
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    };
+    mockGetCurrentSession.mockResolvedValueOnce(session);
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10, name: 'Fußball AG' })]);
+
+    let resolveRooms: (rooms: Room[]) => void = () => undefined;
+    mockGetRooms.mockImplementationOnce(
+      () =>
+        new Promise<Room[]>(resolve => {
+          resolveRooms = resolve;
+        })
+    );
+
+    const fetchPromise = useUserStore.getState().fetchCurrentSession();
+    await vi.waitFor(() => {
+      expect(mockGetRooms).toHaveBeenCalled();
+    });
+
+    await useUserStore.getState().logout();
+    resolveRooms([mockRoom({ id: 5, name: 'Turnhalle', color: '#F4D35E' })]);
+    await fetchPromise;
+
+    const state = useUserStore.getState();
+    expect(state.authenticatedUser).toBeNull();
+    expect(state.currentSession).toBeNull();
+    expect(state.selectedRoom).toBeNull();
+    expect(state.selectedActivity).toBeNull();
+    expect(state.selectedSupervisors).toHaveLength(0);
+  });
+
+  it('does not clear a newer login when a stale fetch finds no session', async () => {
+    setAuthenticated();
+    mockGetCurrentSession.mockImplementationOnce(
+      () =>
+        new Promise<CurrentSession | null>(resolve => {
+          queueMicrotask(() => resolve(null));
+        })
+    );
+
+    const fetchPromise = useUserStore.getState().fetchCurrentSession();
+    await useUserStore.getState().logout();
+    useUserStore.getState().setAuthenticatedUser({
+      staffId: 2,
+      staffName: 'Herr Müller',
+      deviceName: 'Pi-5',
+      pin: '5678',
+    });
+    useUserStore.setState({
+      currentSession: {
+        active_group_id: 9,
+        activity_id: 3,
+        device_id: 1,
+        start_time: 'now',
+        duration: '1h',
+      },
+      selectedRoom: mockRoom({ id: 3, name: 'Raum B' }),
+    });
+    await fetchPromise;
+
+    const state = useUserStore.getState();
+    expect(state.authenticatedUser?.staffId).toBe(2);
+    expect(state.currentSession?.active_group_id).toBe(9);
+    expect(state.selectedRoom?.id).toBe(3);
+  });
 });
 
 // ====================================================================
@@ -870,9 +1111,8 @@ describe('fetchActivities', () => {
 describe('loadSessionSettings', () => {
   it('loads settings from storage', async () => {
     const settings: SessionSettings = {
-      use_last_session: true,
       auto_save_enabled: true,
-      last_session: null,
+      session_history: [],
     };
     mockLoadSessionSettings.mockResolvedValueOnce(settings);
 
@@ -899,51 +1139,69 @@ describe('loadSessionSettings', () => {
   });
 });
 
-describe('toggleUseLastSession', () => {
-  it('toggles use_last_session on', async () => {
-    mockSaveSessionSettings.mockResolvedValueOnce(undefined);
+describe('session history actions', () => {
+  const entryA: SessionHistoryEntry = {
+    activity_id: 1,
+    room_id: 1,
+    supervisor_ids: [1],
+    saved_at: 'now',
+    activity_name: 'a',
+    room_name: 'r',
+    supervisor_names: ['s'],
+  };
+  const entryB: SessionHistoryEntry = { ...entryA, activity_id: 2, activity_name: 'b' };
 
-    await useUserStore.getState().toggleUseLastSession(true);
-
-    const settings = useUserStore.getState().sessionSettings;
-    expect(settings).not.toBeNull();
-    expect(settings!.use_last_session).toBe(true);
-    expect(mockSaveSessionSettings).toHaveBeenCalled();
-  });
-
-  it('toggles use_last_session off', async () => {
+  it('removeSessionHistoryEntry persists and keeps the other entries', async () => {
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: {
-          activity_id: 1,
-          room_id: 1,
-          supervisor_ids: [1],
-          saved_at: 'now',
-          activity_name: 'a',
-          room_name: 'r',
-          supervisor_names: ['s'],
-        },
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [entryA, entryB] },
     });
     mockSaveSessionSettings.mockResolvedValueOnce(undefined);
 
-    await useUserStore.getState().toggleUseLastSession(false);
+    await useUserStore.getState().removeSessionHistoryEntry(entryA);
 
-    const settings = useUserStore.getState().sessionSettings;
-    expect(settings!.use_last_session).toBe(false);
-    // Should preserve existing last_session
-    expect(settings!.last_session).not.toBeNull();
+    expect(mockSaveSessionSettings).toHaveBeenCalledWith({
+      auto_save_enabled: true,
+      session_history: [entryB],
+    });
+    expect(useUserStore.getState().sessionSettings!.session_history).toEqual([entryB]);
   });
 
-  it('handles save error gracefully', async () => {
+  it('removeSessionHistoryEntry leaves state unchanged on save failure', async () => {
+    const settings: SessionSettings = {
+      auto_save_enabled: true,
+      session_history: [entryA, entryB],
+    };
+    useUserStore.setState({ sessionSettings: settings });
     mockSaveSessionSettings.mockRejectedValueOnce(new Error('Save failed'));
 
-    await useUserStore.getState().toggleUseLastSession(true);
+    await useUserStore.getState().removeSessionHistoryEntry(entryA);
 
-    // Should not throw, settings should remain unchanged
-    expect(useUserStore.getState().sessionSettings).toBeNull();
+    expect(useUserStore.getState().sessionSettings).toEqual(settings);
+  });
+
+  it('clearSessionHistory persists an empty history', async () => {
+    useUserStore.setState({
+      sessionSettings: { auto_save_enabled: true, session_history: [entryA, entryB] },
+    });
+    mockSaveSessionSettings.mockResolvedValueOnce(undefined);
+
+    await useUserStore.getState().clearSessionHistory();
+
+    expect(mockSaveSessionSettings).toHaveBeenCalledWith({
+      auto_save_enabled: true,
+      session_history: [],
+    });
+    expect(useUserStore.getState().sessionSettings!.session_history).toEqual([]);
+  });
+
+  it('clearSessionHistory leaves state unchanged on save failure', async () => {
+    const settings: SessionSettings = { auto_save_enabled: true, session_history: [entryA] };
+    useUserStore.setState({ sessionSettings: settings });
+    mockSaveSessionSettings.mockRejectedValueOnce(new Error('Save failed'));
+
+    await useUserStore.getState().clearSessionHistory();
+
+    expect(useUserStore.getState().sessionSettings).toEqual(settings);
   });
 });
 
@@ -953,7 +1211,7 @@ describe('saveLastSessionData', () => {
       selectedActivity: mockActivity({ id: 5, name: 'Kunst AG' }),
       selectedRoom: mockRoom({ id: 3, name: 'Raum B' }),
       selectedSupervisors: [{ id: 1, name: 'Herr Test' }],
-      sessionSettings: { use_last_session: true, auto_save_enabled: true, last_session: null },
+      sessionSettings: { auto_save_enabled: true, session_history: [] },
     });
     mockSaveSessionSettings.mockResolvedValueOnce(undefined);
 
@@ -961,9 +1219,10 @@ describe('saveLastSessionData', () => {
 
     expect(mockSaveSessionSettings).toHaveBeenCalled();
     const savedSettings = mockSaveSessionSettings.mock.calls[0][0];
-    expect(savedSettings.last_session!.activity_id).toBe(5);
-    expect(savedSettings.last_session!.room_id).toBe(3);
-    expect(savedSettings.last_session!.supervisor_ids).toEqual([1]);
+    expect(savedSettings.session_history).toHaveLength(1);
+    expect(savedSettings.session_history[0].activity_id).toBe(5);
+    expect(savedSettings.session_history[0].room_id).toBe(3);
+    expect(savedSettings.session_history[0].supervisor_ids).toEqual([1]);
   });
 
   it('does nothing when activity is missing', async () => {
@@ -1029,24 +1288,12 @@ describe('validateAndRecreateSession', () => {
     supervisor_names: ['Herr A', 'Frau B'],
   };
 
-  it('returns false when no saved session', async () => {
-    setAuthenticated();
-
-    const result = await useUserStore.getState().validateAndRecreateSession();
-
-    expect(result).toEqual({ status: 'error' });
-  });
-
   it('returns false when not authenticated', async () => {
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession] },
     });
 
-    const result = await useUserStore.getState().validateAndRecreateSession();
+    const result = await useUserStore.getState().validateAndRecreateSession(lastSession);
 
     expect(result).toEqual({ status: 'error' });
   });
@@ -1054,11 +1301,7 @@ describe('validateAndRecreateSession', () => {
   it('validates and restores session successfully', async () => {
     setAuthenticated();
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession] },
       users: [
         { id: 1, name: 'Herr A' },
         { id: 2, name: 'Frau B' },
@@ -1070,7 +1313,7 @@ describe('validateAndRecreateSession', () => {
     mockGetActivities.mockResolvedValueOnce(activities);
     mockGetRooms.mockResolvedValueOnce(rooms);
 
-    const result = await useUserStore.getState().validateAndRecreateSession();
+    const result = await useUserStore.getState().validateAndRecreateSession(lastSession);
 
     expect(result).toEqual({ status: 'success' });
     expect(useUserStore.getState().selectedActivity!.id).toBe(10);
@@ -1082,18 +1325,14 @@ describe('validateAndRecreateSession', () => {
   it('uses already-selected supervisors if present', async () => {
     setAuthenticated();
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession] },
       selectedSupervisors: [{ id: 99, name: 'Already Selected' }],
     });
 
     mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10 })]);
     mockGetRooms.mockResolvedValueOnce([mockRoom({ id: 5 })]);
 
-    const result = await useUserStore.getState().validateAndRecreateSession();
+    const result = await useUserStore.getState().validateAndRecreateSession(lastSession);
 
     expect(result).toEqual({ status: 'success' });
     expect(useUserStore.getState().selectedSupervisors).toHaveLength(1);
@@ -1103,36 +1342,31 @@ describe('validateAndRecreateSession', () => {
   it('returns false when activity not found', async () => {
     setAuthenticated();
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession] },
     });
 
     mockGetActivities.mockResolvedValueOnce([]); // Empty - no match
 
-    const result = await useUserStore.getState().validateAndRecreateSession();
+    const result = await useUserStore.getState().validateAndRecreateSession(lastSession);
 
     expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
-    expect(mockClearLastSession).toHaveBeenCalled();
+    expect(mockSaveSessionSettings).toHaveBeenCalledWith({
+      auto_save_enabled: true,
+      session_history: [],
+    });
   });
 
   it('returns false when room not found', async () => {
     setAuthenticated();
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession] },
     });
 
     mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10 })]);
     mockGetRooms.mockResolvedValueOnce([]); // Empty - no match
 
-    const result = await useUserStore.getState().validateAndRecreateSession();
+    const result = await useUserStore.getState().validateAndRecreateSession(lastSession);
 
     expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
@@ -1141,11 +1375,7 @@ describe('validateAndRecreateSession', () => {
   it('fetches teachers when users not loaded for supervisor resolution', async () => {
     setAuthenticated();
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession] },
       users: [], // No users loaded
     });
 
@@ -1157,7 +1387,7 @@ describe('validateAndRecreateSession', () => {
       { staff_id: 2, person_id: 2, first_name: 'Frau', last_name: 'B', display_name: 'Frau B' },
     ]);
 
-    const result = await useUserStore.getState().validateAndRecreateSession();
+    const result = await useUserStore.getState().validateAndRecreateSession(lastSession);
 
     expect(result).toEqual({ status: 'success' });
     expect(mockGetTeachers).toHaveBeenCalled();
@@ -1165,55 +1395,62 @@ describe('validateAndRecreateSession', () => {
 
   it('returns false when supervisor resolution fails', async () => {
     setAuthenticated();
+    const invalidSupervisorEntry = { ...lastSession, supervisor_ids: [999] };
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: {
-          ...lastSession,
-          supervisor_ids: [999], // Non-existent supervisor
-        },
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [invalidSupervisorEntry] },
       users: [{ id: 1, name: 'Other User' }], // Doesn't match supervisor_ids
     });
 
     mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10 })]);
     mockGetRooms.mockResolvedValueOnce([mockRoom({ id: 5 })]);
 
-    const result = await useUserStore.getState().validateAndRecreateSession();
+    const result = await useUserStore.getState().validateAndRecreateSession(invalidSupervisorEntry);
 
     expect(result).toEqual({ status: 'error' });
     expect(useUserStore.getState().error).toBeTruthy();
   });
 
-  it('clears session settings on validation failure', async () => {
+  it('removes only the invalid entry from the history on validation failure', async () => {
     setAuthenticated();
+    const otherEntry = { ...lastSession, activity_id: 77, activity_name: 'Kunst AG' };
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession, otherEntry] },
     });
 
     mockGetActivities.mockResolvedValueOnce([]); // Activity not found
-    mockClearLastSession.mockResolvedValueOnce(undefined);
 
-    await useUserStore.getState().validateAndRecreateSession();
+    await useUserStore.getState().validateAndRecreateSession(lastSession);
 
-    const settings = useUserStore.getState().sessionSettings;
-    expect(settings!.last_session).toBeNull();
-    expect(settings!.use_last_session).toBe(false);
+    expect(mockSaveSessionSettings).toHaveBeenCalledWith({
+      auto_save_enabled: true,
+      session_history: [otherEntry],
+    });
+    expect(useUserStore.getState().sessionSettings!.session_history).toEqual([otherEntry]);
+  });
+
+  it('keeps the entry in the history when validation fails with a network error', async () => {
+    setAuthenticated();
+    const settings: SessionSettings = {
+      auto_save_enabled: true,
+      session_history: [lastSession],
+    };
+    useUserStore.setState({ sessionSettings: settings });
+
+    vi.mocked(isNetworkRelatedError).mockReturnValue(true);
+    mockGetActivities.mockRejectedValueOnce(new Error('Failed to fetch'));
+
+    const result = await useUserStore.getState().validateAndRecreateSession(lastSession);
+    vi.mocked(isNetworkRelatedError).mockReturnValue(false);
+
+    expect(result).toEqual({ status: 'error' });
+    expect(mockSaveSessionSettings).not.toHaveBeenCalled();
+    expect(useUserStore.getState().sessionSettings!.session_history).toEqual([lastSession]);
   });
 
   it('discards a validation success that resolves after logout', async () => {
     setAuthenticated();
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession] },
       users: [
         { id: 1, name: 'Herr A' },
         { id: 2, name: 'Frau B' },
@@ -1228,7 +1465,7 @@ describe('validateAndRecreateSession', () => {
         })
     );
 
-    const validation = useUserStore.getState().validateAndRecreateSession();
+    const validation = useUserStore.getState().validateAndRecreateSession(lastSession);
     expect(useUserStore.getState().isValidatingLastSession).toBe(true);
 
     await useUserStore.getState().logout();
@@ -1243,15 +1480,14 @@ describe('validateAndRecreateSession', () => {
       isValidatingLastSession: false,
     });
     expect(mockGetRooms).not.toHaveBeenCalled();
-    expect(mockClearLastSession).not.toHaveBeenCalled();
+    expect(mockSaveSessionSettings).not.toHaveBeenCalled();
   });
 
   it('does not clear saved settings when a stale validation fails after logout', async () => {
     setAuthenticated();
     const settings: SessionSettings = {
-      use_last_session: true,
       auto_save_enabled: true,
-      last_session: lastSession,
+      session_history: [lastSession],
     };
     useUserStore.setState({ sessionSettings: settings });
 
@@ -1263,24 +1499,20 @@ describe('validateAndRecreateSession', () => {
         })
     );
 
-    const validation = useUserStore.getState().validateAndRecreateSession();
+    const validation = useUserStore.getState().validateAndRecreateSession(lastSession);
     await useUserStore.getState().logout();
     rejectActivities(new Error('Late failure'));
 
     await expect(validation).resolves.toEqual({ status: 'stale' });
     expect(useUserStore.getState().sessionSettings).toEqual(settings);
     expect(useUserStore.getState().error).toBeNull();
-    expect(mockClearLastSession).not.toHaveBeenCalled();
+    expect(mockSaveSessionSettings).not.toHaveBeenCalled();
   });
 
   it('allows a newer validation to supersede an older request', async () => {
     setAuthenticated();
     useUserStore.setState({
-      sessionSettings: {
-        use_last_session: true,
-        auto_save_enabled: true,
-        last_session: lastSession,
-      },
+      sessionSettings: { auto_save_enabled: true, session_history: [lastSession] },
       users: [
         { id: 1, name: 'Herr A' },
         { id: 2, name: 'Frau B' },
@@ -1298,8 +1530,8 @@ describe('validateAndRecreateSession', () => {
       .mockResolvedValueOnce([mockActivity({ id: 10, name: 'New activity' })]);
     mockGetRooms.mockResolvedValueOnce([mockRoom({ id: 5 })]);
 
-    const firstValidation = useUserStore.getState().validateAndRecreateSession();
-    const secondValidation = useUserStore.getState().validateAndRecreateSession();
+    const firstValidation = useUserStore.getState().validateAndRecreateSession(lastSession);
+    const secondValidation = useUserStore.getState().validateAndRecreateSession(lastSession);
 
     await expect(secondValidation).resolves.toEqual({ status: 'success' });
     resolveFirstActivities([mockActivity({ id: 10, name: 'Old activity' })]);

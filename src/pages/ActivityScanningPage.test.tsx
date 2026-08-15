@@ -1,6 +1,6 @@
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 
 import { api, type CurrentSession, type RfidScanResult } from '../services/api';
 import { useUserStore } from '../store/userStore';
@@ -9,8 +9,8 @@ import ActivityScanningPage from './ActivityScanningPage';
 
 // ---- navigation mock ----
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
@@ -160,6 +160,62 @@ describe('ActivityScanningPage', () => {
   it('shows the room name from store', () => {
     renderPage();
     expect(screen.getByText('Raum 101')).toBeInTheDocument();
+  });
+
+  it('uses a light selected room color for the waiting-screen frame', () => {
+    useUserStore.setState({
+      selectedRoom: { ...defaultStoreState.selectedRoom, color: '#F4D35E' },
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({
+      backgroundColor: '#F4D35E',
+    });
+  });
+
+  it('uses a dark selected room color without recoloring the waiting-screen content', () => {
+    useUserStore.setState({
+      selectedRoom: { ...defaultStoreState.selectedRoom, color: '#2457A6' },
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({
+      backgroundColor: '#2457A6',
+    });
+    expect(screen.getByTestId('room-color-content')).toHaveStyle({
+      backgroundColor: '#FFFFFF',
+    });
+  });
+
+  it('does not show a room-color frame when the selected room has no color', () => {
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame').style.backgroundColor).toBe('');
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({ padding: '0px' });
+    expect(screen.getByTestId('room-color-inset')).toHaveStyle({ padding: '0px' });
+  });
+
+  it('keeps the unframed waiting screen flush to the viewport', () => {
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame')).toHaveStyle({ padding: '0px' });
+    expect(screen.getByLabelText('Abholzeit abfragen')).toHaveStyle({
+      top: '20px',
+      left: '20px',
+    });
+  });
+
+  it('does not show a room-color frame when the selected room color is invalid', () => {
+    useUserStore.setState({
+      selectedRoom: { ...defaultStoreState.selectedRoom, color: 'not-a-color' },
+    });
+
+    renderPage();
+
+    expect(screen.getByTestId('room-color-frame').style.backgroundColor).toBe('');
+    expect(screen.getByTestId('room-color-inset')).toHaveStyle({ padding: '0px' });
   });
 
   it('shows a different activity name when store is updated', () => {

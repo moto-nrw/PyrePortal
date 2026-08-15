@@ -1,6 +1,6 @@
 import { render, screen, waitFor, act, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, type TagAssignmentCheck } from '../services/api';
@@ -22,12 +22,12 @@ const mockScanSingleTag = vi.mocked(adapter.scanSingleTag);
 const mockStopScanning = vi.mocked(adapter.stopScanning);
 
 // ---------------------------------------------------------------------------
-// Mock react-router-dom navigate
+// Mock react-router navigate
 // ---------------------------------------------------------------------------
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
+vi.mock('react-router', async () => {
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  const actual = await vi.importActual<typeof import('react-router')>('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,

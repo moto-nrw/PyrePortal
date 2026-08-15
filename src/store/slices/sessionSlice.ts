@@ -14,10 +14,12 @@ import {
   type SessionRecreationOutcome,
 } from '../../services/sessionService';
 import {
+  type SessionHistoryEntry,
   type SessionSettings,
   saveSessionSettings,
   loadSessionSettings,
-  clearLastSession,
+  upsertHistoryEntry,
+  isSameCombination,
 } from '../../services/sessionStorage';
 import { createLogger } from '../../utils/logger';
 import type { GetState, SetState, UserState } from '../userStore';
@@ -147,9 +149,10 @@ const resolveSessionActivity = async (
 };
 
 /**
- * Creates room object from session data if available.
+ * Creates a fallback room object when full data is unavailable.
+ * Used during session restoration when the rooms API call fails or returns no match.
  */
-const createSessionRoom = (session: CurrentSession): Room | null => {
+const createFallbackRoom = (session: CurrentSession): Room | null => {
   if (!session.room_id || !session.room_name) {
     return null;
   }
@@ -159,6 +162,91 @@ const createSessionRoom = (session: CurrentSession): Room | null => {
     name: session.room_name,
     is_occupied: true, // Current session room is always occupied
   };
+};
+
+/**
+ * Fetches room data from API during session restoration.
+ * Returns the matching room or a fallback if not found.
+ */
+const fetchRoomForSession = async (session: CurrentSession, pin: string): Promise<Room | null> => {
+  const fallback = createFallbackRoom(session);
+  if (!fallback) {
+    return null;
+  }
+
+  try {
+    storeLogger.debug('Fetching rooms to restore complete session room data', {
+      roomId: session.room_id,
+    });
+
+    const rooms = await api.getRooms(pin);
+    const matchingRoom = rooms.find(room => room.id === session.room_id);
+
+    if (matchingRoom) {
+      storeLogger.info('Session room restored from API with complete data', {
+        roomId: matchingRoom.id,
+        roomName: matchingRoom.name,
+        hasColor: Boolean(matchingRoom.color),
+      });
+      return {
+        ...matchingRoom,
+        name: session.room_name ?? matchingRoom.name,
+        is_occupied: true,
+      };
+    }
+
+    storeLogger.warn(
+      'Room not found in API response during session restoration, using fallback with limited data',
+      {
+        roomId: session.room_id,
+        availableRoomIds: rooms.map(room => room.id),
+      }
+    );
+    return fallback;
+  } catch (error) {
+    storeLogger.error('Failed to fetch rooms during session restoration, using fallback', {
+      error: error instanceof Error ? error.message : 'Unknown error',
+      roomId: session.room_id,
+    });
+    return fallback;
+  }
+};
+
+/**
+ * Resolves room data for session restoration.
+ * Prefers a selected or cached room that already has a color; otherwise fetches
+ * so a previous colorless fallback does not stick for the rest of the session.
+ */
+const resolveSessionRoom = async (
+  session: CurrentSession,
+  currentSelectedRoom: Room | null,
+  currentRooms: Room[],
+  pin: string
+): Promise<Room | null> => {
+  if (!session.room_id || !session.room_name) {
+    return null;
+  }
+
+  const cachedRoom = currentRooms.find(room => room.id === session.room_id);
+
+  if (currentSelectedRoom?.id === session.room_id && currentSelectedRoom.color) {
+    return {
+      ...currentSelectedRoom,
+      ...(cachedRoom?.color ? { color: cachedRoom.color } : {}),
+      name: session.room_name,
+      is_occupied: true,
+    };
+  }
+
+  if (cachedRoom?.color) {
+    return {
+      ...cachedRoom,
+      name: session.room_name,
+      is_occupied: true,
+    };
+  }
+
+  return fetchRoomForSession(session, pin);
 };
 
 /**
@@ -215,6 +303,9 @@ const SESSION_INITIAL_STATE = {
 export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserState>) => {
   // Race guard for session recreation: stale async responses are discarded
   const recreationTracker = createSessionRequestTracker();
+  // Separate guard for fetchCurrentSession so a late room/activity lookup
+  // cannot repopulate session state after logout or a newer fetch.
+  const currentSessionFetchTracker = createSessionRequestTracker();
 
   return {
     // Initial state
@@ -230,9 +321,10 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
 
     setCurrentSession: (session: CurrentSession) => set({ currentSession: session }),
 
-    // Invalidate all in-flight recreation requests (e.g. on logout)
+    // Invalidate all in-flight recreation and current-session fetches (e.g. on logout)
     invalidateSessionRecreation: () => {
       recreationTracker.invalidate();
+      currentSessionFetchTracker.invalidate();
       set({ isValidatingLastSession: false });
     },
 
@@ -293,6 +385,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
     },
 
     fetchCurrentSession: async () => {
+      const requestId = currentSessionFetchTracker.begin();
       const { authenticatedUser } = get();
 
       if (!authenticatedUser?.pin) {
@@ -300,9 +393,26 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         return;
       }
 
+      const isFetchStillCurrent = (): boolean => {
+        if (!currentSessionFetchTracker.isCurrent(requestId)) {
+          return false;
+        }
+
+        const currentUser = get().authenticatedUser;
+        return (
+          currentUser?.pin === authenticatedUser.pin &&
+          currentUser.staffId === authenticatedUser.staffId
+        );
+      };
+
       try {
         storeLogger.info('Fetching current session for device');
         const session = await api.getCurrentSession(authenticatedUser.pin);
+
+        if (!isFetchStillCurrent()) {
+          storeLogger.warn('Discarding stale fetchCurrentSession result');
+          return;
+        }
 
         if (!session) {
           storeLogger.debug('No active session found for device, clearing session state');
@@ -327,7 +437,17 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           authenticatedUser.pin,
           authenticatedUser.staffName
         );
-        const sessionRoom = createSessionRoom(session);
+        const sessionRoom = await resolveSessionRoom(
+          session,
+          get().selectedRoom,
+          get().rooms,
+          authenticatedUser.pin
+        );
+
+        if (!isFetchStillCurrent()) {
+          storeLogger.warn('Discarding stale fetchCurrentSession result after room lookup');
+          return;
+        }
 
         // Guard: Don't overwrite selectedRoom if user just manually selected a room
         // This prevents stale server data from reverting a recent room switch.
@@ -498,30 +618,11 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         if (settings) {
           set({ sessionSettings: settings });
           storeLogger.info('Session settings loaded', {
-            useLastSession: settings.use_last_session,
-            hasLastSession: !!settings.last_session,
+            historyLength: settings.session_history.length,
           });
         }
       } catch (error) {
         storeLogger.error('Failed to load session settings', { error });
-      }
-    },
-
-    toggleUseLastSession: async (enabled: boolean) => {
-      const { sessionSettings } = get();
-
-      const newSettings: SessionSettings = {
-        use_last_session: enabled,
-        auto_save_enabled: true,
-        last_session: sessionSettings?.last_session ?? null,
-      };
-
-      try {
-        await saveSessionSettings(newSettings);
-        set({ sessionSettings: newSettings });
-        storeLogger.info('Toggle use last session', { enabled });
-      } catch (error) {
-        storeLogger.error('Failed to save session settings', { error });
       }
     },
 
@@ -533,7 +634,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         return;
       }
 
-      const lastSessionConfig = {
+      const entry: SessionHistoryEntry = {
         activity_id: selectedActivity.id,
         room_id: selectedRoom.id,
         supervisor_ids: selectedSupervisors.map(s => s.id),
@@ -544,30 +645,67 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
       };
 
       const newSettings: SessionSettings = {
-        use_last_session: sessionSettings?.use_last_session ?? false,
         auto_save_enabled: true,
-        last_session: lastSessionConfig,
+        session_history: upsertHistoryEntry(sessionSettings?.session_history ?? [], entry),
       };
 
       try {
         await saveSessionSettings(newSettings);
         set({ sessionSettings: newSettings });
-        storeLogger.info('Last session data saved', {
+        storeLogger.info('Session history entry saved', {
           activityId: selectedActivity.id,
           roomId: selectedRoom.id,
           supervisorCount: selectedSupervisors.length,
+          historyLength: newSettings.session_history.length,
         });
       } catch (error) {
-        storeLogger.error('Failed to save last session data', { error });
+        storeLogger.error('Failed to save session history entry', { error });
       }
     },
 
-    validateAndRecreateSession: async () => {
+    removeSessionHistoryEntry: async (entry: SessionHistoryEntry) => {
+      const { sessionSettings } = get();
+
+      const newSettings: SessionSettings = {
+        auto_save_enabled: true,
+        session_history: (sessionSettings?.session_history ?? []).filter(
+          e => !isSameCombination(e, entry)
+        ),
+      };
+
+      try {
+        await saveSessionSettings(newSettings);
+        set({ sessionSettings: newSettings });
+        storeLogger.info('Session history entry removed', {
+          activityId: entry.activity_id,
+          roomId: entry.room_id,
+        });
+      } catch (error) {
+        storeLogger.error('Failed to remove session history entry', { error });
+      }
+    },
+
+    clearSessionHistory: async () => {
+      const newSettings: SessionSettings = {
+        auto_save_enabled: true,
+        session_history: [],
+      };
+
+      try {
+        await saveSessionSettings(newSettings);
+        set({ sessionSettings: newSettings });
+        storeLogger.info('Session history cleared');
+      } catch (error) {
+        storeLogger.error('Failed to clear session history', { error });
+      }
+    },
+
+    validateAndRecreateSession: async (entry: SessionHistoryEntry) => {
       const requestId = recreationTracker.begin();
       const { sessionSettings, authenticatedUser } = get();
 
-      if (!sessionSettings?.last_session || !authenticatedUser?.pin) {
-        storeLogger.warn('Cannot recreate session: no saved session or authentication');
+      if (!authenticatedUser?.pin) {
+        storeLogger.warn('Cannot recreate session: no authentication');
         return { status: 'error' as const };
       }
 
@@ -577,7 +715,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         // Validate activity exists
         const activities = await api.getActivities(authenticatedUser.pin);
         if (!recreationTracker.isCurrent(requestId)) return { status: 'stale' as const };
-        const activity = activities.find(a => a.id === sessionSettings.last_session!.activity_id);
+        const activity = activities.find(a => a.id === entry.activity_id);
 
         if (!activity) {
           throw new Error('Gespeicherte Aktivität nicht mehr verfügbar');
@@ -586,7 +724,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         // Validate room is available
         const rooms = await api.getRooms(authenticatedUser.pin);
         if (!recreationTracker.isCurrent(requestId)) return { status: 'stale' as const };
-        const room = rooms.find(r => r.id === sessionSettings.last_session!.room_id);
+        const room = rooms.find(r => r.id === entry.room_id);
 
         if (!room) {
           throw new Error('Gespeicherter Raum nicht verfügbar');
@@ -598,7 +736,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           selectedSupervisors.length > 0
             ? selectedSupervisors
             : await resolveSupervisorsForSession(
-                sessionSettings.last_session.supervisor_ids,
+                entry.supervisor_ids,
                 users,
                 get().fetchTeachers,
                 () => get().users
@@ -634,13 +772,28 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           rawError: error instanceof Error ? error.message : error,
         });
 
-        // Clear invalid session data
-        await clearLastSession();
+        // Remove only the invalid entry from the history; network failures
+        // keep the entry so it can be retried once the connection is back.
+        let updatedSettings = sessionSettings;
+        if (!isNetworkRelatedError(error) && sessionSettings) {
+          updatedSettings = {
+            ...sessionSettings,
+            session_history: sessionSettings.session_history.filter(
+              e => !isSameCombination(e, entry)
+            ),
+          };
+          try {
+            await saveSessionSettings(updatedSettings);
+          } catch (saveError) {
+            storeLogger.error('Failed to persist history after removing invalid entry', {
+              error: saveError,
+            });
+          }
+        }
+
         if (!recreationTracker.isCurrent(requestId)) return { status: 'stale' as const };
         set({
-          sessionSettings: sessionSettings
-            ? { ...sessionSettings, last_session: null, use_last_session: false }
-            : null,
+          sessionSettings: updatedSettings,
           isValidatingLastSession: false,
           error: userMessage,
         });

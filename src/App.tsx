@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 
 import ProtectedRoute from './components/ProtectedRoute';
 import { RfidServiceInitializer } from './components/RfidServiceInitializer';
@@ -11,6 +11,7 @@ import HomeViewPage from './pages/HomeViewPage';
 import LandingPage from './pages/LandingPage';
 import PinPage from './pages/PinPage';
 import RoomSelectionPage from './pages/RoomSelectionPage';
+import SessionHistoryPage from './pages/SessionHistoryPage';
 import StaffClockPage from './pages/StaffClockPage';
 import StaffSelectionPage from './pages/StaffSelectionPage';
 import StudentSelectionPage from './pages/StudentSelectionPage';
@@ -123,6 +124,14 @@ function App() {
               element={
                 <ProtectedRoute>
                   <StaffSelectionPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/session-history"
+              element={
+                <ProtectedRoute>
+                  <SessionHistoryPage />
                 </ProtectedRoute>
               }
             />

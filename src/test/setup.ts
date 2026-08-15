@@ -2,32 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
-// 1. Tauri IPC mocks — Tauri runtime is not available in test environment
-// ---------------------------------------------------------------------------
-
-// Mock @tauri-apps/api/core (invoke, convertFileSrc, etc.)
-vi.mock('@tauri-apps/api/core', () => ({
-  invoke: vi.fn(() => Promise.reject(new Error('Tauri invoke not available in tests'))),
-  convertFileSrc: vi.fn((path: string) => path),
-}));
-
-// Mock @tauri-apps/api/event (listen, emit, etc.)
-vi.mock('@tauri-apps/api/event', () => ({
-  listen: vi.fn(() => Promise.resolve(() => {})),
-  emit: vi.fn(() => Promise.resolve()),
-  once: vi.fn(() => Promise.resolve(() => {})),
-}));
-
-// ---------------------------------------------------------------------------
-// 2. tauriContext mock — safeInvoke should be mockable per-test
-// ---------------------------------------------------------------------------
-
-vi.mock('../platform/tauri/tauriContext', () => ({
-  safeInvoke: vi.fn(() => Promise.reject(new Error('Tauri context not available in tests'))),
-}));
-
-// ---------------------------------------------------------------------------
-// 3. Logger mock — prevent Tauri IPC calls and console noise during tests
+// 1. Logger mock — prevent console noise during tests
 // ---------------------------------------------------------------------------
 
 vi.mock('../utils/logger', () => {
@@ -66,7 +41,7 @@ vi.mock('../utils/logger', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Storage mocks — explicit, resettable between tests
+// 2. Storage mocks — explicit, resettable between tests
 // ---------------------------------------------------------------------------
 
 function createStorageMock(): Storage {
@@ -107,7 +82,7 @@ Object.defineProperty(globalThis, 'sessionStorage', {
 });
 
 // ---------------------------------------------------------------------------
-// 5. Browser API mocks
+// 3. Browser API mocks
 // ---------------------------------------------------------------------------
 
 // matchMedia (used by some UI components / Tailwind runtime checks)
@@ -146,7 +121,7 @@ if (!globalThis.crypto?.randomUUID) {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Cleanup between tests
+// 4. Cleanup between tests
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {

@@ -24,7 +24,7 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts`) for all appli
    - `currentSession` - Active session from the backend
    - `selectedActivity`, `selectedRoom` (`_roomSelectedAt` guards against stale server data overwriting a fresh manual room switch)
    - `selectedSupervisors`, `activeSupervisorTags`
-   - `sessionSettings`, `isValidatingLastSession` - "Use last session" persistence
+   - `sessionSettings`, `isValidatingLastSession` - Session history persistence
 
 3. **RFID** (`rfid.*`)
    - `isScanning`, `currentScan`, `showModal`
@@ -41,7 +41,7 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts`) for all appli
 2. **Session**: `fetchRooms`, `selectRoom`, `fetchCurrentSession`, `setSelectedActivity`, `fetchActivities`, `clearSessionState`
 3. **Supervisors**: `setSelectedSupervisors`, `toggleSupervisor`, `addSupervisorFromRfid`, `addActiveSupervisorTag`, `isActiveSupervisor`
 4. **RFID**: `startRfidScanning`, `stopRfidScanning`, `setScanResult`, `showScanModal`, `hideScanModal`, pickup-query mode actions, and the duplicate-prevention actions below
-5. **Session settings**: `loadSessionSettings`, `toggleUseLastSession`, `saveLastSessionData`, `validateAndRecreateSession`
+5. **Session settings**: `loadSessionSettings`, `saveLastSessionData`, `removeSessionHistoryEntry`, `clearSessionHistory`, `validateAndRecreateSession`
 6. **Feedback**: `submitDailyFeedback`
 
 ## Logging Middleware

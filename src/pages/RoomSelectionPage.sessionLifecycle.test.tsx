@@ -1,6 +1,6 @@
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
 import { api, ApiError, type Room, type ActivityResponse } from '../services/api';
@@ -9,11 +9,11 @@ import { useUserStore } from '../store/userStore';
 import RoomSelectionPage from './RoomSelectionPage';
 
 // ---------------------------------------------------------------------------
-// Mock react-router-dom's useNavigate
+// Mock react-router's useNavigate
 // ---------------------------------------------------------------------------
 const mockNavigate = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual('react-router-dom');
+vi.mock('react-router', async () => {
+  const actual = await vi.importActual('react-router');
   return {
     ...actual,
     useNavigate: () => mockNavigate,
