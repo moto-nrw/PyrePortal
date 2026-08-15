@@ -37,6 +37,9 @@ const texts = {
     'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.',
   incompleteSessionDataError:
     'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.',
+  clearConfirmHeading: 'Verlauf löschen?',
+  clearConfirmBody: 'Alle Einträge werden entfernt. Das kann nicht rückgängig gemacht werden.',
+  clearConfirmButton: 'Ja, löschen',
   confirmHeading: 'Neue Aufsicht starten?',
   roomLabel: 'Raum:',
   supervisorsLabel: 'Betreuer:',
@@ -85,6 +88,7 @@ function SessionHistoryPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<SessionHistoryEntry | null>(null);
   const isMountedRef = useRef(true);
@@ -351,7 +355,7 @@ function SessionHistoryPage() {
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
               <button
                 type="button"
-                onClick={() => void clearSessionHistory()}
+                onClick={() => setShowClearConfirmModal(true)}
                 style={{
                   fontSize: '20px',
                   fontWeight: 600,
@@ -371,6 +375,47 @@ function SessionHistoryPage() {
           </>
         )}
       </div>
+
+      {/* Clear-history confirmation: destructive, requires an explicit yes */}
+      <ModalBase
+        isOpen={showClearConfirmModal}
+        onClose={() => setShowClearConfirmModal(false)}
+        size="sm"
+        backgroundColor={designSystem.colors.white}
+      >
+        <h2
+          style={{
+            fontSize: '28px',
+            fontWeight: 600,
+            color: designSystem.gray[900],
+            marginBottom: '16px',
+          }}
+        >
+          {texts.clearConfirmHeading}
+        </h2>
+
+        <p
+          style={{
+            fontSize: '20px',
+            color: designSystem.gray[500],
+            marginBottom: '28px',
+            lineHeight: 1.5,
+          }}
+        >
+          {texts.clearConfirmBody}
+        </p>
+
+        <ModalActionButtons
+          onCancel={() => setShowClearConfirmModal(false)}
+          onConfirm={() => {
+            setShowClearConfirmModal(false);
+            void clearSessionHistory();
+          }}
+          confirmLabel={texts.clearConfirmButton}
+          // destructive clear → unified modal red (#CC2626), §4b
+          confirmGradient={designSystem.flat.danger}
+        />
+      </ModalBase>
 
       {/* Error Modal */}
       <ErrorModal

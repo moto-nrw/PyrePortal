@@ -263,7 +263,7 @@ describe('SessionHistoryPage', () => {
     );
   });
 
-  it('clears the whole history', async () => {
+  it('clears the whole history only after confirming the modal', async () => {
     const user = userEvent.setup();
     const clearSessionHistory = vi.fn(() => Promise.resolve());
     useUserStore.setState({ clearSessionHistory });
@@ -271,7 +271,28 @@ describe('SessionHistoryPage', () => {
 
     await user.click(screen.getByText('Alle löschen'));
 
+    // The modal asks first; nothing is deleted yet
+    expect(screen.getByText('Verlauf löschen?')).toBeInTheDocument();
+    expect(clearSessionHistory).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText('Ja, löschen'));
+
     expect(clearSessionHistory).toHaveBeenCalledOnce();
+  });
+
+  it('does not clear the history when the confirmation is cancelled', async () => {
+    const user = userEvent.setup();
+    const clearSessionHistory = vi.fn(() => Promise.resolve());
+    useUserStore.setState({ clearSessionHistory });
+    renderPage();
+
+    await user.click(screen.getByText('Alle löschen'));
+    expect(screen.getByText('Verlauf löschen?')).toBeInTheDocument();
+
+    const cancelButtons = screen.getAllByText('Abbrechen');
+    await user.click(cancelButtons[0]);
+
+    expect(clearSessionHistory).not.toHaveBeenCalled();
   });
 
   // =========================================================================
