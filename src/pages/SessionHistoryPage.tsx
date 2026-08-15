@@ -334,7 +334,7 @@ function SessionHistoryPage() {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: designSystem.brand.greenTint,
+                      backgroundColor: designSystem.pastel.green.tint,
                       color: designSystem.pastel.green.accent,
                       borderRadius: designSystem.borderRadius.full,
                     }}
