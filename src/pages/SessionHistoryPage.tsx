@@ -1,4 +1,4 @@
-import { faTrashCan, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faPlay, faTrashCan, faXmark } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -28,7 +28,7 @@ const logger = createLogger('SessionHistoryPage');
 /** User-facing German UI copy for this page */
 const texts = {
   title: 'Letzte Aufsichten',
-  hint: 'Diese Aufsichten sind beendet. Beim Antippen startet eine neue Aufsicht mit der gleichen Auswahl.',
+  hint: 'Antippen startet die Aufsicht neu.',
   clearAll: 'Alle löschen',
   removeEntryLabel: 'Eintrag löschen',
   emptyHint: 'Keine Einträge vorhanden.',
@@ -286,38 +286,60 @@ function SessionHistoryPage() {
                     transition: designSystem.transitions.base,
                     minHeight: '88px',
                     boxShadow: designSystem.shadows.sm,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '20px',
                   }}
                 >
-                  <span
-                    style={{
-                      display: 'flex',
-                      alignItems: 'baseline',
-                      justifyContent: 'space-between',
-                      gap: '16px',
-                    }}
-                  >
+                  <span style={{ flex: 1, minWidth: 0 }}>
                     <span
                       style={{
-                        fontSize: '24px',
-                        fontWeight: 600,
-                        color: designSystem.gray[900],
+                        display: 'flex',
+                        alignItems: 'baseline',
+                        justifyContent: 'space-between',
+                        gap: '16px',
                       }}
                     >
-                      {entry.activity_name}
+                      <span
+                        style={{
+                          fontSize: '24px',
+                          fontWeight: 600,
+                          color: designSystem.gray[900],
+                        }}
+                      >
+                        {entry.activity_name}
+                      </span>
+                      <span style={{ fontSize: '16px', color: designSystem.gray[500] }}>
+                        {texts.lastUsedPrefix} {formatLastUsed(entry.saved_at)}
+                      </span>
                     </span>
-                    <span style={{ fontSize: '16px', color: designSystem.gray[500] }}>
-                      {texts.lastUsedPrefix} {formatLastUsed(entry.saved_at)}
+                    <span
+                      style={{
+                        display: 'block',
+                        marginTop: '6px',
+                        fontSize: '18px',
+                        color: designSystem.gray[500],
+                      }}
+                    >
+                      {formatRoomName(entry.room_name)} · {entry.supervisor_names.join(', ')}
                     </span>
                   </span>
+                  {/* Visual affordance only; the whole card is the button */}
                   <span
+                    aria-hidden="true"
                     style={{
-                      display: 'block',
-                      marginTop: '6px',
-                      fontSize: '18px',
-                      color: designSystem.gray[500],
+                      flexShrink: 0,
+                      width: '56px',
+                      height: '56px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: designSystem.brand.greenTint,
+                      color: designSystem.pastel.green.accent,
+                      borderRadius: designSystem.borderRadius.full,
                     }}
                   >
-                    {formatRoomName(entry.room_name)} · {entry.supervisor_names.join(', ')}
+                    <FontAwesomeIcon icon={faPlay} style={{ fontSize: '20px' }} />
                   </span>
                 </button>
                 <button

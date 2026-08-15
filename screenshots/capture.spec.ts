@@ -503,7 +503,7 @@ test.describe('PyrePortal User Journey', () => {
 
     await page.click('button:has-text("Letzte Aufsichten")');
     await page.waitForURL('**/session-history');
-    await page.waitForSelector('text=Diese Aufsichten sind beendet.');
+    await page.waitForSelector('text=Antippen startet die Aufsicht neu.');
     await screenshot(page, '32a-session-history-page', 300);
   });
 

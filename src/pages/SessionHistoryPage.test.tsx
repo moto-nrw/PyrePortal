@@ -164,11 +164,7 @@ describe('SessionHistoryPage', () => {
   it('shows the page title and the template hint', () => {
     renderPage();
     expect(screen.getByText('Letzte Aufsichten')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'Diese Aufsichten sind beendet. Beim Antippen startet eine neue Aufsicht mit der gleichen Auswahl.'
-      )
-    ).toBeInTheDocument();
+    expect(screen.getByText('Antippen startet die Aufsicht neu.')).toBeInTheDocument();
   });
 
   it('shows activity, room, supervisors and last-used time of a saved combination', () => {
