@@ -185,10 +185,10 @@ describe('HomeViewPage', () => {
   });
 
   // =========================================================================
-  // Session history shortcut in the main area
+  // Session history shortcut (bottom left)
   // =========================================================================
 
-  it('shows the history button under the start card when a history exists', () => {
+  it('shows the history button when a history exists', () => {
     useUserStore.setState({ sessionSettings: sessionSettingsWithHistory });
     renderPage();
     expect(screen.getByRole('button', { name: /Letzte Aufsichten/ })).toBeInTheDocument();

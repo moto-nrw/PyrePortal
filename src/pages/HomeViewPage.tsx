@@ -344,124 +344,72 @@ function HomeViewPage() {
                 marginBottom: '24px',
               }}
             >
-              {/* Activity column: main card plus history shortcut below */}
-              <div
+              {/* Activity Button - Phoenix Clean Style */}
+              <button
+                onClick={currentSession ? handleContinueActivity : handleStartActivity}
+                onTouchStart={() => setTouchedButton('activity')}
+                onTouchEnd={() => setTouchedButton(null)}
                 style={{
+                  backgroundColor: designSystem.surface.background,
+                  border: `1px solid ${designSystem.surface.border}`,
+                  borderRadius: designSystem.surface.borderRadius,
+                  padding: '36px',
+                  transition: designSystem.transitions.base,
+                  outline: 'none',
+                  minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '12px',
-                  minHeight: '320px',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '16px',
+                  transform: touchedButton === 'activity' ? 'scale(0.98)' : 'scale(1)',
+                  boxShadow:
+                    touchedButton === 'activity'
+                      ? '0 1px 2px rgba(0, 0, 0, 0.06)'
+                      : designSystem.surface.shadow,
+                  cursor: 'pointer',
                 }}
               >
-                {/* Activity Button - Phoenix Clean Style */}
-                <button
-                  onClick={currentSession ? handleContinueActivity : handleStartActivity}
-                  onTouchStart={() => setTouchedButton('activity')}
-                  onTouchEnd={() => setTouchedButton(null)}
-                  style={{
-                    flex: 1,
-                    backgroundColor: designSystem.surface.background,
-                    border: `1px solid ${designSystem.surface.border}`,
-                    borderRadius: designSystem.surface.borderRadius,
-                    padding: '36px',
-                    transition: designSystem.transitions.base,
-                    outline: 'none',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '16px',
-                    transform: touchedButton === 'activity' ? 'scale(0.98)' : 'scale(1)',
-                    boxShadow:
-                      touchedButton === 'activity'
-                        ? '0 1px 2px rgba(0, 0, 0, 0.06)'
-                        : designSystem.surface.shadow,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {/* Content */}
-                  <div>
-                    <div
-                      style={{
-                        width: '88px',
-                        height: '88px',
-                        backgroundColor: designSystem.brand.greenTint,
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        margin: '0 auto 16px',
-                      }}
-                    >
-                      {getActivityIcon(currentSession)}
-                    </div>
-
-                    <h3
-                      style={{
-                        fontSize: '28px',
-                        fontWeight: 600,
-                        color: designSystem.gray[900],
-                        margin: '0 0 8px 0',
-                        textAlign: 'center',
-                      }}
-                    >
-                      {getActivityHeading(currentSession)}
-                    </h3>
-                    <p
-                      style={{
-                        fontSize: '18px',
-                        color: designSystem.gray[500],
-                        margin: 0,
-                        textAlign: 'center',
-                      }}
-                    >
-                      {getActivitySubtitle(currentSession)}
-                    </p>
-                  </div>
-                </button>
-
-                {/* History shortcut: opens the page with the recent combinations */}
-                {!currentSession && hasHistory && (
-                  <button
-                    type="button"
-                    onClick={handleSessionHistory}
-                    onTouchStart={() => setTouchedButton('history')}
-                    onTouchEnd={() => setTouchedButton(null)}
-                    onTouchCancel={() => setTouchedButton(null)}
+                {/* Content */}
+                <div>
+                  <div
                     style={{
-                      height: '64px',
+                      width: '88px',
+                      height: '88px',
+                      backgroundColor: designSystem.brand.greenTint,
+                      borderRadius: '50%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '12px',
-                      backgroundColor:
-                        touchedButton === 'history'
-                          ? designSystem.gray[100]
-                          : designSystem.colors.white,
-                      border: `1px solid ${designSystem.gray[200]}`,
-                      borderRadius: designSystem.surface.borderRadius,
-                      cursor: 'pointer',
-                      transition: designSystem.transitions.base,
-                      outline: 'none',
-                      boxShadow: designSystem.shadows.sm,
+                      margin: '0 auto 16px',
                     }}
                   >
-                    <FontAwesomeIcon
-                      icon={faClockRotateLeft}
-                      style={{ fontSize: '20px', color: designSystem.gray[700] }}
-                    />
-                    <span
-                      style={{
-                        fontSize: '20px',
-                        fontWeight: 600,
-                        color: designSystem.gray[700],
-                      }}
-                    >
-                      {texts.historyButton}
-                    </span>
-                  </button>
-                )}
-              </div>
+                    {getActivityIcon(currentSession)}
+                  </div>
+
+                  <h3
+                    style={{
+                      fontSize: '28px',
+                      fontWeight: 600,
+                      color: designSystem.gray[900],
+                      margin: '0 0 8px 0',
+                      textAlign: 'center',
+                    }}
+                  >
+                    {getActivityHeading(currentSession)}
+                  </h3>
+                  <p
+                    style={{
+                      fontSize: '18px',
+                      color: designSystem.gray[500],
+                      margin: 0,
+                      textAlign: 'center',
+                    }}
+                  >
+                    {getActivitySubtitle(currentSession)}
+                  </p>
+                </div>
+              </button>
 
               {/* Team Management Button - Phoenix Clean Style */}
               <button
@@ -603,6 +551,60 @@ function HomeViewPage() {
             </button>
           </div>
         </div>
+
+        {/* History shortcut - bottom left, same spot as the former panel */}
+        {!currentSession && hasHistory && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '20px',
+              zIndex: 30,
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleSessionHistory}
+              onTouchStart={() => setTouchedButton('history')}
+              onTouchEnd={() => setTouchedButton(null)}
+              onTouchCancel={() => setTouchedButton(null)}
+              onPointerLeave={() =>
+                setTouchedButton(current => (current === 'history' ? null : current))
+              }
+              style={{
+                height: '68px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '0 32px',
+                backgroundColor:
+                  touchedButton === 'history' ? designSystem.gray[100] : designSystem.colors.white,
+                border: `1px solid ${designSystem.gray[200]}`,
+                borderRadius: '34px',
+                cursor: 'pointer',
+                transition: designSystem.transitions.base,
+                outline: 'none',
+                boxShadow: designSystem.shadows.sm,
+                transform:
+                  touchedButton === 'history' ? designSystem.scales.activeSmall : 'scale(1)',
+              }}
+            >
+              <FontAwesomeIcon
+                icon={faClockRotateLeft}
+                style={{ fontSize: '20px', color: designSystem.gray[700] }}
+              />
+              <span
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  color: designSystem.gray[700],
+                }}
+              >
+                {texts.historyButton}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Add animation keyframes */}
