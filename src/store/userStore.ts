@@ -11,7 +11,7 @@ import type {
   SessionRecreationOutcome,
   SessionValidationOutcome,
 } from '../services/sessionService';
-import { type SessionSettings } from '../services/sessionStorage';
+import { type SessionHistoryEntry, type SessionSettings } from '../services/sessionStorage';
 import type { NetworkStatusData } from '../types/network';
 import { LogLevel } from '../utils/logger';
 import { loggerMiddleware } from '../utils/storeMiddleware';
@@ -98,9 +98,10 @@ export interface UserState {
 
   // Session settings actions
   loadSessionSettings: () => Promise<void>;
-  toggleUseLastSession: (enabled: boolean) => Promise<void>;
   saveLastSessionData: () => Promise<void>;
-  validateAndRecreateSession: () => Promise<SessionValidationOutcome>;
+  removeSessionHistoryEntry: (entry: SessionHistoryEntry) => Promise<void>;
+  clearSessionHistory: () => Promise<void>;
+  validateAndRecreateSession: (entry: SessionHistoryEntry) => Promise<SessionValidationOutcome>;
   recreateSession: () => Promise<SessionRecreationOutcome>;
   invalidateSessionRecreation: () => void;
 

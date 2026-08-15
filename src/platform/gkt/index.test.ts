@@ -463,9 +463,8 @@ describe('GKTAdapter', () => {
   describe('session storage', () => {
     it('saves and loads session settings via localStorage', async () => {
       const settings = {
-        use_last_session: true,
         auto_save_enabled: true,
-        last_session: null,
+        session_history: [],
       };
 
       await adapter.saveSessionSettings(settings);
@@ -481,9 +480,8 @@ describe('GKTAdapter', () => {
 
     it('clears session from localStorage', async () => {
       await adapter.saveSessionSettings({
-        use_last_session: true,
         auto_save_enabled: true,
-        last_session: null,
+        session_history: [],
       });
       await adapter.clearLastSession();
       const loaded = await adapter.loadSessionSettings();

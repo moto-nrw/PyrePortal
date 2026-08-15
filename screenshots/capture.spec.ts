@@ -160,6 +160,8 @@ async function ensureCheckedOut(page: Page, tagId: string) {
 //   → NFC Scanning → Check-in → Checkout (Wohin?) → Feedback → Tschüss
 //   → Abholzeit abfragen → Fehler-Modal (unbekanntes Armband)
 //   → Anmelden → PIN → Home (aktive Aufsicht) → Aufsicht beenden
+//   → Letzte Aufsichten → Verlaufsseite → Neue-Aufsicht-Modal
+//   → Verlauf-löschen-Modal
 // ============================================================
 
 test.describe('PyrePortal User Journey', () => {
@@ -485,5 +487,41 @@ test.describe('PyrePortal User Journey', () => {
     // Confirm so the demo session doesn't linger on the backend
     await page.click('button:has-text("Ja, beenden")');
     await page.waitForTimeout(1000);
+  });
+
+  // ----------------------------------------------------------
+  // 8. Session history (Letzte Aufsichten)
+  //    The session started in step 22 left a history entry,
+  //    so the shortcut pill is visible after the session ended.
+  // ----------------------------------------------------------
+
+  test('32 — Home with history shortcut → history page', async () => {
+    test.setTimeout(30_000);
+    await waitForModalClosed(page);
+    await page.waitForSelector('button:has-text("Letzte Aufsichten")', { timeout: 10_000 });
+    await screenshot(page, '32-home-history-shortcut', 300);
+
+    await page.click('button:has-text("Letzte Aufsichten")');
+    await page.waitForURL('**/session-history');
+    await page.waitForSelector('text=Antippen startet die Aufsicht neu.');
+    await screenshot(page, '32a-session-history-page', 300);
+  });
+
+  test('33 — Recreate confirmation (Neue Aufsicht starten?)', async () => {
+    test.setTimeout(30_000);
+    // First history row (rows carry the "Zuletzt:" timestamp label)
+    await page.locator('button', { hasText: 'Zuletzt:' }).first().click();
+    await page.waitForSelector('text=Neue Aufsicht starten?', { timeout: 15_000 });
+    await screenshot(page, '33-history-recreate-confirm', 300);
+    // Cancel — the journey must not start another session here
+    await page.click('dialog[open] button:has-text("Abbrechen")');
+  });
+
+  test('34 — Clear-history confirmation', async () => {
+    await waitForModalClosed(page);
+    await page.click('button:has-text("Alle löschen")');
+    await page.waitForSelector('text=Verlauf löschen?', { timeout: 5_000 });
+    await screenshot(page, '34-history-clear-confirm', 300);
+    await page.click('dialog[open] button:has-text("Abbrechen")');
   });
 });

@@ -1,23 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { LastSessionToggle } from '../components/LastSessionToggle';
-import {
-  ContactlessPaymentIcon,
-  ErrorModal,
-  ModalBase,
-  ModalActionButtons,
-} from '../components/ui';
-import {
-  api,
-  formatRoomName,
-  getNetworkErrorMessage,
-  isNetworkRelatedError,
-  mapServerErrorToGerman,
-  type CurrentSession,
-} from '../services/api';
-import type { SessionSettings } from '../services/sessionStorage';
+import { ContactlessPaymentIcon, ModalBase, ModalActionButtons } from '../components/ui';
+import { api, type CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
@@ -26,28 +14,15 @@ const logger = createLogger('HomeViewPage');
 
 /** User-facing German UI copy for this page */
 const texts = {
-  recreationErrorFallback: 'Fehler beim Starten der Aktivität',
   activityFallback: 'Aktivität',
-  repeatSessionHeading: 'Aufsicht wiederholen',
   startSessionHeading: 'Aufsicht starten',
   continueSubtitle: 'Fortsetzen',
-  supervisorCountMismatch: (selected: number, saved: number) =>
-    `${selected} Betreuer (gespeichert: ${saved})`,
-  supervisorCount: (count: number) => `${count} Betreuer`,
-  validationFailedFallback:
-    'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.',
-  incompleteSessionDataError:
-    'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.',
+  historyButton: 'Letzte Aufsichten',
   tagAssignmentButton: 'Armband identifizieren',
   endSessionButton: 'Aufsicht beenden',
   logoutButton: 'Abmelden',
   menuHeading: 'Menü',
   teamManagementButton: 'Team anpassen',
-  recreationConfirmHeading: 'Aufsicht wiederholen?',
-  roomLabel: 'Raum:',
-  supervisorsLabel: 'Betreuer:',
-  recreationConfirmButton: 'Aufsicht starten',
-  recreationLoadingButton: 'Starte...',
   endSessionConfirmHeading: 'Aufsicht beenden?',
   endSessionWarningPrefix: 'Alle Kinder, die in dieser Aufsicht sind, werden auf den Status',
   endSessionWarningHighlight: 'unterwegs',
@@ -59,19 +34,8 @@ const texts = {
 // Pure helper functions (moved outside component to reduce cognitive complexity)
 // ============================================================================
 
-/** Format session recreation error message for display */
-function formatRecreationError(error: unknown): string {
-  const rawMessage = error instanceof Error ? error.message : texts.recreationErrorFallback;
-  return isNetworkRelatedError(error)
-    ? getNetworkErrorMessage('sessionStart')
-    : mapServerErrorToGerman(rawMessage);
-}
-
 /** Get appropriate activity icon based on session state */
-function getActivityIcon(
-  currentSession: CurrentSession | null,
-  sessionSettings: SessionSettings | null
-): React.ReactNode {
+function getActivityIcon(currentSession: CurrentSession | null): React.ReactNode {
   if (currentSession) {
     return (
       <svg
@@ -82,25 +46,6 @@ function getActivityIcon(
         stroke="none"
       >
         <path d="M8 5v14l11-7z" />
-      </svg>
-    );
-  }
-  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return (
-      <svg
-        width="52"
-        height="52"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke={designSystem.pastel.green.accent}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-        <path d="M21 3v5h-5" />
-        <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-        <path d="M3 21v-5h5" />
       </svg>
     );
   }
@@ -122,50 +67,16 @@ function getActivityIcon(
 }
 
 /** Get activity heading text based on session state */
-function getActivityHeading(
-  currentSession: CurrentSession | null,
-  sessionSettings: SessionSettings | null
-): string {
+function getActivityHeading(currentSession: CurrentSession | null): string {
   if (currentSession) {
     return currentSession.activity_name ?? texts.activityFallback;
-  }
-  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return texts.repeatSessionHeading;
   }
   return texts.startSessionHeading;
 }
 
 /** Get activity subtitle text based on session state */
-function getActivitySubtitle(
-  currentSession: CurrentSession | null,
-  sessionSettings: SessionSettings | null
-): string {
-  if (currentSession) {
-    return texts.continueSubtitle;
-  }
-  if (sessionSettings?.use_last_session && sessionSettings.last_session) {
-    return sessionSettings.last_session.activity_name;
-  }
-  return '';
-}
-
-/** Get supervisor count label for saved session display */
-function getSupervisorCountLabel(
-  sessionSettings: SessionSettings | null,
-  selectedSupervisorsCount: number
-): string {
-  if (!sessionSettings?.last_session) {
-    return '';
-  }
-  const savedCount = sessionSettings.last_session.supervisor_names.length;
-
-  if (selectedSupervisorsCount > 0 && selectedSupervisorsCount !== savedCount) {
-    return texts.supervisorCountMismatch(selectedSupervisorsCount, savedCount);
-  }
-  if (selectedSupervisorsCount > 0) {
-    return texts.supervisorCount(selectedSupervisorsCount);
-  }
-  return texts.supervisorCount(savedCount);
+function getActivitySubtitle(currentSession: CurrentSession | null): string {
+  return currentSession ? texts.continueSubtitle : '';
 }
 
 // ============================================================================
@@ -176,32 +87,17 @@ function HomeViewPage() {
   const {
     authenticatedUser,
     currentSession,
+    sessionSettings,
     logout,
     fetchCurrentSession,
-    selectedSupervisors,
-    sessionSettings,
     loadSessionSettings,
-    validateAndRecreateSession,
-    isValidatingLastSession,
-    recreateSession,
     invalidateSessionRecreation,
   } = useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
-  const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
-  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      invalidateSessionRecreation();
-    };
-  }, [invalidateSessionRecreation]);
+  const hasHistory = (sessionSettings?.session_history.length ?? 0) > 0;
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -218,7 +114,6 @@ function HomeViewPage() {
   // Helper to perform user logout
   const performLogout = async () => {
     invalidateSessionRecreation();
-    setIsNavigatingToScanning(false);
     logUserAction('User logout initiated');
     await logout();
     logNavigation('Home View', '/');
@@ -227,7 +122,6 @@ function HomeViewPage() {
 
   const handleLogout = async () => {
     setTouchedButton(null);
-    if (isValidatingLastSession) return;
     if (currentSession) {
       setShowEndSessionModal(true);
     } else {
@@ -246,36 +140,15 @@ function HomeViewPage() {
     void navigate('/tag-assignment');
   };
 
-  // Helper to handle last session recreation attempt
-  const attemptSessionRecreation = async () => {
-    logUserAction('Attempting to recreate last session');
-    const outcome = await validateAndRecreateSession();
-
-    if (!isMountedRef.current || outcome.status === 'stale') {
-      return;
-    }
-
-    if (outcome.status === 'success') {
-      setShowConfirmModal(true);
-      return;
-    }
-
-    const latestError = useUserStore.getState().error ?? texts.validationFailedFallback;
-    setErrorMessage(latestError);
-    setShowErrorModal(true);
-    setShowConfirmModal(false);
+  const handleStartActivity = () => {
+    logNavigation('Home View', '/activity-selection');
+    void navigate('/activity-selection');
   };
 
-  const handleStartActivity = async () => {
-    const shouldRecreateLastSession =
-      sessionSettings?.use_last_session && sessionSettings.last_session;
-
-    if (shouldRecreateLastSession) {
-      await attemptSessionRecreation();
-    } else {
-      logNavigation('Home View', '/activity-selection');
-      void navigate('/activity-selection');
-    }
+  const handleSessionHistory = () => {
+    setTouchedButton(null);
+    logNavigation('Home View', '/session-history');
+    void navigate('/session-history');
   };
 
   const handleContinueActivity = () => {
@@ -299,53 +172,6 @@ function HomeViewPage() {
     void navigate('/staff-clock');
   };
 
-  // Helper to show error and close confirm modal
-  const showRecreationError = (message: string) => {
-    setErrorMessage(message);
-    setShowErrorModal(true);
-    setShowConfirmModal(false);
-  };
-
-  const handleConfirmRecreation = async () => {
-    if (!authenticatedUser || !sessionSettings?.last_session) return;
-    // Only one recreation request may be in flight; a duplicate submit would
-    // mark the first request stale and then fail with a 409 conflict.
-    if (isNavigatingToScanning) return;
-
-    setIsNavigatingToScanning(true);
-    const outcome = await recreateSession();
-
-    if (outcome.status === 'incomplete') {
-      setIsNavigatingToScanning(false);
-      showRecreationError(texts.incompleteSessionDataError);
-      return;
-    }
-
-    if (outcome.status === 'error') {
-      // Stale responses (superseded attempt or logout) are discarded
-      if (!isMountedRef.current || outcome.stale) {
-        return;
-      }
-      setIsNavigatingToScanning(false);
-      showRecreationError(formatRecreationError(outcome.error));
-      return;
-    }
-
-    // Stale responses (superseded attempt or logout) are discarded
-    if (!isMountedRef.current || outcome.stale) {
-      return;
-    }
-
-    logUserAction('Session recreated successfully', {
-      sessionId: outcome.session.active_group_id,
-    });
-
-    logNavigation('Home View', '/nfc-scanning');
-    void navigate('/nfc-scanning');
-
-    setShowConfirmModal(false);
-  };
-
   // Redirect to login if no authenticated user and fetch current session
   useEffect(() => {
     if (!authenticatedUser) {
@@ -367,7 +193,10 @@ function HomeViewPage() {
 
   return (
     <BackgroundWrapper>
-      <div className="h-screen w-screen overflow-auto p-8">
+      <div
+        className="h-screen w-screen overflow-auto p-8"
+        style={{ display: 'flex', flexDirection: 'column' }}
+      >
         {/* NFC Scan button - Top Left */}
         <div
           style={{
@@ -428,10 +257,7 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleLogout}
-            disabled={isValidatingLastSession}
-            onTouchStart={() => {
-              if (!isValidatingLastSession) setTouchedButton('logout');
-            }}
+            onTouchStart={() => setTouchedButton('logout')}
             onTouchEnd={() => setTouchedButton(null)}
             onTouchCancel={() => setTouchedButton(null)}
             onPointerLeave={() =>
@@ -448,12 +274,11 @@ function HomeViewPage() {
                 touchedButton === 'logout' ? designSystem.pastel.red.bg : designSystem.colors.white,
               border: `1px solid ${designSystem.pastel.red.accent}`,
               borderRadius: '34px',
-              cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
               boxShadow: designSystem.shadows.sm,
               transform: touchedButton === 'logout' ? designSystem.scales.activeSmall : 'scale(1)',
-              opacity: isValidatingLastSession ? 0.6 : 1,
             }}
           >
             <svg
@@ -477,19 +302,20 @@ function HomeViewPage() {
                 color: designSystem.pastel.red.accent,
               }}
             >
-              {currentSession && !isNavigatingToScanning
-                ? texts.endSessionButton
-                : texts.logoutButton}
+              {currentSession ? texts.endSessionButton : texts.logoutButton}
             </span>
           </button>
         </div>
 
-        {/* Welcome Header - Larger for Accessibility */}
+        {/* Welcome Header - vertically centered with the 68px corner pills
+            (pills sit at top: 20px) */}
         <div
           style={{
-            textAlign: 'center',
-            marginTop: '40px',
-            marginBottom: '48px',
+            marginTop: '20px',
+            height: '68px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         >
           <h1
@@ -505,13 +331,15 @@ function HomeViewPage() {
           </h1>
         </div>
 
-        {/* Main Content - Positioned Higher */}
+        {/* Main Content - centered between header row and footer row
+            (footer pill: 68px high, 20px from the bottom) */}
         <div
           style={{
             display: 'flex',
-            alignItems: 'flex-start',
+            alignItems: 'center',
             justifyContent: 'center',
-            paddingTop: '60px',
+            flex: 1,
+            marginBottom: '88px',
           }}
         >
           <div style={{ width: '100%', maxWidth: '800px' }}>
@@ -529,7 +357,6 @@ function HomeViewPage() {
                 onClick={currentSession ? handleContinueActivity : handleStartActivity}
                 onTouchStart={() => setTouchedButton('activity')}
                 onTouchEnd={() => setTouchedButton(null)}
-                disabled={isValidatingLastSession}
                 style={{
                   backgroundColor: designSystem.surface.background,
                   border: `1px solid ${designSystem.surface.border}`,
@@ -548,8 +375,7 @@ function HomeViewPage() {
                     touchedButton === 'activity'
                       ? '0 1px 2px rgba(0, 0, 0, 0.06)'
                       : designSystem.surface.shadow,
-                  opacity: isValidatingLastSession ? 0.7 : 1,
-                  cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
+                  cursor: 'pointer',
                 }}
               >
                 {/* Content */}
@@ -566,7 +392,7 @@ function HomeViewPage() {
                       margin: '0 auto 16px',
                     }}
                   >
-                    {getActivityIcon(currentSession, sessionSettings)}
+                    {getActivityIcon(currentSession)}
                   </div>
 
                   <h3
@@ -578,7 +404,7 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {getActivityHeading(currentSession, sessionSettings)}
+                    {getActivityHeading(currentSession)}
                   </h3>
                   <p
                     style={{
@@ -588,84 +414,8 @@ function HomeViewPage() {
                       textAlign: 'center',
                     }}
                   >
-                    {getActivitySubtitle(currentSession, sessionSettings)}
+                    {getActivitySubtitle(currentSession)}
                   </p>
-
-                  {/* Show room and supervisor info for saved session */}
-                  {!currentSession &&
-                    sessionSettings?.use_last_session &&
-                    sessionSettings.last_session && (
-                      <div
-                        style={{
-                          marginTop: '16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px',
-                        }}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            gap: '8px',
-                            justifyContent: 'center',
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              backgroundColor: designSystem.brand.bluePillBg,
-                              color: designSystem.brand.blue,
-                              padding: '4px 12px',
-                              borderRadius: designSystem.borderRadius.full,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                            }}
-                          >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                            >
-                              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                              <circle cx="12" cy="10" r="3" />
-                            </svg>
-                            {formatRoomName(sessionSettings.last_session.room_name)}
-                          </span>
-                          <span
-                            style={{
-                              fontSize: '13px',
-                              backgroundColor: designSystem.brand.greenTint,
-                              color: designSystem.brand.greenText,
-                              padding: '4px 12px',
-                              borderRadius: designSystem.borderRadius.full,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                            }}
-                          >
-                            <svg
-                              width="14"
-                              height="14"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2.5"
-                            >
-                              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                              <circle cx="9" cy="7" r="4" />
-                              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                            </svg>
-                            {getSupervisorCountLabel(sessionSettings, selectedSupervisors.length)}
-                          </span>
-                        </div>
-                      </div>
-                    )}
                 </div>
               </button>
 
@@ -810,8 +560,59 @@ function HomeViewPage() {
           </div>
         </div>
 
-        {/* Last Session Toggle - only show when no current session */}
-        {!currentSession && <LastSessionToggle />}
+        {/* History shortcut - bottom left, same spot as the former panel */}
+        {!currentSession && hasHistory && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '20px',
+              left: '20px',
+              zIndex: 30,
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleSessionHistory}
+              onTouchStart={() => setTouchedButton('history')}
+              onTouchEnd={() => setTouchedButton(null)}
+              onTouchCancel={() => setTouchedButton(null)}
+              onPointerLeave={() =>
+                setTouchedButton(current => (current === 'history' ? null : current))
+              }
+              style={{
+                height: '68px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '0 32px',
+                backgroundColor:
+                  touchedButton === 'history' ? designSystem.gray[100] : designSystem.colors.white,
+                border: `1px solid ${designSystem.gray[200]}`,
+                borderRadius: '34px',
+                cursor: 'pointer',
+                transition: designSystem.transitions.base,
+                outline: 'none',
+                boxShadow: designSystem.shadows.sm,
+                transform:
+                  touchedButton === 'history' ? designSystem.scales.activeSmall : 'scale(1)',
+              }}
+            >
+              <FontAwesomeIcon
+                icon={faClockRotateLeft}
+                style={{ fontSize: '20px', color: designSystem.gray[700] }}
+              />
+              <span
+                style={{
+                  fontSize: '20px',
+                  fontWeight: 600,
+                  color: designSystem.gray[700],
+                }}
+              >
+                {texts.historyButton}
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Add animation keyframes */}
@@ -830,126 +631,6 @@ function HomeViewPage() {
           }
         `}
       </style>
-
-      {/* Error Modal */}
-      <ErrorModal
-        isOpen={showErrorModal}
-        onClose={() => setShowErrorModal(false)}
-        message={errorMessage}
-        autoCloseDelay={3000}
-      />
-
-      {/* Confirmation Modal for Recreation */}
-      <ModalBase
-        isOpen={showConfirmModal && !!sessionSettings?.last_session}
-        onClose={() => setShowConfirmModal(false)}
-        size="sm"
-        backgroundColor={designSystem.colors.white}
-        closeOnBackdropClick={!isValidatingLastSession && !isNavigatingToScanning}
-      >
-        {/* Success Icon - pastel green pair (design-review v2) */}
-        <div
-          style={{
-            width: '64px',
-            height: '64px',
-            background: designSystem.brand.greenTint,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px auto',
-          }}
-        >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M5 12l5 5L20 7"
-              stroke={designSystem.pastel.green.accent}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-
-        {/* Title */}
-        <h2
-          style={{
-            fontSize: '24px',
-            fontWeight: 600,
-            color: designSystem.gray[900],
-            marginBottom: '12px',
-          }}
-        >
-          {texts.recreationConfirmHeading}
-        </h2>
-
-        {/* Activity Details */}
-        {useUserStore.getState().selectedActivity && useUserStore.getState().selectedRoom && (
-          <div style={{ marginBottom: '24px' }}>
-            <div
-              style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: designSystem.gray[700],
-                marginBottom: '16px',
-              }}
-            >
-              {useUserStore.getState().selectedActivity?.name}
-            </div>
-
-            <div
-              style={{
-                backgroundColor: designSystem.gray[100],
-                borderRadius: designSystem.borderRadius.lg,
-                padding: '16px',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ marginBottom: '8px' }}>
-                <span style={{ color: designSystem.gray[500], fontSize: '14px' }}>
-                  {texts.roomLabel}
-                </span>
-                <span
-                  style={{
-                    color: designSystem.gray[800],
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    marginLeft: '8px',
-                  }}
-                >
-                  {useUserStore.getState().selectedRoom?.name}
-                </span>
-              </div>
-              <div>
-                <span style={{ color: designSystem.gray[500], fontSize: '14px' }}>
-                  {texts.supervisorsLabel}
-                </span>
-                <span
-                  style={{
-                    color: designSystem.gray[800],
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    marginLeft: '8px',
-                  }}
-                >
-                  {useUserStore
-                    .getState()
-                    .selectedSupervisors.map(s => s.name)
-                    .join(', ')}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <ModalActionButtons
-          onCancel={() => setShowConfirmModal(false)}
-          onConfirm={handleConfirmRecreation}
-          isLoading={isValidatingLastSession || isNavigatingToScanning}
-          confirmLabel={texts.recreationConfirmButton}
-          loadingLabel={texts.recreationLoadingButton}
-        />
-      </ModalBase>
 
       {/* End Session Confirmation Modal */}
       <ModalBase
