@@ -10,6 +10,7 @@ import {
   PaginationControls,
   SelectionPageLayout,
 } from '../components/ui';
+import { ConfirmationModal } from '../components/ui/ConfirmationModal';
 import { usePagination } from '../hooks/usePagination';
 import {
   formatRoomName,
@@ -41,10 +42,6 @@ const texts = {
   clearConfirmBody: 'Alle Einträge werden entfernt. Das kann nicht rückgängig gemacht werden.',
   clearConfirmButton: 'Ja, löschen',
   confirmHeading: 'Neue Aufsicht starten?',
-  roomLabel: 'Raum:',
-  supervisorsLabel: 'Betreuer:',
-  confirmButton: 'Aufsicht starten',
-  loadingButton: 'Starte...',
 } as const;
 
 // 4 rows keep pagination and "Alle löschen" inside the 800px kiosk
@@ -75,6 +72,9 @@ function SessionHistoryPage() {
   const {
     authenticatedUser,
     currentSession,
+    selectedActivity,
+    selectedRoom,
+    selectedSupervisors,
     sessionSettings,
     loadSessionSettings,
     removeSessionHistoryEntry,
@@ -426,116 +426,18 @@ function SessionHistoryPage() {
       />
 
       {/* Confirmation Modal: starts a NEW session with the selected combination */}
-      <ModalBase
-        isOpen={showConfirmModal && !!pendingEntry}
-        onClose={() => setShowConfirmModal(false)}
-        size="sm"
-        backgroundColor={designSystem.colors.white}
-        closeOnBackdropClick={!isValidatingLastSession && !isNavigatingToScanning}
-      >
-        {/* Success Icon - pastel green pair (design-review v2) */}
-        <div
-          style={{
-            width: '64px',
-            height: '64px',
-            background: designSystem.brand.greenTint,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px auto',
-          }}
-        >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M5 12l5 5L20 7"
-              stroke={designSystem.pastel.green.accent}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-
-        {/* Title */}
-        <h2
-          style={{
-            fontSize: '24px',
-            fontWeight: 600,
-            color: designSystem.gray[900],
-            marginBottom: '12px',
-          }}
-        >
-          {texts.confirmHeading}
-        </h2>
-
-        {/* Activity Details */}
-        {useUserStore.getState().selectedActivity && useUserStore.getState().selectedRoom && (
-          <div style={{ marginBottom: '24px' }}>
-            <div
-              style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: designSystem.gray[700],
-                marginBottom: '16px',
-              }}
-            >
-              {useUserStore.getState().selectedActivity?.name}
-            </div>
-
-            <div
-              style={{
-                backgroundColor: designSystem.gray[100],
-                borderRadius: designSystem.borderRadius.lg,
-                padding: '16px',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ marginBottom: '8px' }}>
-                <span style={{ color: designSystem.gray[500], fontSize: '14px' }}>
-                  {texts.roomLabel}
-                </span>
-                <span
-                  style={{
-                    color: designSystem.gray[800],
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    marginLeft: '8px',
-                  }}
-                >
-                  {useUserStore.getState().selectedRoom?.name}
-                </span>
-              </div>
-              <div>
-                <span style={{ color: designSystem.gray[500], fontSize: '14px' }}>
-                  {texts.supervisorsLabel}
-                </span>
-                <span
-                  style={{
-                    color: designSystem.gray[800],
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    marginLeft: '8px',
-                  }}
-                >
-                  {useUserStore
-                    .getState()
-                    .selectedSupervisors.map(s => s.name)
-                    .join(', ')}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <ModalActionButtons
-          onCancel={() => setShowConfirmModal(false)}
+      {selectedRoom && (
+        <ConfirmationModal
+          isOpen={showConfirmModal && !!pendingEntry}
+          heading={texts.confirmHeading}
+          activity={selectedActivity}
+          room={selectedRoom}
+          supervisors={selectedSupervisors}
           onConfirm={handleConfirmRecreation}
+          onCancel={() => setShowConfirmModal(false)}
           isLoading={isValidatingLastSession || isNavigatingToScanning}
-          confirmLabel={texts.confirmButton}
-          loadingLabel={texts.loadingButton}
         />
-      </ModalBase>
+      )}
     </SelectionPageLayout>
   );
 }

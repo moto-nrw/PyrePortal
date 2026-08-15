@@ -334,9 +334,10 @@ describe('SessionHistoryPage', () => {
     renderPage();
 
     await openRecreationConfirm(user);
-    expect(screen.getByText('Raum:')).toBeInTheDocument();
-    expect(screen.getByText('Betreuer:')).toBeInTheDocument();
-    expect(screen.getByText('Frau Müller, Herr Schmidt')).toBeInTheDocument();
+    expect(screen.getByText('Raum A')).toBeInTheDocument();
+    expect(screen.getByText('Betreuer (2)')).toBeInTheDocument();
+    expect(screen.getByText('Frau Müller')).toBeInTheDocument();
+    expect(screen.getByText('Herr Schmidt')).toBeInTheDocument();
   });
 
   it('failed validation shows error modal with store error', async () => {

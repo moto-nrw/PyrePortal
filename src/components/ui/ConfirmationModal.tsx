@@ -7,6 +7,8 @@ import { ModalBase } from './ModalBase';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
+  /** Dialog heading; defaults to the session-start question */
+  heading?: string;
   activity: { name: string } | null;
   room: { name: string; room_type?: string };
   supervisors: Array<{ id: number; name: string }>;
@@ -21,6 +23,7 @@ interface ConfirmationModalProps {
  */
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
   isOpen,
+  heading = 'Aufsicht starten?',
   activity,
   room,
   supervisors,
@@ -73,7 +76,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         lineHeight: 1.2,
       }}
     >
-      Aufsicht starten?
+      {heading}
     </h2>
 
     {/* Activity Details Card */}
