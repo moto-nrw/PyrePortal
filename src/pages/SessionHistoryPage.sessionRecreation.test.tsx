@@ -7,7 +7,7 @@ import { api, type CurrentSession } from '../services/api';
 import type { SessionHistoryEntry, SessionSettings } from '../services/sessionStorage';
 import { useUserStore } from '../store/userStore';
 
-import HomeViewPage from './HomeViewPage';
+import SessionHistoryPage from './SessionHistoryPage';
 
 // ---------------------------------------------------------------------------
 // Mock react-router to intercept navigate calls
@@ -32,7 +32,6 @@ vi.mock('../services/api', async () => {
     api: {
       ...actual.api,
       startSession: vi.fn(),
-      endSession: vi.fn().mockResolvedValue(undefined),
       getActivities: vi.fn(),
       getRooms: vi.fn(),
     },
@@ -85,19 +84,17 @@ const startResponse = {
 function renderPage() {
   return render(
     <MemoryRouter>
-      <HomeViewPage />
+      <SessionHistoryPage />
     </MemoryRouter>
   );
 }
 
-/** Expand the history panel, select the saved combination and wait for the modal */
+/** Select the saved combination and wait for the confirmation modal */
 async function openRecreationConfirm(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
-  // Scope to the panel row: the modal keeps a hidden copy of the activity name
   const entryRow = await screen.findByText(/Raum A · /);
   await user.click(entryRow.closest('button')!);
   await waitFor(() => {
-    expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
+    expect(screen.getByText('Neue Aufsicht starten?')).toBeInTheDocument();
   });
 }
 
@@ -108,7 +105,15 @@ async function confirmRecreation(user: ReturnType<typeof userEvent.setup>) {
   await user.click(startButtons[startButtons.length - 1]);
 }
 
-describe('HomeViewPage session recreation behavior', () => {
+/**
+ * Invalidate the in-flight recreation the same way a logout does
+ * (performLogout on the home page calls invalidateSessionRecreation).
+ */
+function invalidateLikeLogout() {
+  useUserStore.getState().invalidateSessionRecreation();
+}
+
+describe('SessionHistoryPage session recreation behavior', () => {
   beforeEach(() => {
     mockNavigate.mockClear();
     mockedApi.startSession.mockReset();
@@ -125,9 +130,7 @@ describe('HomeViewPage session recreation behavior', () => {
         { id: 1, name: 'Frau Müller' },
         { id: 2, name: 'Herr Schmidt' },
       ] as never[],
-      fetchCurrentSession: vi.fn(() => Promise.resolve()),
       loadSessionSettings: vi.fn(() => Promise.resolve()),
-      logout: vi.fn(() => Promise.resolve()),
       validateAndRecreateSession: vi.fn(() => Promise.resolve({ status: 'success' as const })),
       saveLastSessionData: vi.fn(() => Promise.resolve()),
       removeSessionHistoryEntry: vi.fn(() => Promise.resolve()),
@@ -194,7 +197,7 @@ describe('HomeViewPage session recreation behavior', () => {
   // Request-id race guard: stale async responses are discarded
   // =========================================================================
 
-  it('discards a stale error response after logout invalidated the request id', async () => {
+  it('discards a stale error response after an invalidation (logout) while in flight', async () => {
     let rejectStart: (error: unknown) => void = () => {};
     mockedApi.startSession.mockImplementationOnce(
       () =>
@@ -211,11 +214,8 @@ describe('HomeViewPage session recreation behavior', () => {
       expect(mockedApi.startSession).toHaveBeenCalled();
     });
 
-    // Logout while the recreation request is still in flight invalidates it
-    await user.click(screen.getByText('Abmelden'));
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/');
-    });
+    // A logout elsewhere invalidates the in-flight recreation request
+    invalidateLikeLogout();
 
     // Now the stale request fails; the error must be discarded silently
     rejectStart(new Error('Stale server error'));
@@ -225,10 +225,10 @@ describe('HomeViewPage session recreation behavior', () => {
       0
     );
     // The confirmation modal state is left untouched by the stale response
-    expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
+    expect(screen.getByText('Neue Aufsicht starten?')).toBeInTheDocument();
   });
 
-  it('discards a stale success response after logout invalidated the request id', async () => {
+  it('discards a stale success response after an invalidation (logout) while in flight', async () => {
     let resolveStart: (value: typeof startResponse) => void = () => {};
     mockedApi.startSession.mockImplementationOnce(
       () =>
@@ -245,11 +245,8 @@ describe('HomeViewPage session recreation behavior', () => {
       expect(mockedApi.startSession).toHaveBeenCalled();
     });
 
-    // Logout invalidates the request id while the request is in flight
-    await user.click(screen.getByText('Abmelden'));
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/');
-    });
+    // A logout elsewhere invalidates the in-flight recreation request
+    invalidateLikeLogout();
 
     // Now the stale request succeeds; the success must be discarded silently
     resolveStart(startResponse);
@@ -257,7 +254,7 @@ describe('HomeViewPage session recreation behavior', () => {
 
     expect(mockNavigate).not.toHaveBeenCalledWith('/nfc-scanning');
     // The confirmation modal state is left untouched by the stale response
-    expect(screen.getByText('Aufsicht wiederholen?')).toBeInTheDocument();
+    expect(screen.getByText('Neue Aufsicht starten?')).toBeInTheDocument();
   });
 
   it('discards a stale error when a second recreation attempt superseded the first', async () => {
@@ -332,7 +329,7 @@ describe('HomeViewPage session recreation behavior', () => {
     expect(mockedApi.startSession).toHaveBeenCalledTimes(1);
   });
 
-  it('does not repopulate the store from a stale success after logout', async () => {
+  it('does not repopulate the store from a stale success after an invalidation', async () => {
     const saveLastSessionData = vi.fn(() => Promise.resolve());
     useUserStore.setState({ saveLastSessionData });
 
@@ -352,11 +349,8 @@ describe('HomeViewPage session recreation behavior', () => {
       expect(mockedApi.startSession).toHaveBeenCalled();
     });
 
-    // Logout invalidates the request id while the request is in flight
-    await user.click(screen.getByText('Abmelden'));
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/');
-    });
+    // A logout elsewhere invalidates the in-flight recreation request
+    invalidateLikeLogout();
 
     // The stale success must not write session state or persist session data
     resolveStart(startResponse);
@@ -398,7 +392,6 @@ describe('HomeViewPage session recreation behavior', () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
     const deletedRow = await screen.findByText(/Raum A · /);
     await user.click(deletedRow.closest('button')!);
 
@@ -412,8 +405,7 @@ describe('HomeViewPage session recreation behavior', () => {
       useUserStore.getState().sessionSettings?.session_history.map(e => e.activity_id)
     ).toEqual([11]);
 
-    // Reopening the panel shows the valid entry but not the deleted one
-    await user.click(screen.getByRole('button', { name: 'Letzte Aufsichten' }));
+    // The list shows the valid entry but not the deleted one
     expect(await screen.findByText(/Turnhalle · /)).toBeInTheDocument();
     expect(screen.queryByText(/Raum A · /)).not.toBeInTheDocument();
   });

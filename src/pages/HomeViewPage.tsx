@@ -1,22 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { SessionHistoryPanel } from '../components/SessionHistoryPanel';
-import {
-  ContactlessPaymentIcon,
-  ErrorModal,
-  ModalBase,
-  ModalActionButtons,
-} from '../components/ui';
-import {
-  api,
-  getNetworkErrorMessage,
-  isNetworkRelatedError,
-  mapServerErrorToGerman,
-  type CurrentSession,
-} from '../services/api';
-import type { SessionHistoryEntry } from '../services/sessionStorage';
+import { ContactlessPaymentIcon, ModalBase, ModalActionButtons } from '../components/ui';
+import { api, type CurrentSession } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
@@ -25,24 +14,15 @@ const logger = createLogger('HomeViewPage');
 
 /** User-facing German UI copy for this page */
 const texts = {
-  recreationErrorFallback: 'Fehler beim Starten der Aktivität',
   activityFallback: 'Aktivität',
   startSessionHeading: 'Aufsicht starten',
   continueSubtitle: 'Fortsetzen',
-  validationFailedFallback:
-    'Die gespeicherte Sitzung konnte nicht überprüft werden. Bitte Verbindung prüfen oder Sitzung neu erstellen.',
-  incompleteSessionDataError:
-    'Die gespeicherten Sitzungsdaten sind unvollständig. Bitte wählen Sie Aktivität, Raum und Betreuer neu aus.',
+  historyButton: 'Letzte Aufsichten',
   tagAssignmentButton: 'Armband identifizieren',
   endSessionButton: 'Aufsicht beenden',
   logoutButton: 'Abmelden',
   menuHeading: 'Menü',
   teamManagementButton: 'Team anpassen',
-  recreationConfirmHeading: 'Aufsicht wiederholen?',
-  roomLabel: 'Raum:',
-  supervisorsLabel: 'Betreuer:',
-  recreationConfirmButton: 'Aufsicht starten',
-  recreationLoadingButton: 'Starte...',
   endSessionConfirmHeading: 'Aufsicht beenden?',
   endSessionWarningPrefix: 'Alle Kinder, die in dieser Aufsicht sind, werden auf den Status',
   endSessionWarningHighlight: 'unterwegs',
@@ -53,14 +33,6 @@ const texts = {
 // ============================================================================
 // Pure helper functions (moved outside component to reduce cognitive complexity)
 // ============================================================================
-
-/** Format session recreation error message for display */
-function formatRecreationError(error: unknown): string {
-  const rawMessage = error instanceof Error ? error.message : texts.recreationErrorFallback;
-  return isNetworkRelatedError(error)
-    ? getNetworkErrorMessage('sessionStart')
-    : mapServerErrorToGerman(rawMessage);
-}
 
 /** Get appropriate activity icon based on session state */
 function getActivityIcon(currentSession: CurrentSession | null): React.ReactNode {
@@ -115,31 +87,17 @@ function HomeViewPage() {
   const {
     authenticatedUser,
     currentSession,
+    sessionSettings,
     logout,
     fetchCurrentSession,
     loadSessionSettings,
-    validateAndRecreateSession,
-    isValidatingLastSession,
-    recreateSession,
     invalidateSessionRecreation,
   } = useUserStore();
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
-  const [showErrorModal, setShowErrorModal] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
-  const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
-  const [pendingEntry, setPendingEntry] = useState<SessionHistoryEntry | null>(null);
-  const isMountedRef = useRef(true);
 
-  useEffect(() => {
-    isMountedRef.current = true;
-    return () => {
-      isMountedRef.current = false;
-      invalidateSessionRecreation();
-    };
-  }, [invalidateSessionRecreation]);
+  const hasHistory = (sessionSettings?.session_history.length ?? 0) > 0;
 
   // Helper to end the current session
   const endCurrentSession = async () => {
@@ -156,7 +114,6 @@ function HomeViewPage() {
   // Helper to perform user logout
   const performLogout = async () => {
     invalidateSessionRecreation();
-    setIsNavigatingToScanning(false);
     logUserAction('User logout initiated');
     await logout();
     logNavigation('Home View', '/');
@@ -165,7 +122,6 @@ function HomeViewPage() {
 
   const handleLogout = async () => {
     setTouchedButton(null);
-    if (isValidatingLastSession) return;
     if (currentSession) {
       setShowEndSessionModal(true);
     } else {
@@ -184,33 +140,15 @@ function HomeViewPage() {
     void navigate('/tag-assignment');
   };
 
-  // Helper to handle history entry recreation attempt
-  const handleHistorySelect = async (entry: SessionHistoryEntry) => {
-    logUserAction('Attempting to recreate session from history', {
-      activityId: entry.activity_id,
-      roomId: entry.room_id,
-    });
-    setPendingEntry(entry);
-    const outcome = await validateAndRecreateSession(entry);
-
-    if (!isMountedRef.current || outcome.status === 'stale') {
-      return;
-    }
-
-    if (outcome.status === 'success') {
-      setShowConfirmModal(true);
-      return;
-    }
-
-    const latestError = useUserStore.getState().error ?? texts.validationFailedFallback;
-    setErrorMessage(latestError);
-    setShowErrorModal(true);
-    setShowConfirmModal(false);
-  };
-
   const handleStartActivity = () => {
     logNavigation('Home View', '/activity-selection');
     void navigate('/activity-selection');
+  };
+
+  const handleSessionHistory = () => {
+    setTouchedButton(null);
+    logNavigation('Home View', '/session-history');
+    void navigate('/session-history');
   };
 
   const handleContinueActivity = () => {
@@ -232,53 +170,6 @@ function HomeViewPage() {
     setTouchedButton(null);
     logNavigation('Home View', '/staff-clock');
     void navigate('/staff-clock');
-  };
-
-  // Helper to show error and close confirm modal
-  const showRecreationError = (message: string) => {
-    setErrorMessage(message);
-    setShowErrorModal(true);
-    setShowConfirmModal(false);
-  };
-
-  const handleConfirmRecreation = async () => {
-    if (!authenticatedUser || !pendingEntry) return;
-    // Only one recreation request may be in flight; a duplicate submit would
-    // mark the first request stale and then fail with a 409 conflict.
-    if (isNavigatingToScanning) return;
-
-    setIsNavigatingToScanning(true);
-    const outcome = await recreateSession();
-
-    if (outcome.status === 'incomplete') {
-      setIsNavigatingToScanning(false);
-      showRecreationError(texts.incompleteSessionDataError);
-      return;
-    }
-
-    if (outcome.status === 'error') {
-      // Stale responses (superseded attempt or logout) are discarded
-      if (!isMountedRef.current || outcome.stale) {
-        return;
-      }
-      setIsNavigatingToScanning(false);
-      showRecreationError(formatRecreationError(outcome.error));
-      return;
-    }
-
-    // Stale responses (superseded attempt or logout) are discarded
-    if (!isMountedRef.current || outcome.stale) {
-      return;
-    }
-
-    logUserAction('Session recreated successfully', {
-      sessionId: outcome.session.active_group_id,
-    });
-
-    logNavigation('Home View', '/nfc-scanning');
-    void navigate('/nfc-scanning');
-
-    setShowConfirmModal(false);
   };
 
   // Redirect to login if no authenticated user and fetch current session
@@ -363,10 +254,7 @@ function HomeViewPage() {
           <button
             type="button"
             onClick={handleLogout}
-            disabled={isValidatingLastSession}
-            onTouchStart={() => {
-              if (!isValidatingLastSession) setTouchedButton('logout');
-            }}
+            onTouchStart={() => setTouchedButton('logout')}
             onTouchEnd={() => setTouchedButton(null)}
             onTouchCancel={() => setTouchedButton(null)}
             onPointerLeave={() =>
@@ -383,12 +271,11 @@ function HomeViewPage() {
                 touchedButton === 'logout' ? designSystem.pastel.red.bg : designSystem.colors.white,
               border: `1px solid ${designSystem.pastel.red.accent}`,
               borderRadius: '34px',
-              cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
+              cursor: 'pointer',
               transition: designSystem.transitions.base,
               outline: 'none',
               boxShadow: designSystem.shadows.sm,
               transform: touchedButton === 'logout' ? designSystem.scales.activeSmall : 'scale(1)',
-              opacity: isValidatingLastSession ? 0.6 : 1,
             }}
           >
             <svg
@@ -412,9 +299,7 @@ function HomeViewPage() {
                 color: designSystem.pastel.red.accent,
               }}
             >
-              {currentSession && !isNavigatingToScanning
-                ? texts.endSessionButton
-                : texts.logoutButton}
+              {currentSession ? texts.endSessionButton : texts.logoutButton}
             </span>
           </button>
         </div>
@@ -459,74 +344,124 @@ function HomeViewPage() {
                 marginBottom: '24px',
               }}
             >
-              {/* Activity Button - Phoenix Clean Style */}
-              <button
-                onClick={currentSession ? handleContinueActivity : handleStartActivity}
-                onTouchStart={() => setTouchedButton('activity')}
-                onTouchEnd={() => setTouchedButton(null)}
-                disabled={isValidatingLastSession}
+              {/* Activity column: main card plus history shortcut below */}
+              <div
                 style={{
-                  backgroundColor: designSystem.surface.background,
-                  border: `1px solid ${designSystem.surface.border}`,
-                  borderRadius: designSystem.surface.borderRadius,
-                  padding: '36px',
-                  transition: designSystem.transitions.base,
-                  outline: 'none',
-                  minHeight: '320px',
                   display: 'flex',
                   flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '16px',
-                  transform: touchedButton === 'activity' ? 'scale(0.98)' : 'scale(1)',
-                  boxShadow:
-                    touchedButton === 'activity'
-                      ? '0 1px 2px rgba(0, 0, 0, 0.06)'
-                      : designSystem.surface.shadow,
-                  opacity: isValidatingLastSession ? 0.7 : 1,
-                  cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
+                  gap: '12px',
+                  minHeight: '320px',
                 }}
               >
-                {/* Content */}
-                <div>
-                  <div
+                {/* Activity Button - Phoenix Clean Style */}
+                <button
+                  onClick={currentSession ? handleContinueActivity : handleStartActivity}
+                  onTouchStart={() => setTouchedButton('activity')}
+                  onTouchEnd={() => setTouchedButton(null)}
+                  style={{
+                    flex: 1,
+                    backgroundColor: designSystem.surface.background,
+                    border: `1px solid ${designSystem.surface.border}`,
+                    borderRadius: designSystem.surface.borderRadius,
+                    padding: '36px',
+                    transition: designSystem.transitions.base,
+                    outline: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '16px',
+                    transform: touchedButton === 'activity' ? 'scale(0.98)' : 'scale(1)',
+                    boxShadow:
+                      touchedButton === 'activity'
+                        ? '0 1px 2px rgba(0, 0, 0, 0.06)'
+                        : designSystem.surface.shadow,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {/* Content */}
+                  <div>
+                    <div
+                      style={{
+                        width: '88px',
+                        height: '88px',
+                        backgroundColor: designSystem.brand.greenTint,
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px',
+                      }}
+                    >
+                      {getActivityIcon(currentSession)}
+                    </div>
+
+                    <h3
+                      style={{
+                        fontSize: '28px',
+                        fontWeight: 600,
+                        color: designSystem.gray[900],
+                        margin: '0 0 8px 0',
+                        textAlign: 'center',
+                      }}
+                    >
+                      {getActivityHeading(currentSession)}
+                    </h3>
+                    <p
+                      style={{
+                        fontSize: '18px',
+                        color: designSystem.gray[500],
+                        margin: 0,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {getActivitySubtitle(currentSession)}
+                    </p>
+                  </div>
+                </button>
+
+                {/* History shortcut: opens the page with the recent combinations */}
+                {!currentSession && hasHistory && (
+                  <button
+                    type="button"
+                    onClick={handleSessionHistory}
+                    onTouchStart={() => setTouchedButton('history')}
+                    onTouchEnd={() => setTouchedButton(null)}
+                    onTouchCancel={() => setTouchedButton(null)}
                     style={{
-                      width: '88px',
-                      height: '88px',
-                      backgroundColor: designSystem.brand.greenTint,
-                      borderRadius: '50%',
+                      height: '64px',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      margin: '0 auto 16px',
+                      gap: '12px',
+                      backgroundColor:
+                        touchedButton === 'history'
+                          ? designSystem.gray[100]
+                          : designSystem.colors.white,
+                      border: `1px solid ${designSystem.gray[200]}`,
+                      borderRadius: designSystem.surface.borderRadius,
+                      cursor: 'pointer',
+                      transition: designSystem.transitions.base,
+                      outline: 'none',
+                      boxShadow: designSystem.shadows.sm,
                     }}
                   >
-                    {getActivityIcon(currentSession)}
-                  </div>
-
-                  <h3
-                    style={{
-                      fontSize: '28px',
-                      fontWeight: 600,
-                      color: designSystem.gray[900],
-                      margin: '0 0 8px 0',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {getActivityHeading(currentSession)}
-                  </h3>
-                  <p
-                    style={{
-                      fontSize: '18px',
-                      color: designSystem.gray[500],
-                      margin: 0,
-                      textAlign: 'center',
-                    }}
-                  >
-                    {getActivitySubtitle(currentSession)}
-                  </p>
-                </div>
-              </button>
+                    <FontAwesomeIcon
+                      icon={faClockRotateLeft}
+                      style={{ fontSize: '20px', color: designSystem.gray[700] }}
+                    />
+                    <span
+                      style={{
+                        fontSize: '20px',
+                        fontWeight: 600,
+                        color: designSystem.gray[700],
+                      }}
+                    >
+                      {texts.historyButton}
+                    </span>
+                  </button>
+                )}
+              </div>
 
               {/* Team Management Button - Phoenix Clean Style */}
               <button
@@ -668,14 +603,6 @@ function HomeViewPage() {
             </button>
           </div>
         </div>
-
-        {/* Session history panel - only show when no current session */}
-        {!currentSession && (
-          <SessionHistoryPanel
-            onSelect={entry => void handleHistorySelect(entry)}
-            disabled={isValidatingLastSession}
-          />
-        )}
       </div>
 
       {/* Add animation keyframes */}
@@ -694,126 +621,6 @@ function HomeViewPage() {
           }
         `}
       </style>
-
-      {/* Error Modal */}
-      <ErrorModal
-        isOpen={showErrorModal}
-        onClose={() => setShowErrorModal(false)}
-        message={errorMessage}
-        autoCloseDelay={3000}
-      />
-
-      {/* Confirmation Modal for Recreation */}
-      <ModalBase
-        isOpen={showConfirmModal && !!pendingEntry}
-        onClose={() => setShowConfirmModal(false)}
-        size="sm"
-        backgroundColor={designSystem.colors.white}
-        closeOnBackdropClick={!isValidatingLastSession && !isNavigatingToScanning}
-      >
-        {/* Success Icon - pastel green pair (design-review v2) */}
-        <div
-          style={{
-            width: '64px',
-            height: '64px',
-            background: designSystem.brand.greenTint,
-            borderRadius: '50%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 24px auto',
-          }}
-        >
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
-            <path
-              d="M5 12l5 5L20 7"
-              stroke={designSystem.pastel.green.accent}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </div>
-
-        {/* Title */}
-        <h2
-          style={{
-            fontSize: '24px',
-            fontWeight: 600,
-            color: designSystem.gray[900],
-            marginBottom: '12px',
-          }}
-        >
-          {texts.recreationConfirmHeading}
-        </h2>
-
-        {/* Activity Details */}
-        {useUserStore.getState().selectedActivity && useUserStore.getState().selectedRoom && (
-          <div style={{ marginBottom: '24px' }}>
-            <div
-              style={{
-                fontSize: '18px',
-                fontWeight: 600,
-                color: designSystem.gray[700],
-                marginBottom: '16px',
-              }}
-            >
-              {useUserStore.getState().selectedActivity?.name}
-            </div>
-
-            <div
-              style={{
-                backgroundColor: designSystem.gray[100],
-                borderRadius: designSystem.borderRadius.lg,
-                padding: '16px',
-                textAlign: 'left',
-              }}
-            >
-              <div style={{ marginBottom: '8px' }}>
-                <span style={{ color: designSystem.gray[500], fontSize: '14px' }}>
-                  {texts.roomLabel}
-                </span>
-                <span
-                  style={{
-                    color: designSystem.gray[800],
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    marginLeft: '8px',
-                  }}
-                >
-                  {useUserStore.getState().selectedRoom?.name}
-                </span>
-              </div>
-              <div>
-                <span style={{ color: designSystem.gray[500], fontSize: '14px' }}>
-                  {texts.supervisorsLabel}
-                </span>
-                <span
-                  style={{
-                    color: designSystem.gray[800],
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    marginLeft: '8px',
-                  }}
-                >
-                  {useUserStore
-                    .getState()
-                    .selectedSupervisors.map(s => s.name)
-                    .join(', ')}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <ModalActionButtons
-          onCancel={() => setShowConfirmModal(false)}
-          onConfirm={handleConfirmRecreation}
-          isLoading={isValidatingLastSession || isNavigatingToScanning}
-          confirmLabel={texts.recreationConfirmButton}
-          loadingLabel={texts.recreationLoadingButton}
-        />
-      </ModalBase>
 
       {/* End Session Confirmation Modal */}
       <ModalBase
