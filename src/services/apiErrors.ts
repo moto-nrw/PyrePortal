@@ -110,6 +110,11 @@ export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   ],
   ['no active session to end', 'Keine aktive Sitzung zum Beenden vorhanden.'],
   ['no active session', 'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.'],
+  // Backend services/active: no room was sent and the activity has no planned room
+  [
+    'no room available',
+    'Für diese Aktivität ist kein Raum hinterlegt. Bitte einen Raum auswählen.',
+  ],
   ['invalid session ID', 'Ungültige Sitzungs-ID.'],
   ['activity_id is required', 'Aktivität muss ausgewählt werden.'],
   ['at least one supervisor', 'Mindestens ein Betreuer muss ausgewählt werden.'], // Matches both variants

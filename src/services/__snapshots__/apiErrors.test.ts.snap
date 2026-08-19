@@ -66,6 +66,10 @@ exports[`ERROR_MESSAGE_MAPPINGS backend contract > keeps all patterns and German
     "Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.",
   ],
   [
+    "no room available",
+    "Für diese Aktivität ist kein Raum hinterlegt. Bitte einen Raum auswählen.",
+  ],
+  [
     "invalid session ID",
     "Ungültige Sitzungs-ID.",
   ],
