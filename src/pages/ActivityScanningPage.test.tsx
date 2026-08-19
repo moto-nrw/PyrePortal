@@ -1050,10 +1050,10 @@ describe('ActivityScanningPage', () => {
   });
 
   // =======================================================================
-  // nach Hause + feedback flow
+  // nach Hause flow
   // =======================================================================
 
-  it('handles nach Hause click and shows feedback prompt', async () => {
+  it('handles nach Hause click and shows the farewell', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.toggleAttendance.mockResolvedValueOnce({
       status: 'confirmed',
@@ -1086,18 +1086,13 @@ describe('ActivityScanningPage', () => {
       );
     });
 
-    // After successful daily checkout, feedback prompt should show
+    // After a successful daily checkout the farewell shows immediately
     await waitFor(() => {
-      expect(screen.getByText('Wie war dein Tag, Lisa?')).toBeInTheDocument();
+      expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
     });
-
-    // Feedback buttons should be visible
-    expect(screen.getByText('Gut')).toBeInTheDocument();
-    expect(screen.getByText('Okay')).toBeInTheDocument();
-    expect(screen.getByText('Schlecht')).toBeInTheDocument();
   });
 
-  it('shows feedback prompt even when toggleAttendance fails', async () => {
+  it('shows the farewell even when toggleAttendance fails', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.toggleAttendance.mockRejectedValueOnce(new Error('Server error'));
 
@@ -1117,72 +1112,11 @@ describe('ActivityScanningPage', () => {
     await user.click(screen.getByText('nach Hause'));
 
     await waitFor(() => {
-      expect(screen.getByText('Wie war dein Tag, Lisa?')).toBeInTheDocument();
-    });
-  });
-
-  it('skips feedback and shows farewell when backend disables feedback', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({
-      status: 'confirmed',
-      message: 'Daily checkout confirmed',
-      data: {
-        feedback_enabled: false,
-      },
-    } as never);
-
-    mockRfidHookReturn = {
-      ...mockRfidHookReturn,
-      currentScan: {
-        student_id: 42,
-        student_name: 'Lisa Schmidt',
-        action: 'checked_out',
-        daily_checkout_available: true,
-        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-      },
-      showModal: true,
-    };
-
-    renderPage();
-    await user.click(screen.getByText('nach Hause'));
-
-    await waitFor(() => {
       expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
     });
-
-    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
-    expect(screen.queryByText('Gut')).not.toBeInTheDocument();
   });
 
-  it('skips feedback after checkout confirmation fails when scan disables feedback', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockRejectedValueOnce(new Error('Server error'));
-
-    mockRfidHookReturn = {
-      ...mockRfidHookReturn,
-      currentScan: {
-        student_id: 42,
-        student_name: 'Lisa Schmidt',
-        action: 'checked_out',
-        daily_checkout_available: true,
-        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-        feedback_enabled: false,
-      },
-      showModal: true,
-    };
-
-    renderPage();
-    await user.click(screen.getByText('nach Hause'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
-    });
-
-    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
-    expect(screen.queryByText('Gut')).not.toBeInTheDocument();
-  });
-
-  it('keeps the new scan visible when feedback is disabled after checkout state was cleared', async () => {
+  it('keeps the new scan visible after the checkout state was cleared', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     let resolveToggleAttendance: ((value: unknown) => void) | undefined;
 
@@ -1238,19 +1172,15 @@ describe('ActivityScanningPage', () => {
       resolveToggleAttendance?.({
         status: 'confirmed',
         message: 'Daily checkout confirmed',
-        data: {
-          feedback_enabled: false,
-        },
       });
       await Promise.resolve();
     });
 
     expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
     expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
-    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
   });
 
-  it('keeps the new scan visible when failed checkout confirmation falls back to disabled feedback', async () => {
+  it('keeps the new scan visible when the checkout confirmation fails', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     let rejectToggleAttendance: ((reason?: unknown) => void) | undefined;
 
@@ -1269,7 +1199,6 @@ describe('ActivityScanningPage', () => {
         action: 'checked_out',
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-        feedback_enabled: false,
         visit_id: 100,
       },
       showModal: true,
@@ -1313,162 +1242,6 @@ describe('ActivityScanningPage', () => {
     });
 
     expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
-    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
-  });
-
-  it('submits positive feedback and shows farewell', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({
-      status: 'confirmed',
-      message: 'ok',
-    } as never);
-
-    // Mock submitDailyFeedback on the store
-    const mockSubmitFeedback = vi.fn().mockResolvedValue(true);
-    useUserStore.setState({ submitDailyFeedback: mockSubmitFeedback });
-
-    mockRfidHookReturn = {
-      ...mockRfidHookReturn,
-      currentScan: {
-        student_id: 42,
-        student_name: 'Lisa Schmidt',
-        action: 'checked_out',
-        daily_checkout_available: true,
-        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-      },
-      showModal: true,
-    };
-
-    renderPage();
-
-    // First click nach Hause
-    await user.click(screen.getByText('nach Hause'));
-    await waitFor(() => {
-      expect(screen.getByText('Gut')).toBeInTheDocument();
-    });
-
-    // Then click Gut feedback
-    await user.click(screen.getByText('Gut'));
-
-    // Should show farewell
-    await waitFor(() => {
-      expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
-    });
-  });
-
-  it('submits neutral feedback and shows farewell', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({
-      status: 'confirmed',
-      message: 'ok',
-    } as never);
-
-    const mockSubmitFeedback = vi.fn().mockResolvedValue(true);
-    useUserStore.setState({ submitDailyFeedback: mockSubmitFeedback });
-
-    mockRfidHookReturn = {
-      ...mockRfidHookReturn,
-      currentScan: {
-        student_id: 42,
-        student_name: 'Lisa Schmidt',
-        action: 'checked_out',
-        daily_checkout_available: true,
-        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-      },
-      showModal: true,
-    };
-
-    renderPage();
-    await user.click(screen.getByText('nach Hause'));
-    await waitFor(() => expect(screen.getByText('Okay')).toBeInTheDocument());
-    await user.click(screen.getByText('Okay'));
-    await waitFor(() => expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument());
-  });
-
-  it('submits negative feedback and shows farewell', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({
-      status: 'confirmed',
-      message: 'ok',
-    } as never);
-
-    const mockSubmitFeedback = vi.fn().mockResolvedValue(true);
-    useUserStore.setState({ submitDailyFeedback: mockSubmitFeedback });
-
-    mockRfidHookReturn = {
-      ...mockRfidHookReturn,
-      currentScan: {
-        student_id: 42,
-        student_name: 'Lisa Schmidt',
-        action: 'checked_out',
-        daily_checkout_available: true,
-        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-      },
-      showModal: true,
-    };
-
-    renderPage();
-    await user.click(screen.getByText('nach Hause'));
-    await waitFor(() => expect(screen.getByText('Schlecht')).toBeInTheDocument());
-    await user.click(screen.getByText('Schlecht'));
-    await waitFor(() => expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument());
-  });
-
-  it('shows farewell even when feedback submission fails', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({
-      status: 'confirmed',
-      message: 'ok',
-    } as never);
-
-    const mockSubmitFeedback = vi.fn().mockResolvedValue(false);
-    useUserStore.setState({ submitDailyFeedback: mockSubmitFeedback });
-
-    mockRfidHookReturn = {
-      ...mockRfidHookReturn,
-      currentScan: {
-        student_id: 42,
-        student_name: 'Lisa Schmidt',
-        action: 'checked_out',
-        daily_checkout_available: true,
-        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-      },
-      showModal: true,
-    };
-
-    renderPage();
-    await user.click(screen.getByText('nach Hause'));
-    await waitFor(() => expect(screen.getByText('Gut')).toBeInTheDocument());
-    await user.click(screen.getByText('Gut'));
-    await waitFor(() => expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument());
-  });
-
-  it('skips feedback when student_id is null', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockedApi.toggleAttendance.mockResolvedValueOnce({
-      status: 'confirmed',
-      message: 'ok',
-    } as never);
-
-    mockRfidHookReturn = {
-      ...mockRfidHookReturn,
-      currentScan: {
-        student_id: null,
-        student_name: 'Unknown Student',
-        action: 'checked_out',
-        daily_checkout_available: true,
-        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-      },
-      showModal: true,
-    };
-
-    renderPage();
-    await user.click(screen.getByText('nach Hause'));
-    await waitFor(() => expect(screen.getByText('Gut')).toBeInTheDocument());
-
-    // Clicking feedback with null student_id should skip directly to farewell
-    await user.click(screen.getByText('Gut'));
-    await waitFor(() => expect(screen.getByText('Tschüss, Unknown!')).toBeInTheDocument());
   });
 
   // =======================================================================

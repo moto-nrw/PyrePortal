@@ -129,18 +129,6 @@ exports[`ERROR_MESSAGE_MAPPINGS backend contract > keeps all patterns and German
     "Mitarbeiter hat kein Armband zugewiesen.",
   ],
   [
-    "student_id is required",
-    "Schüler-ID fehlt.",
-  ],
-  [
-    "value is required",
-    "Bewertung fehlt.",
-  ],
-  [
-    "student not found",
-    "Schüler nicht gefunden.",
-  ],
-  [
     "room_id is required for check-in",
     "Raum muss für Check-in ausgewählt werden.",
   ],

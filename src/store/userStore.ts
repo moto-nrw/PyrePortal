@@ -5,7 +5,6 @@ import {
   type Room,
   type CurrentSession,
   type RfidScanResult,
-  type DailyFeedbackRating,
 } from '../services/api';
 import type {
   SessionRecreationOutcome,
@@ -108,9 +107,6 @@ export interface UserState {
   // Network status actions
   setNetworkStatus: (status: NetworkStatusData) => void;
   updateNetworkQuality: (quality: NetworkStatusData['quality'], responseTime: number) => void;
-
-  // Daily feedback action
-  submitDailyFeedback: (studentId: number, rating: DailyFeedbackRating) => Promise<boolean>;
 
   // Session state cleanup action
   clearSessionState: () => void;

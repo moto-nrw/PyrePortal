@@ -1,10 +1,4 @@
-import {
-  faClock,
-  faFaceSmile,
-  faFaceMeh,
-  faFaceFrown,
-  faRestroom,
-} from '@fortawesome/free-solid-svg-icons';
+import { faClock, faRestroom } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 import { useNavigate } from 'react-router';
@@ -13,7 +7,7 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { HouseLineIcon, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { useActivityScanningPage } from '../hooks/pages/useActivityScanningPage';
-import { formatRoomName, type DailyFeedbackRating } from '../services/api';
+import { formatRoomName } from '../services/api';
 import { designSystem } from '../styles/designSystem';
 
 /** User-facing German UI copy for this page */
@@ -22,9 +16,6 @@ const texts = {
   backToHomeButton: 'Zurück zur Startseite',
   pickupTimeLoading: 'Abholzeit wird geladen...',
   pickupQueryScanPrompt: 'Bitte halte dein Armband an das Lesegerät.',
-  feedbackPositive: 'Gut',
-  feedbackNeutral: 'Okay',
-  feedbackNegative: 'Schlecht',
   destinationRaumwechsel: 'Raumwechsel',
   destinationSchulhof: 'Schulhof',
   destinationToilette: 'Toilette',
@@ -40,7 +31,6 @@ const texts = {
   pickupQueryAriaLabel: 'Abholzeit abfragen',
   unknownRoom: 'Unbekannt',
   pickupQueryHeading: 'Abholzeit abfragen',
-  feedbackHeading: (firstName: string) => `Wie war dein Tag, ${firstName}?`,
   farewellHeading: (firstName: string) => `Tschüss, ${firstName}!`,
   supervisorRoomFallback: 'diesen Raum',
   supervisorHeading: (name: string, roomName: string) => `${name} betreut jetzt ${roomName}`,
@@ -48,44 +38,6 @@ const texts = {
   checkinGreeting: (name: string) => `Hallo, ${name}!`,
   destinationQuestionHeading: (firstName: string) => `Wohin geht ${firstName}?`,
 } as const;
-
-// Feedback modal is white; the three emojis carry the only color accents
-// (pastel family accents: green, amber, red).
-const FEEDBACK_BUTTON_COLORS = {
-  positive: designSystem.pastel.green.accent,
-  neutral: designSystem.pastel.amber.accent,
-  negative: designSystem.pastel.red.accent,
-} as const;
-
-// Button style constants for consistent styling (matching Check In/Check Out modal patterns)
-const FEEDBACK_BUTTON_STYLES = {
-  base: {
-    borderRadius: '20px',
-    backgroundColor: designSystem.colors.white,
-    color: designSystem.gray[700],
-    padding: '24px 0',
-    cursor: 'pointer',
-    transition: 'all 200ms',
-    outline: 'none',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    gap: '12px',
-    // Fixed width keeps all three buttons the same size regardless of label
-    // (168px x3 + 2x24px gap fits the lg modal content width without wrapping)
-    width: '168px',
-    borderWidth: '3px',
-    borderStyle: 'solid' as const,
-    borderColor: designSystem.gray[200],
-  },
-  hover: {
-    transform: 'scale(1.05)',
-  },
-  normal: {
-    transform: 'scale(1)',
-  },
-};
 
 const DESTINATION_BUTTON_STYLES = {
   base: {
@@ -242,13 +194,6 @@ function DestinationButton({
   );
 }
 
-// Button configuration arrays
-const feedbackButtons = [
-  { rating: 'positive' as DailyFeedbackRating, icon: faFaceSmile, label: texts.feedbackPositive },
-  { rating: 'neutral' as DailyFeedbackRating, icon: faFaceMeh, label: texts.feedbackNeutral },
-  { rating: 'negative' as DailyFeedbackRating, icon: faFaceFrown, label: texts.feedbackNegative },
-];
-
 const ActivityScanningPage: React.FC = () => {
   const navigate = useNavigate();
   const {
@@ -266,9 +211,7 @@ const ActivityScanningPage: React.FC = () => {
     schulhofRoomId,
     wcRoomId,
     deviceConfig,
-    showFeedbackPrompt,
     handleNachHause,
-    handleFeedbackSubmit,
     isAwaitingPickupQueryScan,
     isPickupQueryLoading,
     isPickupQueryPromptOpen,
@@ -348,9 +291,7 @@ const ActivityScanningPage: React.FC = () => {
       : designSystem.pastel.orange;
   })();
 
-  // The feedback prompt is the exception: white modal, neutral chrome, and the
-  // three emojis carry the only color accents.
-  const modalTextColor = showFeedbackPrompt ? designSystem.gray[900] : scanFamily.accent;
+  const modalTextColor = scanFamily.accent;
 
   // Helper function to render modal content area - extracted to avoid nested ternaries
   const renderModalContent = () => {
@@ -386,66 +327,6 @@ const ActivityScanningPage: React.FC = () => {
           }}
         >
           {texts.pickupQueryScanPrompt}
-        </div>
-      );
-    }
-
-    // Feedback prompt UI - styled to match Check In/Check Out modals
-    if (showFeedbackPrompt) {
-      return (
-        <div
-          style={{
-            position: 'relative',
-            zIndex: 2,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-          }}
-        >
-          {/* Feedback buttons container - centered with consistent spacing */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '24px',
-              justifyContent: 'center',
-              flexWrap: 'wrap',
-            }}
-          >
-            {feedbackButtons.map(({ rating, icon, label }) => {
-              const emojiColor = FEEDBACK_BUTTON_COLORS[rating];
-              return (
-                <button
-                  key={rating}
-                  onClick={() => handleFeedbackSubmit(rating)}
-                  style={FEEDBACK_BUTTON_STYLES.base}
-                  onPointerDown={e => {
-                    e.currentTarget.style.backgroundColor = designSystem.gray[50];
-                    e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.hover.transform;
-                  }}
-                  onPointerUp={e => {
-                    e.currentTarget.style.backgroundColor = designSystem.colors.white;
-                    e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
-                  }}
-                  onPointerLeave={e => {
-                    e.currentTarget.style.backgroundColor = designSystem.colors.white;
-                    e.currentTarget.style.transform = FEEDBACK_BUTTON_STYLES.normal.transform;
-                  }}
-                >
-                  {/* The emoji is the only color accent on the white modal */}
-                  <FontAwesomeIcon
-                    icon={icon}
-                    style={{
-                      fontSize: '56px',
-                      width: '64px',
-                      height: '64px',
-                      color: emojiColor,
-                    }}
-                  />
-                  <span style={{ fontSize: '20px', fontWeight: 700 }}>{label}</span>
-                </button>
-              );
-            })}
-          </div>
         </div>
       );
     }
@@ -880,7 +761,6 @@ const ActivityScanningPage: React.FC = () => {
           autoWidth
           size={
             !isPickupQueryPromptOpen &&
-            !showFeedbackPrompt &&
             currentScan?.action === 'checked_out' &&
             checkoutDestinationState &&
             !checkoutDestinationState.showingFarewell
@@ -889,20 +769,17 @@ const ActivityScanningPage: React.FC = () => {
                 : 'lg'
               : 'lg'
           }
-          backgroundColor={showFeedbackPrompt ? designSystem.colors.white : scanFamily.bg}
-          timeoutColor={showFeedbackPrompt ? undefined : scanFamily.accent}
-          timeoutTrackColor={showFeedbackPrompt ? undefined : scanFamily.tint}
+          backgroundColor={scanFamily.bg}
+          timeoutColor={scanFamily.accent}
+          timeoutTrackColor={scanFamily.tint}
           timeout={modalTimeoutDuration}
           timeoutResetKey={
             isPickupQueryPromptOpen
               ? `pickup-query-prompt-${scanContextId}`
-              : showFeedbackPrompt
-                ? `feedback-${checkoutDestinationState?.studentId}`
-                : `${currentScan?.student_id ?? 'none'}-${currentScan?.action ?? 'none'}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
+              : `${currentScan?.student_id ?? 'none'}-${currentScan?.action ?? 'none'}-${checkoutDestinationState?.showingFarewell ?? false}`
           }
           closeOnContentClick={
             !shouldKeepPickupQueryModalOpen &&
-            !showFeedbackPrompt &&
             !(
               currentScan?.action === 'checked_out' &&
               checkoutDestinationState &&
@@ -912,9 +789,8 @@ const ActivityScanningPage: React.FC = () => {
           closeOnBackdropClick={!shouldKeepPickupQueryModalOpen}
           closeOnEscapeKey={!shouldKeepPickupQueryModalOpen}
         >
-          {/* Icon container with background circle - hidden during checkout destination selection (but visible during feedback) */}
+          {/* Icon container with background circle - hidden during checkout destination selection */}
           {(isPickupQueryPromptOpen ||
-            showFeedbackPrompt ||
             !(
               currentScan?.action === 'checked_out' &&
               checkoutDestinationState &&
@@ -924,7 +800,7 @@ const ActivityScanningPage: React.FC = () => {
               style={{
                 width: '120px',
                 height: '120px',
-                backgroundColor: showFeedbackPrompt ? designSystem.gray[100] : scanFamily.tint,
+                backgroundColor: scanFamily.tint,
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -943,15 +819,9 @@ const ActivityScanningPage: React.FC = () => {
                     />
                   );
                 }
-                // "nach Hause" flow - Phosphor house-line for farewell and feedback
-                // states; on the white feedback modal it stays neutral gray.
-                if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
-                  return (
-                    <HouseLineIcon
-                      size={80}
-                      color={showFeedbackPrompt ? designSystem.gray[700] : scanFamily.accent}
-                    />
-                  );
+                // "nach Hause" flow - Phosphor house-line for the farewell state.
+                if (checkoutDestinationState?.showingFarewell) {
+                  return <HouseLineIcon size={80} color={scanFamily.accent} />;
                 }
                 // Supervisor authentication icon
                 if (currentScan?.action === 'supervisor_authenticated') {
@@ -1058,13 +928,7 @@ const ActivityScanningPage: React.FC = () => {
                 return texts.pickupQueryHeading;
               }
 
-              // Feedback prompt
-              if (showFeedbackPrompt) {
-                const firstName = checkoutDestinationState?.studentName?.split(' ')[0] ?? '';
-                return texts.feedbackHeading(firstName);
-              }
-
-              // Farewell state after "nach Hause" feedback
+              // Farewell state after "nach Hause"
               if (checkoutDestinationState?.showingFarewell) {
                 const firstName = checkoutDestinationState.studentName.split(' ')[0];
                 return texts.farewellHeading(firstName);

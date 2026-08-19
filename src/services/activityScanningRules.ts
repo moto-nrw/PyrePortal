@@ -98,7 +98,6 @@ export interface ModalTimeoutParams {
   isAwaitingPickupQueryScan: boolean;
   showingFarewell: boolean;
   hasCheckoutDestination: boolean;
-  showFeedbackPrompt: boolean;
   scanAction: RfidScanResult['action'] | undefined;
   hasPickupTime: boolean;
   scanTimeout: number;
@@ -121,8 +120,8 @@ export const getModalTimeoutDuration = (params: ModalTimeoutParams): number => {
   if (params.showingFarewell) {
     return FAREWELL_TIMEOUT_MS;
   }
-  // Checkout destination states (buttons, feedback) use longer timeout
-  if (params.hasCheckoutDestination || params.showFeedbackPrompt) {
+  // Checkout destination states (buttons) use longer timeout
+  if (params.hasCheckoutDestination) {
     return DAILY_CHECKOUT_TIMEOUT_MS;
   }
   if (params.scanAction === 'pickup_info') {

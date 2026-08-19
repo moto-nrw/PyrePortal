@@ -744,29 +744,7 @@ export const api = {
   },
 
   /**
-   * Submit daily feedback when student checks out for the day
-   * Endpoint: POST /api/iot/feedback
-   */
-  async submitDailyFeedback(
-    pin: string,
-    feedback: DailyFeedbackRequest
-  ): Promise<DailyFeedbackResponse> {
-    try {
-      const response = await apiCall<DailyFeedbackResponse>('/api/iot/feedback', {
-        method: 'POST',
-        headers: buildAuthHeaders(pin),
-        body: JSON.stringify(feedback),
-      });
-
-      return response;
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'feedback'));
-    }
-  },
-
-  /**
-   * Get device configuration (checkout button visibility, feedback settings)
+   * Get device configuration (checkout button visibility)
    * Endpoint: GET /api/iot/config
    * Auth: Device API key only (no PIN required)
    */
@@ -781,7 +759,7 @@ export const api = {
 
 /**
  * Device configuration returned by GET /api/iot/config.
- * Controls which buttons appear on the checkout screen and whether feedback is shown.
+ * Controls which buttons appear on the checkout screen.
  */
 export interface DeviceConfig {
   presence_mode: 'detailed' | 'binary';
@@ -791,9 +769,6 @@ export interface DeviceConfig {
     wc_enabled: boolean;
     /** "HH:MM" or null (null = "nach Hause" always available) */
     daily_checkout_time: string | null;
-  };
-  feedback: {
-    enabled: boolean;
   };
 }
 
@@ -853,8 +828,6 @@ export interface RfidScanResult {
   greeting?: string;
   /** Whether the student is eligible for daily checkout ("nach Hause") */
   daily_checkout_available?: boolean;
-  /** Whether the feedback modal should be shown after daily checkout */
-  feedback_enabled?: boolean;
   /** Today's scheduled pickup time in HH:MM format (e.g. "15:30") */
   pickup_time?: string;
   /** Optional pickup note for the current day */
@@ -900,37 +873,6 @@ interface AttendanceToggleResponse {
       checked_out_by: string;
     };
     message: string;
-    /** Whether the feedback modal should be shown after daily checkout */
-    feedback_enabled?: boolean;
   };
   message: string;
-}
-
-/**
- * Daily feedback rating type - matches backend enum validation
- */
-export type DailyFeedbackRating = 'positive' | 'neutral' | 'negative';
-
-/**
- * Feedback submission request for POST /api/iot/feedback
- */
-interface DailyFeedbackRequest {
-  student_id: number;
-  value: DailyFeedbackRating;
-}
-
-/**
- * Feedback submission response from POST /api/iot/feedback
- */
-interface DailyFeedbackResponse {
-  status: string;
-  message: string;
-  data?: {
-    id: number;
-    student_id: number;
-    value: string;
-    day: string; // "2025-10-12"
-    time: string; // "15:30:45"
-    created_at: string; // ISO 8601
-  };
 }

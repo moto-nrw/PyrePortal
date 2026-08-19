@@ -6,7 +6,6 @@ import {
   type ActivityResponse,
   type Room,
   type CurrentSession,
-  type DailyFeedbackRating,
 } from '../../services/api';
 import {
   createSessionRequestTracker,
@@ -799,42 +798,6 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         });
 
         return { status: 'error' as const };
-      }
-    },
-
-    // Submit daily feedback
-    submitDailyFeedback: async (
-      studentId: number,
-      rating: DailyFeedbackRating
-    ): Promise<boolean> => {
-      const { authenticatedUser } = get();
-
-      if (!authenticatedUser?.pin) {
-        storeLogger.error('Cannot submit feedback: no authenticated user');
-        return false;
-      }
-
-      try {
-        storeLogger.info('Submitting daily feedback', {
-          studentId,
-          rating,
-        });
-
-        await api.submitDailyFeedback(authenticatedUser.pin, {
-          student_id: studentId,
-          value: rating,
-        });
-
-        storeLogger.info('Daily feedback submitted successfully', {
-          studentId,
-          rating,
-        });
-
-        return true;
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        storeLogger.error('Failed to submit daily feedback', { error: errorMessage });
-        return false;
       }
     },
 

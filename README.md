@@ -25,7 +25,7 @@ The Raspberry Pi/Balena and Tauri targets are retired. They are not supported de
 - Activity sessions, room selection and supervisor teams
 - RFID tag assignment for students and staff
 - Staff time tracking by RFID
-- Pickup-time lookup and optional daily feedback
+- Pickup-time lookup
 - Network status monitoring and German user-facing errors
 
 ## Architecture

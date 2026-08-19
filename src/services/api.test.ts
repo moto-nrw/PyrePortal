@@ -1961,76 +1961,6 @@ describe('api methods', () => {
   });
 
   // ------------------------------------------------------------------
-  // api.submitDailyFeedback (mapAttendanceErrorToGerman feedback context)
-  // ------------------------------------------------------------------
-
-  describe('api.submitDailyFeedback', () => {
-    it('returns feedback response on success', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      const feedbackResponse = {
-        status: 'success',
-        message: 'Feedback submitted',
-        data: {
-          id: 1,
-          student_id: 1,
-          value: 'positive',
-          day: '2025-01-01',
-          time: '15:00:00',
-          created_at: '2025-01-01T15:00:00Z',
-        },
-      };
-      mockFetch.mockResolvedValueOnce(mockResponse(feedbackResponse));
-
-      const result = await freshApi.submitDailyFeedback('1234', {
-        student_id: 1,
-        value: 'positive',
-      });
-      expect(result.message).toBe('Feedback submitted');
-    });
-
-    it('maps 404 error to feedback-specific German message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: 'API Error: 404 - generic' },
-          { status: 404, statusText: 'Not Found', ok: false }
-        )
-      );
-
-      await expect(
-        freshApi.submitDailyFeedback('1234', { student_id: 1, value: 'positive' })
-      ).rejects.toThrow('Feedback-Service nicht erreichbar. Bitte später versuchen.');
-    });
-
-    it('maps 403 error to feedback-specific German message', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockResolvedValueOnce(
-        mockResponse(
-          { status: 'error', message: '403 Forbidden' },
-          { status: 403, statusText: 'Forbidden', ok: false }
-        )
-      );
-
-      await expect(
-        freshApi.submitDailyFeedback('1234', { student_id: 1, value: 'negative' })
-      ).rejects.toThrow('Keine Berechtigung für Feedback-Übermittlung.');
-    });
-
-    it('maps network error in feedback context', async () => {
-      const { api: freshApi } = await getFreshApi();
-
-      mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-
-      await expect(
-        freshApi.submitDailyFeedback('1234', { student_id: 1, value: 'neutral' })
-      ).rejects.toThrow('Netzwerkfehler. Bitte Verbindung prüfen.');
-    });
-  });
-
-  // ------------------------------------------------------------------
   // api.getDeviceConfig
   // ------------------------------------------------------------------
 
@@ -2045,9 +1975,6 @@ describe('api methods', () => {
           schulhof_enabled: true,
           wc_enabled: false,
           daily_checkout_time: null,
-        },
-        feedback: {
-          enabled: true,
         },
       };
 

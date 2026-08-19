@@ -157,7 +157,7 @@ async function ensureCheckedOut(page: Page, tagId: string) {
 //   → Armband zuweisen → Erfolgreich → Zurück
 //   → Home → Team anpassen → auswählen → Team speichern → Modal
 //   → Home → Aufsicht starten → Aktivität → Betreuer → Raum → Starten
-//   → NFC Scanning → Check-in → Checkout (Wohin?) → Feedback → Tschüss
+//   → NFC Scanning → Check-in → Checkout (Wohin?) → Tschüss
 //   → Abholzeit abfragen → Fehler-Modal (unbekanntes Armband)
 //   → Anmelden → PIN → Home (aktive Aufsicht) → Aufsicht beenden
 //   → Letzte Aufsichten → Verlaufsseite → Neue-Aufsicht-Modal
@@ -396,7 +396,7 @@ test.describe('PyrePortal User Journey', () => {
   });
 
   // ----------------------------------------------------------
-  // 5. Deterministic scans → Check-in / Checkout / Feedback
+  // 5. Deterministic scans → Check-in / Checkout
   //    SCREENSHOT_TAG was assigned to a student in step 10.
   // ----------------------------------------------------------
 
@@ -420,55 +420,49 @@ test.describe('PyrePortal User Journey', () => {
     await screenshot(page, '24-checkout-destination', 300);
   });
 
-  test('25 — Checkout: feedback prompt', async () => {
+  test('25 — Checkout: farewell', async () => {
     await page.click('dialog[open] button:has-text("nach Hause")');
-    await page.waitForSelector('text=Wie war dein Tag', { timeout: 10_000 });
-    await screenshot(page, '25-feedback-prompt', 300);
-  });
-
-  test('26 — Checkout: farewell', async () => {
-    await page.click('dialog[open] button:has-text("Gut")');
     // Farewell modal: "Tschüss, <Name>!" — auto-closes after 1.5s, capture fast
     await page.waitForSelector('text=Tschüss,', { timeout: 10_000 });
-    await screenshot(page, '26-farewell', 150);
+    await screenshot(page, '25-farewell', 150);
   });
 
   // ----------------------------------------------------------
   // 6. Pickup query + error state
   // ----------------------------------------------------------
 
-  test('27 — Pickup query prompt', async () => {
+  test('26 — Pickup query prompt', async () => {
     test.setTimeout(30_000);
     await waitForModalClosed(page);
     await page.click('button[aria-label="Abholzeit abfragen"]');
     await page.waitForSelector('text=Bitte halte dein Armband an das Lesegerät', {
       timeout: 10_000,
     });
-    await screenshot(page, '27-pickup-query-prompt', 300);
+    await screenshot(page, '26-pickup-query-prompt', 300);
   });
 
-  test('28 — Pickup query result', async () => {
+  test('27 — Pickup query result', async () => {
     test.setTimeout(30_000);
     await injectScan(page, SCREENSHOT_TAG);
     // Shows either the pickup time or "keine Abholzeit hinterlegt" (both valid)
     await page.waitForSelector('text=/Abholzeit für|keine Abholzeit/', { timeout: 15_000 });
-    await screenshot(page, '28-pickup-query-result', 300);
+    await screenshot(page, '27-pickup-query-result', 300);
   });
 
-  test('29 — Error modal (unknown tag)', async () => {
+  test('28 — Error modal (unknown tag)', async () => {
     test.setTimeout(30_000);
     await waitForModalClosed(page);
     await injectScan(page, UNKNOWN_TAG);
     // Deliberate error-state capture: unassigned wristband → red modal
     await page.waitForSelector('text=Scan fehlgeschlagen', { timeout: 15_000 });
-    await screenshot(page, '29-scan-error', 200);
+    await screenshot(page, '28-scan-error', 200);
   });
 
   // ----------------------------------------------------------
   // 7. Back to Home → end session
   // ----------------------------------------------------------
 
-  test('30 — Home with active session', async () => {
+  test('29 — Home with active session', async () => {
     test.setTimeout(30_000);
     await waitForModalClosed(page);
     await page.click('button[aria-label="Anmelden - zur PIN-Eingabe"]');
@@ -477,13 +471,13 @@ test.describe('PyrePortal User Journey', () => {
     await page.waitForURL('**/home', { timeout: 10_000 });
     await page.waitForSelector('button:has-text("Aufsicht beenden")', { timeout: 10_000 });
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '30-home-active-session');
+    await screenshot(page, '29-home-active-session');
   });
 
-  test('31 — End session confirmation', async () => {
+  test('30 — End session confirmation', async () => {
     await page.click('button:has-text("Aufsicht beenden")');
     await page.waitForSelector('text=Aufsicht beenden?', { timeout: 5_000 });
-    await screenshot(page, '31-end-session-confirm', 300);
+    await screenshot(page, '30-end-session-confirm', 300);
     // Confirm so the demo session doesn't linger on the backend
     await page.click('button:has-text("Ja, beenden")');
     await page.waitForTimeout(1000);
@@ -495,11 +489,11 @@ test.describe('PyrePortal User Journey', () => {
   //    so the shortcut pill is visible after the session ended.
   // ----------------------------------------------------------
 
-  test('32 — Home with history shortcut → history page', async () => {
+  test('31 — Home with history shortcut → history page', async () => {
     test.setTimeout(30_000);
     await waitForModalClosed(page);
     await page.waitForSelector('button:has-text("Letzte Aufsichten")', { timeout: 10_000 });
-    await screenshot(page, '32-home-history-shortcut', 300);
+    await screenshot(page, '31-home-history-shortcut', 300);
 
     await page.click('button:has-text("Letzte Aufsichten")');
     await page.waitForURL('**/session-history');
@@ -507,21 +501,21 @@ test.describe('PyrePortal User Journey', () => {
     await screenshot(page, '32a-session-history-page', 300);
   });
 
-  test('33 — Recreate confirmation (Neue Aufsicht starten?)', async () => {
+  test('32 — Recreate confirmation (Neue Aufsicht starten?)', async () => {
     test.setTimeout(30_000);
     // First history row (rows carry the "Zuletzt:" timestamp label)
     await page.locator('button', { hasText: 'Zuletzt:' }).first().click();
     await page.waitForSelector('text=Neue Aufsicht starten?', { timeout: 15_000 });
-    await screenshot(page, '33-history-recreate-confirm', 300);
+    await screenshot(page, '32-history-recreate-confirm', 300);
     // Cancel — the journey must not start another session here
     await page.click('dialog[open] button:has-text("Abbrechen")');
   });
 
-  test('34 — Clear-history confirmation', async () => {
+  test('33 — Clear-history confirmation', async () => {
     await waitForModalClosed(page);
     await page.click('button:has-text("Alle löschen")');
     await page.waitForSelector('text=Verlauf löschen?', { timeout: 5_000 });
-    await screenshot(page, '34-history-clear-confirm', 300);
+    await screenshot(page, '33-history-clear-confirm', 300);
     await page.click('dialog[open] button:has-text("Abbrechen")');
   });
 });

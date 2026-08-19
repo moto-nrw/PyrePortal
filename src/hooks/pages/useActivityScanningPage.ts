@@ -11,13 +11,7 @@ import {
   shouldApplyAuthoritativeCount,
   type ExtendedScanResult,
 } from '../../services/activityScanningRules';
-import {
-  api,
-  WC_ROOM_ALIASES,
-  type DailyFeedbackRating,
-  type DeviceConfig,
-  type Room,
-} from '../../services/api';
+import { api, WC_ROOM_ALIASES, type DeviceConfig, type Room } from '../../services/api';
 import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 import { createLogger, serializeError } from '../../utils/logger';
@@ -43,7 +37,7 @@ const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | un
  * View model for the activity scanning page.
  *
  * Owns polling, the on-mount fetches (Schulhof room, WC room, device config),
- * the student count rules, the checkout destination and feedback flows and
+ * the student count rules, the checkout destination flow and
  * the modal wiring. The page component consumes this hook and renders JSX only.
  */
 export function useActivityScanningPage() {
@@ -157,11 +151,8 @@ export function useActivityScanningPage() {
   const { checkoutDestinationState, setCheckoutDestinationState, handleDestinationSelect } =
     useCheckoutDestination({ schulhofRoomId, wcRoomId });
 
-  // Feedback prompt state
-  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
-
-  // Track which visit started the feedback prompt so we can detect new scans
-  const feedbackVisitIdRef = useRef<number | null>(null);
+  // Track which visit started the checkout flow so we can detect new scans
+  const checkoutVisitIdRef = useRef<number | null>(null);
 
   // Device config (checkout button visibility, fetched once on mount)
   const [deviceConfig, setDeviceConfig] = useState<DeviceConfig | null>(null);
@@ -188,7 +179,7 @@ export function useActivityScanningPage() {
     }
   }, [currentScan, isAwaitingPickupQueryScan]);
 
-  // Clear stale checkout/feedback/farewell state when a new scan arrives.
+  // Clear stale checkout/farewell state when a new scan arrives.
   // A "new scan" is detected by: different RFID tag, different visit_id, or
   // a check-in arriving while we're in a checkout flow (always means new scan).
   useEffect(() => {
@@ -197,9 +188,9 @@ export function useActivityScanningPage() {
     const currentRfid = currentScan.scannedTagId ?? '';
     const isDifferentTag = currentRfid && checkoutDestinationState.rfid !== currentRfid;
     const isDifferentVisit =
-      feedbackVisitIdRef.current !== null &&
+      checkoutVisitIdRef.current !== null &&
       currentScan.visit_id != null &&
-      currentScan.visit_id !== feedbackVisitIdRef.current;
+      currentScan.visit_id !== checkoutVisitIdRef.current;
     const isCheckinDuringCheckoutFlow = currentScan.action === 'checked_in';
 
     if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow) {
@@ -214,8 +205,7 @@ export function useActivityScanningPage() {
         newAction: currentScan.action,
       });
       setCheckoutDestinationState(null);
-      setShowFeedbackPrompt(false);
-      feedbackVisitIdRef.current = null;
+      checkoutVisitIdRef.current = null;
     }
   }, [currentScan, checkoutDestinationState, setCheckoutDestinationState]);
 
@@ -314,7 +304,7 @@ export function useActivityScanningPage() {
     void fetchSchulhofRoom();
   }, [authenticatedUser?.pin]);
 
-  // Fetch device config once on mount (checkout button visibility, feedback settings)
+  // Fetch device config once on mount (checkout button visibility)
   useEffect(() => {
     const fetchDeviceConfig = async () => {
       try {
@@ -324,7 +314,6 @@ export function useActivityScanningPage() {
           raumwechsel: config.checkout.raumwechsel_enabled,
           schulhof: config.checkout.schulhof_enabled,
           wc: config.checkout.wc_enabled,
-          feedbackEnabled: config.feedback.enabled,
         });
       } catch (error) {
         logger.error('Failed to fetch device config', { error: serializeError(error) });
@@ -401,7 +390,6 @@ export function useActivityScanningPage() {
         isAwaitingPickupQueryScan,
         showingFarewell: checkoutDestinationState?.showingFarewell ?? false,
         hasCheckoutDestination: !!checkoutDestinationState,
-        showFeedbackPrompt,
         scanAction: currentScan?.action,
         hasPickupTime: !!currentScan?.pickup_time,
         scanTimeout: rfid.scanTimeout,
@@ -414,7 +402,6 @@ export function useActivityScanningPage() {
       isPickupQueryLoading,
       rfid.modalDisplayTime,
       rfid.scanTimeout,
-      showFeedbackPrompt,
     ]
   );
 
@@ -424,7 +411,6 @@ export function useActivityScanningPage() {
     logger.debug('Modal timeout triggered', {
       hasDestinationState: !!checkoutDestinationState,
       showingFarewell: checkoutDestinationState?.showingFarewell,
-      showFeedbackPrompt,
       isAwaitingPickupQueryScan,
       isPickupQueryLoading,
       navigateOnClose: (currentScan as { navigateOnClose?: string } | null)?.navigateOnClose,
@@ -454,12 +440,8 @@ export function useActivityScanningPage() {
       setCheckoutDestinationState(null);
     }
 
-    // Clear feedback prompt state to prevent orphaned state (Issue #129 Bug 2 fix)
-    if (showFeedbackPrompt) {
-      setShowFeedbackPrompt(false);
-    }
     // Always clear visit ID ref to prevent stale ref from wiping next checkout's destination state
-    feedbackVisitIdRef.current = null;
+    checkoutVisitIdRef.current = null;
 
     if (isAwaitingPickupQueryScan) {
       setIsAwaitingPickupQueryScan(false);
@@ -495,7 +477,6 @@ export function useActivityScanningPage() {
     resetScanMode,
     setCheckoutDestinationState,
     setScanResult,
-    showFeedbackPrompt,
     showScanModal,
   ]);
 
@@ -515,7 +496,7 @@ export function useActivityScanningPage() {
   };
 
   // Handle "nach Hause" button - student confirmed going home
-  // Call confirm_daily_checkout to finalize attendance, then show feedback prompt
+  // Call confirm_daily_checkout to finalize attendance, then show the farewell
   const handleNachHause = async () => {
     if (!checkoutDestinationState || !authenticatedUser?.pin) return;
 
@@ -525,7 +506,7 @@ export function useActivityScanningPage() {
     });
 
     try {
-      const response = await api.toggleAttendance(
+      await api.toggleAttendance(
         authenticatedUser.pin,
         checkoutDestinationState.rfid,
         'confirm_daily_checkout',
@@ -533,16 +514,8 @@ export function useActivityScanningPage() {
         resolveStaffAttributionId(authenticatedUser, selectedSupervisors)
       );
       logger.info('Daily checkout confirmed');
-      feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
-
-      // Show feedback prompt only if feedback is enabled for this tenant
-      const feedbackEnabled = response.data?.feedback_enabled !== false;
-      if (feedbackEnabled) {
-        setShowFeedbackPrompt(true);
-      } else {
-        logger.info('Feedback disabled for tenant, skipping feedback prompt');
-        setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-      }
+      checkoutVisitIdRef.current = currentScan?.visit_id ?? null;
+      setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
     } catch (error) {
       logger.error('Failed to confirm daily checkout', {
         rfid: checkoutDestinationState.rfid,
@@ -550,49 +523,9 @@ export function useActivityScanningPage() {
       });
       // Still proceed — the visit is already ended,
       // attendance sync failure shouldn't block the student.
-      // Fall back to checkin scan's feedback_enabled flag.
-      feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
-      const feedbackEnabled = currentScan?.feedback_enabled !== false;
-      if (feedbackEnabled) {
-        setShowFeedbackPrompt(true);
-      } else {
-        setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-      }
-    }
-  };
-
-  // Handle feedback submission
-  const handleFeedbackSubmit = async (rating: DailyFeedbackRating) => {
-    if (!checkoutDestinationState || !currentScan) return;
-
-    const { submitDailyFeedback } = useUserStore.getState();
-
-    logger.info('Submitting feedback', {
-      studentId: currentScan.student_id,
-      rating,
-    });
-
-    // Guard against null student_id (shouldn't happen for real student scans)
-    if (currentScan.student_id === null) {
-      logger.warn('Cannot submit feedback: student_id is null');
-      setShowFeedbackPrompt(false);
-      // Show farewell - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
+      checkoutVisitIdRef.current = currentScan?.visit_id ?? null;
       setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
-      return;
     }
-
-    const success = await submitDailyFeedback(currentScan.student_id, rating);
-
-    if (success) {
-      logger.info('Feedback submitted successfully', { rating });
-    } else {
-      // On error, still show farewell (don't block user from leaving)
-      logger.warn('Feedback submission failed but continuing with checkout');
-    }
-
-    // Show farewell message - useModalTimeout will auto-close with FAREWELL_TIMEOUT_MS
-    setShowFeedbackPrompt(false);
-    setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
   };
 
   const shouldShowCheckModal = showModal && (!!currentScan || isAwaitingPickupQueryScan);
@@ -622,10 +555,7 @@ export function useActivityScanningPage() {
     schulhofRoomId,
     wcRoomId,
     deviceConfig,
-    // Feedback flow
-    showFeedbackPrompt,
     handleNachHause,
-    handleFeedbackSubmit,
     // Pickup query flow
     isAwaitingPickupQueryScan,
     isPickupQueryLoading,

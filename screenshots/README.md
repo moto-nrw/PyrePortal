@@ -13,11 +13,10 @@ video of the whole flow.
 | `01`–`22` PNGs            | Landing, PIN, Home, Armband zuweisen, Team, Aufsicht |
 | `23-checkin-modal`        | "Hallo, {Name}!" check-in modal                      |
 | `24-checkout-destination` | "Wohin geht {Name}?" checkout question               |
-| `25-feedback-prompt`      | "Wie war dein Tag?" smiley feedback                  |
-| `26-farewell`             | "Tschüss, {Name}!"                                   |
-| `27/28-pickup-query-*`    | Abholzeit prompt + result                            |
-| `29-scan-error`           | Error modal (deliberate: unknown wristband)          |
-| `30/31` PNGs              | Home with active session, end-session confirm        |
+| `25-farewell`             | "Tschüss, {Name}!"                                   |
+| `26/27-pickup-query-*`    | Abholzeit prompt + result                            |
+| `28-scan-error`           | Error modal (deliberate: unknown wristband)          |
+| `29/30` PNGs              | Home with active session, end-session confirm        |
 | `user-journey.webm`       | Video recording of the entire run                    |
 
 Convert the video for platforms that need mp4 (requires ffmpeg):
@@ -46,17 +45,15 @@ ffmpeg -i screenshots/output/user-journey.webm -c:v libx264 -pix_fmt yuv420p scr
    VITE_DEVICE_API_KEY=<api_key of a device from backend/.seed-state.json>
    ```
 
-3. **Tenant settings for the checkout/feedback flow** (steps 24-26). The
-   "nach Hause" button and the feedback prompt are opt-in tenant settings;
-   without them the checkout scan shows no destination buttons. Enable them
-   once per seeded database:
+3. **Tenant settings for the checkout flow** (steps 24-25). The
+   "nach Hause" button is an opt-in tenant setting; without it the checkout
+   scan shows no destination buttons. Enable it once per seeded database:
 
    ```sql
    INSERT INTO config.setting_values (tenant_id, setting_key, value)
    SELECT t.id, s.key, s.val::jsonb
    FROM platform.schools t,
-        (VALUES ('feedback.enabled','true'),
-                ('operations.student_daily_checkout_time','"00:01"')) AS s(key,val)
+        (VALUES ('operations.student_daily_checkout_time','"00:01"')) AS s(key,val)
    ON CONFLICT (tenant_id, setting_key) DO UPDATE SET value = EXCLUDED.value;
    ```
 

@@ -28,7 +28,6 @@ vi.mock('../services/api', () => ({
     getRooms: vi.fn(),
     getCurrentSession: vi.fn(),
     endSession: vi.fn(),
-    submitDailyFeedback: vi.fn(),
   },
   mapServerErrorToGerman: vi.fn((msg: string) => msg),
   isNetworkRelatedError: vi.fn(() => false),
@@ -130,7 +129,6 @@ const mockGetActivities = vi.mocked(api.getActivities);
 const mockGetRooms = vi.mocked(api.getRooms);
 const mockGetCurrentSession = vi.mocked(api.getCurrentSession);
 const mockEndSession = vi.mocked(api.endSession);
-const mockSubmitDailyFeedback = vi.mocked(api.submitDailyFeedback);
 const mockLoadSessionSettings = vi.mocked(loadSessionSettings);
 const mockSaveSessionSettings = vi.mocked(saveSessionSettings);
 
@@ -1539,44 +1537,6 @@ describe('validateAndRecreateSession', () => {
 
     expect(useUserStore.getState().selectedActivity?.name).toBe('New activity');
     expect(useUserStore.getState().isValidatingLastSession).toBe(false);
-  });
-});
-
-// ====================================================================
-// submitDailyFeedback
-// ====================================================================
-
-describe('submitDailyFeedback', () => {
-  it('submits feedback when authenticated', async () => {
-    setAuthenticated();
-    mockSubmitDailyFeedback.mockResolvedValueOnce({
-      status: 'success',
-      message: 'Feedback submitted',
-    });
-
-    const result = await useUserStore.getState().submitDailyFeedback(10, 'positive');
-
-    expect(result).toBe(true);
-    expect(mockSubmitDailyFeedback).toHaveBeenCalledWith('1234', {
-      student_id: 10,
-      value: 'positive',
-    });
-  });
-
-  it('returns false when not authenticated', async () => {
-    const result = await useUserStore.getState().submitDailyFeedback(10, 'positive');
-
-    expect(result).toBe(false);
-    expect(mockSubmitDailyFeedback).not.toHaveBeenCalled();
-  });
-
-  it('returns false on API error', async () => {
-    setAuthenticated();
-    mockSubmitDailyFeedback.mockRejectedValueOnce(new Error('Server error'));
-
-    const result = await useUserStore.getState().submitDailyFeedback(10, 'positive');
-
-    expect(result).toBe(false);
   });
 });
 

@@ -73,7 +73,6 @@ type ErrorMapping = readonly [pattern: string | readonly string[], germanMessage
  * - /backend/api/iot/sessions/handlers.go
  * - /backend/api/iot/attendance/handlers.go
  * - /backend/api/iot/rfid/handlers.go
- * - /backend/api/iot/feedback/handlers.go
  */
 export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   // 1. CAPACITY ERRORS (409)
@@ -139,11 +138,6 @@ export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   ['invalid staff ID', 'Ungültige Mitarbeiter-ID.'],
   ['staff not found', 'Mitarbeiter nicht gefunden.'],
   ['staff has no RFID tag assigned', 'Mitarbeiter hat kein Armband zugewiesen.'],
-
-  // 8. FEEDBACK ERRORS (400/404)
-  ['student_id is required', 'Schüler-ID fehlt.'],
-  ['value is required', 'Bewertung fehlt.'],
-  ['student not found', 'Schüler nicht gefunden.'],
 
   // 9. VALIDATION ERRORS (400)
   ['room_id is required for check-in', 'Raum muss für Check-in ausgewählt werden.'],
@@ -418,10 +412,7 @@ export function getNetworkErrorMessage(context: NetworkErrorContext = 'generic')
  * This function first tries to match specific backend messages via
  * mapServerErrorToGerman, then falls back to context-specific generic messages.
  */
-export function mapAttendanceErrorToGerman(
-  errorMessage: string,
-  context: 'toggle' | 'feedback'
-): string {
+export function mapAttendanceErrorToGerman(errorMessage: string, context: 'toggle'): string {
   // Network errors - use consolidated handler
   if (isNetworkRelatedError(errorMessage)) {
     return getNetworkErrorMessage('generic');
@@ -461,8 +452,6 @@ export function mapAttendanceErrorToGerman(
     switch (context) {
       case 'toggle':
         return 'Schüler nicht gefunden. RFID-Tag möglicherweise nicht zugewiesen.';
-      case 'feedback':
-        return 'Feedback-Service nicht erreichbar. Bitte später versuchen.';
     }
   }
 
@@ -471,8 +460,6 @@ export function mapAttendanceErrorToGerman(
     switch (context) {
       case 'toggle':
         return 'Keine Berechtigung für An-/Abmeldung dieses Schülers.';
-      case 'feedback':
-        return 'Keine Berechtigung für Feedback-Übermittlung.';
     }
   }
 

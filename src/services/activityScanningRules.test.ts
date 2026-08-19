@@ -129,7 +129,6 @@ describe('getModalTimeoutDuration', () => {
     isAwaitingPickupQueryScan: false,
     showingFarewell: false,
     hasCheckoutDestination: false,
-    showFeedbackPrompt: false,
     scanAction: undefined,
     hasPickupTime: false,
     scanTimeout: 3000,
@@ -156,12 +155,6 @@ describe('getModalTimeoutDuration', () => {
 
   it('uses the daily checkout timeout for the destination selection', () => {
     expect(getModalTimeoutDuration({ ...baseParams, hasCheckoutDestination: true })).toBe(
-      DAILY_CHECKOUT_TIMEOUT_MS
-    );
-  });
-
-  it('uses the daily checkout timeout for the feedback prompt', () => {
-    expect(getModalTimeoutDuration({ ...baseParams, showFeedbackPrompt: true })).toBe(
       DAILY_CHECKOUT_TIMEOUT_MS
     );
   });
@@ -193,7 +186,6 @@ describe('getModalTimeoutDuration', () => {
         isPickupQueryLoading: true,
         showingFarewell: true,
         hasCheckoutDestination: true,
-        showFeedbackPrompt: true,
       })
     ).toBe(3000);
   });
@@ -204,7 +196,6 @@ describe('getModalTimeoutDuration', () => {
         ...baseParams,
         showingFarewell: true,
         hasCheckoutDestination: true,
-        showFeedbackPrompt: true,
       })
     ).toBe(FAREWELL_TIMEOUT_MS);
   });
