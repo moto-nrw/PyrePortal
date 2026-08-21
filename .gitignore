@@ -41,9 +41,9 @@ coverage/
 .worktrees/
 
 # Playwright
-screenshots/output/*.png
-screenshots/output/*.webm
-screenshots/output/*.mp4
+screenshots/output/**/*.png
+screenshots/output/**/*.webm
+screenshots/output/**/*.mp4
 screenshots/test-results/
 
 # Devbox
