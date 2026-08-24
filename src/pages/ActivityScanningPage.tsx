@@ -35,6 +35,7 @@ const texts = {
   roomFallback: 'diesem Raum',
   checkedInMessage: (roomName: string) => `Du bist jetzt in ${roomName}`,
   transferSuccess: 'Raumwechsel erfolgreich',
+  checkoutConfirmation: 'Du bist aus diesem Raum abgemeldet.',
   loginButton: 'Anmelden',
   loginAriaLabel: 'Anmelden - zur PIN-Eingabe',
   pickupQueryAriaLabel: 'Abholzeit abfragen',
@@ -513,10 +514,10 @@ const ActivityScanningPage: React.FC = () => {
           : []),
       ];
 
-      // No destinations available — skip straight to farewell instead of showing
-      // "Wohin geht X?" with an empty button grid
+      // No destinations available — show the neutral checkout confirmation
+      // instead of an empty destination grid.
       if (destinations.length === 0) {
-        setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
+        setCheckoutDestinationState(null);
         return null;
       }
 
@@ -943,15 +944,17 @@ const ActivityScanningPage: React.FC = () => {
                     />
                   );
                 }
-                // "nach Hause" flow - Phosphor house-line for farewell and feedback
-                // states; on the white feedback modal it stays neutral gray.
-                if (checkoutDestinationState?.showingFarewell || showFeedbackPrompt) {
+                if (showFeedbackPrompt) {
                   return (
-                    <HouseLineIcon
-                      size={80}
-                      color={showFeedbackPrompt ? designSystem.gray[700] : scanFamily.accent}
+                    <FontAwesomeIcon
+                      icon={faFaceSmile}
+                      style={{ fontSize: '72px', color: designSystem.gray[700] }}
                     />
                   );
+                }
+                // The large house belongs only to the confirmed farewell state.
+                if (checkoutDestinationState?.showingFarewell) {
+                  return <HouseLineIcon size={80} color={scanFamily.accent} />;
                 }
                 // Supervisor authentication icon
                 if (currentScan?.action === 'supervisor_authenticated') {
@@ -1106,10 +1109,9 @@ const ActivityScanningPage: React.FC = () => {
                 return texts.destinationQuestionHeading(firstName);
               }
 
-              // Checkout farewell: after destination selected or no destinations available
+              // Neutral confirmation after leaving this room without going home
               if (currentScan?.action === 'checked_out') {
-                const firstName = (currentScan?.student_name ?? '').split(' ')[0];
-                return texts.farewellHeading(firstName);
+                return texts.checkoutConfirmation;
               }
 
               // Fallback: use backend message or student name
