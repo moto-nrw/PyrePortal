@@ -67,6 +67,7 @@ export function useActivityScanningPage() {
     setScanResult,
     showScanModal,
     startPickupQueryMode,
+    timeoutPickupQueryMode,
   } = useUserStore();
 
   // Debug logging for selectedActivity
@@ -463,9 +464,8 @@ export function useActivityScanningPage() {
 
     if (isAwaitingPickupQueryScan) {
       setIsAwaitingPickupQueryScan(false);
-    }
-
-    if (rfid.scanMode === 'pickupQuery') {
+      timeoutPickupQueryMode();
+    } else if (rfid.scanMode !== 'checkin') {
       resetScanMode();
     }
 
@@ -497,6 +497,7 @@ export function useActivityScanningPage() {
     setScanResult,
     showFeedbackPrompt,
     showScanModal,
+    timeoutPickupQueryMode,
   ]);
 
   const handleAnmelden = () => {
@@ -595,7 +596,8 @@ export function useActivityScanningPage() {
     setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
   };
 
-  const shouldShowCheckModal = showModal && (!!currentScan || isAwaitingPickupQueryScan);
+  const shouldShowCheckModal =
+    showModal && (!!currentScan || isAwaitingPickupQueryScan || isPickupQueryLoading);
   const shouldKeepPickupQueryModalOpen = isAwaitingPickupQueryScan || isPickupQueryLoading;
   const isPickupQueryPromptOpen =
     shouldShowCheckModal && isAwaitingPickupQueryScan && !isPickupQueryLoading && !currentScan;

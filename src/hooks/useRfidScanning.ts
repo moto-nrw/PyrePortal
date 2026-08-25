@@ -116,7 +116,7 @@ export const useRfidScanning = () => {
         return;
       }
 
-      if (freshRfid.scanMode === 'pickupQuery') {
+      if (freshRfid.scanMode !== 'checkin') {
         if (freshRfid.pickupQueryTagId && freshRfid.pickupQueryTagId !== tagId) {
           logger.debug('Pickup query already locked to another tag, skipping scan', {
             requestedTagId: tagId,
@@ -141,6 +141,9 @@ export const useRfidScanning = () => {
 
         lockPickupQueryTag(tagId);
         addToProcessingQueue(tagId);
+        if (freshRfid.scanMode === 'pickupQueryTimedOut') {
+          showScanModal();
+        }
         try {
           const outcome = await runPickupQuery({
             tagId,

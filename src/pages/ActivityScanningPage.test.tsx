@@ -40,6 +40,16 @@ vi.mock('../services/api', async () => {
       processRfidScan: vi.fn().mockResolvedValue({}),
       queryPickupInfo: vi.fn().mockResolvedValue({}),
       toggleAttendance: vi.fn().mockResolvedValue({}),
+      getDeviceConfig: vi.fn().mockResolvedValue({
+        presence_mode: 'detailed',
+        checkout: {
+          raumwechsel_enabled: true,
+          schulhof_enabled: true,
+          wc_enabled: true,
+          daily_checkout_time: null,
+        },
+        feedback: { enabled: true },
+      }),
     },
   };
 });
@@ -119,6 +129,14 @@ function renderPage() {
     </MemoryRouter>
   );
 }
+
+const queryCheckoutHomeIcon = () =>
+  document
+    .querySelector('dialog svg[width="80"][viewBox="0 0 256 256"] path[d^="M240,208H224"]')
+    ?.closest('svg') ?? null;
+
+const queryFeedbackIcon = () =>
+  document.querySelector('dialog svg[data-icon="face-smile"][style*="font-size: 72px"]');
 
 describe('ActivityScanningPage', () => {
   beforeEach(() => {
@@ -294,6 +312,39 @@ describe('ActivityScanningPage', () => {
     );
 
     expect(screen.getByText('Bitte halte dein Armband an das Lesegerät.')).toBeInTheDocument();
+  });
+
+  it('keeps the pickup prompt open for seven seconds and guards the next scan on timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      showModal: true,
+      currentScan: null,
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(6999);
+    });
+
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
+    expect(useUserStore.getState().rfid.showModal).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQueryTimedOut');
+    expect(useUserStore.getState().rfid.showModal).toBe(false);
   });
 
   it('times out a stalled pickup query load and resets the kiosk state', async () => {
@@ -653,6 +704,8 @@ describe('ActivityScanningPage', () => {
     };
     renderPage();
     expect(screen.getByText('nach Hause')).toBeInTheDocument();
+    expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
+    expect(queryCheckoutHomeIcon()).not.toBeInTheDocument();
   });
 
   it('does not show nach Hause button when daily_checkout_available is false', () => {
@@ -669,6 +722,38 @@ describe('ActivityScanningPage', () => {
     };
     renderPage();
     expect(screen.queryByText('nach Hause')).not.toBeInTheDocument();
+  });
+
+  it('shows a neutral confirmation when no checkout destination is available', async () => {
+    mockedApi.getDeviceConfig.mockResolvedValueOnce({
+      presence_mode: 'detailed',
+      checkout: {
+        raumwechsel_enabled: false,
+        schulhof_enabled: false,
+        wc_enabled: false,
+        daily_checkout_time: null,
+      },
+      feedback: { enabled: true },
+    });
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'checked_out',
+        daily_checkout_available: false,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+      },
+      showModal: true,
+    };
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Du bist aus diesem Raum abgemeldet.')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
+    expect(queryCheckoutHomeIcon()).not.toBeInTheDocument();
   });
 
   it('shows Schulhof button when schulhofRoomId is set', async () => {
@@ -754,7 +839,7 @@ describe('ActivityScanningPage', () => {
   // Raumwechsel click
   // =======================================================================
 
-  it('clears destination state when Raumwechsel is clicked', async () => {
+  it('shows a neutral confirmation after Raumwechsel is clicked', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockRfidHookReturn = {
       ...mockRfidHookReturn,
@@ -769,9 +854,10 @@ describe('ActivityScanningPage', () => {
     };
     renderPage();
     await user.click(screen.getByText('Raumwechsel'));
-    // After clicking Raumwechsel, destination state is cleared —
-    // the modal should show the checked_out confirmation instead of destination buttons
-    expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
+
+    expect(screen.getByText('Du bist aus diesem Raum abgemeldet.')).toBeInTheDocument();
+    expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
+    expect(queryCheckoutHomeIcon()).not.toBeInTheDocument();
   });
 
   // =======================================================================
@@ -1091,6 +1177,9 @@ describe('ActivityScanningPage', () => {
       expect(screen.getByText('Wie war dein Tag, Lisa?')).toBeInTheDocument();
     });
 
+    expect(queryCheckoutHomeIcon()).not.toBeInTheDocument();
+    expect(queryFeedbackIcon()).toBeInTheDocument();
+
     // Feedback buttons should be visible
     expect(screen.getByText('Gut')).toBeInTheDocument();
     expect(screen.getByText('Okay')).toBeInTheDocument();
@@ -1150,6 +1239,7 @@ describe('ActivityScanningPage', () => {
       expect(screen.getByText('Tschüss, Lisa!')).toBeInTheDocument();
     });
 
+    expect(queryCheckoutHomeIcon()).toBeInTheDocument();
     expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
     expect(screen.queryByText('Gut')).not.toBeInTheDocument();
   });
@@ -2193,28 +2283,6 @@ describe('ActivityScanningPage', () => {
     };
     renderPage();
     expect(screen.queryByText('nach Hause')).not.toBeInTheDocument();
-  });
-
-  // =======================================================================
-  // Checkout without destinations selected (simple checkout after raumwechsel)
-  // =======================================================================
-
-  it('shows "ist unterwegs" after raumwechsel click', async () => {
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    mockRfidHookReturn = {
-      ...mockRfidHookReturn,
-      currentScan: {
-        student_id: 42,
-        student_name: 'Max Mustermann',
-        action: 'checked_out',
-        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
-      },
-      showModal: true,
-    };
-    renderPage();
-    expect(screen.getByText('Raumwechsel')).toBeInTheDocument();
-    await user.click(screen.getByText('Raumwechsel'));
-    expect(screen.getByText('Tschüss, Max!')).toBeInTheDocument();
   });
 
   // =======================================================================

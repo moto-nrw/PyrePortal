@@ -12,6 +12,9 @@ export const DAILY_CHECKOUT_TIMEOUT_MS = 7000;
  */
 export const FAREWELL_TIMEOUT_MS = 1500;
 
+/** Time children have to present a wristband for a pickup query. */
+export const PICKUP_QUERY_SCAN_TIMEOUT_MS = 7000;
+
 /**
  * Timeout duration for successful pickup lookups.
  * Longer than transient attendance toasts so children can actually read the result.
@@ -115,7 +118,7 @@ export const getModalTimeoutDuration = (params: ModalTimeoutParams): number => {
     return params.scanTimeout;
   }
   if (params.isAwaitingPickupQueryScan) {
-    return params.scanTimeout;
+    return PICKUP_QUERY_SCAN_TIMEOUT_MS;
   }
   // Farewell messages use shorter timeout (just showing goodbye)
   if (params.showingFarewell) {
