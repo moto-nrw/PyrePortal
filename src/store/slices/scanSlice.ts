@@ -15,7 +15,9 @@ export interface RecentTagScan {
   syncPromise?: Promise<void>; // Background sync promise (for race condition prevention)
 }
 
-type RfidScanMode = 'checkin' | 'pickupQuery';
+// GKT exposes completed tap events but no start/removal lifecycle. After the
+// prompt closes, keep one scan read-only until its result is dismissed.
+type RfidScanMode = 'checkin' | 'pickupQuery' | 'pickupQueryTimedOut';
 
 // Cache TTL for recentTagScans. This is NOT a dedup window — dedup is handled by
 // scanId (adapter-level) + processingQueue (Layer 1).
@@ -152,6 +154,7 @@ export const createScanSlice = (set: SetState<UserState>, get: GetState<UserStat
     set(state => ({
       rfid: {
         ...state.rfid,
+        scanMode: 'pickupQuery' as RfidScanMode,
         pickupQueryTagId: state.rfid.pickupQueryTagId ?? tagId,
       },
     }));
@@ -162,6 +165,17 @@ export const createScanSlice = (set: SetState<UserState>, get: GetState<UserStat
       rfid: {
         ...state.rfid,
         scanMode: 'checkin' as RfidScanMode,
+        scanContextId: state.rfid.scanContextId + 1,
+        pickupQueryTagId: null,
+      },
+    }));
+  },
+
+  timeoutPickupQueryMode: () => {
+    set(state => ({
+      rfid: {
+        ...state.rfid,
+        scanMode: 'pickupQueryTimedOut' as RfidScanMode,
         scanContextId: state.rfid.scanContextId + 1,
         pickupQueryTagId: null,
       },
