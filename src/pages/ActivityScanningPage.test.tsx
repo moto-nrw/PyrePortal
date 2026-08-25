@@ -314,6 +314,39 @@ describe('ActivityScanningPage', () => {
     expect(screen.getByText('Bitte halte dein Armband an das Lesegerät.')).toBeInTheDocument();
   });
 
+  it('keeps the pickup prompt open for seven seconds and guards the next scan on timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const view = renderPage();
+
+    await user.click(screen.getByLabelText('Abholzeit abfragen'));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      showModal: true,
+      currentScan: null,
+    };
+
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+
+    await act(async () => {
+      vi.advanceTimersByTime(6999);
+    });
+
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQuery');
+    expect(useUserStore.getState().rfid.showModal).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(1);
+    });
+
+    expect(useUserStore.getState().rfid.scanMode).toBe('pickupQueryTimedOut');
+    expect(useUserStore.getState().rfid.showModal).toBe(false);
+  });
+
   it('times out a stalled pickup query load and resets the kiosk state', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const view = renderPage();

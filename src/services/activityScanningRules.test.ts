@@ -4,6 +4,7 @@ import {
   CHECKIN_WITH_PICKUP_TIME_TIMEOUT_MS,
   DAILY_CHECKOUT_TIMEOUT_MS,
   FAREWELL_TIMEOUT_MS,
+  PICKUP_QUERY_SCAN_TIMEOUT_MS,
   PICKUP_QUERY_RESULT_TIMEOUT_MS,
   createPickupQueryTimeoutResult,
   getCheckinCountDelta,
@@ -140,8 +141,10 @@ describe('getModalTimeoutDuration', () => {
     expect(getModalTimeoutDuration({ ...baseParams, isPickupQueryLoading: true })).toBe(3000);
   });
 
-  it('uses the scan timeout while awaiting a pickup query scan', () => {
-    expect(getModalTimeoutDuration({ ...baseParams, isAwaitingPickupQueryScan: true })).toBe(3000);
+  it('gives children seven seconds to scan for a pickup query', () => {
+    expect(getModalTimeoutDuration({ ...baseParams, isAwaitingPickupQueryScan: true })).toBe(
+      PICKUP_QUERY_SCAN_TIMEOUT_MS
+    );
   });
 
   it('uses the farewell timeout when showing a farewell message', () => {

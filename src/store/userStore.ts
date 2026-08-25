@@ -85,6 +85,7 @@ export interface UserState {
   startPickupQueryMode: () => void;
   lockPickupQueryTag: (tagId: string) => void;
   resetScanMode: () => void;
+  timeoutPickupQueryMode: () => void;
 
   // Duplicate prevention bookkeeping actions
   addToProcessingQueue: (tagId: string) => void;

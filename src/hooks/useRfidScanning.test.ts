@@ -76,6 +76,9 @@ vi.mock('../utils/crypto', () => ({
 const setRealScanning = () => {
   (adapter as unknown as Record<string, unknown>).platform = 'gkt';
 };
+const setWedgeScanning = () => {
+  (adapter as unknown as Record<string, unknown>).platform = 'wedge';
+};
 const setMockScanning = () => {
   (adapter as unknown as Record<string, unknown>).platform = undefined;
 };
@@ -400,6 +403,43 @@ describe('useRfidScanning', () => {
 
       // processRfidScan should be called from the mock scan interval
       expect(mockedProcessRfidScan).toHaveBeenCalled();
+    });
+
+    it('guards a browser mock event after timeout and rearms on the next event', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      const { result } = renderHook(() => useRfidScanning());
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      useUserStore.getState().startPickupQueryMode();
+      useUserStore.getState().timeoutPickupQueryMode();
+      const injectScan = (window as unknown as Record<string, unknown>).__PYREPORTAL_MOCK_SCAN__ as
+        ((tagId: string) => void) | undefined;
+
+      expect(injectScan).toBeDefined();
+
+      await act(async () => {
+        injectScan?.(MOCK_TAG);
+        await drainMicrotasks();
+      });
+      expect(mockedQueryPickupInfo).toHaveBeenCalledTimes(1);
+      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
+      expect(useUserStore.getState().rfid.currentScan?.action).toBe('pickup_info');
+      expect(useUserStore.getState().rfid.showModal).toBe(true);
+
+      useUserStore.getState().resetScanMode();
+      useUserStore.getState().hideScanModal();
+
+      await act(async () => {
+        injectScan?.(MOCK_TAG);
+        await drainMicrotasks();
+      });
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
     });
 
     it('does not start duplicate mock interval', async () => {
@@ -1956,6 +1996,102 @@ describe('useRfidScanning', () => {
         resolveKeepalive?.();
         await Promise.resolve();
       });
+    });
+
+    it('routes a GKT scan after pickup timeout to pickup lookup before rearming', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      const { result } = renderHook(() => useRfidScanning());
+      useUserStore.getState().startPickupQueryMode();
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+
+      useUserStore.getState().timeoutPickupQueryMode();
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 15 });
+        onScan?.({ tagId: MOCK_TAG, scanId: 15 });
+        await drainMicrotasks();
+      });
+
+      expect(mockedQueryPickupInfo).toHaveBeenCalledTimes(1);
+      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
+      expect(useUserStore.getState().rfid.currentScan?.action).toBe('pickup_info');
+      expect(useUserStore.getState().rfid.showModal).toBe(true);
+
+      useUserStore.getState().resetScanMode();
+      useUserStore.getState().hideScanModal();
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 16 });
+        await drainMicrotasks();
+      });
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a delayed first GKT scan read-only without a timing assumption', async () => {
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      const { result } = renderHook(() => useRfidScanning());
+      useUserStore.getState().startPickupQueryMode();
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+
+      useUserStore.getState().timeoutPickupQueryMode();
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 17 });
+        await drainMicrotasks();
+      });
+
+      expect(mockedQueryPickupInfo).toHaveBeenCalledTimes(1);
+      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
+    });
+
+    it('keeps a delayed first wedge scan read-only without a timing assumption', async () => {
+      setWedgeScanning();
+      setAuthenticated();
+      setRoom();
+      setSession();
+
+      const { result } = renderHook(() => useRfidScanning());
+      useUserStore.getState().startPickupQueryMode();
+
+      await act(async () => {
+        await result.current.startScanning();
+      });
+
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+      useUserStore.getState().timeoutPickupQueryMode();
+      await vi.advanceTimersByTimeAsync(60_000);
+
+      await act(async () => {
+        onScan?.({ tagId: MOCK_TAG, scanId: 18 });
+        await drainMicrotasks();
+      });
+
+      expect(mockedQueryPickupInfo).toHaveBeenCalledTimes(1);
+      expect(mockedProcessRfidScan).not.toHaveBeenCalled();
     });
 
     it('ignores additional tags while a pickup query is already in flight', async () => {
