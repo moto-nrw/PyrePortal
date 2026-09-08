@@ -1580,6 +1580,63 @@ describe('useRfidScanning', () => {
   // ------------------------------------------------------------------
 
   describe('RFID event processing', () => {
+    it.each([
+      { eventNumber: 303, expectedRequests: 1 },
+      { eventNumber: undefined, expectedRequests: 3 },
+    ])(
+      'handles repeated failed GKT deliveries with eventNumber=$eventNumber without timer retries',
+      async ({ eventNumber, expectedRequests }) => {
+        setRealScanning();
+        setAuthenticated();
+        setRoom();
+        setSession();
+        mockedProcessRfidScan.mockRejectedValue(new Error('API Error: 404 - RFID tag not found'));
+
+        let onScan: ((event: NfcScanEvent) => void) | undefined;
+        mockAdapterStartScanning.mockImplementation(async callback => {
+          onScan = callback;
+        });
+        mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+
+        let deliverNfc: ((payload: unknown) => void) | undefined;
+        vi.stubGlobal('SYSTEM', {
+          registerNfc: (callback: (payload: unknown) => void) => {
+            deliverNfc = callback;
+          },
+          log2: vi.fn(),
+        });
+        const { adapter: gkt } = await import('../platform/gkt');
+        try {
+          const { result } = renderHook(() => useRfidScanning());
+          await act(async () => {
+            await result.current.startScanning();
+          });
+          expect(onScan).toBeDefined();
+          await gkt.initializeNfc();
+          await gkt.startScanning(event => onScan?.(event));
+
+          for (const delay of [0, 1323, 1127]) {
+            await act(async () => {
+              await vi.advanceTimersByTimeAsync(delay);
+              deliverNfc?.({ uid: MOCK_TAG, eventSource: 'NFC', eventNumber });
+              await vi.advanceTimersByTimeAsync(0);
+            });
+          }
+          expect(mockedProcessRfidScan).toHaveBeenCalledTimes(expectedRequests);
+          expect(useUserStore.getState().rfid.processingQueue.size).toBe(0);
+          expect(result.current.currentScan?.action).toBe('error');
+
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(10_000);
+          });
+          expect(mockedProcessRfidScan).toHaveBeenCalledTimes(expectedRequests);
+        } finally {
+          await gkt.stopScanning();
+          vi.unstubAllGlobals();
+        }
+      }
+    );
+
     it('processes scans from adapter callback', async () => {
       setRealScanning();
       setAuthenticated();

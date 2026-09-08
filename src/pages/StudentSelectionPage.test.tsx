@@ -302,6 +302,35 @@ describe('StudentSelectionPage', () => {
   // Grade filter
   // -------------------------------------------------------------------
 
+  it('does not assign a bracelet to a selection hidden by pagination', async () => {
+    const user = userEvent.setup();
+    mockedApi.getStudents.mockResolvedValue(mockStudents);
+    mockedApi.getTeachers.mockResolvedValue([]);
+    mockedApi.assignTag.mockClear();
+
+    renderPage();
+    await user.click(await screen.findByText('Anna Müller'));
+    await user.click(screen.getByText('Nächste'));
+    expect(screen.queryByText('Anna Müller')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Armband zuweisen' }));
+    expect(mockedApi.assignTag).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Armband zuweisen' })).toBeDisabled();
+
+    await user.click(screen.getByText('Clara Weber'));
+    await user.click(screen.getByText('Vorherige'));
+    await user.click(screen.getByRole('button', { name: 'Armband zuweisen' }));
+    expect(mockedApi.assignTag).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText('Anna Müller'));
+    await user.click(screen.getByRole('button', { name: 'Armband zuweisen' }));
+    expect(mockedApi.assignTag).toHaveBeenCalledExactlyOnceWith(
+      baseUser.pin,
+      1,
+      locationState.scannedTag
+    );
+  });
+
   it('shows grade filter chips derived from student classes', async () => {
     mockedApi.getStudents.mockResolvedValue(mockStudents);
     mockedApi.getTeachers.mockResolvedValue([]);
