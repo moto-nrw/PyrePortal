@@ -518,8 +518,14 @@ function StudentSelectionPage() {
             <PaginationControls
               currentPage={currentPage}
               totalPages={totalPages}
-              onPrevPage={goToPrevPage}
-              onNextPage={goToNextPage}
+              onPrevPage={() => {
+                setSelectedEntityId(null);
+                goToPrevPage();
+              }}
+              onNextPage={() => {
+                setSelectedEntityId(null);
+                goToNextPage();
+              }}
               canGoPrev={canGoPrev}
               canGoNext={canGoNext}
             />
