@@ -138,3 +138,7 @@ export const getModalTimeoutDuration = (params: ModalTimeoutParams): number => {
   // Normal scans use configured display time
   return params.modalDisplayTime;
 };
+
+/** Both server checkout outcomes use the same kiosk presentation. */
+export const isCheckoutAction = (action: RfidScanResult['action'] | undefined): boolean =>
+  action === 'checked_out' || action === 'checked_out_daily';

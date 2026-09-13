@@ -7,6 +7,7 @@ import {
   api,
   mapApiErrorToGerman,
   type RfidScanResult,
+  type RfidScanResponse,
   type CurrentSession,
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
@@ -204,7 +205,7 @@ async function triggerMockScanAndDrain() {
   });
 }
 
-function makeCheckinResult(overrides: Partial<RfidScanResult> = {}): RfidScanResult {
+function makeCheckinResult(overrides: Partial<RfidScanResponse> = {}): RfidScanResponse {
   return {
     student_id: 42,
     student_name: 'Max Mustermann',
@@ -217,8 +218,8 @@ function makeCheckinResult(overrides: Partial<RfidScanResult> = {}): RfidScanRes
 function makeSupervisorResult(
   staffId: number,
   staffName: string,
-  overrides: Partial<RfidScanResult> = {}
-): RfidScanResult {
+  overrides: Partial<RfidScanResponse> = {}
+): RfidScanResponse {
   return {
     student_id: staffId,
     student_name: staffName,
@@ -918,7 +919,7 @@ describe('useRfidScanning', () => {
       expect(state.rfid.showModal).toBe(true);
     });
 
-    it('syncs supervisors with backend on supervisor auth', async () => {
+    it('uses the confirmed supervisor result without replacing the server supervisor list', async () => {
       mockedProcessRfidScan.mockResolvedValue(makeSupervisorResult(99, 'Herr Meier'));
 
       const { result } = renderHook(() => useRfidScanning());
@@ -929,10 +930,10 @@ describe('useRfidScanning', () => {
 
       await triggerMockScanAndDrain();
 
-      expect(mockedUpdateSessionSupervisors).toHaveBeenCalled();
+      expect(mockedUpdateSessionSupervisors).not.toHaveBeenCalled();
     });
 
-    it('handles supervisor sync failure gracefully', async () => {
+    it('shows the confirmed supervisor even when a redundant sync would fail', async () => {
       mockedProcessRfidScan.mockResolvedValue(makeSupervisorResult(99, 'Herr Meier'));
       mockedUpdateSessionSupervisors.mockRejectedValue(new Error('Sync failed'));
 
@@ -1027,8 +1028,25 @@ describe('useRfidScanning', () => {
       setSession();
     });
 
-    it('handles "already has an active visit" error', async () => {
-      mockedProcessRfidScan.mockRejectedValue(new Error('already has an active visit'));
+    it('does not infer an active visit from an unrelated error message', async () => {
+      const { ApiError } = await import('../services/api');
+      mockedProcessRfidScan.mockRejectedValue(
+        new ApiError('already has an active visit', 500, 'UNRELATED_ERROR')
+      );
+      const { result } = renderHook(() => useRfidScanning());
+      await act(async () => {
+        await result.current.startScanning();
+      });
+      await triggerMockScanAndDrain();
+      expect(result.current.currentScan?.action).toBe('error');
+      expect(result.current.currentScan?.isInfo).not.toBe(true);
+    });
+
+    it('uses the active-visit code independently of backend message wording', async () => {
+      const { ApiError } = await import('../services/api');
+      mockedProcessRfidScan.mockRejectedValue(
+        new ApiError('Updated backend wording', 409, 'STUDENT_ALREADY_ACTIVE')
+      );
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -1634,6 +1652,80 @@ describe('useRfidScanning', () => {
           await gkt.stopScanning();
           vi.unstubAllGlobals();
         }
+      }
+    );
+
+    it.each(['browser', 'gkt'] as const)(
+      'keeps rapid scans and network recovery server-authoritative (%s)',
+      async platform => {
+        if (platform === 'gkt') setRealScanning();
+        setAuthenticated();
+        setRoom();
+        setSession();
+        let onScan: ((event: NfcScanEvent) => void) | undefined;
+        mockAdapterStartScanning.mockImplementation(async callback => {
+          onScan = callback;
+        });
+        mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+        const { result } = renderHook(() => useRfidScanning());
+        await act(async () => {
+          await result.current.startScanning();
+        });
+        let scanId = 0;
+        const emit = (tagId: string) => {
+          if (platform === 'gkt') onScan!({ tagId, scanId: ++scanId });
+          else {
+            const inject = (
+              window as unknown as { __PYREPORTAL_MOCK_SCAN__: (tag: string) => void }
+            ).__PYREPORTAL_MOCK_SCAN__;
+            inject(tagId);
+          }
+        };
+        let finishFirst!: (value: RfidScanResponse) => void;
+        mockedProcessRfidScan.mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              finishFirst = resolve;
+            })
+        );
+        await act(async () => {
+          emit(MOCK_TAG);
+          await vi.advanceTimersByTimeAsync(100);
+          emit(MOCK_TAG); // Same tag is still in flight, even with a fresh event ID.
+          emit('04:11:22:33:44:55:66');
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(mockedProcessRfidScan).toHaveBeenCalledTimes(2);
+        expect(useUserStore.getState().rfid.processingQueue.has(MOCK_TAG)).toBe(true);
+        await act(async () => {
+          finishFirst(makeCheckinResult());
+        });
+        expect(useUserStore.getState().rfid.processingQueue.size).toBe(0);
+        mockedProcessRfidScan.mockResolvedValueOnce(
+          makeCheckinResult({ action: 'checked_out_daily', daily_checkout_available: true })
+        );
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(100);
+          emit(MOCK_TAG);
+        });
+        expect(mockedProcessRfidScan).toHaveBeenCalledTimes(3);
+        expect(result.current.currentScan?.action).toBe('checked_out_daily');
+        mockedProcessRfidScan.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+        await act(async () => {
+          emit(MOCK_TAG);
+        });
+        expect(result.current.currentScan?.action).toBe('error');
+        expect(useUserStore.getState().rfid.processingQueue.size).toBe(0);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(100);
+        });
+        expect(mockedProcessRfidScan).toHaveBeenCalledTimes(4); // No automatic write retry.
+        await act(async () => {
+          emit(MOCK_TAG);
+        });
+        expect(mockedProcessRfidScan).toHaveBeenCalledTimes(5);
+        expect(result.current.currentScan?.action).toBe('checked_in');
+        expect(useUserStore.getState().rfid.processingQueue.size).toBe(0);
       }
     );
 

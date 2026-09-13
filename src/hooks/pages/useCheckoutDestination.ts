@@ -18,12 +18,10 @@ interface UseCheckoutDestinationParams {
  * Checkout destination flow (unified: Raumwechsel, Schulhof, Toilette).
  *
  * Holds the destination modal state and performs the destination room
- * check-in through the checkout destination service. The service waits for
- * the background checkout sync of the triggering scan before checking in.
+ * check-in through the checkout destination service after the server scan completes.
  */
 export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckoutDestinationParams) {
   const { authenticatedUser, selectedSupervisors, setScanResult, showScanModal } = useUserStore();
-  const { recentTagScans } = useUserStore(state => state.rfid);
 
   // State for checkout destination selection (unified: Raumwechsel, Schulhof, nach Hause)
   const [checkoutDestinationState, setCheckoutDestinationState] =
@@ -45,7 +43,6 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       state: checkoutDestinationState,
       pin: authenticatedUser.pin,
       staffId: resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
-      recentTagScans,
     });
 
     setScanResult(result);

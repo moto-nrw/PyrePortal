@@ -12,7 +12,6 @@ export interface RecentTagScan {
   timestamp: number;
   studentId?: string;
   result?: RfidScanResult;
-  syncPromise?: Promise<void>; // Background sync promise (for race condition prevention)
 }
 
 // GKT exposes completed tap events but no start/removal lifecycle. After the
@@ -21,7 +20,7 @@ type RfidScanMode = 'checkin' | 'pickupQuery' | 'pickupQueryTimedOut';
 
 // Cache TTL for recentTagScans. This is NOT a dedup window — dedup is handled by
 // scanId (adapter-level) + processingQueue (Layer 1).
-// recentTagScans only exists as a short-lived cache for result replay and syncPromise.
+// recentTagScans only exists as a short-lived cache for result replay.
 export const RECENT_SCAN_CACHE_TTL_MS = 10_000;
 
 // RFID scanning state

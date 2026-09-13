@@ -2,7 +2,7 @@ import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
 
 import { api, mapApiErrorToGerman, ApiError, formatRoomName } from './api';
-import type { RfidScanResult, CurrentSession } from './api';
+import type { RfidScanResult } from './api';
 
 const logger = createLogger('scanProcessor');
 
@@ -46,8 +46,6 @@ export const createSupervisorRedirectResult = (): ScanDisplayResult => ({
 interface SupervisorScanParams {
   result: RfidScanResult;
   tagId: string;
-  currentSession: CurrentSession | null;
-  pin: string;
   scannedSupervisors: Set<number>;
   addSupervisorFromRfid: (staffId: number, staffName: string) => boolean;
   addActiveSupervisorTag: (tagId: string) => void;
@@ -59,14 +57,10 @@ export type SupervisorScanOutcome =
   | { handled: true; presentation: 'redirect' }
   | { handled: true; presentation: 'firstScan'; result: ScanDisplayResult };
 
-export const evaluateSupervisorScan = async (
-  params: SupervisorScanParams
-): Promise<SupervisorScanOutcome> => {
+export const evaluateSupervisorScan = (params: SupervisorScanParams): SupervisorScanOutcome => {
   const {
     result,
     tagId,
-    currentSession,
-    pin,
     scannedSupervisors,
     addSupervisorFromRfid,
     addActiveSupervisorTag,
@@ -92,11 +86,6 @@ export const evaluateSupervisorScan = async (
   scannedSupervisors.add(staffId);
   addActiveSupervisorTag(tagId);
 
-  // Sync supervisors with backend (fire-and-forget)
-  if (currentSession && pin) {
-    void syncSupervisorsWithBackend(currentSession, pin, staffId);
-  }
-
   logger.info('Supervisor authenticated successfully', {
     supervisorName: staffName,
     message: result.message,
@@ -117,29 +106,6 @@ export const evaluateSupervisorScan = async (
     message: `${result.student_name} wurde als Betreuer zu diesem Raum hinzugefügt.`,
   };
   return { handled: true, presentation: 'firstScan', result: firstScanResult };
-};
-
-/**
- * Syncs supervisor list with backend after RFID authentication.
- */
-const syncSupervisorsWithBackend = async (
-  currentSession: CurrentSession,
-  pin: string,
-  staffId: number
-): Promise<void> => {
-  try {
-    const updatedSupervisorIds = useUserStore.getState().selectedSupervisors.map(s => s.id);
-    await api.updateSessionSupervisors(pin, currentSession.active_group_id, updatedSupervisorIds);
-    logger.info('Supervisor synced via RFID (network path)', {
-      staffId,
-      sessionId: currentSession.active_group_id,
-    });
-  } catch (error) {
-    logger.warn('Supervisor sync failed (network path)', {
-      error: error instanceof Error ? error.message : String(error),
-      staffId,
-    });
-  }
 };
 
 /**
@@ -208,27 +174,13 @@ const buildAlreadyInMessage = (error: unknown): string => {
   return 'Schüler*in ist bereits angemeldet.';
 };
 
-/**
- * Detect duplicate-active-visit responses. Prefer the structured
- * `STUDENT_ALREADY_ACTIVE` code from the new 409 body (Issue #844). Keep
- * the substring fallback so older backend builds without the structured
- * response still resolve to the friendly modal instead of a generic error.
- */
-const isStudentAlreadyActiveError = (error: unknown, errorMessage: string): boolean => {
-  if (error instanceof ApiError && error.code === 'STUDENT_ALREADY_ACTIVE') {
-    return true;
-  }
-  return errorMessage.includes('already has an active visit');
-};
+/** Domain outcomes are identified only by the backend's stable error code. */
+const isStudentAlreadyActiveError = (error: unknown): boolean =>
+  error instanceof ApiError && error.code === 'STUDENT_ALREADY_ACTIVE';
 
 /**
- * Extract the student_id from a STUDENT_ALREADY_ACTIVE error if present.
- * The backend (Issue #844) ships the student id in `details.student_id`
- * even on the degraded 409 path, so we always have at least the identity
- * to wire into the dedup map. Older backends that only emit the substring
- * fallback won't include details — return null and accept that the next
- * scan event will hit the backend again until a successful scan
- * populates the mapping organically.
+ * Preserve the identity supplied with a conflict, without guessing when details
+ * are missing. This cache is presentation bookkeeping, never a dedup gate.
  */
 const extractAlreadyActiveStudentId = (error: unknown): number | null => {
   if (error instanceof ApiError && typeof error.details?.student_id === 'number') {
@@ -241,10 +193,8 @@ const extractAlreadyActiveStudentId = (error: unknown): number | null => {
  * Creates an error result for display when scan fails.
  */
 export const createScanErrorResult = (error: unknown): ScanDisplayResult => {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-
   // Special handling for "already checked in" scenario
-  if (isStudentAlreadyActiveError(error, errorMessage)) {
+  if (isStudentAlreadyActiveError(error)) {
     return {
       student_name: 'Bereits eingecheckt',
       student_id: extractAlreadyActiveStudentId(error),

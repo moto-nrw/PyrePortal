@@ -104,7 +104,6 @@ export const useRfidScanning = () => {
       const currentState = useUserStore.getState();
       const freshRoom = currentState.selectedRoom;
       const freshUser = currentState.authenticatedUser;
-      const freshSession = currentState.currentSession;
       const freshSupervisors = currentState.selectedSupervisors;
       const freshRfid = currentState.rfid;
 
@@ -213,11 +212,9 @@ export const useRfidScanning = () => {
         setScanResult({ ...result, scannedTagId: tagId });
 
         // Handle supervisor authentication (handled outcomes end the scan here)
-        const supervisorOutcome = await evaluateSupervisorScan({
+        const supervisorOutcome = evaluateSupervisorScan({
           result,
           tagId,
-          currentSession: freshSession,
-          pin: freshUser.pin,
           scannedSupervisors: scannedSupervisorsRef.current,
           addSupervisorFromRfid,
           addActiveSupervisorTag,

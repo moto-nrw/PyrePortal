@@ -138,7 +138,7 @@ const queryCheckoutHomeIcon = () =>
 const queryFeedbackIcon = () =>
   document.querySelector('dialog svg[data-icon="face-smile"][style*="font-size: 72px"]');
 
-describe('ActivityScanningPage', () => {
+describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', action => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockRfidHookReturn = {
@@ -679,7 +679,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -696,7 +696,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -714,7 +714,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -740,7 +740,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -766,7 +766,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -793,7 +793,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -819,7 +819,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -846,7 +846,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -881,7 +881,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -919,7 +919,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -954,7 +954,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -997,7 +997,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1041,7 +1041,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1079,7 +1079,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1113,7 +1113,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1151,7 +1151,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
         visit_id: 100,
@@ -1195,7 +1195,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1225,7 +1225,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1253,7 +1253,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
         feedback_enabled: false,
@@ -1288,7 +1288,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
         visit_id: 100,
@@ -1356,7 +1356,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
         feedback_enabled: false,
@@ -1422,7 +1422,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1461,7 +1461,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1490,7 +1490,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1519,7 +1519,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1545,7 +1545,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: null,
         student_name: 'Unknown Student',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1771,7 +1771,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Max Mustermann',
-        action: 'checked_out',
+        action,
         active_students: 5,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -1794,7 +1794,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Max Mustermann',
-        action: 'checked_out',
+        action,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
       showModal: true,
@@ -2063,7 +2063,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
       showModal: true,
@@ -2138,23 +2138,11 @@ describe('ActivityScanningPage', () => {
   });
 
   // =======================================================================
-  // Schulhof with syncPromise wait
+  // Schulhof after confirmed checkout
   // =======================================================================
 
-  it('waits for syncPromise before Schulhof check-in', async () => {
+  it('checks into Schulhof after confirmed checkout', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    let resolveSyncPromise: () => void;
-    const syncPromise = new Promise<void>(resolve => {
-      resolveSyncPromise = resolve;
-    });
-
-    useUserStore.setState({
-      rfid: {
-        ...defaultRfidState,
-        recentTagScans: new Map([['04:AA:BB:CC:DD:EE:FF', { timestamp: Date.now(), syncPromise }]]),
-      },
-    });
 
     mockedApi.getRooms.mockResolvedValueOnce([
       { id: 99, name: 'Schulhof', room_type: 'outdoor', capacity: 100, is_occupied: false },
@@ -2171,7 +2159,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -2186,15 +2174,7 @@ describe('ActivityScanningPage', () => {
       expect(screen.getByText('Schulhof')).toBeInTheDocument();
     });
 
-    // Click Schulhof — it should wait for syncPromise
-    const clickPromise = user.click(screen.getByText('Schulhof'));
-
-    // Resolve the sync promise
-    await act(async () => {
-      resolveSyncPromise!();
-    });
-
-    await clickPromise;
+    await user.click(screen.getByText('Schulhof'));
 
     await waitFor(() => {
       expect(mockedApi.processRfidScan).toHaveBeenCalled();
@@ -2202,23 +2182,11 @@ describe('ActivityScanningPage', () => {
   });
 
   // =======================================================================
-  // Toilette with syncPromise wait
+  // Toilette after confirmed checkout
   // =======================================================================
 
-  it('waits for syncPromise before Toilette check-in', async () => {
+  it('checks into Toilette after confirmed checkout', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-
-    let resolveSyncPromise: () => void;
-    const syncPromise = new Promise<void>(resolve => {
-      resolveSyncPromise = resolve;
-    });
-
-    useUserStore.setState({
-      rfid: {
-        ...defaultRfidState,
-        recentTagScans: new Map([['04:AA:BB:CC:DD:EE:FF', { timestamp: Date.now(), syncPromise }]]),
-      },
-    });
 
     mockedApi.getRooms.mockResolvedValueOnce([
       { id: 88, name: 'WC', room_type: 'facility', capacity: 5, is_occupied: false },
@@ -2235,7 +2203,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: false,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -2250,13 +2218,7 @@ describe('ActivityScanningPage', () => {
       expect(screen.getByText('Toilette')).toBeInTheDocument();
     });
 
-    const clickPromise = user.click(screen.getByText('Toilette'));
-
-    await act(async () => {
-      resolveSyncPromise!();
-    });
-
-    await clickPromise;
+    await user.click(screen.getByText('Toilette'));
 
     await waitFor(() => {
       expect(mockedApi.processRfidScan).toHaveBeenCalled();
@@ -2300,7 +2262,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Lisa Schmidt',
-        action: 'checked_out',
+        action,
         daily_checkout_available: true,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
@@ -2355,7 +2317,7 @@ describe('ActivityScanningPage', () => {
       currentScan: {
         student_id: 42,
         student_name: 'Max Mustermann',
-        action: 'checked_out',
+        action,
         scannedTagId: '04:AA:BB:CC:DD:EE:FF',
       },
       showModal: true,

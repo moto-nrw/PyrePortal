@@ -13,6 +13,7 @@ import { BackgroundWrapper } from '../components/background-wrapper';
 import { HouseLineIcon, ModalBase } from '../components/ui';
 import BackButton from '../components/ui/BackButton';
 import { useActivityScanningPage } from '../hooks/pages/useActivityScanningPage';
+import { isCheckoutAction } from '../services/activityScanningRules';
 import { formatRoomName, type DailyFeedbackRating } from '../services/api';
 import { designSystem } from '../styles/designSystem';
 
@@ -453,7 +454,7 @@ const ActivityScanningPage: React.FC = () => {
 
     // Unified checkout destination selection (Raumwechsel, Schulhof, nach Hause)
     if (
-      currentScan.action === 'checked_out' &&
+      isCheckoutAction(currentScan.action) &&
       checkoutDestinationState &&
       !checkoutDestinationState.showingFarewell
     ) {
@@ -665,6 +666,7 @@ const ActivityScanningPage: React.FC = () => {
                   )}
                 </>
               );
+            case 'checked_out_daily':
             case 'checked_out':
               return ''; // Checkout shows destination buttons, no extra text needed
             case 'transferred':
@@ -882,7 +884,7 @@ const ActivityScanningPage: React.FC = () => {
           size={
             !isPickupQueryPromptOpen &&
             !showFeedbackPrompt &&
-            currentScan?.action === 'checked_out' &&
+            isCheckoutAction(currentScan?.action) &&
             checkoutDestinationState &&
             !checkoutDestinationState.showingFarewell
               ? destinationCount >= 3
@@ -905,7 +907,7 @@ const ActivityScanningPage: React.FC = () => {
             !shouldKeepPickupQueryModalOpen &&
             !showFeedbackPrompt &&
             !(
-              currentScan?.action === 'checked_out' &&
+              isCheckoutAction(currentScan?.action) &&
               checkoutDestinationState &&
               !checkoutDestinationState.showingFarewell
             )
@@ -917,7 +919,7 @@ const ActivityScanningPage: React.FC = () => {
           {(isPickupQueryPromptOpen ||
             showFeedbackPrompt ||
             !(
-              currentScan?.action === 'checked_out' &&
+              isCheckoutAction(currentScan?.action) &&
               checkoutDestinationState &&
               !checkoutDestinationState.showingFarewell
             )) && (
@@ -1101,7 +1103,7 @@ const ActivityScanningPage: React.FC = () => {
 
               // Checkout with destination buttons: ask where the student is going
               if (
-                currentScan?.action === 'checked_out' &&
+                isCheckoutAction(currentScan?.action) &&
                 checkoutDestinationState &&
                 !checkoutDestinationState.showingFarewell
               ) {
@@ -1110,7 +1112,7 @@ const ActivityScanningPage: React.FC = () => {
               }
 
               // Neutral confirmation after leaving this room without going home
-              if (currentScan?.action === 'checked_out') {
+              if (isCheckoutAction(currentScan?.action)) {
                 return texts.checkoutConfirmation;
               }
 
