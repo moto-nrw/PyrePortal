@@ -1076,6 +1076,8 @@ describe('api methods', () => {
       const activities = [
         { id: 1, name: 'Fußball AG', category: 'sport' },
         { id: 2, name: 'Kunst AG', category: 'kreativ' },
+        { id: 3, name: 'Schulhof Freispiel', category: 'Schulhof', is_system: true },
+        { id: 4, name: 'WC', category: 'WC', is_system: true },
       ];
       mockFetch.mockResolvedValueOnce(
         mockResponse({ status: 'success', data: activities, message: 'ok' })
@@ -1118,7 +1120,11 @@ describe('api methods', () => {
     it('returns rooms array without capacity param', async () => {
       const { api: freshApi } = await getFreshApi();
 
-      const rooms = [{ id: 1, name: 'Turnhalle', is_occupied: false }];
+      const rooms = [
+        { id: 1, name: 'Turnhalle', is_occupied: false },
+        { id: 2, name: 'Schulhof', is_occupied: false, is_system: true },
+        { id: 3, name: 'WC', is_occupied: false, is_system: true },
+      ];
       mockFetch.mockResolvedValueOnce(
         mockResponse({ status: 'success', data: rooms, message: 'ok' })
       );

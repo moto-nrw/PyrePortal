@@ -121,45 +121,32 @@ describe('CreateActivityPage', () => {
   it.each([
     { id: 20, name: 'Schulhof Freispiel', category: 'Schulhof' },
     { id: 21, name: 'WC', category: 'WC' },
-    { id: 22, name: 'Technical activity', category: 'Internal', is_system: true },
-  ])('does not offer infrastructure activity $name', async activity => {
-    mockFetchActivities.mockResolvedValue([activity, ...sampleActivities]);
-    renderPage();
-    await screen.findByText('Fußball');
-    expect(screen.queryByText(activity.name)).not.toBeInTheDocument();
-  });
+    { id: 22, name: 'Schulhof Freispiel', category: 'Schulhof', is_system: true },
+    { id: 23, name: 'WC', category: 'WC', is_system: true },
+    { id: 24, name: 'Schulhof', category: 'Schulhof', is_system: false },
+  ])(
+    'keeps backend-provided activity $id selectable regardless of system metadata',
+    async activity => {
+      mockFetchActivities.mockResolvedValue([activity]);
+      renderPage();
+      fireEvent.click(await screen.findByText(activity.name));
+      expect(mockSetSelectedActivity).toHaveBeenCalledWith(activity);
+    }
+  );
 
-  it.each([
-    { id: 20, name: 'Schulhof', category: 'Schulhof' },
-    { id: 21, name: 'Schulhof Freispiel', category: 'Sport' },
-    { id: 22, name: 'WC', category: 'Kreativ' },
-    { id: 23, name: 'Schulhof Freispiel', category: 'Schulhof', is_system: false },
-    { id: 24, name: 'WC', category: 'WC', is_system: false },
-  ])('keeps school-managed activity $id selectable', async activity => {
+  it('allows continuing with a backend-provided system activity', async () => {
+    const activity = {
+      id: 20,
+      name: 'Schulhof Freispiel',
+      category: 'Schulhof',
+      is_system: true,
+    };
     mockFetchActivities.mockResolvedValue([activity]);
+    useUserStore.setState({ selectedActivity: activity });
     renderPage();
-    fireEvent.click(await screen.findByText(activity.name));
-    expect(mockSetSelectedActivity).toHaveBeenCalledWith(activity);
-  });
-
-  it('shows the empty state when only infrastructure activities are returned', async () => {
-    mockFetchActivities.mockResolvedValue([
-      { id: 20, name: 'Schulhof Freispiel', category: 'Schulhof' },
-      { id: 21, name: 'WC', category: 'WC' },
-    ]);
-    renderPage();
-    expect(await screen.findByText('Keine Aktivitäten verfügbar')).toBeInTheDocument();
-    expect(screen.queryByText('Schulhof Freispiel')).not.toBeInTheDocument();
-  });
-
-  it('cannot continue with a previously selected infrastructure activity', async () => {
-    useUserStore.setState({
-      selectedActivity: { id: 20, name: 'Schulhof Freispiel', category: 'Schulhof' },
-    });
-    renderPage();
-    await screen.findByText('Fußball');
-    expect(screen.getByRole('button', { name: 'Weiter' })).toBeDisabled();
-    expect(mockNavigate).not.toHaveBeenCalled();
+    await screen.findByText(activity.name);
+    fireEvent.click(screen.getByRole('button', { name: 'Weiter' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/staff-selection');
   });
 
   it('renders page title when authenticated', () => {

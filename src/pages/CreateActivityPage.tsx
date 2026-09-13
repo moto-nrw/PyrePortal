@@ -28,18 +28,6 @@ const texts = {
   continueButton: 'Weiter',
 } as const;
 
-// Filter only the picker: session restoration still needs the complete IoT list.
-function isSelectableActivity(activity: ActivityResponse): boolean {
-  if (activity.is_system !== undefined) return !activity.is_system;
-
-  // Legacy IoT payloads omit is_system. Match the provisioning name/category
-  // pairs, not room names: Schulhof remains a valid RFID room and activity.
-  return !(
-    (activity.name === 'Schulhof Freispiel' && activity.category === 'Schulhof') ||
-    (activity.name === 'WC' && activity.category === 'WC')
-  );
-}
-
 function CreateActivityPage() {
   const {
     authenticatedUser,
@@ -97,7 +85,7 @@ function CreateActivityPage() {
       logger.debug('Activities fetch performance', { duration_ms: measure.duration });
 
       if (activitiesData && Array.isArray(activitiesData)) {
-        setActivities(activitiesData.filter(isSelectableActivity));
+        setActivities(activitiesData);
         logger.info('Activities loaded successfully', {
           count: activitiesData.length,
           activities: activitiesData.map(a => ({ id: a.id, name: a.name })),
@@ -192,7 +180,7 @@ function CreateActivityPage() {
 
   // Continue to team selection (requires selectedActivity)
   const handleContinue = () => {
-    if (!selectedActivity || !isSelectableActivity(selectedActivity)) return;
+    if (!selectedActivity) return;
 
     logNavigation('CreateActivityPage', 'StaffSelectionPage', {
       reason: 'activity_confirmed',
@@ -334,11 +322,7 @@ function CreateActivityPage() {
           />
 
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-            <PillButton
-              variant="primary"
-              onClick={handleContinue}
-              disabled={!selectedActivity || !isSelectableActivity(selectedActivity)}
-            >
+            <PillButton variant="primary" onClick={handleContinue} disabled={!selectedActivity}>
               {texts.continueButton}
             </PillButton>
           </div>
