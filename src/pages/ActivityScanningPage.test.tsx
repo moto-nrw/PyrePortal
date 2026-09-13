@@ -141,6 +141,7 @@ const queryFeedbackIcon = () =>
 describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', action => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-09-13T12:00:00Z'));
     mockRfidHookReturn = {
       isScanning: false,
       currentScan: null,
@@ -148,7 +149,8 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
       startScanning: mockStartScanning,
       stopScanning: mockStopScanning,
     };
-    useUserStore.setState(defaultStoreState);
+    // Reset transition timestamps and store actions replaced by earlier cases.
+    useUserStore.setState({ ...useUserStore.getInitialState(), ...defaultStoreState });
     mockNavigate.mockReset();
   });
 
