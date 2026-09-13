@@ -227,6 +227,20 @@ describe('RoomSelectionPage', () => {
   // =========================================================================
 
   describe('room selection', () => {
+    it('keeps the system Schulhof selectable for RFID sessions', async () => {
+      setStoreState({ rooms: [makeRoom({ name: 'Schulhof', is_system: true })] });
+      renderPage();
+      await userEvent.click(screen.getByText('Schulhof'));
+      expect(screen.getByText('Aufsicht starten?')).toBeInTheDocument();
+      await userEvent.click(screen.getByText('Aufsicht starten'));
+      await waitFor(() => {
+        expect(mockedApi.startSession).toHaveBeenCalledWith(
+          '1234',
+          expect.objectContaining({ activity_id: 10, room_id: 1 })
+        );
+      });
+    });
+
     it('clicking available room opens confirmation modal', async () => {
       const user = userEvent.setup();
       renderPage();
