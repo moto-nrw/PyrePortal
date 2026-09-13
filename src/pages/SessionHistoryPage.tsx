@@ -1,4 +1,4 @@
-import { faPlay, faTrashCan, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faPlay, faTrashCan } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -31,6 +31,8 @@ const texts = {
   hint: 'Antippen startet die Aufsicht neu.',
   clearAll: 'Alle löschen',
   removeEntryLabel: 'Eintrag löschen',
+  removeConfirmHeading: 'Eintrag löschen?',
+  cancelRemove: 'Abbrechen',
   emptyHint: 'Keine Einträge vorhanden.',
   lastUsedPrefix: 'Zuletzt:',
   recreationErrorFallback: 'Fehler beim Starten der Aktivität',
@@ -91,7 +93,14 @@ function SessionHistoryPage() {
   const [showClearConfirmModal, setShowClearConfirmModal] = useState(false);
   const [isNavigatingToScanning, setIsNavigatingToScanning] = useState(false);
   const [pendingEntry, setPendingEntry] = useState<SessionHistoryEntry | null>(null);
+  const [entryToRemove, setEntryToRemove] = useState<SessionHistoryEntry | null>(null);
+  const [isRemovingEntry, setIsRemovingEntry] = useState(false);
+  const cancelRemoveRef = useRef<HTMLButtonElement>(null);
   const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    if (entryToRemove) cancelRemoveRef.current?.focus();
+  }, [entryToRemove]);
 
   const history = sessionSettings?.session_history ?? [];
   const {
@@ -136,6 +145,7 @@ function SessionHistoryPage() {
 
   const handleSelect = async (entry: SessionHistoryEntry) => {
     if (isValidatingLastSession) return;
+    setEntryToRemove(null);
     logUserAction('Attempting to recreate session from history', {
       activityId: entry.activity_id,
       roomId: entry.room_id,
@@ -206,11 +216,17 @@ function SessionHistoryPage() {
   };
 
   const handleRemoveEntry = async (entry: SessionHistoryEntry) => {
+    setEntryToRemove(null);
+    setIsRemovingEntry(true);
     logger.info('Removing history entry', {
       activityId: entry.activity_id,
       roomId: entry.room_id,
     });
-    await removeSessionHistoryEntry(entry);
+    try {
+      await removeSessionHistoryEntry(entry);
+    } finally {
+      setIsRemovingEntry(false);
+    }
   };
 
   if (!authenticatedUser || (currentSession && !isNavigatingToScanning)) {
@@ -270,84 +286,143 @@ function SessionHistoryPage() {
                   gap: '12px',
                 }}
               >
-                <button
-                  type="button"
-                  onClick={() => void handleSelect(entry)}
-                  disabled={isValidatingLastSession}
-                  style={{
-                    flex: 1,
-                    textAlign: 'left',
-                    backgroundColor: designSystem.colors.white,
-                    border: `1px solid ${designSystem.gray[200]}`,
-                    borderRadius: designSystem.borderRadius.lg,
-                    padding: '18px 24px',
-                    cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
-                    opacity: isValidatingLastSession ? 0.6 : 1,
-                    transition: designSystem.transitions.base,
-                    minHeight: '88px',
-                    boxShadow: designSystem.shadows.sm,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '20px',
-                  }}
-                >
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span
-                      style={{
-                        display: 'flex',
-                        alignItems: 'baseline',
-                        justifyContent: 'space-between',
-                        gap: '16px',
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: '24px',
-                          fontWeight: 600,
-                          color: designSystem.gray[900],
-                        }}
-                      >
-                        {entry.activity_name}
-                      </span>
-                      <span style={{ fontSize: '16px', color: designSystem.gray[500] }}>
-                        {texts.lastUsedPrefix} {formatLastUsed(entry.saved_at)}
-                      </span>
-                    </span>
-                    <span
-                      style={{
-                        display: 'block',
-                        marginTop: '6px',
-                        fontSize: '18px',
-                        color: designSystem.gray[500],
-                      }}
-                    >
-                      {formatRoomName(entry.room_name)} · {entry.supervisor_names.join(', ')}
-                    </span>
-                  </span>
-                  {/* Visual affordance only; the whole card is the button */}
-                  <span
-                    aria-hidden="true"
+                {entryToRemove === entry ? (
+                  <div
                     style={{
-                      flexShrink: 0,
-                      width: '56px',
-                      height: '56px',
+                      flex: 1,
+                      minWidth: 0,
+                      textAlign: 'left',
+                      color: designSystem.gray[900],
+                      minHeight: '88px',
+                      padding: '18px 24px',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center',
-                      backgroundColor: designSystem.pastel.green.tint,
-                      color: designSystem.pastel.green.accent,
-                      borderRadius: designSystem.borderRadius.full,
+                      gap: '20px',
+                      backgroundColor: designSystem.colors.white,
+                      border: `1px solid ${designSystem.pastel.red.accent}`,
+                      borderRadius: designSystem.borderRadius.lg,
                     }}
                   >
-                    <FontAwesomeIcon icon={faPlay} style={{ fontSize: '20px' }} />
-                  </span>
-                </button>
+                    <div id="remove-history-entry-prompt" style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: '24px', fontWeight: 600 }}>
+                        {texts.removeConfirmHeading}
+                      </span>
+                      <span
+                        style={{
+                          display: 'block',
+                          fontSize: '18px',
+                          color: designSystem.gray[500],
+                        }}
+                      >
+                        {entry.activity_name} · {formatRoomName(entry.room_name)} ·{' '}
+                        {entry.supervisor_names.join(', ')}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      aria-describedby="remove-history-entry-prompt"
+                      onClick={() => void handleRemoveEntry(entry)}
+                      style={{
+                        minHeight: '56px',
+                        padding: '12px 24px',
+                        flexShrink: 0,
+                        fontSize: '18px',
+                        fontWeight: 600,
+                        color: designSystem.colors.white,
+                        backgroundColor: designSystem.flat.danger,
+                        border: 'none',
+                        borderRadius: designSystem.borderRadius.full,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {texts.clearConfirmButton}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handleSelect(entry)}
+                    disabled={isValidatingLastSession}
+                    style={{
+                      flex: 1,
+                      textAlign: 'left',
+                      backgroundColor: designSystem.colors.white,
+                      border: `1px solid ${designSystem.gray[200]}`,
+                      borderRadius: designSystem.borderRadius.lg,
+                      padding: '18px 24px',
+                      cursor: isValidatingLastSession ? 'not-allowed' : 'pointer',
+                      opacity: isValidatingLastSession ? 0.6 : 1,
+                      transition: designSystem.transitions.base,
+                      minHeight: '88px',
+                      boxShadow: designSystem.shadows.sm,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '20px',
+                    }}
+                  >
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span
+                        style={{
+                          display: 'flex',
+                          alignItems: 'baseline',
+                          justifyContent: 'space-between',
+                          gap: '16px',
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontSize: '24px',
+                            fontWeight: 600,
+                            color: designSystem.gray[900],
+                          }}
+                        >
+                          {entry.activity_name}
+                        </span>
+                        <span style={{ fontSize: '16px', color: designSystem.gray[500] }}>
+                          {texts.lastUsedPrefix} {formatLastUsed(entry.saved_at)}
+                        </span>
+                      </span>
+                      <span
+                        style={{
+                          display: 'block',
+                          marginTop: '6px',
+                          fontSize: '18px',
+                          color: designSystem.gray[500],
+                        }}
+                      >
+                        {formatRoomName(entry.room_name)} · {entry.supervisor_names.join(', ')}
+                      </span>
+                    </span>
+                    {/* Visual affordance only; the whole card is the button */}
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        flexShrink: 0,
+                        width: '56px',
+                        height: '56px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: designSystem.pastel.green.tint,
+                        color: designSystem.pastel.green.accent,
+                        borderRadius: designSystem.borderRadius.full,
+                      }}
+                    >
+                      <FontAwesomeIcon icon={faPlay} style={{ fontSize: '20px' }} />
+                    </span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  aria-label={texts.removeEntryLabel}
-                  onClick={() => void handleRemoveEntry(entry)}
+                  ref={entryToRemove === entry ? cancelRemoveRef : undefined}
+                  aria-label={entryToRemove === entry ? texts.cancelRemove : texts.removeEntryLabel}
+                  aria-describedby={
+                    entryToRemove === entry ? 'remove-history-entry-prompt' : undefined
+                  }
+                  disabled={isRemovingEntry}
+                  onClick={() => setEntryToRemove(entryToRemove === entry ? null : entry)}
                   style={{
-                    width: '72px',
+                    width: entryToRemove === entry ? '130px' : '72px',
                     height: '72px',
                     flexShrink: 0,
                     display: 'flex',
@@ -360,7 +435,11 @@ function SessionHistoryPage() {
                     cursor: 'pointer',
                   }}
                 >
-                  <FontAwesomeIcon icon={faXmark} style={{ fontSize: '28px' }} />
+                  {entryToRemove === entry ? (
+                    <span style={{ fontSize: '18px' }}>{texts.cancelRemove}</span>
+                  ) : (
+                    <FontAwesomeIcon icon={faTrashCan} style={{ fontSize: '24px' }} />
+                  )}
                 </button>
               </div>
             ))}
@@ -370,14 +449,24 @@ function SessionHistoryPage() {
               totalPages={totalPages}
               canGoPrev={canGoPrev}
               canGoNext={canGoNext}
-              onPrevPage={goToPrevPage}
-              onNextPage={goToNextPage}
+              onPrevPage={() => {
+                setEntryToRemove(null);
+                goToPrevPage();
+              }}
+              onNextPage={() => {
+                setEntryToRemove(null);
+                goToNextPage();
+              }}
             />
 
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
               <button
                 type="button"
-                onClick={() => setShowClearConfirmModal(true)}
+                disabled={isRemovingEntry}
+                onClick={() => {
+                  setEntryToRemove(null);
+                  setShowClearConfirmModal(true);
+                }}
                 style={{
                   fontSize: '20px',
                   fontWeight: 600,
