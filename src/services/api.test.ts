@@ -7,6 +7,7 @@ import {
   isWCRoomAlias,
   mapApiErrorToGerman,
   mapServerErrorToGerman,
+  type RfidScanResult,
   setNetworkStatusCallback,
   WC_ROOM_ALIASES,
 } from './api';
@@ -1710,6 +1711,37 @@ describe('api methods', () => {
   // ------------------------------------------------------------------
 
   describe('api.processRfidScan', () => {
+    it.each([
+      { action: 'checked_in', visit_id: 41, active_students: 1 },
+      { action: 'transferred', visit_id: 42, previous_room: 'Bibliothek', active_students: 2 },
+      { action: 'checked_out', visit_id: 42, active_students: 0 },
+      { action: 'checked_out', visit_id: null, active_students: 0 },
+    ] satisfies Partial<RfidScanResult>[])(
+      'preserves authoritative room state for $action with visit $visit_id',
+      async fields => {
+        const { api: freshApi } = await getFreshApi();
+        const scanResult: RfidScanResult = {
+          student_id: 1,
+          student_name: 'Lena Müller',
+          room_name: 'Werkraum',
+          processed_at: '2026-09-11T12:00:00Z',
+          ...fields,
+        };
+        mockFetch.mockResolvedValueOnce(
+          mockResponse({ status: 'success', data: scanResult, message: 'ok' })
+        );
+
+        // The terminal always requests checkin. The server chooses the transition,
+        // including after a web-created visit; never infer it from the request.
+        const result = await freshApi.processRfidScan(
+          { student_rfid: 'AA:BB:CC', action: 'checkin', room_id: 1 },
+          '1234'
+        );
+
+        expect(result).toEqual(scanResult);
+      }
+    );
+
     it('returns scan result for checkin', async () => {
       const { api: freshApi } = await getFreshApi();
 

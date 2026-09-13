@@ -859,7 +859,8 @@ export interface RfidScanResult {
   pickup_time?: string;
   /** Optional pickup note for the current day */
   pickup_note?: string;
-  visit_id?: number;
+  /** Detailed scans can return null when no visit was created; other scan modes omit it. */
+  visit_id?: number | null;
   room_name?: string;
   previous_room?: string;
   processed_at?: string;
