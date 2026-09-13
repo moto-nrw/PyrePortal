@@ -135,6 +135,8 @@ The API client and response types live in [`src/services/api.ts`](src/services/a
 
 ## Documentation
 
+- [Terminal fallback contract](docs/terminal-fallback-contract.md): room/activity semantics, Phoenix web fallback parity, and verification limits
+
 - [Wedge reader setup](docs/wedge-reader-setup.md): hardware, reader configuration, local testing and rollout
 - [Screenshot and video tooling](screenshots/README.md): deterministic Playwright capture flow
 - [Contributor guidance](CLAUDE.md): repository architecture and implementation rules
