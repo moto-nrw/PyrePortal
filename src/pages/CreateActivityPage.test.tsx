@@ -118,6 +118,37 @@ describe('CreateActivityPage', () => {
   // Basic rendering
   // -----------------------------------------------------------------------
 
+  it.each([
+    { id: 20, name: 'Schulhof Freispiel', category: 'Schulhof' },
+    { id: 21, name: 'WC', category: 'WC' },
+    { id: 22, name: 'Schulhof Freispiel', category: 'Schulhof', is_system: true },
+    { id: 23, name: 'WC', category: 'WC', is_system: true },
+    { id: 24, name: 'Schulhof', category: 'Schulhof', is_system: false },
+  ])(
+    'keeps backend-provided activity $id selectable regardless of system metadata',
+    async activity => {
+      mockFetchActivities.mockResolvedValue([activity]);
+      renderPage();
+      fireEvent.click(await screen.findByText(activity.name));
+      expect(mockSetSelectedActivity).toHaveBeenCalledWith(activity);
+    }
+  );
+
+  it('allows continuing with a backend-provided system activity', async () => {
+    const activity = {
+      id: 20,
+      name: 'Schulhof Freispiel',
+      category: 'Schulhof',
+      is_system: true,
+    };
+    mockFetchActivities.mockResolvedValue([activity]);
+    useUserStore.setState({ selectedActivity: activity });
+    renderPage();
+    await screen.findByText(activity.name);
+    fireEvent.click(screen.getByRole('button', { name: 'Weiter' }));
+    expect(mockNavigate).toHaveBeenCalledWith('/staff-selection');
+  });
+
   it('renders page title when authenticated', () => {
     renderPage();
     expect(screen.getByText('Was machen wir?')).toBeInTheDocument();

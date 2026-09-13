@@ -69,6 +69,8 @@ export interface ActivityResponse {
   id: number;
   name: string;
   category: string;
+  // Optional backend metadata, not a client-side visibility rule.
+  is_system?: boolean;
   // Optional fields that might not be present in the new API
   category_name?: string;
   category_color?: string;
@@ -94,6 +96,8 @@ interface ActivitiesResponse {
  * Room data structure from API
  */
 export interface Room {
+  // System metadata must not exclude rooms from intentional RFID use.
+  is_system?: boolean;
   id: number;
   name: string;
   room_type?: string;
