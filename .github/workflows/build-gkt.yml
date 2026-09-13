@@ -1,4 +1,4 @@
-name: Build GKT
+name: Build Kiosk
 
 on: [workflow_call]
 
@@ -24,7 +24,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build GKT
-        run: pnpm tsc && pnpm vite build
-        env:
-          BUILD_TARGET: gkt
+      - name: Test adapters and application
+        run: pnpm run test
+
+      - name: Build unified kiosk
+        run: pnpm run build

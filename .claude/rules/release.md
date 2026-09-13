@@ -22,17 +22,17 @@ The script checks that `package.json` is greater than the latest GitHub release 
 2. Run `./scripts/check-version.sh`.
 3. Commit the version bump.
 4. Push to `development`.
-5. Let the GKT deployment workflow build and deploy the staging app.
-6. Verify the deployed staging GKT environment.
+5. Let the kiosk deployment workflow build and deploy the staging app.
+6. Verify the deployed staging environment on GKT/GKTL and Wedge.
 7. Merge the release PR from `development` into `main`.
-8. Let the GKT deployment workflow deploy production and create the GitHub release for the version in `package.json`.
-9. Verify the production GKT environment and confirm that the `v<version>` tag and GitHub release target the deployed commit.
+8. Let the kiosk deployment workflow deploy production and create the GitHub release for the version in `package.json`.
+9. Verify the production kiosk environment and confirm that the `v<version>` tag and GitHub release target the deployed commit.
 
 The production workflow creates a metadata-only GitHub release with generated notes after a successful deployment. Re-running the workflow for the same commit is idempotent; reusing an existing version for a different commit fails before deployment.
 
 ## Rules
 
-- GKT/GKTL is the production deployment path.
+- One kiosk deployment serves GKT/GKTL and Wedge. Verify both on staging before production; see `docs/kiosk-deployment.md`.
 - Do not create Raspberry Pi, Balena, or Tauri release steps.
 - Never commit secrets, API keys, `.env` files, PINs, or credentials. This repo is public.
 - The version is exposed to the frontend via the Vite build and shown in the app UI.
