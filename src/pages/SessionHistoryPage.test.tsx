@@ -246,7 +246,7 @@ describe('SessionHistoryPage', () => {
   // Deleting entries
   // =========================================================================
 
-  it('deletes a single history entry', async () => {
+  it('deletes a single history entry only after inline confirmation', async () => {
     const user = userEvent.setup();
     const removeSessionHistoryEntry = vi.fn(() => Promise.resolve());
     useUserStore.setState({ removeSessionHistoryEntry });
@@ -254,9 +254,66 @@ describe('SessionHistoryPage', () => {
 
     await user.click(screen.getByRole('button', { name: 'Eintrag löschen' }));
 
+    expect(removeSessionHistoryEntry).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Ja, löschen' }));
+
     expect(removeSessionHistoryEntry).toHaveBeenCalledWith(
       expect.objectContaining({ activity_id: 10 })
     );
+  });
+
+  it('keeps the entry when inline deletion is cancelled', async () => {
+    const user = userEvent.setup();
+    const removeSessionHistoryEntry = vi.fn(() => Promise.resolve());
+    useUserStore.setState({ removeSessionHistoryEntry });
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: 'Eintrag löschen' }));
+    expect(screen.getByText('Eintrag löschen?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Abbrechen' }));
+
+    expect(removeSessionHistoryEntry).not.toHaveBeenCalled();
+    expect(screen.queryByText('Eintrag löschen?')).not.toBeInTheDocument();
+    expect(screen.getByText('Hausaufgaben')).toBeInTheDocument();
+  });
+
+  it('confirms only the most recently selected entry', async () => {
+    const user = userEvent.setup();
+    const first = makeEntry(0);
+    const second = makeEntry(1);
+    const removeSessionHistoryEntry = vi.fn(() => Promise.resolve());
+    useUserStore.setState({
+      sessionSettings: { auto_save_enabled: true, session_history: [first, second] },
+      removeSessionHistoryEntry,
+    });
+    renderPage();
+
+    await user.click(screen.getAllByRole('button', { name: 'Eintrag löschen' })[0]);
+    expect(screen.getByRole('button', { name: 'Abbrechen' })).toHaveFocus();
+    await user.click(screen.getByRole('button', { name: 'Eintrag löschen' }));
+    expect(removeSessionHistoryEntry).not.toHaveBeenCalled();
+    expect(screen.getAllByText('Eintrag löschen?')).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Ja, löschen' }));
+
+    expect(removeSessionHistoryEntry).toHaveBeenCalledExactlyOnceWith(second);
+  });
+
+  it('resets inline confirmation when changing pages', async () => {
+    const user = userEvent.setup();
+    useUserStore.setState({
+      sessionSettings: {
+        auto_save_enabled: true,
+        session_history: Array.from({ length: 5 }, (_, index) => makeEntry(index)),
+      },
+    });
+    renderPage();
+
+    await user.click(screen.getAllByRole('button', { name: 'Eintrag löschen' })[0]);
+    await user.click(screen.getByRole('button', { name: 'Nächste' }));
+    await user.click(screen.getByRole('button', { name: 'Vorherige' }));
+
+    expect(screen.queryByText('Eintrag löschen?')).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Eintrag löschen' })).toHaveLength(4);
   });
 
   it('clears the whole history only after confirming the modal', async () => {
