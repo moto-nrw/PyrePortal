@@ -361,6 +361,7 @@ export function useActivityScanningPage() {
           if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
         }
         break;
+      case 'checked_out_daily':
       case 'checked_out': {
         // Uses scan.scannedTagId directly instead of looking up from recentTagScans
         // (fixes race condition).

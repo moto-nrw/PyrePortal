@@ -1773,29 +1773,33 @@ describe('api methods', () => {
       expect(result.action).toBe('checked_in');
     });
 
-    it('normalizes checked_out_daily to checked_out with daily_checkout_available', async () => {
-      const { api: freshApi } = await getFreshApi();
+    it.each([true, false])(
+      'preserves daily checkout outcome and server availability %s',
+      async available => {
+        const { api: freshApi } = await getFreshApi();
 
-      const scanResult = {
-        student_id: 1,
-        student_name: 'Max Müller',
-        action: 'checked_out_daily',
-      };
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: scanResult,
-          message: 'ok',
-        })
-      );
+        const scanResult = {
+          student_id: 1,
+          student_name: 'Max Müller',
+          action: 'checked_out_daily',
+          daily_checkout_available: available,
+        };
+        mockFetch.mockResolvedValueOnce(
+          mockResponse({
+            status: 'success',
+            data: scanResult,
+            message: 'ok',
+          })
+        );
 
-      const result = await freshApi.processRfidScan(
-        { student_rfid: 'DD:EE:FF', action: 'checkout', room_id: 1 },
-        '1234'
-      );
-      expect(result.action).toBe('checked_out');
-      expect(result.daily_checkout_available).toBe(true);
-    });
+        const result = await freshApi.processRfidScan(
+          { student_rfid: 'DD:EE:FF', action: 'checkout', room_id: 1 },
+          '1234'
+        );
+        expect(result.action).toBe('checked_out_daily');
+        expect(result.daily_checkout_available).toBe(available);
+      }
+    );
 
     it('sends correct body', async () => {
       const { api: freshApi } = await getFreshApi();
