@@ -44,9 +44,9 @@ The Raspberry Pi/Balena and Tauri targets are retired. They are not supported de
 ```bash
 pnpm run dev          # Browser/mock development
 pnpm run dev:wedge    # Wedge development (USB NFC reader types scans)
-pnpm run build:gkt    # Production GKT bundle
-pnpm run build:wedge  # Production wedge bundle
-pnpm run build        # Browser/mock production build
+pnpm run build:gkt    # Compatibility alias for the unified build
+pnpm run build:wedge  # Compatibility alias for the unified build
+pnpm run build        # Unified production bundle (GKT + Wedge)
 pnpm run check        # ESLint + TypeScript
 pnpm run test         # Vitest
 pnpm run format       # Auto-format with Prettier
@@ -87,11 +87,13 @@ RFID hardware and browser mocks can emit duplicate scan events. Defense in depth
 
 **Location**: `src/platform/*`
 
-`BUILD_TARGET` chooses which adapter Vite bundles:
+Production always bundles `src/platform/kiosk`, which selects GKT when the
+native `GKTKiosk` bridge is present and Wedge otherwise. There is no selection UI.
+`SYSTEM` alone is not a detection signal because `public/system.js` defines it
+in ordinary browsers too. Keep the script before the app entry point.
 
-- `BUILD_TARGET=gkt`: production GKT adapter.
-- `BUILD_TARGET=wedge`: keyboard-wedge adapter for tablets with USB NFC readers.
-- default/browser: browser mock adapter.
+`BUILD_TARGET` only selects development behavior: `gkt`, `wedge`, `kiosk`
+(automatic selection), or default `browser` (mock).
 
 New platform behavior should go through the adapter interface instead of branching throughout UI code.
 
@@ -120,9 +122,9 @@ VITE_DEVICE_API_KEY=dev_device_key
 VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,...
 ```
 
-### GKT Deployment
+### Kiosk Deployment
 
-- `VITE_API_BASE_URL` is set during `pnpm run build:gkt`.
+- `VITE_API_BASE_URL` is set by CI for staging or production. Local builds default to the production API.
 - The device API key is provided via the kiosk URL query parameter: `?key=...`.
 
 ### Authentication Pattern
@@ -158,7 +160,7 @@ See `.claude/rules/release.md` for the full release checklist.
 Key rules:
 
 - Run `./scripts/check-version.sh` before release work.
-- GKT deploys are the production path.
+- One kiosk deployment serves GKT/GKTL and Wedge. See `docs/kiosk-deployment.md`.
 - Version source is `package.json`.
 - This repo is public. Never commit secrets, API keys, `.env` files, PINs, or credentials.
 

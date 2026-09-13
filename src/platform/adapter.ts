@@ -1,8 +1,8 @@
 /**
  * Platform Adapter Interface
  *
- * Each supported build target (GKT, Wedge, browser) implements this interface.
- * Vite resolves `@platform` to the correct directory based on BUILD_TARGET.
+ * Production selects GKT or Wedge at runtime through the kiosk entry point.
+ * Development can select a single adapter, including the browser mock.
  */
 
 import { adapter } from '@platform';
