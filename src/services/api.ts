@@ -69,6 +69,8 @@ export interface ActivityResponse {
   id: number;
   name: string;
   category: string;
+  // Optional backend metadata, not a client-side visibility rule.
+  is_system?: boolean;
   // Optional fields that might not be present in the new API
   category_name?: string;
   category_color?: string;
@@ -94,6 +96,8 @@ interface ActivitiesResponse {
  * Room data structure from API
  */
 export interface Room {
+  // System metadata must not exclude rooms from intentional RFID use.
+  is_system?: boolean;
   id: number;
   name: string;
   room_type?: string;
@@ -642,9 +646,9 @@ export const api = {
     },
     pin: string,
     staffId?: number
-  ): Promise<RfidScanResult> {
+  ): Promise<RfidScanResponse> {
     const response = await apiCall<{
-      data: RfidScanResult;
+      data: RfidScanResponse;
       message: string;
       status: string;
     }>('/api/iot/checkin', {
@@ -655,17 +659,7 @@ export const api = {
       body: JSON.stringify(scanData),
     });
 
-    // Extract the actual data from the nested response
-    const result = response.data;
-
-    // Normalize backend action: checked_out_daily → checked_out + daily_checkout_available
-    // Student is checked out and eligible for "nach Hause" (daily checkout)
-    if ((result.action as string) === 'checked_out_daily') {
-      result.action = 'checked_out';
-      result.daily_checkout_available = true;
-    }
-
-    return result;
+    return response.data;
   },
 
   /**
@@ -839,17 +833,17 @@ interface TagAssignmentResult {
 /**
  * RFID scan result from POST /api/iot/checkin
  */
-export interface RfidScanResult {
+export interface RfidScanResponse {
   student_id: number | null;
   student_name: string;
   action:
     | 'checked_in'
     | 'checked_out'
+    | 'checked_out_daily'
+    | 'no_action'
     | 'transferred'
     | 'pickup_info'
-    | 'supervisor_authenticated'
-    | 'error'
-    | 'already_in';
+    | 'supervisor_authenticated';
   greeting?: string;
   /** Whether the student is eligible for daily checkout ("nach Hause") */
   daily_checkout_available?: boolean;
@@ -859,20 +853,24 @@ export interface RfidScanResult {
   pickup_time?: string;
   /** Optional pickup note for the current day */
   pickup_note?: string;
-  visit_id?: number;
+  /** Detailed scans can return null when no visit was created; other scan modes omit it. */
+  visit_id?: number | null;
   room_name?: string;
   previous_room?: string;
   processed_at?: string;
   message?: string;
   status?: string;
-  /** Indicates this result should be displayed as an error state */
-  showAsError?: boolean;
-  /** Indicates this result is informational (not a scan result) */
-  isInfo?: boolean;
-  /** The RFID tag that was scanned (added by frontend, not from server) */
-  scannedTagId?: string;
-  /** Authoritative count of active students in the room's session (from server) */
+  /** Authoritative count for the scanned room, omitted when unavailable. */
   active_students?: number;
+}
+
+/** Local presentation state. Never used to infer an attendance transition. */
+export interface RfidScanResult extends Omit<RfidScanResponse, 'action'> {
+  action: RfidScanResponse['action'] | 'error' | 'already_in';
+  showAsError?: boolean;
+  isInfo?: boolean;
+  /** The tag that triggered this result, attached by the kiosk. */
+  scannedTagId?: string;
 }
 
 /**

@@ -47,7 +47,7 @@ flowchart TB
 The frontend follows three rules:
 
 1. **The server is authoritative.** RFID actions complete on the Project Phoenix backend before the UI shows a result.
-2. **Platform code stays behind adapters.** `BUILD_TARGET` selects the GKT, Wedge or browser implementation at build time.
+2. **Platform code stays behind adapters.** The production bundle selects GKT when the native `GKTKiosk` bridge exists and Wedge otherwise. `BUILD_TARGET` only selects development adapters.
 3. **Duplicate scans are rejected at multiple layers.** The store tracks in-flight tags, and the scanning hook rejects duplicate adapter events.
 
 Project Phoenix is the source of truth for students, staff, rooms, sessions, attendance and RFID assignments.
@@ -97,13 +97,15 @@ Mock tags must exist in the connected Project Phoenix database.
 | ---------------------- | -------------------------------------- |
 | `pnpm run dev`         | Start browser/mock development         |
 | `pnpm run dev:wedge`   | Start local Wedge development          |
-| `pnpm run build:gkt`   | Build the production GKT bundle        |
-| `pnpm run build:wedge` | Build the Wedge bundle                 |
-| `pnpm run build`       | Build the browser/mock bundle          |
+| `pnpm run build:gkt`   | Alias for the unified kiosk build      |
+| `pnpm run build:wedge` | Alias for the unified kiosk build      |
+| `pnpm run build`       | Build one bundle for GKT and Wedge     |
 | `pnpm run check`       | Run ESLint and TypeScript checks       |
 | `pnpm run test`        | Run Vitest                             |
 | `pnpm run screenshots` | Capture the Playwright screenshot flow |
 | `pnpm run format`      | Format supported files with Prettier   |
+
+See [Kiosk deployment](docs/kiosk-deployment.md) for runtime selection, CI and rollout checks.
 
 ### Test the GKT Adapter Locally
 
@@ -134,6 +136,8 @@ X-Staff-ID: <staff-id>
 The API client and response types live in [`src/services/api.ts`](src/services/api.ts). Backend error strings are mapped to German UI messages in [`src/services/apiErrors.ts`](src/services/apiErrors.ts); changing backend text can change which message users see.
 
 ## Documentation
+
+- [Terminal fallback contract](docs/terminal-fallback-contract.md): room/activity semantics, Phoenix web fallback parity, and verification limits
 
 - [Wedge reader setup](docs/wedge-reader-setup.md): hardware, reader configuration, local testing and rollout
 - [Screenshot and video tooling](screenshots/README.md): deterministic Playwright capture flow

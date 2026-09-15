@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RecentTagScan } from '../store/slices/scanSlice';
-
-import { api, type RfidScanResult } from './api';
+import { api, type RfidScanResponse } from './api';
 import {
   checkInToDestinationRoom,
   type CheckoutDestinationState,
@@ -31,7 +29,7 @@ const makeState = (
   ...overrides,
 });
 
-const serverResult: RfidScanResult = {
+const serverResult: RfidScanResponse = {
   student_id: 42,
   student_name: 'Max Mustermann',
   action: 'checked_in',
@@ -51,7 +49,6 @@ describe('checkInToDestinationRoom', () => {
         roomId: null,
         state: makeState(),
         pin: '1234',
-        recentTagScans: new Map(),
       });
 
       expect(result).toEqual({
@@ -70,7 +67,6 @@ describe('checkInToDestinationRoom', () => {
         roomId: null,
         state: makeState(),
         pin: '1234',
-        recentTagScans: new Map(),
       });
 
       expect(result).toEqual({
@@ -92,7 +88,6 @@ describe('checkInToDestinationRoom', () => {
         state: makeState(),
         pin: '1234',
         staffId: 7,
-        recentTagScans: new Map(),
       });
 
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
@@ -118,7 +113,6 @@ describe('checkInToDestinationRoom', () => {
         state: makeState(),
         pin: '1234',
         staffId: 7,
-        recentTagScans: new Map(),
       });
 
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
@@ -138,58 +132,28 @@ describe('checkInToDestinationRoom', () => {
     });
   });
 
-  describe('background checkout sync race handling', () => {
-    it('waits for the pending sync promise before checking in', async () => {
-      const callOrder: string[] = [];
-      let resolveSync!: () => void;
-      const syncPromise = new Promise<void>(resolve => {
-        resolveSync = () => {
-          callOrder.push('sync-resolved');
-          resolve();
-        };
-      });
-      mockedApi.processRfidScan.mockImplementation(() => {
-        callOrder.push('processRfidScan');
-        return Promise.resolve(serverResult);
-      });
-
-      const recentTagScans = new Map<string, RecentTagScan>([
-        ['04:D6:94:82:97:6A:80', { timestamp: Date.now(), syncPromise }],
-      ]);
-
-      const pending = checkInToDestinationRoom({
-        destination: 'schulhof',
-        roomId: 9,
-        state: makeState(),
-        pin: '1234',
-        recentTagScans,
-      });
-
-      // Give the service a chance to (incorrectly) call the server early
-      await Promise.resolve();
-      expect(mockedApi.processRfidScan).not.toHaveBeenCalled();
-
-      resolveSync();
-      await pending;
-
-      expect(callOrder).toEqual(['sync-resolved', 'processRfidScan']);
-    });
-
-    it('proceeds directly when no sync promise is pending for the tag', async () => {
-      const recentTagScans = new Map<string, RecentTagScan>([
-        ['04:D6:94:82:97:6A:80', { timestamp: Date.now() }],
-      ]);
-
-      await checkInToDestinationRoom({
-        destination: 'toilette',
-        roomId: 11,
-        state: makeState(),
-        pin: '1234',
-        recentTagScans,
-      });
-
-      expect(mockedApi.processRfidScan).toHaveBeenCalledTimes(1);
-    });
+  it('waits for the destination server result before presenting success', async () => {
+    let resolveScan!: (result: RfidScanResponse) => void;
+    mockedApi.processRfidScan.mockReturnValue(
+      new Promise(resolve => {
+        resolveScan = resolve;
+      })
+    );
+    const presented = vi.fn();
+    const pending = checkInToDestinationRoom({
+      destination: 'schulhof',
+      roomId: 9,
+      state: makeState(),
+      pin: '1234',
+    }).then(presented);
+    await Promise.resolve();
+    expect(mockedApi.processRfidScan).toHaveBeenCalledTimes(1);
+    expect(presented).not.toHaveBeenCalled();
+    resolveScan(serverResult);
+    await pending;
+    expect(presented).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'checked_in', isSchulhof: true })
+    );
   });
 
   describe('error handling', () => {
@@ -201,7 +165,6 @@ describe('checkInToDestinationRoom', () => {
         roomId: 9,
         state: makeState(),
         pin: '1234',
-        recentTagScans: new Map(),
       });
 
       expect(result).toEqual({
@@ -222,7 +185,6 @@ describe('checkInToDestinationRoom', () => {
         roomId: 11,
         state: makeState(),
         pin: '1234',
-        recentTagScans: new Map(),
       });
 
       expect(result).toEqual({
@@ -243,7 +205,6 @@ describe('checkInToDestinationRoom', () => {
         roomId: 9,
         state: makeState(),
         pin: '1234',
-        recentTagScans: new Map(),
       });
 
       expect(result.action).toBe('error');

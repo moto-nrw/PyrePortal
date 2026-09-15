@@ -7,6 +7,7 @@ import {
   isWCRoomAlias,
   mapApiErrorToGerman,
   mapServerErrorToGerman,
+  type RfidScanResult,
   setNetworkStatusCallback,
   WC_ROOM_ALIASES,
 } from './api';
@@ -1075,6 +1076,8 @@ describe('api methods', () => {
       const activities = [
         { id: 1, name: 'Fußball AG', category: 'sport' },
         { id: 2, name: 'Kunst AG', category: 'kreativ' },
+        { id: 3, name: 'Schulhof Freispiel', category: 'Schulhof', is_system: true },
+        { id: 4, name: 'WC', category: 'WC', is_system: true },
       ];
       mockFetch.mockResolvedValueOnce(
         mockResponse({ status: 'success', data: activities, message: 'ok' })
@@ -1117,7 +1120,11 @@ describe('api methods', () => {
     it('returns rooms array without capacity param', async () => {
       const { api: freshApi } = await getFreshApi();
 
-      const rooms = [{ id: 1, name: 'Turnhalle', is_occupied: false }];
+      const rooms = [
+        { id: 1, name: 'Turnhalle', is_occupied: false },
+        { id: 2, name: 'Schulhof', is_occupied: false, is_system: true },
+        { id: 3, name: 'WC', is_occupied: false, is_system: true },
+      ];
       mockFetch.mockResolvedValueOnce(
         mockResponse({ status: 'success', data: rooms, message: 'ok' })
       );
@@ -1710,6 +1717,37 @@ describe('api methods', () => {
   // ------------------------------------------------------------------
 
   describe('api.processRfidScan', () => {
+    it.each([
+      { action: 'checked_in', visit_id: 41, active_students: 1 },
+      { action: 'transferred', visit_id: 42, previous_room: 'Bibliothek', active_students: 2 },
+      { action: 'checked_out', visit_id: 42, active_students: 0 },
+      { action: 'checked_out', visit_id: null, active_students: 0 },
+    ] satisfies Partial<RfidScanResult>[])(
+      'preserves authoritative room state for $action with visit $visit_id',
+      async fields => {
+        const { api: freshApi } = await getFreshApi();
+        const scanResult: RfidScanResult = {
+          student_id: 1,
+          student_name: 'Lena Müller',
+          room_name: 'Werkraum',
+          processed_at: '2026-09-11T12:00:00Z',
+          ...fields,
+        };
+        mockFetch.mockResolvedValueOnce(
+          mockResponse({ status: 'success', data: scanResult, message: 'ok' })
+        );
+
+        // The terminal always requests checkin. The server chooses the transition,
+        // including after a web-created visit; never infer it from the request.
+        const result = await freshApi.processRfidScan(
+          { student_rfid: 'AA:BB:CC', action: 'checkin', room_id: 1 },
+          '1234'
+        );
+
+        expect(result).toEqual(scanResult);
+      }
+    );
+
     it('returns scan result for checkin', async () => {
       const { api: freshApi } = await getFreshApi();
 
@@ -1735,29 +1773,33 @@ describe('api methods', () => {
       expect(result.action).toBe('checked_in');
     });
 
-    it('normalizes checked_out_daily to checked_out with daily_checkout_available', async () => {
-      const { api: freshApi } = await getFreshApi();
+    it.each([true, false])(
+      'preserves daily checkout outcome and server availability %s',
+      async available => {
+        const { api: freshApi } = await getFreshApi();
 
-      const scanResult = {
-        student_id: 1,
-        student_name: 'Max Müller',
-        action: 'checked_out_daily',
-      };
-      mockFetch.mockResolvedValueOnce(
-        mockResponse({
-          status: 'success',
-          data: scanResult,
-          message: 'ok',
-        })
-      );
+        const scanResult = {
+          student_id: 1,
+          student_name: 'Max Müller',
+          action: 'checked_out_daily',
+          daily_checkout_available: available,
+        };
+        mockFetch.mockResolvedValueOnce(
+          mockResponse({
+            status: 'success',
+            data: scanResult,
+            message: 'ok',
+          })
+        );
 
-      const result = await freshApi.processRfidScan(
-        { student_rfid: 'DD:EE:FF', action: 'checkout', room_id: 1 },
-        '1234'
-      );
-      expect(result.action).toBe('checked_out');
-      expect(result.daily_checkout_available).toBe(true);
-    });
+        const result = await freshApi.processRfidScan(
+          { student_rfid: 'DD:EE:FF', action: 'checkout', room_id: 1 },
+          '1234'
+        );
+        expect(result.action).toBe('checked_out_daily');
+        expect(result.daily_checkout_available).toBe(available);
+      }
+    );
 
     it('sends correct body', async () => {
       const { api: freshApi } = await getFreshApi();

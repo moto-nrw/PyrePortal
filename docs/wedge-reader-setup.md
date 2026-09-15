@@ -1,6 +1,6 @@
 # Wedge Target: USB NFC Reader Setup
 
-The `wedge` build target runs PyrePortal on iPads, iPhones and Android tablets
+The Wedge adapter runs PyrePortal on iPads, iPhones and Android tablets
 with a wired USB NFC reader in keyboard-emulation mode. The reader enumerates
 as a USB keyboard and "types" the tag UID followed by Enter; the adapter in
 `src/platform/wedge/index.ts` captures this with a document-level keydown
@@ -116,12 +116,12 @@ Notes:
 
 ## Production deployment
 
-`pnpm run build:wedge` produces the production bundle (bakes in
-`VITE_API_BASE_URL=https://api.moto-app.de`). Hosting is **not set up yet**:
-the wedge build needs its own delivery URL on the same infrastructure as the
-GKT build (`deploy-gkt.yml` rsyncs to `/var/www/pyreportal[-staging]`; the
-wedge build needs an analogous directory and workflow step). Devices are then
-pointed at `https://<wedge-url>/?key=<device-api-key>`.
+`pnpm run build` produces one production bundle for GKT and Wedge. The existing
+kiosk URL serves both device types with `?key=<device-api-key>`. No separate
+Wedge directory, domain or deployment is needed. `build:wedge` remains a
+compatibility alias for the same build.
+
+See [Kiosk deployment](kiosk-deployment.md) for CI, server requirements and rollout.
 
 ## Rollout checklist
 
@@ -130,6 +130,6 @@ pointed at `https://<wedge-url>/?key=<device-api-key>`.
       compare the stored tag IDs. If the byte order is reversed, set
       `OUTPUT_FORMAT = [0x30, 0x01]` in `scripts/configure-acr1552u.py` and
       re-run it (works over USB thanks to mode `02`).
-- [ ] Decide and set up the wedge hosting path (see above).
+- [ ] Verify the shared staging URL on both GKT/GKTL and Wedge before production.
 - [ ] Walk through the full kiosk flow on the target tablet once, including
       PIN login with the reader attached.

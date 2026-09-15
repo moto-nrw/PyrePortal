@@ -1,14 +1,14 @@
 {
   "name": "pyreportal",
   "private": true,
-  "version": "1.7.2",
+  "version": "1.7.3",
   "type": "module",
   "packageManager": "pnpm@10.34.4+sha512.8768be55200ae3f2226b6527fcca2687e14bc4e5f12d7721a0f25da3df47915177058648db4177baf348120fa0ba2752d8d8d93f6beaf1fe64ae18da8de961af",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "build:gkt": "BUILD_TARGET=gkt VITE_API_BASE_URL=https://api.moto-app.de tsc && BUILD_TARGET=gkt VITE_API_BASE_URL=https://api.moto-app.de vite build",
-    "build:wedge": "BUILD_TARGET=wedge VITE_API_BASE_URL=https://api.moto-app.de tsc && BUILD_TARGET=wedge VITE_API_BASE_URL=https://api.moto-app.de vite build",
+    "build:gkt": "pnpm run build",
+    "build:wedge": "pnpm run build",
     "dev:wedge": "BUILD_TARGET=wedge VITE_API_BASE_URL=http://localhost:8080 vite",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.tsx",
@@ -23,7 +23,8 @@
     "test:coverage": "vitest run --coverage",
     "knip": "knip",
     "screenshots": "playwright test --config playwright.config.ts",
-    "prepare": "lefthook install || true"
+    "prepare": "lefthook install || true",
+    "dev:kiosk": "BUILD_TARGET=kiosk VITE_API_BASE_URL=http://localhost:8080 vite"
   },
   "dependencies": {
     "@fontsource/geist-sans": "^5.2.5",

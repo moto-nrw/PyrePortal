@@ -1,4 +1,3 @@
-import type { RecentTagScan } from '../store/slices/scanSlice';
 import { createLogger, serializeError } from '../utils/logger';
 
 import {
@@ -67,15 +66,13 @@ export interface CheckInToDestinationParams {
   state: CheckoutDestinationState;
   pin: string;
   staffId?: number;
-  recentTagScans: Map<string, RecentTagScan>;
 }
 
 /**
  * Checks a student into a destination room (Schulhof or Toilette) after checkout.
  *
- * Waits for the background checkout sync of the triggering scan to complete
- * before issuing the check-in. This prevents the race condition where the
- * check-in would reach the server before the checkout.
+ * The destination chooser is shown only after the triggering server scan
+ * completes. There is no background attendance write to wait for.
  *
  * Returns the scan result to display (success with destination flag, or a
  * visible error result). Never throws.
@@ -83,7 +80,7 @@ export interface CheckInToDestinationParams {
 export const checkInToDestinationRoom = async (
   params: CheckInToDestinationParams
 ): Promise<RfidScanResult> => {
-  const { destination, roomId, state, pin, staffId, recentTagScans } = params;
+  const { destination, roomId, state, pin, staffId } = params;
   const config = DESTINATION_ROOM_CONFIGS[destination];
 
   if (!roomId) {
@@ -105,16 +102,6 @@ export const checkInToDestinationRoom = async (
       roomId,
     });
 
-    // CRITICAL: Wait for background checkout sync to complete
-    // This prevents race condition where check-in happens before checkout
-    const recentScan = recentTagScans.get(state.rfid);
-    if (recentScan?.syncPromise) {
-      logger.debug('Waiting for background checkout sync to complete');
-      await recentScan.syncPromise;
-      logger.debug(`Background sync completed, proceeding with ${config.logLabel} check-in`);
-    }
-
-    // Now safe to check into the destination room
     const result = await api.processRfidScan(
       {
         student_rfid: state.rfid,
