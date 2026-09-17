@@ -23,7 +23,6 @@ PyrePortal is part of a three-repo system. All repos live side-by-side (`../`):
 | Repo                                        | Role                          | Relationship                                                                                     |
 | ------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
 | **project-phoenix** (`../project-phoenix/`) | Go backend + Next.js frontend | Provides `/api/iot/*` endpoints. Source of truth for all students, staff, rooms, sessions, tags. |
-| **moto-balenaOS** (`../moto-balenaOS/`)     | Retired deployment layer      | Legacy Raspberry Pi/Balena target. Do not add new PyrePortal work for this target.               |
 
 **If the backend changes**: Error messages in `src/services/apiErrors.ts` are hardcoded mappings from backend error strings to German UI text. Backend error text changes break the mapping silently; users see generic fallback messages instead of specific messages.
 
@@ -37,8 +36,6 @@ Supported targets:
 - **Wedge**: kiosk target for iPads/tablets with a USB NFC reader in keyboard-emulation mode. See `docs/wedge-reader-setup.md`.
 - **Browser mock**: local development target. Mock RFID scans are generated in the frontend.
 
-The Raspberry Pi/Balena and Tauri targets are retired. They are not supported development or release targets. The Tauri source has been removed from the repository; do not reintroduce it.
-
 ## Development Commands
 
 ```bash
@@ -51,8 +48,6 @@ pnpm run check        # ESLint + TypeScript
 pnpm run test         # Vitest
 pnpm run format       # Auto-format with Prettier
 ```
-
-Do not add new CI, release, or deployment work for Raspberry Pi, Balena, or Tauri targets.
 
 ## Critical Architecture Patterns
 

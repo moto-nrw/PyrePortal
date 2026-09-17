@@ -33,6 +33,5 @@ The production workflow creates a metadata-only GitHub release with generated no
 ## Rules
 
 - One kiosk deployment serves GKT/GKTL and Wedge. Verify both on staging before production; see `docs/kiosk-deployment.md`.
-- Do not create Raspberry Pi, Balena, or Tauri release steps.
 - Never commit secrets, API keys, `.env` files, PINs, or credentials. This repo is public.
 - The version is exposed to the frontend via the Vite build and shown in the app UI.
