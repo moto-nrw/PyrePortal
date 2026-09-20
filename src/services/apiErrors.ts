@@ -98,7 +98,6 @@ export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   ['invalid API key format', 'API-Schlüssel Format ungültig. Bearer Token erwartet.'],
   ['invalid staff PIN', 'Ungültiger PIN. Bitte erneut versuchen.'],
   ['staff PIN is required', 'PIN nicht angegeben.'],
-  ['locked', 'Konto gesperrt. Bitte später erneut versuchen.'], // Generic fallback for lock-related
 
   // 3. AUTHORIZATION ERRORS (403)
   ['device is not active', 'Gerät ist deaktiviert. Bitte Administrator kontaktieren.'],
