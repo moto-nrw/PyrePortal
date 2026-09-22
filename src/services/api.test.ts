@@ -338,6 +338,26 @@ describe('mapApiErrorToGerman', () => {
     expect(mapApiErrorToGerman(new ApiError('opaque backend message', 409, code))).toBe(expected);
   });
 
+  // project-phoenix #3067: POST /api/iot/move-to-room refusals
+  it.each([
+    ['room_not_found', 404, 'Diesen Raum gibt es nicht mehr. Bitte eine Betreuungskraft fragen.'],
+    [
+      'room_not_released',
+      409,
+      'Dieser Raum ist gerade nicht offen. Bitte einen anderen Ort wählen.',
+    ],
+    [
+      'student_not_present',
+      409,
+      'Das Kind ist heute noch nicht angemeldet. Bitte eine Betreuungskraft fragen.',
+    ],
+    ['open_room_binary_mode', 409, 'Offene Räume gibt es an dieser Schule nicht.'],
+  ])('maps open-room code %s without parsing its message', (code, status, expected) => {
+    expect(mapApiErrorToGerman(new ApiError('opaque backend message', status, code))).toBe(
+      expected
+    );
+  });
+
   it('handles ApiError with activity capacity details', () => {
     // Backend sends current_occupancy/max_capacity for activity capacity too
     // (project-phoenix issue #1879)
@@ -1841,6 +1861,82 @@ describe('api methods', () => {
 
       const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
       expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('7');
+    });
+  });
+
+  // ------------------------------------------------------------------
+  // api.moveToOpenRoom (project-phoenix #3067)
+  // ------------------------------------------------------------------
+
+  describe('api.moveToOpenRoom', () => {
+    const booked = {
+      student_id: 1,
+      student_name: 'Lena Müller',
+      action: 'open_room_stay',
+      room_id: 77,
+      room_name: 'Turnhalle',
+      active_group_id: 250,
+      moved: true,
+      processed_at: '2026-09-22T10:00:00Z',
+      message: 'Lena ist jetzt in Turnhalle.',
+    };
+
+    it('posts the card and room and returns the booked stay', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', data: booked }));
+
+      const result = await freshApi.moveToOpenRoom(
+        { student_rfid: 'AA:BB:CC', room_id: 77 },
+        '1234'
+      );
+
+      expect(result).toEqual(booked);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://test-api.local/api/iot/move-to-room',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ student_rfid: 'AA:BB:CC', room_id: 77 }),
+        })
+      );
+      const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      const headers = options.headers as Record<string, string>;
+      expect(headers['X-Staff-PIN']).toBe('1234');
+      expect(headers['X-Staff-ID']).toBeUndefined();
+    });
+
+    it('sends X-Staff-ID when a staff member was resolved', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', data: booked }));
+
+      await freshApi.moveToOpenRoom({ student_rfid: 'AA:BB:CC', room_id: 77 }, '1234', 7);
+
+      const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('7');
+    });
+
+    it('rejects with the refusal code so the kiosk can map it', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(
+          {
+            status: 'error',
+            error: 'room is not released as an open room',
+            code: 'room_not_released',
+          },
+          { status: 409, statusText: 'Conflict' }
+        )
+      );
+
+      const error: unknown = await freshApi
+        .moveToOpenRoom({ student_rfid: 'AA:BB:CC', room_id: 77 }, '1234')
+        .catch((e: unknown) => e);
+
+      // getFreshApi re-imports the module, so compare the shape, not the class.
+      expect(error).toMatchObject({
+        name: 'ApiError',
+        code: 'room_not_released',
+        statusCode: 409,
+      });
     });
   });
 

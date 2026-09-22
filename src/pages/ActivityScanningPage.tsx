@@ -1,5 +1,6 @@
 import {
   faClock,
+  faDoorOpen,
   faFaceSmile,
   faFaceMeh,
   faFaceFrown,
@@ -101,6 +102,12 @@ const DESTINATION_BUTTON_STYLES = {
     width: '240px',
     aspectRatio: '5 / 4',
   },
+  /** Smaller cards once released rooms push the grid past six buttons. */
+  compact: {
+    width: '200px',
+    aspectRatio: '4 / 3',
+    padding: '20px 24px',
+  },
   hover: {
     transform: 'scale(1.05)',
   },
@@ -108,6 +115,14 @@ const DESTINATION_BUTTON_STYLES = {
     transform: 'scale(1)',
   },
 };
+
+/** Columns for the destination grid: one row up to two, then 2, 3 or 4 wide. */
+function destinationGridColumns(count: number): number {
+  if (count <= 2) return count;
+  if (count <= 4) return 2;
+  if (count <= 6) return 3;
+  return 4;
+}
 
 /** Color presets for destination buttons on the pastel checkout modal:
  *  Raumwechsel is a neutral white card; the location shortcuts use their
@@ -130,6 +145,12 @@ const DESTINATION_COLORS = {
     bgHover: designSystem.pastel.blue.tint,
     border: designSystem.pastel.blue.tint,
     accent: designSystem.pastel.blue.accent,
+  },
+  openRoom: {
+    bg: designSystem.pastel.green.bg,
+    bgHover: designSystem.pastel.green.tint,
+    border: designSystem.pastel.green.tint,
+    accent: designSystem.pastel.green.accent,
   },
   destructive: {
     bg: designSystem.pastel.orange.tint,
@@ -202,11 +223,13 @@ function DestinationButton({
   label,
   icon,
   colorScheme = 'default',
+  compact = false,
   onClick,
 }: {
   label: string;
   icon: React.ReactNode;
   colorScheme?: keyof typeof DESTINATION_COLORS;
+  compact?: boolean;
   onClick: () => void;
 }) {
   const colors = DESTINATION_COLORS[colorScheme];
@@ -216,6 +239,7 @@ function DestinationButton({
       onClick={onClick}
       style={{
         ...DESTINATION_BUTTON_STYLES.base,
+        ...(compact ? DESTINATION_BUTTON_STYLES.compact : {}),
         backgroundColor: colors.bg,
         border: `3px solid ${colors.border}`,
         color: colors.accent,
@@ -239,7 +263,10 @@ function DestinationButton({
       }}
     >
       {icon}
-      <span style={{ fontSize: '24px', fontWeight: 800 }}>{label}</span>
+      {/* Room names can be long; they wrap at spaces, centered. */}
+      <span style={{ fontSize: compact ? '20px' : '24px', fontWeight: 800, textAlign: 'center' }}>
+        {label}
+      </span>
     </button>
   );
 }
@@ -264,6 +291,8 @@ const ActivityScanningPage: React.FC = () => {
     checkoutDestinationState,
     setCheckoutDestinationState,
     handleDestinationSelect,
+    handleOpenRoomSelect,
+    openRoomDestinations,
     destinationCount,
     schulhofRoomId,
     wcRoomId,
@@ -341,6 +370,7 @@ const ActivityScanningPage: React.FC = () => {
       return designSystem.pastel.amber;
     if ((currentScan as { isToilette?: boolean } | null)?.isToilette)
       return designSystem.pastel.blue;
+    if (currentScan?.isOpenRoom) return designSystem.pastel.green;
     if (currentScan?.action === 'supervisor_authenticated') return designSystem.pastel.blue;
     if ((currentScan as { showAsError?: boolean } | null)?.showAsError)
       return designSystem.pastel.red;
@@ -459,7 +489,7 @@ const ActivityScanningPage: React.FC = () => {
       !checkoutDestinationState.showingFarewell
     ) {
       const destinations: {
-        destination: 'raumwechsel' | 'schulhof' | 'toilette' | 'nach_hause';
+        destination: string;
         label: string;
         icon: React.ReactNode;
         colorScheme?: keyof typeof DESTINATION_COLORS;
@@ -502,6 +532,19 @@ const ActivityScanningPage: React.FC = () => {
               },
             ]
           : []),
+        // Released rooms (#3067): booked here, the room needs no device.
+        ...openRoomDestinations.map(room => ({
+          destination: `open-room-${room.id}`,
+          label: formatRoomName(room.name),
+          colorScheme: 'openRoom' as const,
+          icon: (
+            <FontAwesomeIcon
+              icon={faDoorOpen}
+              style={{ fontSize: '48px', color: 'currentColor' }}
+            />
+          ),
+          onClick: () => void handleOpenRoomSelect(room),
+        })),
         ...(checkoutDestinationState.dailyCheckoutAvailable
           ? [
               {
@@ -522,8 +565,11 @@ const ActivityScanningPage: React.FC = () => {
         return null;
       }
 
-      // Determine grid columns: 2x2 for 3-4 buttons, single row for 1-2
-      const gridColumns = destinations.length >= 3 ? 2 : destinations.length;
+      const gridColumns = destinationGridColumns(destinations.length);
+      const compact = gridColumns > 3;
+      const buttonWidth = compact
+        ? DESTINATION_BUTTON_STYLES.compact.width
+        : DESTINATION_BUTTON_STYLES.base.width;
 
       return (
         <div
@@ -531,7 +577,7 @@ const ActivityScanningPage: React.FC = () => {
             position: 'relative',
             zIndex: 2,
             display: 'grid',
-            gridTemplateColumns: `repeat(${gridColumns}, ${DESTINATION_BUTTON_STYLES.base.width})`,
+            gridTemplateColumns: `repeat(${gridColumns}, ${buttonWidth})`,
             gap: '24px',
             justifyContent: 'center',
           }}
@@ -542,6 +588,7 @@ const ActivityScanningPage: React.FC = () => {
               label={label}
               icon={icon}
               colorScheme={colorScheme}
+              compact={compact}
               onClick={onClick}
             />
           ))}
@@ -575,6 +622,9 @@ const ActivityScanningPage: React.FC = () => {
           }
           if ((currentScan as { isToilette?: boolean }).isToilette) {
             return ''; // Empty content - title message is enough
+          }
+          if (currentScan.isOpenRoom) {
+            return ''; // The title names the room
           }
 
           switch (currentScan.action) {
@@ -1014,7 +1064,8 @@ const ActivityScanningPage: React.FC = () => {
                 }
                 // Success states
                 return currentScan?.action === 'checked_in' ||
-                  currentScan?.action === 'transferred' ? (
+                  currentScan?.action === 'transferred' ||
+                  currentScan?.isOpenRoom ? (
                   <svg
                     width="80"
                     height="80"

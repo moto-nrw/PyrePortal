@@ -315,6 +315,18 @@ const STAFF_CLOCK_MESSAGES: Readonly<Record<string, string>> = {
 };
 
 /**
+ * German copy for the refusals of the open-room destination booking
+ * (project-phoenix POST /api/iot/move-to-room, #3067). Matched on the code.
+ */
+const OPEN_ROOM_MESSAGES: Readonly<Record<string, string>> = {
+  room_not_found: 'Diesen Raum gibt es nicht mehr. Bitte eine Betreuungskraft fragen.',
+  room_not_released: 'Dieser Raum ist gerade nicht offen. Bitte einen anderen Ort wählen.',
+  student_not_present:
+    'Das Kind ist heute noch nicht angemeldet. Bitte eine Betreuungskraft fragen.',
+  open_room_binary_mode: 'Offene Räume gibt es an dieser Schule nicht.',
+};
+
+/**
  * Map API errors to German user-friendly messages with rich details support
  * Handles structured error responses (e.g., capacity errors with room/activity details)
  */
@@ -344,6 +356,10 @@ export function mapApiErrorToGerman(error: unknown): string {
   // matched on the code rather than on the message text.
   if (error.code && STAFF_CLOCK_MESSAGES[error.code]) {
     return STAFF_CLOCK_MESSAGES[error.code];
+  }
+
+  if (error.code && OPEN_ROOM_MESSAGES[error.code]) {
+    return OPEN_ROOM_MESSAGES[error.code];
   }
 
   // Fall back to message-based mapping
@@ -388,7 +404,8 @@ export type NetworkErrorContext =
   | 'sessionStart'
   | 'sessionValidation'
   | 'schulhofCheckin'
-  | 'toiletteCheckin';
+  | 'toiletteCheckin'
+  | 'openRoomCheckin';
 
 const NETWORK_ERROR_MESSAGES: Record<NetworkErrorContext, string> = {
   generic: 'Netzwerkfehler. Bitte Verbindung prüfen.',
@@ -401,6 +418,7 @@ const NETWORK_ERROR_MESSAGES: Record<NetworkErrorContext, string> = {
     'Netzwerkfehler bei Schulhof-Anmeldung. Bitte Verbindung prüfen und erneut scannen.',
   toiletteCheckin:
     'Netzwerkfehler bei Toilette-Anmeldung. Bitte Verbindung prüfen und erneut scannen.',
+  openRoomCheckin: 'Netzwerkfehler beim Raumwechsel. Bitte Verbindung prüfen und erneut scannen.',
 };
 
 /**

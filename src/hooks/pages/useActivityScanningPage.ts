@@ -13,11 +13,13 @@ import {
 } from '../../services/activityScanningRules';
 import {
   api,
+  isWCRoomAlias,
   WC_ROOM_ALIASES,
   type DailyFeedbackRating,
   type DeviceConfig,
   type Room,
 } from '../../services/api';
+import { selectOpenRoomDestinations } from '../../services/checkoutDestinationService';
 import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 import { createLogger, serializeError } from '../../utils/logger';
@@ -154,9 +156,16 @@ export function useActivityScanningPage() {
   // WC room ID (discovered dynamically from server)
   const [wcRoomId, setWcRoomId] = useState<number | null>(null);
 
-  // Checkout destination flow (unified: Raumwechsel, Schulhof, nach Hause)
-  const { checkoutDestinationState, setCheckoutDestinationState, handleDestinationSelect } =
-    useCheckoutDestination({ schulhofRoomId, wcRoomId });
+  // Released rooms from the same fetch (#3067); older backends omit the flag.
+  const [rooms, setRooms] = useState<Room[]>([]);
+
+  // Checkout destination flow (unified: Raumwechsel, Schulhof, nach Hause, released rooms)
+  const {
+    checkoutDestinationState,
+    setCheckoutDestinationState,
+    handleDestinationSelect,
+    handleOpenRoomSelect,
+  } = useCheckoutDestination({ schulhofRoomId, wcRoomId });
 
   // Feedback prompt state
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
@@ -167,16 +176,26 @@ export function useActivityScanningPage() {
   // Device config (checkout button visibility, fetched once on mount)
   const [deviceConfig, setDeviceConfig] = useState<DeviceConfig | null>(null);
 
+  // Released rooms offered as destinations. Binary-mode schools track no
+  // rooms, so they get none.
+  const openRoomDestinations = useMemo(
+    () =>
+      deviceConfig?.presence_mode === 'binary'
+        ? []
+        : selectOpenRoomDestinations(rooms, selectedRoom?.id, isWCRoomAlias),
+    [deviceConfig, rooms, selectedRoom?.id]
+  );
+
   // Compute how many destination buttons will be visible (drives modal size)
   const destinationCount = useMemo(() => {
     if (!checkoutDestinationState || checkoutDestinationState.showingFarewell) return 0;
-    let count = 0;
+    let count = openRoomDestinations.length;
     if (deviceConfig?.checkout.raumwechsel_enabled !== false) count++;
     if (schulhofRoomId && deviceConfig?.checkout.schulhof_enabled !== false) count++;
     if (wcRoomId && deviceConfig?.checkout.wc_enabled !== false) count++;
     if (checkoutDestinationState.dailyCheckoutAvailable) count++;
     return count;
-  }, [deviceConfig, schulhofRoomId, wcRoomId, checkoutDestinationState]);
+  }, [deviceConfig, schulhofRoomId, wcRoomId, checkoutDestinationState, openRoomDestinations]);
 
   // Pickup query prompt state
   const [isAwaitingPickupQueryScan, setIsAwaitingPickupQueryScan] = useState(false);
@@ -281,9 +300,11 @@ export function useActivityScanningPage() {
       try {
         logger.debug('Fetching rooms to find Schulhof');
         const rooms = await api.getRooms(authenticatedUser.pin);
+        setRooms(rooms);
 
-        // Find Schulhof room by name (consistent with backend name-based detection)
-        const schulhofRoom = rooms.find(r => r.name === 'Schulhof');
+        // Prefer the backend's Schulhof flag; older backends only send the name.
+        const schulhofRoom =
+          rooms.find(r => r.is_schulhof) ?? rooms.find(r => r.name === 'Schulhof');
 
         if (schulhofRoom) {
           setSchulhofRoomId(schulhofRoom.id);
@@ -621,6 +642,8 @@ export function useActivityScanningPage() {
     checkoutDestinationState,
     setCheckoutDestinationState,
     handleDestinationSelect,
+    handleOpenRoomSelect,
+    openRoomDestinations,
     destinationCount,
     schulhofRoomId,
     wcRoomId,
