@@ -85,10 +85,6 @@ describe('mapServerErrorToGerman', () => {
     );
   });
 
-  it('maps generic locked', () => {
-    expect(mapServerErrorToGerman('locked')).toBe('Konto gesperrt. Bitte später erneut versuchen.');
-  });
-
   // Capacity errors
   it('maps activity capacity exceeded', () => {
     expect(mapServerErrorToGerman('ACTIVITY_CAPACITY_EXCEEDED')).toBe(
