@@ -165,6 +165,7 @@ export function useActivityScanningPage() {
     setCheckoutDestinationState,
     handleDestinationSelect,
     handleOpenRoomSelect,
+    isBookingInFlight,
   } = useCheckoutDestination({ schulhofRoomId, wcRoomId });
 
   // Feedback prompt state
@@ -293,12 +294,16 @@ export function useActivityScanningPage() {
 
   // Refresh room availability while the kiosk stays open.
   useEffect(() => {
+    let active = true;
+    let inFlight = false;
     const fetchDestinationRooms = async () => {
-      if (!authenticatedUser?.pin) return;
+      if (!authenticatedUser?.pin || inFlight) return;
+      inFlight = true;
 
       try {
         logger.debug('Fetching destination rooms');
         const rooms = await api.getRooms(authenticatedUser.pin);
+        if (!active) return;
         setRooms(rooms);
 
         // Prefer the backend's Schulhof flag; older backends only send the name.
@@ -329,13 +334,19 @@ export function useActivityScanningPage() {
           logger.warn('No WC/Toilette room found - Toilette button will not work');
         }
       } catch (error) {
-        logger.error('Failed to fetch destination rooms', { error: serializeError(error) });
+        if (active)
+          logger.error('Failed to fetch destination rooms', { error: serializeError(error) });
+      } finally {
+        inFlight = false;
       }
     };
 
     void fetchDestinationRooms();
     const interval = setInterval(() => void fetchDestinationRooms(), 15000);
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [authenticatedUser?.pin]);
 
   // Fetch device config once on mount (checkout button visibility, feedback settings)
@@ -542,7 +553,7 @@ export function useActivityScanningPage() {
   // Handle "nach Hause" button - student confirmed going home
   // Call confirm_daily_checkout to finalize attendance, then show feedback prompt
   const handleNachHause = async () => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+    if (!checkoutDestinationState || !authenticatedUser?.pin || isBookingInFlight()) return;
 
     logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
       rfid: checkoutDestinationState.rfid,

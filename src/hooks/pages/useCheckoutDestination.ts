@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
 import type { RfidScanResult } from '../../services/api';
 import {
@@ -29,8 +29,17 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
   const { authenticatedUser, selectedSupervisors, setScanResult, showScanModal } = useUserStore();
 
   // State for checkout destination selection (unified: Raumwechsel, Schulhof, nach Hause)
-  const [checkoutDestinationState, setCheckoutDestinationState] =
-    useState<CheckoutDestinationState | null>(null);
+  const [checkoutDestinationState, setDestinationState] = useState<CheckoutDestinationState | null>(
+    null
+  );
+  // Keep the active chooser identity current even before React commits a state update.
+  const destinationStateRef = useRef<CheckoutDestinationState | null>(null);
+  const setCheckoutDestinationState: Dispatch<SetStateAction<CheckoutDestinationState | null>> =
+    useCallback(value => {
+      const nextState = typeof value === 'function' ? value(destinationStateRef.current) : value;
+      destinationStateRef.current = nextState;
+      setDestinationState(nextState);
+    }, []);
 
   // A destination tap books once, even when the child taps twice.
   const bookingInFlight = useRef(false);
@@ -40,8 +49,16 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
   ) => {
     if (!checkoutDestinationState || !authenticatedUser?.pin || bookingInFlight.current) return;
     bookingInFlight.current = true;
+    const activeState = checkoutDestinationState;
+    const activeScan = useUserStore.getState().rfid.currentScan;
     try {
-      const result = await run(checkoutDestinationState, authenticatedUser.pin);
+      const result = await run(activeState, authenticatedUser.pin);
+      // A timeout, a new scan, or another chooser invalidates this result.
+      if (
+        destinationStateRef.current !== activeState ||
+        (activeScan && useUserStore.getState().rfid.currentScan !== activeScan)
+      )
+        return;
       setScanResult(result);
       setCheckoutDestinationState(null);
       showScanModal();
@@ -53,7 +70,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
 
   // Handle checkout destination selection (Schulhof, Toilette or Raumwechsel)
   const handleDestinationSelect = async (destination: CheckoutDestination) => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+    if (!checkoutDestinationState || !authenticatedUser?.pin || bookingInFlight.current) return;
 
     if (destination === 'raumwechsel') {
       // Clear destination state - student will scan at destination room
@@ -90,5 +107,6 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     setCheckoutDestinationState,
     handleDestinationSelect,
     handleOpenRoomSelect,
+    isBookingInFlight: () => bookingInFlight.current,
   };
 }
