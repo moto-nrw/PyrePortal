@@ -25,7 +25,7 @@ import { useUserStore } from '../../store/userStore';
 import { createLogger, serializeError } from '../../utils/logger';
 import { useRfidScanning } from '../useRfidScanning';
 
-import { useCheckoutDestination } from './useCheckoutDestination';
+import { BOOKING_TIMEOUT_MS, useCheckoutDestination } from './useCheckoutDestination';
 
 const logger = createLogger('ActivityScanningPage');
 
@@ -560,6 +560,8 @@ export function useActivityScanningPage() {
     if (!checkoutDestinationState || !authenticatedUser?.pin || isBookingInFlight()) return;
     const activeState = reserveBooking();
     if (!activeState) return;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
       rfid: activeState.rfid,
@@ -567,13 +569,35 @@ export function useActivityScanningPage() {
     });
 
     try {
-      const response = await api.toggleAttendance(
-        authenticatedUser.pin,
-        activeState.rfid,
-        'confirm_daily_checkout',
-        'zuhause',
-        resolveStaffAttributionId(authenticatedUser, selectedSupervisors)
-      );
+      const response = await Promise.race([
+        api.toggleAttendance(
+          authenticatedUser.pin,
+          activeState.rfid,
+          'confirm_daily_checkout',
+          'zuhause',
+          resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
+          controller.signal
+        ),
+        new Promise<null>(resolve => {
+          timeoutId = setTimeout(() => {
+            resolve(null);
+            controller.abort();
+          }, BOOKING_TIMEOUT_MS);
+        }),
+      ]);
+      if (response === null) {
+        if (!isActiveDestination(activeState)) return;
+        setScanResult({
+          student_name: 'Abmeldung nicht bestätigt',
+          student_id: activeState.studentId,
+          action: 'error',
+          message: 'Die Abmeldung ist nicht bestätigt. Bitte die Betreuung fragen.',
+          showAsError: true,
+        });
+        setCheckoutDestinationState(null);
+        showScanModal();
+        return;
+      }
       logger.info('Daily checkout confirmed');
       if (!isActiveDestination(activeState)) return;
       feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
@@ -603,6 +627,7 @@ export function useActivityScanningPage() {
         setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
       }
     } finally {
+      clearTimeout(timeoutId);
       releaseBooking(activeState);
     }
   };

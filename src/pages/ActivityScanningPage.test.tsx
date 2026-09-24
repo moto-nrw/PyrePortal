@@ -1725,7 +1725,8 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
         '04:AA:BB:CC:DD:EE:FF',
         'confirm_daily_checkout',
         'zuhause',
-        1
+        1,
+        expect.any(AbortSignal)
       );
     });
 
@@ -1770,6 +1771,52 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
       resolveCheckout({ status: 'confirmed', message: 'Daily checkout confirmed' } as never);
     });
     expect(screen.getByText('Wie war dein Tag, Lisa?')).toBeInTheDocument();
+  });
+
+  it('releases a stalled home checkout without claiming it succeeded', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms).mockResolvedValueOnce(releasedRooms);
+    mockedApi.toggleAttendance.mockReturnValueOnce(new Promise(() => {}));
+    showCheckoutChooser();
+    mockRfidHookReturn.currentScan = {
+      ...mockRfidHookReturn.currentScan!,
+      daily_checkout_available: true,
+    };
+    const view = renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'nach Hause' }));
+    await act(async () => {
+      vi.advanceTimersByTime(7000);
+    });
+    expect(screen.getByText('Wohin geht Lisa?')).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(8000);
+    });
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'error',
+      showAsError: true,
+      message: 'Die Abmeldung ist nicht bestätigt. Bitte die Betreuung fragen.',
+    });
+    expect(mockedApi.toggleAttendance.mock.calls[0]?.[5]?.aborted).toBe(true);
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 99,
+        student_name: 'Max Mustermann',
+        action,
+        scannedTagId: '04:11:22:33:44:55:66',
+      },
+    };
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledTimes(1);
   });
 
   it('shows feedback prompt even when toggleAttendance fails', async () => {

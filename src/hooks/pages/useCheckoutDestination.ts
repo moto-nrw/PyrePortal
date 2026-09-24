@@ -11,7 +11,7 @@ import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 
 export type CheckoutDestination = 'schulhof' | 'raumwechsel' | 'toilette';
-const BOOKING_TIMEOUT_MS = 15000;
+export const BOOKING_TIMEOUT_MS = 15000;
 
 interface UseCheckoutDestinationParams {
   schulhofRoomId: number | null;
@@ -50,11 +50,15 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     const state = destinationStateRef.current;
     if (!state || bookingInFlight.current) return null;
     bookingInFlight.current = state;
+    setPendingState(state);
     return state;
   };
 
   const releaseBooking = (state: CheckoutDestinationState) => {
-    if (bookingInFlight.current === state) bookingInFlight.current = null;
+    if (bookingInFlight.current === state) {
+      bookingInFlight.current = null;
+      setPendingState(null);
+    }
   };
 
   const book = async (
@@ -67,7 +71,6 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     if (!checkoutDestinationState || !authenticatedUser?.pin) return;
     const activeState = reserveBooking();
     if (!activeState) return;
-    setPendingState(activeState);
     const activeScan = useUserStore.getState().rfid.currentScan;
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -100,10 +103,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       // Modal will auto-close via useModalTimeout hook
     } finally {
       clearTimeout(timeoutId);
-      if (bookingInFlight.current === activeState) {
-        releaseBooking(activeState);
-        setPendingState(null);
-      }
+      releaseBooking(activeState);
     }
   };
 

@@ -745,7 +745,8 @@ export const api = {
     rfid: string,
     action: 'confirm' | 'cancel' | 'confirm_daily_checkout',
     destination?: 'zuhause' | 'unterwegs',
-    staffId?: number
+    staffId?: number,
+    signal?: AbortSignal
   ): Promise<AttendanceToggleResponse> {
     try {
       const body: { rfid: string; action: string; destination?: string } = {
@@ -764,6 +765,7 @@ export const api = {
         // member so the backend can mark them present (project-phoenix #1439).
         headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
         body: JSON.stringify(body),
+        ...(signal && { signal }),
       });
 
       return response;
