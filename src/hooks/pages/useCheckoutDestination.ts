@@ -65,7 +65,6 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
         run(activeState, authenticatedUser.pin, controller.signal),
         new Promise<RfidScanResult>(resolve => {
           timeoutId = setTimeout(() => {
-            controller.abort();
             resolve({
               student_name: 'Buchung nicht bestätigt',
               student_id: activeState.studentId,
@@ -73,6 +72,8 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
               message: 'Die Buchung ist nicht bestätigt. Bitte die Betreuung fragen.',
               showAsError: true,
             });
+            // Settle the timeout result before abort can reject the request.
+            controller.abort();
           }, BOOKING_TIMEOUT_MS);
         }),
       ]);

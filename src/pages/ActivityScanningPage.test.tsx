@@ -1539,6 +1539,32 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     });
   });
 
+  it('keeps the booking-status warning when abort immediately rejects', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    mockedApi.moveToOpenRoom.mockImplementationOnce(
+      (_request, _pin, _staffId, signal) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        })
+    );
+    showCheckoutChooser();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'error',
+      message: 'Die Buchung ist nicht bestätigt. Bitte die Betreuung fragen.',
+      showAsError: true,
+    });
+  });
+
   it('ignores Raumwechsel and nach Hause while a room booking runs', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
