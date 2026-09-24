@@ -11,6 +11,7 @@ import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 
 export type CheckoutDestination = 'schulhof' | 'raumwechsel' | 'toilette';
+const BOOKING_TIMEOUT_MS = 15000;
 
 interface UseCheckoutDestinationParams {
   schulhofRoomId: number | null;
@@ -41,25 +42,40 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       setDestinationState(nextState);
     }, []);
 
-  // A destination tap books once per chooser, even when the child taps twice.
+  // Only one attendance write may run at a time, even across new scans.
   const bookingInFlight = useRef<CheckoutDestinationState | null>(null);
   const [pendingState, setPendingState] = useState<CheckoutDestinationState | null>(null);
 
   const book = async (
-    run: (state: CheckoutDestinationState, pin: string) => Promise<RfidScanResult>
+    run: (
+      state: CheckoutDestinationState,
+      pin: string,
+      signal: AbortSignal
+    ) => Promise<RfidScanResult>
   ) => {
-    if (
-      !checkoutDestinationState ||
-      !authenticatedUser?.pin ||
-      bookingInFlight.current === checkoutDestinationState
-    )
-      return;
+    if (!checkoutDestinationState || !authenticatedUser?.pin || bookingInFlight.current) return;
     bookingInFlight.current = checkoutDestinationState;
     setPendingState(checkoutDestinationState);
     const activeState = checkoutDestinationState;
     const activeScan = useUserStore.getState().rfid.currentScan;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await run(activeState, authenticatedUser.pin);
+      const result = await Promise.race([
+        run(activeState, authenticatedUser.pin, controller.signal),
+        new Promise<RfidScanResult>(resolve => {
+          timeoutId = setTimeout(() => {
+            controller.abort();
+            resolve({
+              student_name: 'Buchung nicht bestätigt',
+              student_id: activeState.studentId,
+              action: 'error',
+              message: 'Die Buchung ist nicht bestätigt. Bitte die Betreuung fragen.',
+              showAsError: true,
+            });
+          }, BOOKING_TIMEOUT_MS);
+        }),
+      ]);
       // A timeout, a new scan, or another chooser invalidates this result.
       if (
         destinationStateRef.current !== activeState ||
@@ -71,6 +87,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       showScanModal();
       // Modal will auto-close via useModalTimeout hook
     } finally {
+      clearTimeout(timeoutId);
       if (bookingInFlight.current === activeState) {
         bookingInFlight.current = null;
         setPendingState(null);
@@ -80,12 +97,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
 
   // Handle checkout destination selection (Schulhof, Toilette or Raumwechsel)
   const handleDestinationSelect = async (destination: CheckoutDestination) => {
-    if (
-      !checkoutDestinationState ||
-      !authenticatedUser?.pin ||
-      bookingInFlight.current === checkoutDestinationState
-    )
-      return;
+    if (!checkoutDestinationState || !authenticatedUser?.pin || bookingInFlight.current) return;
 
     if (destination === 'raumwechsel') {
       // Clear destination state - student will scan at destination room
@@ -93,13 +105,14 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       return;
     }
 
-    await book((state, pin) =>
+    await book((state, pin, signal) =>
       checkInToDestinationRoom({
         destination,
         roomId: destination === 'schulhof' ? schulhofRoomId : wcRoomId,
         state,
         pin,
         staffId: resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
+        signal,
       })
     );
   };
@@ -107,12 +120,13 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
   // Handle a released room: the stay is booked here, the room needs no device.
   const handleOpenRoomSelect = async (room: OpenRoomDestination) => {
     if (!authenticatedUser) return;
-    await book((state, pin) =>
+    await book((state, pin, signal) =>
       moveToOpenRoom({
         room,
         state,
         pin,
         staffId: resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
+        signal,
       })
     );
   };
@@ -122,7 +136,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     setCheckoutDestinationState,
     handleDestinationSelect,
     handleOpenRoomSelect,
-    isBookingInFlight: () => bookingInFlight.current === checkoutDestinationState,
-    isBookingPending: pendingState !== null && pendingState === checkoutDestinationState,
+    isBookingInFlight: () => bookingInFlight.current !== null,
+    isBookingPending: pendingState !== null && checkoutDestinationState !== null,
   };
 }

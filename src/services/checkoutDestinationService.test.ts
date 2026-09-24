@@ -107,7 +107,8 @@ describe('checkInToDestinationRoom', () => {
           room_id: 9,
         },
         '1234',
-        7
+        7,
+        undefined
       );
       expect(result).toEqual({
         ...serverResult,
@@ -132,7 +133,8 @@ describe('checkInToDestinationRoom', () => {
           room_id: 11,
         },
         '1234',
-        7
+        7,
+        undefined
       );
       expect(result).toEqual({
         ...serverResult,
@@ -280,7 +282,8 @@ describe('moveToOpenRoom', () => {
     expect(mockedApi.moveToOpenRoom).toHaveBeenCalledWith(
       { student_rfid: '04:D6:94:82:97:6A:80', room_id: 77 },
       '1234',
-      7
+      7,
+      undefined
     );
     expect(result).toEqual({
       student_id: 42,

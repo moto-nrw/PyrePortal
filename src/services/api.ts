@@ -653,7 +653,8 @@ export const api = {
       room_id: number;
     },
     pin: string,
-    staffId?: number
+    staffId?: number,
+    signal?: AbortSignal
   ): Promise<RfidScanResponse> {
     const response = await apiCall<{
       data: RfidScanResponse;
@@ -665,6 +666,7 @@ export const api = {
       // so the backend can mark them present (project-phoenix #1439).
       headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
       body: JSON.stringify(scanData),
+      ...(signal && { signal }),
     });
 
     return response.data;
@@ -679,7 +681,8 @@ export const api = {
   async moveToOpenRoom(
     request: { student_rfid: string; room_id: number },
     pin: string,
-    staffId?: number
+    staffId?: number,
+    signal?: AbortSignal
   ): Promise<OpenRoomMoveResponse> {
     const response = await apiCall<{
       data: OpenRoomMoveResponse;
@@ -689,6 +692,7 @@ export const api = {
       method: 'POST',
       headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
       body: JSON.stringify(request),
+      ...(signal && { signal }),
     });
 
     return response.data;

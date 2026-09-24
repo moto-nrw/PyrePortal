@@ -1862,6 +1862,24 @@ describe('api methods', () => {
       const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
       expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('7');
     });
+
+    it('passes a cancellation signal to the destination check-in request', async () => {
+      const { api: freshApi } = await getFreshApi();
+      const controller = new AbortController();
+      mockFetch.mockResolvedValueOnce(
+        mockResponse({ status: 'success', data: { student_id: 1, action: 'checked_in' } })
+      );
+
+      await freshApi.processRfidScan(
+        { student_rfid: 'AA:BB:CC', action: 'checkin', room_id: 5 },
+        '1234',
+        7,
+        controller.signal
+      );
+
+      const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      expect(options.signal).toBe(controller.signal);
+    });
   });
 
   // ------------------------------------------------------------------
@@ -1912,6 +1930,22 @@ describe('api methods', () => {
 
       const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
       expect((options.headers as Record<string, string>)['X-Staff-ID']).toBe('7');
+    });
+
+    it('passes a cancellation signal to the room booking request', async () => {
+      const { api: freshApi } = await getFreshApi();
+      const controller = new AbortController();
+      mockFetch.mockResolvedValueOnce(mockResponse({ status: 'success', data: booked }));
+
+      await freshApi.moveToOpenRoom(
+        { student_rfid: 'AA:BB:CC', room_id: 77 },
+        '1234',
+        7,
+        controller.signal
+      );
+
+      const options = mockFetch.mock.calls[0]?.[1] as RequestInit;
+      expect(options.signal).toBe(controller.signal);
     });
 
     it('rejects with the refusal code so the kiosk can map it', async () => {

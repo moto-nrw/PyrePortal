@@ -69,6 +69,7 @@ export interface CheckInToDestinationParams {
   state: CheckoutDestinationState;
   pin: string;
   staffId?: number;
+  signal?: AbortSignal;
 }
 
 /**
@@ -83,7 +84,7 @@ export interface CheckInToDestinationParams {
 export const checkInToDestinationRoom = async (
   params: CheckInToDestinationParams
 ): Promise<RfidScanResult> => {
-  const { destination, roomId, state, pin, staffId } = params;
+  const { destination, roomId, state, pin, staffId, signal } = params;
   const config = DESTINATION_ROOM_CONFIGS[destination];
 
   if (!roomId) {
@@ -112,7 +113,8 @@ export const checkInToDestinationRoom = async (
         room_id: roomId,
       },
       pin,
-      staffId
+      staffId,
+      signal
     );
 
     logger.info(`${config.logLabel} check-in successful`, {
@@ -175,6 +177,7 @@ export interface MoveToOpenRoomParams {
   state: CheckoutDestinationState;
   pin: string;
   staffId?: number;
+  signal?: AbortSignal;
 }
 
 /**
@@ -186,7 +189,7 @@ export interface MoveToOpenRoomParams {
  * visible error result). Never throws.
  */
 export const moveToOpenRoom = async (params: MoveToOpenRoomParams): Promise<RfidScanResult> => {
-  const { room, state, pin, staffId } = params;
+  const { room, state, pin, staffId, signal } = params;
 
   try {
     logger.info('Booking student into open room', { rfid: state.rfid, roomId: room.id });
@@ -194,7 +197,8 @@ export const moveToOpenRoom = async (params: MoveToOpenRoomParams): Promise<Rfid
     const result = await api.moveToOpenRoom(
       { student_rfid: state.rfid, room_id: room.id },
       pin,
-      staffId
+      staffId,
+      signal
     );
 
     logger.info('Open room booking successful', { roomId: result.room_id, moved: result.moved });
