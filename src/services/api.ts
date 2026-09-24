@@ -107,6 +107,14 @@ export interface Room {
   category?: string;
   color?: string;
   is_occupied: boolean;
+  /**
+   * Released by the administration as an open room: a child may choose it as
+   * a destination without a device there (project-phoenix #3067). Older
+   * backends omit it and the kiosk then shows no open-room buttons.
+   */
+  is_open_room?: boolean;
+  /** The system Schulhof room; it keeps its own check-in flow. */
+  is_schulhof?: boolean;
 }
 
 /**
@@ -645,7 +653,8 @@ export const api = {
       room_id: number;
     },
     pin: string,
-    staffId?: number
+    staffId?: number,
+    signal?: AbortSignal
   ): Promise<RfidScanResponse> {
     const response = await apiCall<{
       data: RfidScanResponse;
@@ -657,6 +666,33 @@ export const api = {
       // so the backend can mark them present (project-phoenix #1439).
       headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
       body: JSON.stringify(scanData),
+      ...(signal && { signal }),
+    });
+
+    return response.data;
+  },
+
+  /**
+   * Book the child behind the card into a released room chosen at this
+   * kiosk (project-phoenix #3067). The destination needs no device and no
+   * second scan; a repeated booking answers moved=false.
+   * Endpoint: POST /api/iot/move-to-room
+   */
+  async moveToOpenRoom(
+    request: { student_rfid: string; room_id: number },
+    pin: string,
+    staffId?: number,
+    signal?: AbortSignal
+  ): Promise<OpenRoomMoveResponse> {
+    const response = await apiCall<{
+      data: OpenRoomMoveResponse;
+      message: string;
+      status: string;
+    }>('/api/iot/move-to-room', {
+      method: 'POST',
+      headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
+      body: JSON.stringify(request),
+      ...(signal && { signal }),
     });
 
     return response.data;
@@ -709,7 +745,8 @@ export const api = {
     rfid: string,
     action: 'confirm' | 'cancel' | 'confirm_daily_checkout',
     destination?: 'zuhause' | 'unterwegs',
-    staffId?: number
+    staffId?: number,
+    signal?: AbortSignal
   ): Promise<AttendanceToggleResponse> {
     try {
       const body: { rfid: string; action: string; destination?: string } = {
@@ -728,6 +765,7 @@ export const api = {
         // member so the backend can mark them present (project-phoenix #1439).
         headers: buildAuthHeaders(pin, staffId && staffId > 0 ? staffId : undefined),
         body: JSON.stringify(body),
+        ...(signal && { signal }),
       });
 
       return response;
@@ -864,11 +902,30 @@ export interface RfidScanResponse {
   active_students?: number;
 }
 
+/**
+ * Booked independent stay from POST /api/iot/move-to-room (project-phoenix
+ * #3067). active_group_id is the released room's own session.
+ */
+export interface OpenRoomMoveResponse {
+  student_id: number;
+  student_name: string;
+  action: 'open_room_stay';
+  room_id: number;
+  room_name: string;
+  active_group_id: number;
+  /** False when the child already stayed in that room. */
+  moved: boolean;
+  processed_at?: string;
+  message?: string;
+}
+
 /** Local presentation state. Never used to infer an attendance transition. */
 export interface RfidScanResult extends Omit<RfidScanResponse, 'action'> {
-  action: RfidScanResponse['action'] | 'error' | 'already_in';
+  action: RfidScanResponse['action'] | OpenRoomMoveResponse['action'] | 'error' | 'already_in';
   showAsError?: boolean;
   isInfo?: boolean;
+  /** Stay booked in a released room chosen at this kiosk (#3067). */
+  isOpenRoom?: boolean;
   /** The tag that triggered this result, attached by the kiosk. */
   scannedTagId?: string;
 }

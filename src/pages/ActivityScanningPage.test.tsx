@@ -38,6 +38,7 @@ vi.mock('../services/api', async () => {
       getCurrentSession: vi.fn().mockResolvedValue(null),
       getRooms: vi.fn().mockResolvedValue([]),
       processRfidScan: vi.fn().mockResolvedValue({}),
+      moveToOpenRoom: vi.fn().mockResolvedValue({}),
       queryPickupInfo: vi.fn().mockResolvedValue({}),
       toggleAttendance: vi.fn().mockResolvedValue({}),
       getDeviceConfig: vi.fn().mockResolvedValue({
@@ -904,7 +905,8 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 99 },
         '1234',
-        1
+        1,
+        expect.any(AbortSignal)
       );
     });
   });
@@ -1020,7 +1022,8 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 88 },
         '1234',
-        1
+        1,
+        expect.any(AbortSignal)
       );
     });
   });
@@ -1064,7 +1067,8 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
       expect(mockedApi.processRfidScan).toHaveBeenCalledWith(
         { student_rfid: '04:AA:BB:CC:DD:EE:FF', action: 'checkin', room_id: 88 },
         '1234',
-        1
+        1,
+        expect.any(AbortSignal)
       );
     });
   });
@@ -1138,6 +1142,557 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
   });
 
   // =======================================================================
+  // Released rooms (project-phoenix #3067)
+  // =======================================================================
+
+  const releasedRooms = [
+    { id: 1, name: 'Raum 101', is_occupied: false, is_open_room: true },
+    { id: 77, name: 'Turnhalle', is_occupied: false, is_open_room: true },
+    { id: 78, name: 'Bibliothek', is_occupied: true, is_open_room: true },
+    { id: 79, name: 'Werkraum', is_occupied: false },
+    { id: 99, name: 'Schulhof', is_occupied: false, is_open_room: true, is_schulhof: true },
+    { id: 88, name: 'WC', is_occupied: false, is_open_room: true },
+  ];
+
+  const showCheckoutChooser = () => {
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action,
+        daily_checkout_available: false,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+      },
+      showModal: true,
+    };
+  };
+
+  it('offers every released room except this one, the Schulhof and the toilet', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Turnhalle' })).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: 'Bibliothek' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Werkraum' })).not.toBeInTheDocument();
+    // The room the child is leaving (named in the page header) is no destination.
+    expect(screen.queryByRole('button', { name: 'Raum 101' })).not.toBeInTheDocument();
+    // The Schulhof and the toilet keep their own single buttons.
+    expect(screen.getAllByRole('button', { name: 'Schulhof' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Toilette' })).toHaveLength(1);
+  });
+
+  it('keeps additional destination rows scrollable in the modal', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce([
+      ...releasedRooms,
+      ...Array.from({ length: 12 }, (_, index) => ({
+        id: 200 + index,
+        name: `Zusatzraum ${index + 1}`,
+        is_occupied: false,
+        is_open_room: true,
+      })),
+    ]);
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    expect(screen.getByRole('button', { name: 'Zusatzraum 12' })).toBeInTheDocument();
+    expect(document.querySelector('dialog .moto-modal-container')).toHaveStyle({
+      maxHeight: 'calc(100dvh - 34px - 64px - 64px)',
+      overflowY: 'auto',
+    });
+  });
+
+  it('books a released room without a second scan', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    mockedApi.moveToOpenRoom.mockResolvedValueOnce({
+      student_id: 42,
+      student_name: 'Lisa Schmidt',
+      action: 'open_room_stay',
+      room_id: 77,
+      room_name: 'Turnhalle',
+      active_group_id: 250,
+      moved: true,
+    });
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Turnhalle')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Turnhalle'));
+
+    await waitFor(() => {
+      expect(mockedApi.moveToOpenRoom).toHaveBeenCalledWith(
+        { student_rfid: '04:AA:BB:CC:DD:EE:FF', room_id: 77 },
+        '1234',
+        1,
+        expect.any(AbortSignal)
+      );
+    });
+    expect(mockedApi.processRfidScan).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+        action: 'open_room_stay',
+        message: 'Lisa ist jetzt in Turnhalle',
+        isOpenRoom: true,
+      });
+    });
+  });
+
+  it('books once when the child taps twice', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveBooking!: (value: Awaited<ReturnType<typeof api.moveToOpenRoom>>) => void;
+    mockedApi.moveToOpenRoom.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveBooking = resolve;
+      })
+    );
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Turnhalle')).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText('Turnhalle'));
+    await user.click(screen.getByText('Bibliothek'));
+
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledTimes(1);
+    await act(async () => {
+      resolveBooking({
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'open_room_stay',
+        room_id: 77,
+        room_name: 'Turnhalle',
+        active_group_id: 250,
+        moved: true,
+      });
+    });
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not show a late booking result after another child scans', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveBooking!: (value: Awaited<ReturnType<typeof api.moveToOpenRoom>>) => void;
+    mockedApi.moveToOpenRoom.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveBooking = resolve;
+      })
+    );
+    showCheckoutChooser();
+    useUserStore.getState().setScanResult(mockRfidHookReturn.currentScan);
+    const view = renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    const nextScan: RfidScanResult = {
+      student_id: 99,
+      student_name: 'Max Mustermann',
+      action: 'checked_in',
+      scannedTagId: '04:11:22:33:44:55:66',
+    };
+    await act(async () => {
+      mockRfidHookReturn = { ...mockRfidHookReturn, currentScan: nextScan };
+      useUserStore.getState().setScanResult(nextScan);
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+    });
+
+    await act(async () => {
+      resolveBooking({
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'open_room_stay',
+        room_id: 77,
+        room_name: 'Turnhalle',
+        active_group_id: 250,
+        moved: true,
+      });
+    });
+    expect(useUserStore.getState().rfid.currentScan).toBe(nextScan);
+    expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
+  });
+
+  it('keeps the chooser open until a slow booking returns', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveBooking!: (value: Awaited<ReturnType<typeof api.moveToOpenRoom>>) => void;
+    mockedApi.moveToOpenRoom.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveBooking = resolve;
+      })
+    );
+    showCheckoutChooser();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(7000);
+    });
+    expect(screen.getByText('Wohin geht Lisa?')).toBeInTheDocument();
+
+    await act(async () => {
+      resolveBooking({
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'open_room_stay',
+        room_id: 77,
+        room_name: 'Turnhalle',
+        active_group_id: 250,
+        moved: true,
+      });
+    });
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'open_room_stay',
+      isOpenRoom: true,
+    });
+  });
+
+  it('shows a slow booking failure instead of losing it on timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let rejectBooking!: (error: Error) => void;
+    mockedApi.moveToOpenRoom.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectBooking = reject;
+      })
+    );
+    showCheckoutChooser();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(7000);
+    });
+    expect(screen.getByText('Wohin geht Lisa?')).toBeInTheDocument();
+
+    await act(async () => {
+      rejectBooking(new Error('Network error'));
+    });
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'error',
+      showAsError: true,
+    });
+  });
+
+  it('blocks the next booking until the earlier request settles', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveOldBooking!: (value: Awaited<ReturnType<typeof api.moveToOpenRoom>>) => void;
+    mockedApi.moveToOpenRoom
+      .mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveOldBooking = resolve;
+        })
+      )
+      .mockResolvedValueOnce({
+        student_id: 99,
+        student_name: 'Max Mustermann',
+        action: 'open_room_stay',
+        room_id: 78,
+        room_name: 'Bibliothek',
+        active_group_id: 251,
+        moved: true,
+      });
+    showCheckoutChooser();
+    useUserStore.getState().setScanResult(mockRfidHookReturn.currentScan);
+    const view = renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    const nextScan: RfidScanResult = {
+      student_id: 99,
+      student_name: 'Max Mustermann',
+      action,
+      scannedTagId: '04:11:22:33:44:55:66',
+    };
+    await act(async () => {
+      mockRfidHookReturn = { ...mockRfidHookReturn, currentScan: nextScan };
+      useUserStore.getState().setScanResult(nextScan);
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+    });
+    await user.click(screen.getByRole('button', { name: 'Bibliothek' }));
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveOldBooking({
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'open_room_stay',
+        room_id: 77,
+        room_name: 'Turnhalle',
+        active_group_id: 250,
+        moved: true,
+      });
+    });
+    await user.click(screen.getByRole('button', { name: 'Bibliothek' }));
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledTimes(2);
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      student_id: 99,
+      isOpenRoom: true,
+    });
+  });
+
+  it('ends a stalled booking with a dismissible error and ignores late results', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms).mockResolvedValueOnce(releasedRooms);
+    let resolveLateBooking!: (value: Awaited<ReturnType<typeof api.moveToOpenRoom>>) => void;
+    mockedApi.moveToOpenRoom.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveLateBooking = resolve;
+      })
+    );
+    showCheckoutChooser();
+    const view = renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'error',
+      showAsError: true,
+      message: 'Die Buchung ist nicht bestätigt. Bitte die Betreuung fragen.',
+    });
+    expect(mockedApi.moveToOpenRoom.mock.calls[0]?.[3]?.aborted).toBe(true);
+    expect(screen.queryByText('Wohin geht Lisa?')).not.toBeInTheDocument();
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: useUserStore.getState().rfid.currentScan,
+    };
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+    expect(
+      screen.getByText('Die Buchung ist nicht bestätigt. Bitte die Betreuung fragen.')
+    ).toBeInTheDocument();
+    expect(document.querySelector('dialog .moto-modal-container')).toHaveAttribute(
+      'role',
+      'button'
+    );
+
+    mockedApi.moveToOpenRoom.mockResolvedValueOnce({
+      student_id: 99,
+      student_name: 'Max Mustermann',
+      action: 'open_room_stay',
+      room_id: 78,
+      room_name: 'Bibliothek',
+      active_group_id: 251,
+      moved: true,
+    });
+    const nextScan: RfidScanResult = {
+      student_id: 99,
+      student_name: 'Max Mustermann',
+      action,
+      scannedTagId: '04:11:22:33:44:55:66',
+    };
+    await act(async () => {
+      mockRfidHookReturn = { ...mockRfidHookReturn, currentScan: nextScan };
+      useUserStore.getState().setScanResult(nextScan);
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+    });
+    await user.click(screen.getByRole('button', { name: 'Bibliothek' }));
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveLateBooking({
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'open_room_stay',
+        room_id: 77,
+        room_name: 'Turnhalle',
+        active_group_id: 250,
+        moved: true,
+      });
+    });
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      student_id: 99,
+      isOpenRoom: true,
+    });
+  });
+
+  it('keeps the booking-status warning when abort immediately rejects', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    mockedApi.moveToOpenRoom.mockImplementationOnce(
+      (_request, _pin, _staffId, signal) =>
+        new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () => {
+            reject(new DOMException('The operation was aborted', 'AbortError'));
+          });
+        })
+    );
+    showCheckoutChooser();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'error',
+      message: 'Die Buchung ist nicht bestätigt. Bitte die Betreuung fragen.',
+      showAsError: true,
+    });
+  });
+
+  it('ignores Raumwechsel and nach Hause while a room booking runs', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    mockedApi.moveToOpenRoom.mockReturnValueOnce(new Promise(() => {}));
+    showCheckoutChooser();
+    mockRfidHookReturn.currentScan!.daily_checkout_available = true;
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+    await user.click(screen.getByRole('button', { name: 'Raumwechsel' }));
+    await user.click(screen.getByRole('button', { name: 'nach Hause' }));
+
+    expect(screen.getByText('Wohin geht Lisa?')).toBeInTheDocument();
+    expect(mockedApi.toggleAttendance).not.toHaveBeenCalled();
+  });
+
+  it('offers no released rooms in binary presence mode', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    mockedApi.getDeviceConfig.mockResolvedValueOnce({
+      presence_mode: 'binary',
+      checkout: {
+        raumwechsel_enabled: true,
+        schulhof_enabled: true,
+        wc_enabled: true,
+        daily_checkout_time: null,
+      },
+      feedback: { enabled: true },
+    });
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Schulhof')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Turnhalle')).not.toBeInTheDocument();
+    expect(screen.queryByText('Bibliothek')).not.toBeInTheDocument();
+  });
+
+  it('waits for confirmed detailed presence mode before offering released rooms', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveConfig!: (config: Awaited<ReturnType<typeof api.getDeviceConfig>>) => void;
+    mockedApi.getDeviceConfig.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveConfig = resolve;
+      })
+    );
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    expect(screen.queryByRole('button', { name: 'Turnhalle' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveConfig({
+        presence_mode: 'detailed',
+        checkout: {
+          raumwechsel_enabled: true,
+          schulhof_enabled: true,
+          wc_enabled: true,
+          daily_checkout_time: null,
+        },
+        feedback: { enabled: true },
+      });
+    });
+    expect(screen.getByRole('button', { name: 'Turnhalle' })).toBeInTheDocument();
+  });
+
+  it('keeps released rooms hidden when device configuration fails', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    mockedApi.getDeviceConfig.mockRejectedValueOnce(new Error('Network error'));
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    expect(screen.queryByRole('button', { name: 'Turnhalle' })).not.toBeInTheDocument();
+  });
+
+  it('refreshes released rooms while the kiosk stays open', async () => {
+    mockedApi.getRooms
+      .mockResolvedValueOnce(releasedRooms)
+      .mockResolvedValueOnce([
+        ...releasedRooms.filter(room => room.id !== 77),
+        { id: 80, name: 'Musikraum', is_occupied: false, is_open_room: true },
+      ]);
+    const view = renderPage();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+    showCheckoutChooser();
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('button', { name: 'Turnhalle' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Musikraum' })).toBeInTheDocument();
+  });
+
+  it('does not start a second room refresh while the first is pending', async () => {
+    let resolveRooms!: (rooms: Awaited<ReturnType<typeof api.getRooms>>) => void;
+    mockedApi.getRooms.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveRooms = resolve;
+      })
+    );
+    renderPage();
+
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+    expect(mockedApi.getRooms).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveRooms(releasedRooms);
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+    expect(mockedApi.getRooms).toHaveBeenCalledTimes(2);
+  });
+
+  // =======================================================================
   // nach Hause + feedback flow
   // =======================================================================
 
@@ -1170,7 +1725,8 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
         '04:AA:BB:CC:DD:EE:FF',
         'confirm_daily_checkout',
         'zuhause',
-        1
+        1,
+        expect.any(AbortSignal)
       );
     });
 
@@ -1186,6 +1742,81 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     expect(screen.getByText('Gut')).toBeInTheDocument();
     expect(screen.getByText('Okay')).toBeInTheDocument();
     expect(screen.getByText('Schlecht')).toBeInTheDocument();
+  });
+
+  it('blocks other destination actions while nach Hause is pending', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveCheckout!: (value: Awaited<ReturnType<typeof api.toggleAttendance>>) => void;
+    mockedApi.toggleAttendance.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveCheckout = resolve;
+      })
+    );
+    showCheckoutChooser();
+    mockRfidHookReturn.currentScan = {
+      ...mockRfidHookReturn.currentScan!,
+      daily_checkout_available: true,
+    };
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'nach Hause' }));
+    await user.click(screen.getByRole('button', { name: 'nach Hause' }));
+    await user.click(screen.getByRole('button', { name: 'Turnhalle' }));
+
+    expect(mockedApi.toggleAttendance).toHaveBeenCalledTimes(1);
+    expect(mockedApi.moveToOpenRoom).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveCheckout({ status: 'confirmed', message: 'Daily checkout confirmed' } as never);
+    });
+    expect(screen.getByText('Wie war dein Tag, Lisa?')).toBeInTheDocument();
+  });
+
+  it('releases a stalled home checkout without claiming it succeeded', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms).mockResolvedValueOnce(releasedRooms);
+    mockedApi.toggleAttendance.mockReturnValueOnce(new Promise(() => {}));
+    showCheckoutChooser();
+    mockRfidHookReturn.currentScan = {
+      ...mockRfidHookReturn.currentScan!,
+      daily_checkout_available: true,
+    };
+    const view = renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'nach Hause' }));
+    await act(async () => {
+      vi.advanceTimersByTime(7000);
+    });
+    expect(screen.getByText('Wohin geht Lisa?')).toBeInTheDocument();
+
+    await act(async () => {
+      vi.advanceTimersByTime(8000);
+    });
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'error',
+      showAsError: true,
+      message: 'Die Abmeldung ist nicht bestätigt. Bitte die Betreuung fragen.',
+    });
+    expect(mockedApi.toggleAttendance.mock.calls[0]?.[5]?.aborted).toBe(true);
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 99,
+        student_name: 'Max Mustermann',
+        action,
+        scannedTagId: '04:11:22:33:44:55:66',
+      },
+    };
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledTimes(1);
   });
 
   it('shows feedback prompt even when toggleAttendance fails', async () => {
@@ -1339,6 +1970,55 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
 
     expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
     expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+  });
+
+  it('does not show feedback for an old checkout after another child scans', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    let resolveCheckout!: (value: Awaited<ReturnType<typeof api.toggleAttendance>>) => void;
+    mockedApi.toggleAttendance.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveCheckout = resolve;
+      })
+    );
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action,
+        daily_checkout_available: true,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+        visit_id: 100,
+      },
+      showModal: true,
+    };
+
+    const view = renderPage();
+    await user.click(screen.getByRole('button', { name: 'nach Hause' }));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 43,
+        student_name: 'Max Mustermann',
+        action: 'checked_in',
+        room_name: 'Raum 101',
+        scannedTagId: '04:11:22:33:44:55:66',
+        visit_id: 101,
+      },
+      showModal: true,
+    };
+    await act(async () => {
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+      resolveCheckout({ status: 'confirmed', message: 'Daily checkout confirmed' } as never);
+    });
+
+    expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
     expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
   });
 
@@ -1944,6 +2624,23 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     };
     renderPage();
     expect(screen.getByText('Viel Spaß auf dem Schulhof, Max!')).toBeInTheDocument();
+  });
+
+  it('shows the booked released room as the heading', () => {
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Max Mustermann',
+        action: 'open_room_stay',
+        room_name: 'Turnhalle',
+        message: 'Max ist jetzt in Turnhalle',
+        isOpenRoom: true,
+      },
+      showModal: true,
+    };
+    renderPage();
+    expect(screen.getByRole('heading', { name: 'Max ist jetzt in Turnhalle' })).toBeInTheDocument();
   });
 
   it('shows Toilette message with empty content area', () => {

@@ -11,6 +11,7 @@ import {
   getCheckoutCountDelta,
   getModalTimeoutDuration,
   getTransferCountDelta,
+  isDestinationScan,
   isNonActionableScan,
   shouldApplyAuthoritativeCount,
   type ExtendedScanResult,
@@ -35,6 +36,10 @@ describe('getCheckinCountDelta', () => {
 
   it('does not count Toilette check-ins', () => {
     expect(getCheckinCountDelta(makeScan({ isToilette: true }))).toBe(0);
+  });
+
+  it('does not count open-room bookings', () => {
+    expect(getCheckinCountDelta(makeScan({ isOpenRoom: true }))).toBe(0);
   });
 });
 
@@ -121,6 +126,26 @@ describe('shouldApplyAuthoritativeCount', () => {
     expect(shouldApplyAuthoritativeCount(makeScan({ active_students: 7, isToilette: true }))).toBe(
       false
     );
+  });
+
+  it('is false for open-room bookings (count refers to that room)', () => {
+    expect(shouldApplyAuthoritativeCount(makeScan({ active_students: 7, isOpenRoom: true }))).toBe(
+      false
+    );
+  });
+});
+
+describe('isDestinationScan', () => {
+  it.each([
+    ['Schulhof', { isSchulhof: true }],
+    ['Toilette', { isToilette: true }],
+    ['open room', { isOpenRoom: true }],
+  ])('is true for a %s booking', (_, flags) => {
+    expect(isDestinationScan(makeScan(flags))).toBe(true);
+  });
+
+  it('is false for a scan at this kiosk', () => {
+    expect(isDestinationScan(makeScan())).toBe(false);
   });
 });
 

@@ -43,6 +43,28 @@ success confirms the backend has already stored the supervisor assignment.
 replace the source room's count. Existing display-only optimistic deltas
 remain when a count is missing; they never determine an attendance write.
 
+## Released rooms as destinations (project-phoenix #3067)
+
+`GET /api/iot/rooms/available` flags `is_open_room` and `is_schulhof`. The
+checkout chooser adds one green button per released room, except the room
+this kiosk runs in, the Schulhof and the toilet, which keep their own buttons.
+The Schulhof is found by `is_schulhof`, falling back to its name on older
+backends. Binary presence mode shows no released rooms.
+
+A released-room tap calls `POST /api/iot/move-to-room` with
+`{student_rfid, room_id}` and the usual device and staff headers. Phoenix
+records an independent stay in that room's own session. The destination needs
+no kiosk, no second scan and no supervision. The result (`open_room_stay`,
+`moved: false` on a repeated booking) is shown as success and is flagged
+`isOpenRoom`, so it never changes this room's count. A tap while a booking is
+in flight is ignored.
+
+Refusals are matched on their code: `room_not_found`, `room_not_released`,
+`student_not_present` and `open_room_binary_mode`, plus the capacity and
+`STUDENT_ALREADY_ACTIVE` bodies of the check-in. Deploy Phoenix first: an older
+backend sends no `is_open_room`, so the kiosk shows no released rooms and keeps
+the Schulhof/WC buttons.
+
 ## Errors and kiosk state
 
 `STUDENT_ALREADY_ACTIVE`, `ROOM_CAPACITY_EXCEEDED`, and

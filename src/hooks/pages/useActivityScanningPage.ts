@@ -13,17 +13,19 @@ import {
 } from '../../services/activityScanningRules';
 import {
   api,
+  isWCRoomAlias,
   WC_ROOM_ALIASES,
   type DailyFeedbackRating,
   type DeviceConfig,
   type Room,
 } from '../../services/api';
+import { selectOpenRoomDestinations } from '../../services/checkoutDestinationService';
 import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 import { createLogger, serializeError } from '../../utils/logger';
 import { useRfidScanning } from '../useRfidScanning';
 
-import { useCheckoutDestination } from './useCheckoutDestination';
+import { BOOKING_TIMEOUT_MS, useCheckoutDestination } from './useCheckoutDestination';
 
 const logger = createLogger('ActivityScanningPage');
 
@@ -42,7 +44,7 @@ const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | un
 /**
  * View model for the activity scanning page.
  *
- * Owns polling, the on-mount fetches (Schulhof room, WC room, device config),
+ * Owns polling, destination room refresh, the device config fetch,
  * the student count rules, the checkout destination and feedback flows and
  * the modal wiring. The page component consumes this hook and renders JSX only.
  */
@@ -154,9 +156,21 @@ export function useActivityScanningPage() {
   // WC room ID (discovered dynamically from server)
   const [wcRoomId, setWcRoomId] = useState<number | null>(null);
 
-  // Checkout destination flow (unified: Raumwechsel, Schulhof, nach Hause)
-  const { checkoutDestinationState, setCheckoutDestinationState, handleDestinationSelect } =
-    useCheckoutDestination({ schulhofRoomId, wcRoomId });
+  // Released rooms from the same fetch (#3067); older backends omit the flag.
+  const [rooms, setRooms] = useState<Room[]>([]);
+
+  // Checkout destination flow (unified: Raumwechsel, Schulhof, nach Hause, released rooms)
+  const {
+    checkoutDestinationState,
+    setCheckoutDestinationState,
+    handleDestinationSelect,
+    handleOpenRoomSelect,
+    reserveBooking,
+    releaseBooking,
+    isActiveDestination,
+    isBookingInFlight,
+    isBookingPending,
+  } = useCheckoutDestination({ schulhofRoomId, wcRoomId });
 
   // Feedback prompt state
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false);
@@ -167,16 +181,25 @@ export function useActivityScanningPage() {
   // Device config (checkout button visibility, fetched once on mount)
   const [deviceConfig, setDeviceConfig] = useState<DeviceConfig | null>(null);
 
+  // Only confirmed detailed presence mode supports direct room bookings.
+  const openRoomDestinations = useMemo(
+    () =>
+      deviceConfig?.presence_mode === 'detailed'
+        ? selectOpenRoomDestinations(rooms, selectedRoom?.id, isWCRoomAlias)
+        : [],
+    [deviceConfig, rooms, selectedRoom?.id]
+  );
+
   // Compute how many destination buttons will be visible (drives modal size)
   const destinationCount = useMemo(() => {
     if (!checkoutDestinationState || checkoutDestinationState.showingFarewell) return 0;
-    let count = 0;
+    let count = openRoomDestinations.length;
     if (deviceConfig?.checkout.raumwechsel_enabled !== false) count++;
     if (schulhofRoomId && deviceConfig?.checkout.schulhof_enabled !== false) count++;
     if (wcRoomId && deviceConfig?.checkout.wc_enabled !== false) count++;
     if (checkoutDestinationState.dailyCheckoutAvailable) count++;
     return count;
-  }, [deviceConfig, schulhofRoomId, wcRoomId, checkoutDestinationState]);
+  }, [deviceConfig, schulhofRoomId, wcRoomId, checkoutDestinationState, openRoomDestinations]);
 
   // Pickup query prompt state
   const [isAwaitingPickupQueryScan, setIsAwaitingPickupQueryScan] = useState(false);
@@ -273,17 +296,23 @@ export function useActivityScanningPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticatedUser?.pin]); // fetchSessionInfo is stable within this component lifecycle
 
-  // Fetch Schulhof room ID once on page mount
+  // Refresh room availability while the kiosk stays open.
   useEffect(() => {
-    const fetchSchulhofRoom = async () => {
-      if (!authenticatedUser?.pin) return;
+    let active = true;
+    let inFlight = false;
+    const fetchDestinationRooms = async () => {
+      if (!authenticatedUser?.pin || inFlight) return;
+      inFlight = true;
 
       try {
-        logger.debug('Fetching rooms to find Schulhof');
+        logger.debug('Fetching destination rooms');
         const rooms = await api.getRooms(authenticatedUser.pin);
+        if (!active) return;
+        setRooms(rooms);
 
-        // Find Schulhof room by name (consistent with backend name-based detection)
-        const schulhofRoom = rooms.find(r => r.name === 'Schulhof');
+        // Prefer the backend's Schulhof flag; older backends only send the name.
+        const schulhofRoom =
+          rooms.find(r => r.is_schulhof) ?? rooms.find(r => r.name === 'Schulhof');
 
         if (schulhofRoom) {
           setSchulhofRoomId(schulhofRoom.id);
@@ -293,6 +322,7 @@ export function useActivityScanningPage() {
             category: schulhofRoom.category,
           });
         } else {
+          setSchulhofRoomId(null);
           logger.warn('No Schulhof room found in available rooms - Schulhof button will not work');
           // Don't fail - just won't show Schulhof option
         }
@@ -304,15 +334,23 @@ export function useActivityScanningPage() {
           setWcRoomId(wcRoom.id);
           logger.info('Found toilet room', { id: wcRoom.id, name: wcRoom.name });
         } else {
+          setWcRoomId(null);
           logger.warn('No WC/Toilette room found - Toilette button will not work');
         }
       } catch (error) {
-        logger.error('Failed to fetch Schulhof room', { error: serializeError(error) });
-        // Non-critical error - continue without Schulhof functionality
+        if (active)
+          logger.error('Failed to fetch destination rooms', { error: serializeError(error) });
+      } finally {
+        inFlight = false;
       }
     };
 
-    void fetchSchulhofRoom();
+    void fetchDestinationRooms();
+    const interval = setInterval(() => void fetchDestinationRooms(), 15000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [authenticatedUser?.pin]);
 
   // Fetch device config once on mount (checkout button visibility, feedback settings)
@@ -519,22 +557,49 @@ export function useActivityScanningPage() {
   // Handle "nach Hause" button - student confirmed going home
   // Call confirm_daily_checkout to finalize attendance, then show feedback prompt
   const handleNachHause = async () => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+    if (!checkoutDestinationState || !authenticatedUser?.pin || isBookingInFlight()) return;
+    const activeState = reserveBooking();
+    if (!activeState) return;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
     logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
-      rfid: checkoutDestinationState.rfid,
-      studentName: checkoutDestinationState.studentName,
+      rfid: activeState.rfid,
+      studentName: activeState.studentName,
     });
 
     try {
-      const response = await api.toggleAttendance(
-        authenticatedUser.pin,
-        checkoutDestinationState.rfid,
-        'confirm_daily_checkout',
-        'zuhause',
-        resolveStaffAttributionId(authenticatedUser, selectedSupervisors)
-      );
+      const response = await Promise.race([
+        api.toggleAttendance(
+          authenticatedUser.pin,
+          activeState.rfid,
+          'confirm_daily_checkout',
+          'zuhause',
+          resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
+          controller.signal
+        ),
+        new Promise<null>(resolve => {
+          timeoutId = setTimeout(() => {
+            resolve(null);
+            controller.abort();
+          }, BOOKING_TIMEOUT_MS);
+        }),
+      ]);
+      if (response === null) {
+        if (!isActiveDestination(activeState)) return;
+        setScanResult({
+          student_name: 'Abmeldung nicht bestätigt',
+          student_id: activeState.studentId,
+          action: 'error',
+          message: 'Die Abmeldung ist nicht bestätigt. Bitte die Betreuung fragen.',
+          showAsError: true,
+        });
+        setCheckoutDestinationState(null);
+        showScanModal();
+        return;
+      }
       logger.info('Daily checkout confirmed');
+      if (!isActiveDestination(activeState)) return;
       feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
 
       // Show feedback prompt only if feedback is enabled for this tenant
@@ -547,9 +612,10 @@ export function useActivityScanningPage() {
       }
     } catch (error) {
       logger.error('Failed to confirm daily checkout', {
-        rfid: checkoutDestinationState.rfid,
+        rfid: activeState.rfid,
         error: error instanceof Error ? error.message : String(error),
       });
+      if (!isActiveDestination(activeState)) return;
       // Still proceed — the visit is already ended,
       // attendance sync failure shouldn't block the student.
       // Fall back to checkin scan's feedback_enabled flag.
@@ -560,6 +626,9 @@ export function useActivityScanningPage() {
       } else {
         setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
       }
+    } finally {
+      clearTimeout(timeoutId);
+      releaseBooking(activeState);
     }
   };
 
@@ -621,6 +690,9 @@ export function useActivityScanningPage() {
     checkoutDestinationState,
     setCheckoutDestinationState,
     handleDestinationSelect,
+    handleOpenRoomSelect,
+    isBookingPending,
+    openRoomDestinations,
     destinationCount,
     schulhofRoomId,
     wcRoomId,

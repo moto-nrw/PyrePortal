@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api, type RfidScanResponse } from './api';
+import {
+  api,
+  ApiError,
+  isWCRoomAlias,
+  type OpenRoomMoveResponse,
+  type RfidScanResponse,
+  type Room,
+} from './api';
 import {
   checkInToDestinationRoom,
+  moveToOpenRoom,
+  selectOpenRoomDestinations,
   type CheckoutDestinationState,
 } from './checkoutDestinationService';
 
@@ -12,6 +21,7 @@ vi.mock('./api', async () => {
     ...actual,
     api: {
       processRfidScan: vi.fn(),
+      moveToOpenRoom: vi.fn(),
     },
   };
 });
@@ -97,7 +107,8 @@ describe('checkInToDestinationRoom', () => {
           room_id: 9,
         },
         '1234',
-        7
+        7,
+        undefined
       );
       expect(result).toEqual({
         ...serverResult,
@@ -122,7 +133,8 @@ describe('checkInToDestinationRoom', () => {
           room_id: 11,
         },
         '1234',
-        7
+        7,
+        undefined
       );
       expect(result).toEqual({
         ...serverResult,
@@ -213,5 +225,125 @@ describe('checkInToDestinationRoom', () => {
       // mapServerErrorToGerman falls back to a generic German message for unknown errors
       expect(result.message).not.toContain('Netzwerkfehler bei Schulhof-Anmeldung');
     });
+  });
+});
+
+describe('selectOpenRoomDestinations', () => {
+  const rooms: Room[] = [
+    { id: 1, name: 'Klassenraum 1a', is_occupied: false },
+    { id: 2, name: 'Turnhalle', is_occupied: false, is_open_room: true },
+    { id: 3, name: 'Schulhof', is_occupied: false, is_open_room: true, is_schulhof: true },
+    { id: 6, name: 'Schulhof', is_occupied: false, is_open_room: true },
+    { id: 4, name: 'WC', is_occupied: false, is_open_room: true },
+    { id: 5, name: 'Bibliothek', is_occupied: true, is_open_room: true },
+  ];
+
+  it('offers every released room except the Schulhof, the toilet and the current room', () => {
+    expect(selectOpenRoomDestinations(rooms, 5, isWCRoomAlias)).toEqual([
+      { id: 2, name: 'Turnhalle' },
+    ]);
+  });
+
+  it('offers occupied released rooms too', () => {
+    expect(selectOpenRoomDestinations(rooms, null, isWCRoomAlias)).toEqual([
+      { id: 2, name: 'Turnhalle' },
+      { id: 5, name: 'Bibliothek' },
+    ]);
+  });
+
+  it('offers nothing when an older backend sends no release flag', () => {
+    const legacy: Room[] = [{ id: 2, name: 'Turnhalle', is_occupied: false }];
+    expect(selectOpenRoomDestinations(legacy, undefined, isWCRoomAlias)).toEqual([]);
+  });
+});
+
+describe('moveToOpenRoom', () => {
+  const room = { id: 77, name: 'Turnhalle' };
+  const booked: OpenRoomMoveResponse = {
+    student_id: 42,
+    student_name: 'Max Mustermann',
+    action: 'open_room_stay',
+    room_id: 77,
+    room_name: 'Turnhalle',
+    active_group_id: 250,
+    moved: true,
+    processed_at: '2026-09-22T10:00:00Z',
+    message: 'Max ist jetzt in Turnhalle.',
+  };
+
+  beforeEach(() => {
+    mockedApi.moveToOpenRoom.mockReset();
+    mockedApi.moveToOpenRoom.mockResolvedValue(booked);
+  });
+
+  it('books the card into the room and flags the result with isOpenRoom', async () => {
+    const result = await moveToOpenRoom({ room, state: makeState(), pin: '1234', staffId: 7 });
+
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledWith(
+      { student_rfid: '04:D6:94:82:97:6A:80', room_id: 77 },
+      '1234',
+      7,
+      undefined
+    );
+    expect(result).toEqual({
+      student_id: 42,
+      student_name: 'Max Mustermann',
+      action: 'open_room_stay',
+      room_name: 'Turnhalle',
+      processed_at: '2026-09-22T10:00:00Z',
+      message: 'Max ist jetzt in Turnhalle',
+      isOpenRoom: true,
+    });
+  });
+
+  it('presents a repeated booking as success too', async () => {
+    mockedApi.moveToOpenRoom.mockResolvedValue({ ...booked, moved: false });
+
+    const result = await moveToOpenRoom({ room, state: makeState(), pin: '1234' });
+
+    expect(result.isOpenRoom).toBe(true);
+    expect(result.showAsError).toBeUndefined();
+  });
+
+  it('maps a refusal code to German', async () => {
+    mockedApi.moveToOpenRoom.mockRejectedValue(
+      new ApiError('API Error: 409 - room is not released', 409, 'room_not_released')
+    );
+
+    const result = await moveToOpenRoom({ room, state: makeState(), pin: '1234' });
+
+    expect(result).toEqual({
+      student_name: 'Turnhalle: Wechsel fehlgeschlagen',
+      student_id: 42,
+      action: 'error',
+      message: 'Dieser Raum ist gerade nicht offen. Bitte einen anderen Ort wählen.',
+      showAsError: true,
+    });
+  });
+
+  it('keeps the room occupancy of a full room', async () => {
+    mockedApi.moveToOpenRoom.mockRejectedValue(
+      new ApiError('Room capacity exceeded', 409, 'ROOM_CAPACITY_EXCEEDED', {
+        room_id: 77,
+        room_name: 'Turnhalle',
+        current_occupancy: 20,
+        max_capacity: 20,
+      })
+    );
+
+    const result = await moveToOpenRoom({ room, state: makeState(), pin: '1234' });
+
+    expect(result.message).toBe('Turnhalle ist voll (20/20 Plätze belegt).');
+  });
+
+  it('maps network errors to the open-room network message', async () => {
+    mockedApi.moveToOpenRoom.mockRejectedValue(new Error('Failed to fetch'));
+
+    const result = await moveToOpenRoom({ room, state: makeState(), pin: '1234' });
+
+    expect(result.message).toBe(
+      'Netzwerkfehler beim Raumwechsel. Bitte Verbindung prüfen und erneut scannen.'
+    );
+    expect(result.showAsError).toBe(true);
   });
 });

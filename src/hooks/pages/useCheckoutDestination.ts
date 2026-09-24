@@ -1,13 +1,17 @@
-import { useState } from 'react';
+import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
+import type { RfidScanResult } from '../../services/api';
 import {
   checkInToDestinationRoom,
+  moveToOpenRoom,
   type CheckoutDestinationState,
+  type OpenRoomDestination,
 } from '../../services/checkoutDestinationService';
 import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 
 export type CheckoutDestination = 'schulhof' | 'raumwechsel' | 'toilette';
+export const BOOKING_TIMEOUT_MS = 15000;
 
 interface UseCheckoutDestinationParams {
   schulhofRoomId: number | null;
@@ -15,21 +19,97 @@ interface UseCheckoutDestinationParams {
 }
 
 /**
- * Checkout destination flow (unified: Raumwechsel, Schulhof, Toilette).
+ * Checkout destination flow (unified: Raumwechsel, Schulhof, Toilette and
+ * released rooms).
  *
- * Holds the destination modal state and performs the destination room
- * check-in through the checkout destination service after the server scan completes.
+ * Holds the destination modal state and performs the destination booking
+ * through the checkout destination service after the server scan completes.
+ * One booking runs at a time: a second tap while it is in flight is ignored.
  */
 export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckoutDestinationParams) {
   const { authenticatedUser, selectedSupervisors, setScanResult, showScanModal } = useUserStore();
 
   // State for checkout destination selection (unified: Raumwechsel, Schulhof, nach Hause)
-  const [checkoutDestinationState, setCheckoutDestinationState] =
-    useState<CheckoutDestinationState | null>(null);
+  const [checkoutDestinationState, setDestinationState] = useState<CheckoutDestinationState | null>(
+    null
+  );
+  // Keep the active chooser identity current even before React commits a state update.
+  const destinationStateRef = useRef<CheckoutDestinationState | null>(null);
+  const setCheckoutDestinationState: Dispatch<SetStateAction<CheckoutDestinationState | null>> =
+    useCallback(value => {
+      const nextState = typeof value === 'function' ? value(destinationStateRef.current) : value;
+      destinationStateRef.current = nextState;
+      setDestinationState(nextState);
+    }, []);
+
+  // Only one attendance write may run at a time, even across new scans.
+  const bookingInFlight = useRef<CheckoutDestinationState | null>(null);
+  const [pendingState, setPendingState] = useState<CheckoutDestinationState | null>(null);
+
+  const reserveBooking = () => {
+    const state = destinationStateRef.current;
+    if (!state || bookingInFlight.current) return null;
+    bookingInFlight.current = state;
+    setPendingState(state);
+    return state;
+  };
+
+  const releaseBooking = (state: CheckoutDestinationState) => {
+    if (bookingInFlight.current === state) {
+      bookingInFlight.current = null;
+      setPendingState(null);
+    }
+  };
+
+  const book = async (
+    run: (
+      state: CheckoutDestinationState,
+      pin: string,
+      signal: AbortSignal
+    ) => Promise<RfidScanResult>
+  ) => {
+    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+    const activeState = reserveBooking();
+    if (!activeState) return;
+    const activeScan = useUserStore.getState().rfid.currentScan;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        run(activeState, authenticatedUser.pin, controller.signal),
+        new Promise<RfidScanResult>(resolve => {
+          timeoutId = setTimeout(() => {
+            resolve({
+              student_name: 'Buchung nicht bestätigt',
+              student_id: activeState.studentId,
+              action: 'error',
+              message: 'Die Buchung ist nicht bestätigt. Bitte die Betreuung fragen.',
+              showAsError: true,
+            });
+            // Settle the timeout result before abort can reject the request.
+            controller.abort();
+          }, BOOKING_TIMEOUT_MS);
+        }),
+      ]);
+      // A timeout, a new scan, or another chooser invalidates this result.
+      if (
+        destinationStateRef.current !== activeState ||
+        (activeScan && useUserStore.getState().rfid.currentScan !== activeScan)
+      )
+        return;
+      setScanResult(result);
+      setCheckoutDestinationState(null);
+      showScanModal();
+      // Modal will auto-close via useModalTimeout hook
+    } finally {
+      clearTimeout(timeoutId);
+      releaseBooking(activeState);
+    }
+  };
 
   // Handle checkout destination selection (Schulhof, Toilette or Raumwechsel)
   const handleDestinationSelect = async (destination: CheckoutDestination) => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+    if (!checkoutDestinationState || !authenticatedUser?.pin || bookingInFlight.current) return;
 
     if (destination === 'raumwechsel') {
       // Clear destination state - student will scan at destination room
@@ -37,23 +117,41 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       return;
     }
 
-    const result = await checkInToDestinationRoom({
-      destination,
-      roomId: destination === 'schulhof' ? schulhofRoomId : wcRoomId,
-      state: checkoutDestinationState,
-      pin: authenticatedUser.pin,
-      staffId: resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
-    });
+    await book((state, pin, signal) =>
+      checkInToDestinationRoom({
+        destination,
+        roomId: destination === 'schulhof' ? schulhofRoomId : wcRoomId,
+        state,
+        pin,
+        staffId: resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
+        signal,
+      })
+    );
+  };
 
-    setScanResult(result);
-    setCheckoutDestinationState(null);
-    showScanModal();
-    // Modal will auto-close via useModalTimeout hook
+  // Handle a released room: the stay is booked here, the room needs no device.
+  const handleOpenRoomSelect = async (room: OpenRoomDestination) => {
+    if (!authenticatedUser) return;
+    await book((state, pin, signal) =>
+      moveToOpenRoom({
+        room,
+        state,
+        pin,
+        staffId: resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
+        signal,
+      })
+    );
   };
 
   return {
     checkoutDestinationState,
     setCheckoutDestinationState,
     handleDestinationSelect,
+    handleOpenRoomSelect,
+    reserveBooking,
+    releaseBooking,
+    isActiveDestination: (state: CheckoutDestinationState) => destinationStateRef.current === state,
+    isBookingInFlight: () => bookingInFlight.current !== null,
+    isBookingPending: pendingState !== null && checkoutDestinationState !== null,
   };
 }
