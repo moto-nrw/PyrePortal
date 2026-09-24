@@ -41,14 +41,21 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       setDestinationState(nextState);
     }, []);
 
-  // A destination tap books once, even when the child taps twice.
-  const bookingInFlight = useRef(false);
+  // A destination tap books once per chooser, even when the child taps twice.
+  const bookingInFlight = useRef<CheckoutDestinationState | null>(null);
+  const [pendingState, setPendingState] = useState<CheckoutDestinationState | null>(null);
 
   const book = async (
     run: (state: CheckoutDestinationState, pin: string) => Promise<RfidScanResult>
   ) => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin || bookingInFlight.current) return;
-    bookingInFlight.current = true;
+    if (
+      !checkoutDestinationState ||
+      !authenticatedUser?.pin ||
+      bookingInFlight.current === checkoutDestinationState
+    )
+      return;
+    bookingInFlight.current = checkoutDestinationState;
+    setPendingState(checkoutDestinationState);
     const activeState = checkoutDestinationState;
     const activeScan = useUserStore.getState().rfid.currentScan;
     try {
@@ -64,13 +71,21 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       showScanModal();
       // Modal will auto-close via useModalTimeout hook
     } finally {
-      bookingInFlight.current = false;
+      if (bookingInFlight.current === activeState) {
+        bookingInFlight.current = null;
+        setPendingState(null);
+      }
     }
   };
 
   // Handle checkout destination selection (Schulhof, Toilette or Raumwechsel)
   const handleDestinationSelect = async (destination: CheckoutDestination) => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin || bookingInFlight.current) return;
+    if (
+      !checkoutDestinationState ||
+      !authenticatedUser?.pin ||
+      bookingInFlight.current === checkoutDestinationState
+    )
+      return;
 
     if (destination === 'raumwechsel') {
       // Clear destination state - student will scan at destination room
@@ -107,6 +122,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     setCheckoutDestinationState,
     handleDestinationSelect,
     handleOpenRoomSelect,
-    isBookingInFlight: () => bookingInFlight.current,
+    isBookingInFlight: () => bookingInFlight.current === checkoutDestinationState,
+    isBookingPending: pendingState !== null && pendingState === checkoutDestinationState,
   };
 }

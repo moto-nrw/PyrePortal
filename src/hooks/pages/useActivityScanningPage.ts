@@ -166,6 +166,7 @@ export function useActivityScanningPage() {
     handleDestinationSelect,
     handleOpenRoomSelect,
     isBookingInFlight,
+    isBookingPending,
   } = useCheckoutDestination({ schulhofRoomId, wcRoomId });
 
   // Feedback prompt state
@@ -656,6 +657,7 @@ export function useActivityScanningPage() {
     setCheckoutDestinationState,
     handleDestinationSelect,
     handleOpenRoomSelect,
+    isBookingPending,
     openRoomDestinations,
     destinationCount,
     schulhofRoomId,

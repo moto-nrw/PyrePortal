@@ -294,6 +294,7 @@ const ActivityScanningPage: React.FC = () => {
     handleOpenRoomSelect,
     openRoomDestinations,
     destinationCount,
+    isBookingPending,
     schulhofRoomId,
     wcRoomId,
     deviceConfig,
@@ -932,6 +933,11 @@ const ActivityScanningPage: React.FC = () => {
           isOpen={shouldShowCheckModal}
           onClose={handleModalTimeout}
           autoWidth
+          scrollable={
+            isCheckoutAction(currentScan?.action) &&
+            !!checkoutDestinationState &&
+            !checkoutDestinationState.showingFarewell
+          }
           size={
             !isPickupQueryPromptOpen &&
             !showFeedbackPrompt &&
@@ -946,7 +952,7 @@ const ActivityScanningPage: React.FC = () => {
           backgroundColor={showFeedbackPrompt ? designSystem.colors.white : scanFamily.bg}
           timeoutColor={showFeedbackPrompt ? undefined : scanFamily.accent}
           timeoutTrackColor={showFeedbackPrompt ? undefined : scanFamily.tint}
-          timeout={modalTimeoutDuration}
+          timeout={isBookingPending ? undefined : modalTimeoutDuration}
           timeoutResetKey={
             isPickupQueryPromptOpen
               ? `pickup-query-prompt-${scanContextId}`
@@ -963,8 +969,8 @@ const ActivityScanningPage: React.FC = () => {
               !checkoutDestinationState.showingFarewell
             )
           }
-          closeOnBackdropClick={!shouldKeepPickupQueryModalOpen}
-          closeOnEscapeKey={!shouldKeepPickupQueryModalOpen}
+          closeOnBackdropClick={!shouldKeepPickupQueryModalOpen && !isBookingPending}
+          closeOnEscapeKey={!shouldKeepPickupQueryModalOpen && !isBookingPending}
         >
           {/* Icon container with background circle - hidden during checkout destination selection (but visible during feedback) */}
           {(isPickupQueryPromptOpen ||

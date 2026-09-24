@@ -1185,6 +1185,28 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     expect(screen.getAllByRole('button', { name: 'Toilette' })).toHaveLength(1);
   });
 
+  it('keeps additional destination rows scrollable in the modal', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce([
+      ...releasedRooms,
+      ...Array.from({ length: 12 }, (_, index) => ({
+        id: 200 + index,
+        name: `Zusatzraum ${index + 1}`,
+        is_occupied: false,
+        is_open_room: true,
+      })),
+    ]);
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    expect(screen.getByRole('button', { name: 'Zusatzraum 12' })).toBeInTheDocument();
+    expect(document.querySelector('dialog .moto-modal-container')).toHaveStyle({
+      maxHeight: 'calc(100dvh - 34px - 64px - 64px)',
+      overflowY: 'auto',
+    });
+  });
+
   it('books a released room without a second scan', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
@@ -1306,7 +1328,7 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
   });
 
-  it('ignores a booking result after the chooser times out', async () => {
+  it('keeps the chooser open until a slow booking returns', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
     let resolveBooking!: (value: Awaited<ReturnType<typeof api.moveToOpenRoom>>) => void;
@@ -1322,7 +1344,7 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     await act(async () => {
       vi.advanceTimersByTime(7000);
     });
-    expect(screen.queryByText('Wohin geht Lisa?')).not.toBeInTheDocument();
+    expect(screen.getByText('Wohin geht Lisa?')).toBeInTheDocument();
 
     await act(async () => {
       resolveBooking({
@@ -1335,7 +1357,96 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
         moved: true,
       });
     });
-    expect(useUserStore.getState().rfid.currentScan).toBeNull();
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'open_room_stay',
+      isOpenRoom: true,
+    });
+  });
+
+  it('shows a slow booking failure instead of losing it on timeout', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let rejectBooking!: (error: Error) => void;
+    mockedApi.moveToOpenRoom.mockReturnValueOnce(
+      new Promise((_, reject) => {
+        rejectBooking = reject;
+      })
+    );
+    showCheckoutChooser();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    await act(async () => {
+      vi.advanceTimersByTime(7000);
+    });
+    expect(screen.getByText('Wohin geht Lisa?')).toBeInTheDocument();
+
+    await act(async () => {
+      rejectBooking(new Error('Network error'));
+    });
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      action: 'error',
+      showAsError: true,
+    });
+  });
+
+  it('allows the next child to book while an earlier request is still pending', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveOldBooking!: (value: Awaited<ReturnType<typeof api.moveToOpenRoom>>) => void;
+    mockedApi.moveToOpenRoom
+      .mockReturnValueOnce(
+        new Promise(resolve => {
+          resolveOldBooking = resolve;
+        })
+      )
+      .mockResolvedValueOnce({
+        student_id: 99,
+        student_name: 'Max Mustermann',
+        action: 'open_room_stay',
+        room_id: 78,
+        room_name: 'Bibliothek',
+        active_group_id: 251,
+        moved: true,
+      });
+    showCheckoutChooser();
+    useUserStore.getState().setScanResult(mockRfidHookReturn.currentScan);
+    const view = renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Turnhalle' }));
+
+    const nextScan: RfidScanResult = {
+      student_id: 99,
+      student_name: 'Max Mustermann',
+      action,
+      scannedTagId: '04:11:22:33:44:55:66',
+    };
+    await act(async () => {
+      mockRfidHookReturn = { ...mockRfidHookReturn, currentScan: nextScan };
+      useUserStore.getState().setScanResult(nextScan);
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+    });
+    await user.click(screen.getByRole('button', { name: 'Bibliothek' }));
+    expect(mockedApi.moveToOpenRoom).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      resolveOldBooking({
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action: 'open_room_stay',
+        room_id: 77,
+        room_name: 'Turnhalle',
+        active_group_id: 250,
+        moved: true,
+      });
+    });
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      student_id: 99,
+      isOpenRoom: true,
+    });
   });
 
   it('ignores Raumwechsel and nach Hause while a room booking runs', async () => {

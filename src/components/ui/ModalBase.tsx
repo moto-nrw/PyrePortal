@@ -65,6 +65,9 @@ interface ModalBaseProps {
   /** Use fit-content width instead of 90vw. Default: false */
   autoWidth?: boolean;
 
+  /** Constrain tall content to the viewport and allow scrolling. Default: false */
+  scrollable?: boolean;
+
   // --- Timeout ---
 
   /** Auto-close timeout in ms. Undefined = no auto-close */
@@ -134,6 +137,7 @@ export function ModalBase({
   timeoutColor,
   timeoutTrackColor,
   autoWidth = false,
+  scrollable = false,
   closeOnBackdropClick = true,
   closeOnContentClick = false,
   closeOnEscapeKey = true,
@@ -274,7 +278,11 @@ export function ModalBase({
           backdropFilter: isLight ? designSystem.modal.blur : undefined,
           WebkitBackdropFilter: isLight ? designSystem.modal.blur : undefined,
           position: 'relative',
-          overflow: 'hidden',
+          maxHeight: scrollable
+            ? `calc(100dvh - 34px - ${sizePreset.padding} - ${sizePreset.padding})`
+            : undefined,
+          overflowX: 'hidden',
+          overflowY: scrollable ? 'auto' : 'hidden',
           cursor: closeOnContentClick ? 'pointer' : undefined,
         }}
       >
