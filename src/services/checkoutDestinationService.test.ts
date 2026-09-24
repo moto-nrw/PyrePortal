@@ -231,6 +231,7 @@ describe('selectOpenRoomDestinations', () => {
     { id: 1, name: 'Klassenraum 1a', is_occupied: false },
     { id: 2, name: 'Turnhalle', is_occupied: false, is_open_room: true },
     { id: 3, name: 'Schulhof', is_occupied: false, is_open_room: true, is_schulhof: true },
+    { id: 6, name: 'Schulhof', is_occupied: false, is_open_room: true },
     { id: 4, name: 'WC', is_occupied: false, is_open_room: true },
     { id: 5, name: 'Bibliothek', is_occupied: true, is_open_room: true },
   ];

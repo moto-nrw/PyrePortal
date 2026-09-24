@@ -44,7 +44,7 @@ const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | un
 /**
  * View model for the activity scanning page.
  *
- * Owns polling, the on-mount fetches (Schulhof room, WC room, device config),
+ * Owns polling, destination room refresh, the device config fetch,
  * the student count rules, the checkout destination and feedback flows and
  * the modal wiring. The page component consumes this hook and renders JSX only.
  */
@@ -176,13 +176,12 @@ export function useActivityScanningPage() {
   // Device config (checkout button visibility, fetched once on mount)
   const [deviceConfig, setDeviceConfig] = useState<DeviceConfig | null>(null);
 
-  // Released rooms offered as destinations. Binary-mode schools track no
-  // rooms, so they get none.
+  // Only confirmed detailed presence mode supports direct room bookings.
   const openRoomDestinations = useMemo(
     () =>
-      deviceConfig?.presence_mode === 'binary'
-        ? []
-        : selectOpenRoomDestinations(rooms, selectedRoom?.id, isWCRoomAlias),
+      deviceConfig?.presence_mode === 'detailed'
+        ? selectOpenRoomDestinations(rooms, selectedRoom?.id, isWCRoomAlias)
+        : [],
     [deviceConfig, rooms, selectedRoom?.id]
   );
 
@@ -292,13 +291,13 @@ export function useActivityScanningPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticatedUser?.pin]); // fetchSessionInfo is stable within this component lifecycle
 
-  // Fetch Schulhof room ID once on page mount
+  // Refresh room availability while the kiosk stays open.
   useEffect(() => {
-    const fetchSchulhofRoom = async () => {
+    const fetchDestinationRooms = async () => {
       if (!authenticatedUser?.pin) return;
 
       try {
-        logger.debug('Fetching rooms to find Schulhof');
+        logger.debug('Fetching destination rooms');
         const rooms = await api.getRooms(authenticatedUser.pin);
         setRooms(rooms);
 
@@ -314,6 +313,7 @@ export function useActivityScanningPage() {
             category: schulhofRoom.category,
           });
         } else {
+          setSchulhofRoomId(null);
           logger.warn('No Schulhof room found in available rooms - Schulhof button will not work');
           // Don't fail - just won't show Schulhof option
         }
@@ -325,15 +325,17 @@ export function useActivityScanningPage() {
           setWcRoomId(wcRoom.id);
           logger.info('Found toilet room', { id: wcRoom.id, name: wcRoom.name });
         } else {
+          setWcRoomId(null);
           logger.warn('No WC/Toilette room found - Toilette button will not work');
         }
       } catch (error) {
-        logger.error('Failed to fetch Schulhof room', { error: serializeError(error) });
-        // Non-critical error - continue without Schulhof functionality
+        logger.error('Failed to fetch destination rooms', { error: serializeError(error) });
       }
     };
 
-    void fetchSchulhofRoom();
+    void fetchDestinationRooms();
+    const interval = setInterval(() => void fetchDestinationRooms(), 15000);
+    return () => clearInterval(interval);
   }, [authenticatedUser?.pin]);
 
   // Fetch device config once on mount (checkout button visibility, feedback settings)

@@ -268,7 +268,7 @@ export function ModalBase({
           padding: sizePreset.padding,
           maxWidth: sizePreset.maxWidth,
           width: autoWidth ? 'fit-content' : '90vw',
-          minWidth: autoWidth ? '700px' : undefined,
+          minWidth: autoWidth ? 'min(700px, 90vw)' : undefined,
           textAlign: 'center',
           boxShadow: designSystem.modal.shadow,
           backdropFilter: isLight ? designSystem.modal.blur : undefined,

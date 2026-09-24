@@ -99,12 +99,12 @@ const DESTINATION_BUTTON_STYLES = {
     cursor: 'pointer',
     transition: 'all 200ms',
     outline: 'none',
-    width: '240px',
+    width: '100%',
+    boxSizing: 'border-box' as const,
     aspectRatio: '5 / 4',
   },
   /** Smaller cards once released rooms push the grid past six buttons. */
   compact: {
-    width: '200px',
     aspectRatio: '4 / 3',
     padding: '20px 24px',
   },
@@ -567,9 +567,8 @@ const ActivityScanningPage: React.FC = () => {
 
       const gridColumns = destinationGridColumns(destinations.length);
       const compact = gridColumns > 3;
-      const buttonWidth = compact
-        ? DESTINATION_BUTTON_STYLES.compact.width
-        : DESTINATION_BUTTON_STYLES.base.width;
+      const buttonWidth = compact ? 200 : 240;
+      const gridWidth = gridColumns * buttonWidth + (gridColumns - 1) * 24;
 
       return (
         <div
@@ -577,7 +576,9 @@ const ActivityScanningPage: React.FC = () => {
             position: 'relative',
             zIndex: 2,
             display: 'grid',
-            gridTemplateColumns: `repeat(${gridColumns}, ${buttonWidth})`,
+            gridTemplateColumns:
+              'repeat(auto-fit, minmax(min(100%, clamp(160px, 20vw, 200px)), 1fr))',
+            width: `min(${gridWidth}px, calc(90vw - 128px))`,
             gap: '24px',
             justifyContent: 'center',
           }}

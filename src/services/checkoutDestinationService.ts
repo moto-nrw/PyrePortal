@@ -164,6 +164,7 @@ export const selectOpenRoomDestinations = (
       room =>
         room.is_open_room === true &&
         room.is_schulhof !== true &&
+        room.name !== 'Schulhof' &&
         !isToiletRoom(room.name) &&
         room.id !== currentRoomId
     )

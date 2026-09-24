@@ -1285,6 +1285,71 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     expect(screen.queryByText('Bibliothek')).not.toBeInTheDocument();
   });
 
+  it('waits for confirmed detailed presence mode before offering released rooms', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveConfig!: (config: Awaited<ReturnType<typeof api.getDeviceConfig>>) => void;
+    mockedApi.getDeviceConfig.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveConfig = resolve;
+      })
+    );
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    expect(screen.queryByRole('button', { name: 'Turnhalle' })).not.toBeInTheDocument();
+
+    await act(async () => {
+      resolveConfig({
+        presence_mode: 'detailed',
+        checkout: {
+          raumwechsel_enabled: true,
+          schulhof_enabled: true,
+          wc_enabled: true,
+          daily_checkout_time: null,
+        },
+        feedback: { enabled: true },
+      });
+    });
+    expect(screen.getByRole('button', { name: 'Turnhalle' })).toBeInTheDocument();
+  });
+
+  it('keeps released rooms hidden when device configuration fails', async () => {
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    mockedApi.getDeviceConfig.mockRejectedValueOnce(new Error('Network error'));
+    showCheckoutChooser();
+
+    await act(async () => {
+      renderPage();
+    });
+    expect(screen.queryByRole('button', { name: 'Turnhalle' })).not.toBeInTheDocument();
+  });
+
+  it('refreshes released rooms while the kiosk stays open', async () => {
+    mockedApi.getRooms
+      .mockResolvedValueOnce(releasedRooms)
+      .mockResolvedValueOnce([
+        ...releasedRooms.filter(room => room.id !== 77),
+        { id: 80, name: 'Musikraum', is_occupied: false, is_open_room: true },
+      ]);
+    const view = renderPage();
+    await act(async () => {
+      await Promise.resolve();
+    });
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+    showCheckoutChooser();
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+    expect(screen.queryByRole('button', { name: 'Turnhalle' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Musikraum' })).toBeInTheDocument();
+  });
+
   // =======================================================================
   // nach Hause + feedback flow
   // =======================================================================
