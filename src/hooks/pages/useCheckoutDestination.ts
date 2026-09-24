@@ -46,6 +46,17 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
   const bookingInFlight = useRef<CheckoutDestinationState | null>(null);
   const [pendingState, setPendingState] = useState<CheckoutDestinationState | null>(null);
 
+  const reserveBooking = () => {
+    const state = destinationStateRef.current;
+    if (!state || bookingInFlight.current) return null;
+    bookingInFlight.current = state;
+    return state;
+  };
+
+  const releaseBooking = (state: CheckoutDestinationState) => {
+    if (bookingInFlight.current === state) bookingInFlight.current = null;
+  };
+
   const book = async (
     run: (
       state: CheckoutDestinationState,
@@ -53,10 +64,10 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
       signal: AbortSignal
     ) => Promise<RfidScanResult>
   ) => {
-    if (!checkoutDestinationState || !authenticatedUser?.pin || bookingInFlight.current) return;
-    bookingInFlight.current = checkoutDestinationState;
-    setPendingState(checkoutDestinationState);
-    const activeState = checkoutDestinationState;
+    if (!checkoutDestinationState || !authenticatedUser?.pin) return;
+    const activeState = reserveBooking();
+    if (!activeState) return;
+    setPendingState(activeState);
     const activeScan = useUserStore.getState().rfid.currentScan;
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -90,7 +101,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     } finally {
       clearTimeout(timeoutId);
       if (bookingInFlight.current === activeState) {
-        bookingInFlight.current = null;
+        releaseBooking(activeState);
         setPendingState(null);
       }
     }
@@ -137,6 +148,9 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     setCheckoutDestinationState,
     handleDestinationSelect,
     handleOpenRoomSelect,
+    reserveBooking,
+    releaseBooking,
+    isActiveDestination: (state: CheckoutDestinationState) => destinationStateRef.current === state,
     isBookingInFlight: () => bookingInFlight.current !== null,
     isBookingPending: pendingState !== null && checkoutDestinationState !== null,
   };

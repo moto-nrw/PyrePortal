@@ -1743,6 +1743,35 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     expect(screen.getByText('Schlecht')).toBeInTheDocument();
   });
 
+  it('blocks other destination actions while nach Hause is pending', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.getRooms.mockResolvedValueOnce(releasedRooms);
+    let resolveCheckout!: (value: Awaited<ReturnType<typeof api.toggleAttendance>>) => void;
+    mockedApi.toggleAttendance.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveCheckout = resolve;
+      })
+    );
+    showCheckoutChooser();
+    mockRfidHookReturn.currentScan = {
+      ...mockRfidHookReturn.currentScan!,
+      daily_checkout_available: true,
+    };
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'nach Hause' }));
+    await user.click(screen.getByRole('button', { name: 'nach Hause' }));
+    await user.click(screen.getByRole('button', { name: 'Turnhalle' }));
+
+    expect(mockedApi.toggleAttendance).toHaveBeenCalledTimes(1);
+    expect(mockedApi.moveToOpenRoom).not.toHaveBeenCalled();
+
+    await act(async () => {
+      resolveCheckout({ status: 'confirmed', message: 'Daily checkout confirmed' } as never);
+    });
+    expect(screen.getByText('Wie war dein Tag, Lisa?')).toBeInTheDocument();
+  });
+
   it('shows feedback prompt even when toggleAttendance fails', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.toggleAttendance.mockRejectedValueOnce(new Error('Server error'));
@@ -1894,6 +1923,55 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
 
     expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
     expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+  });
+
+  it('does not show feedback for an old checkout after another child scans', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    let resolveCheckout!: (value: Awaited<ReturnType<typeof api.toggleAttendance>>) => void;
+    mockedApi.toggleAttendance.mockReturnValueOnce(
+      new Promise(resolve => {
+        resolveCheckout = resolve;
+      })
+    );
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action,
+        daily_checkout_available: true,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+        visit_id: 100,
+      },
+      showModal: true,
+    };
+
+    const view = renderPage();
+    await user.click(screen.getByRole('button', { name: 'nach Hause' }));
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 43,
+        student_name: 'Max Mustermann',
+        action: 'checked_in',
+        room_name: 'Raum 101',
+        scannedTagId: '04:11:22:33:44:55:66',
+        visit_id: 101,
+      },
+      showModal: true,
+    };
+    await act(async () => {
+      view.rerender(
+        <MemoryRouter>
+          <ActivityScanningPage />
+        </MemoryRouter>
+      );
+      resolveCheckout({ status: 'confirmed', message: 'Daily checkout confirmed' } as never);
+    });
+
+    expect(screen.getByText('Hallo, Max Mustermann!')).toBeInTheDocument();
     expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
   });
 

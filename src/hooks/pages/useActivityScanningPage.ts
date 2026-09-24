@@ -165,6 +165,9 @@ export function useActivityScanningPage() {
     setCheckoutDestinationState,
     handleDestinationSelect,
     handleOpenRoomSelect,
+    reserveBooking,
+    releaseBooking,
+    isActiveDestination,
     isBookingInFlight,
     isBookingPending,
   } = useCheckoutDestination({ schulhofRoomId, wcRoomId });
@@ -555,21 +558,24 @@ export function useActivityScanningPage() {
   // Call confirm_daily_checkout to finalize attendance, then show feedback prompt
   const handleNachHause = async () => {
     if (!checkoutDestinationState || !authenticatedUser?.pin || isBookingInFlight()) return;
+    const activeState = reserveBooking();
+    if (!activeState) return;
 
     logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
-      rfid: checkoutDestinationState.rfid,
-      studentName: checkoutDestinationState.studentName,
+      rfid: activeState.rfid,
+      studentName: activeState.studentName,
     });
 
     try {
       const response = await api.toggleAttendance(
         authenticatedUser.pin,
-        checkoutDestinationState.rfid,
+        activeState.rfid,
         'confirm_daily_checkout',
         'zuhause',
         resolveStaffAttributionId(authenticatedUser, selectedSupervisors)
       );
       logger.info('Daily checkout confirmed');
+      if (!isActiveDestination(activeState)) return;
       feedbackVisitIdRef.current = currentScan?.visit_id ?? null;
 
       // Show feedback prompt only if feedback is enabled for this tenant
@@ -582,9 +588,10 @@ export function useActivityScanningPage() {
       }
     } catch (error) {
       logger.error('Failed to confirm daily checkout', {
-        rfid: checkoutDestinationState.rfid,
+        rfid: activeState.rfid,
         error: error instanceof Error ? error.message : String(error),
       });
+      if (!isActiveDestination(activeState)) return;
       // Still proceed — the visit is already ended,
       // attendance sync failure shouldn't block the student.
       // Fall back to checkin scan's feedback_enabled flag.
@@ -595,6 +602,8 @@ export function useActivityScanningPage() {
       } else {
         setCheckoutDestinationState(prev => (prev ? { ...prev, showingFarewell: true } : null));
       }
+    } finally {
+      releaseBooking(activeState);
     }
   };
 
