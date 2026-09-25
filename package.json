@@ -1,7 +1,7 @@
 {
   "name": "pyreportal",
   "private": true,
-  "version": "1.8.0",
+  "version": "1.8.1",
   "type": "module",
   "packageManager": "pnpm@10.34.4+sha512.8768be55200ae3f2226b6527fcca2687e14bc4e5f12d7721a0f25da3df47915177058648db4177baf348120fa0ba2752d8d8d93f6beaf1fe64ae18da8de961af",
   "scripts": {
@@ -32,6 +32,7 @@
     "@fortawesome/free-solid-svg-icons": "^7.3.1",
     "@fortawesome/react-fontawesome": "^3.5.0",
     "@moto-nrw/design-system": "^0.5.2",
+    "@sentry/react": "^11.0.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^8.4.0",
@@ -39,6 +40,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
+    "@sentry/vite-plugin": "^5.4.0",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",

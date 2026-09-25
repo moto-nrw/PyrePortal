@@ -9,7 +9,7 @@ import { adapter } from '@platform';
 
 import type { SessionSettings } from '../services/sessionStorage';
 
-type Platform = 'gkt' | 'browser' | 'wedge';
+export type Platform = 'gkt' | 'browser' | 'wedge';
 
 /**
  * True when the current platform uses real NFC/RFID hardware (not mock).
