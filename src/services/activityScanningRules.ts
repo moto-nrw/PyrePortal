@@ -48,12 +48,20 @@ export interface ExtendedScanResult extends RfidScanResult {
 }
 
 /**
+ * Whether the result books the student into a destination chosen at this
+ * kiosk (Schulhof, WC or a released room). Such a result describes the
+ * destination room, never this kiosk's room.
+ */
+export const isDestinationScan = (scan: ExtendedScanResult): boolean =>
+  Boolean(scan.isSchulhof) || Boolean(scan.isToilette) || Boolean(scan.isOpenRoom);
+
+/**
  * Count delta for a check-in.
- * Schulhof/WC check-ins don't increment (student is leaving, not entering).
+ * Destination check-ins don't increment (student is leaving, not entering).
  */
 export const getCheckinCountDelta = (scan: ExtendedScanResult): number => {
-  if (scan.isSchulhof || scan.isToilette) {
-    return 0; // No change for Schulhof/WC check-in
+  if (isDestinationScan(scan)) {
+    return 0; // No change for a destination check-in
   }
   return 1; // Increment count
 };
@@ -89,10 +97,10 @@ export const isNonActionableScan = (scan: ExtendedScanResult): boolean => {
 
 /**
  * Whether the server-provided active_students count may replace the local count.
- * Skipped for Schulhof/WC scans: active_students refers to that room, not ours.
+ * Skipped for destination scans: active_students refers to that room, not ours.
  */
 export const shouldApplyAuthoritativeCount = (scan: ExtendedScanResult): boolean => {
-  return scan.active_students != null && !scan.isSchulhof && !scan.isToilette;
+  return scan.active_students != null && !isDestinationScan(scan);
 };
 
 /** Inputs for the modal timeout matrix. */
