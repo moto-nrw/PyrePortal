@@ -74,9 +74,25 @@ describe('buildErrorReportingOptions', () => {
     expect(options.release).toBe('pyreportal@1.8.0+abc1234');
     expect(options.environment).toBe('staging');
     expect(options.initialScope).toEqual({ tags: { platform: 'gkt' } });
-    expect(options.sendDefaultPii).toBe(false);
+    expect(options.dataCollection).toEqual({
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { request: { allow: ['user-agent'] }, response: false },
+      httpBodies: [],
+      urlQueryParams: false,
+    });
     expect(options.tracePropagationTargets).toEqual([]);
     expect(options.transportOptions).toMatchObject({ maxQueueSize: 30 });
+  });
+
+  it('removes the console integration and keeps the other defaults', () => {
+    const integrations = build().integrations;
+    if (typeof integrations !== 'function') throw new Error('expected an integrations filter');
+    const defaults = [{ name: 'Console' }, { name: 'Breadcrumbs' }, { name: 'HttpContext' }];
+    expect(integrations(defaults).map(integration => integration.name)).toEqual([
+      'Breadcrumbs',
+      'HttpContext',
+    ]);
   });
 
   it('buffers offline with IndexedDB and falls back to plain fetch without it', () => {
@@ -89,17 +105,12 @@ describe('buildErrorReportingOptions', () => {
 });
 
 describe('beforeSend', () => {
-  it('removes key from the request URL and Referer', () => {
+  it('removes key from the request URL', () => {
     const event = scrubEvent({
       type: undefined,
-      request: {
-        url: 'https://kiosk.example.test/?key=secret-device-key',
-        headers: { Referer: 'https://kiosk.example.test/?key=secret-device-key&x=1' },
-      },
+      request: { url: 'https://kiosk.example.test/?key=secret-device-key&x=1' },
     });
-    expect(event?.request?.url).toBe('https://kiosk.example.test/');
-    expect(event?.request?.headers?.Referer).toBe('https://kiosk.example.test/?x=1');
-    expect(JSON.stringify(event)).not.toContain('secret-device-key');
+    expect(event?.request?.url).toBe('https://kiosk.example.test/?x=1');
   });
 
   it('keeps events without a request', () => {

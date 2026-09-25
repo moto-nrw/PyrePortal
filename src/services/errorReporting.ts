@@ -5,12 +5,13 @@
  * authenticates the device key and adds `device_id` and `school_id`. The
  * device key and wristband UIDs must never reach Sentry: `key` is removed
  * from every URL, and console breadcrumbs are off because system.js logs
- * UIDs to the console.
+ * UIDs to the console. `dataCollection` keeps IP, cookies, bodies, query
+ * parameters and all headers but User-Agent out; it does not cover the
+ * request URL, hence the `key` filter.
  */
 
 import { adapter } from '@platform';
 import {
-  breadcrumbsIntegration,
   init,
   makeBrowserOfflineTransport,
   makeFetchTransport,
@@ -28,6 +29,8 @@ const ERROR_REPORTS_PATH = '/api/iot/error-reports';
 const OFFLINE_QUEUE_SIZE = 30;
 const KEY_PARAM = /[?&]key=/;
 const HAS_SCHEME = /^[a-z][a-z\d+.-]*:/i;
+// v11 records console breadcrumbs through this default integration.
+const CONSOLE_INTEGRATION = 'Console';
 
 export interface ErrorReportingConfig {
   dsn: string | undefined;
@@ -49,7 +52,6 @@ export function removeDeviceKey(url: string): string {
 function scrubEvent(event: ErrorEvent): ErrorEvent {
   const request = event.request;
   if (request?.url) request.url = removeDeviceKey(request.url);
-  if (request?.headers?.Referer) request.headers.Referer = removeDeviceKey(request.headers.Referer);
   return event;
 }
 
@@ -69,19 +71,25 @@ function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb | null {
 export function buildErrorReportingOptions(config: ErrorReportingConfig): BrowserOptions | null {
   if (!config.dsn) return null;
 
-  // maxQueueSize is an option of the offline transport, which BrowserOptions
-  // does not type.
   // Not buildAuthHeaders(): this runs before initializeApi() sets its key.
   const headers: Record<string, string> = config.deviceApiKey
     ? { Authorization: `Bearer ${config.deviceApiKey}` }
     : {};
+  // maxQueueSize is an option of the offline transport, which BrowserOptions
+  // does not type.
   const transportOptions = { maxQueueSize: OFFLINE_QUEUE_SIZE, headers };
 
   return {
     dsn: config.dsn,
     environment: config.environment,
     release: config.release,
-    sendDefaultPii: false,
+    dataCollection: {
+      userInfo: false,
+      cookies: false,
+      httpHeaders: { request: { allow: ['user-agent'] }, response: false },
+      httpBodies: [],
+      urlQueryParams: false,
+    },
     tracePropagationTargets: [],
     tunnel: `${config.apiBaseUrl}${ERROR_REPORTS_PATH}`,
     // Without IndexedDB the kiosk runs without an offline buffer.
@@ -90,7 +98,8 @@ export function buildErrorReportingOptions(config: ErrorReportingConfig): Browse
         ? makeFetchTransport
         : makeBrowserOfflineTransport(makeFetchTransport),
     transportOptions,
-    integrations: [breadcrumbsIntegration({ console: false })],
+    integrations: defaults =>
+      defaults.filter(integration => integration.name !== CONSOLE_INTEGRATION),
     initialScope: { tags: { platform: config.platform } },
     beforeSend: scrubEvent,
     beforeBreadcrumb: scrubBreadcrumb,

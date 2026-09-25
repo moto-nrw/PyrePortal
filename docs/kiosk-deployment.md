@@ -51,8 +51,12 @@ sets only the tag `platform`. Code: `src/services/errorReporting.ts`.
 
 - Without `VITE_SENTRY_DSN` in the build, Sentry does not start. Local builds
   and the CI check builds have none.
-- The `key` query parameter is removed from the request URL, the Referer and
-  breadcrumb URLs. Console breadcrumbs are off because `system.js` logs
+- `@sentry/react` 11. `dataCollection` is set explicitly because the v11
+  defaults collect more: no user or IP, cookies, bodies or query parameters,
+  and no headers except `User-Agent`.
+- The request URL is not covered by `dataCollection`, so the `key` query
+  parameter is removed from it and from breadcrumb URLs. Console breadcrumbs
+  are off (the `Console` integration is removed) because `system.js` logs
   wristband UIDs. There is no trace propagation.
 - Errors while offline wait in IndexedDB (up to 30 envelopes) and are sent
   after reconnecting. Without IndexedDB the kiosk runs without a buffer.
