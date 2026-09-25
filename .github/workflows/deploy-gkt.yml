@@ -115,8 +115,9 @@ jobs:
 
       - name: Report deploy to Sentry
         if: steps.deploy.outcome == 'success'
-        # A missing deploy marker must not fail a finished deploy
+        # A missing deploy marker must not fail or stall a finished deploy
         continue-on-error: true
+        timeout-minutes: 5
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG }}
