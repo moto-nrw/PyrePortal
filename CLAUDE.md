@@ -147,6 +147,7 @@ headers: {
 | `POST /api/iot/staff-clock/state` | Read staff clock state | Device + PIN |
 | `POST /api/iot/staff-clock`       | Record staff time      | Device + PIN |
 | `GET /api/iot/config`             | Fetch device settings  | Device only  |
+| `POST /api/iot/error-reports`     | Sentry relay (tunnel)  | Device only  |
 
 ## Releasing
 
