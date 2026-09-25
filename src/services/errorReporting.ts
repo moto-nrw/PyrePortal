@@ -44,7 +44,7 @@ export interface ErrorReportingConfig {
 /** Removes the `key` query parameter (the device API key) from a URL or path. */
 export function removeDeviceKey(url: string): string {
   if (!KEY_PARAM.test(url)) return url;
-  const parsed = new URL(url, 'http://relative.invalid');
+  const parsed = new URL(url, 'https://relative.invalid');
   parsed.searchParams.delete('key');
   return HAS_SCHEME.test(url) ? parsed.href : parsed.pathname + parsed.search + parsed.hash;
 }

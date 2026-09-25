@@ -1,11 +1,23 @@
-import { makeFetchTransport, type Breadcrumb, type ErrorEvent } from '@sentry/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { adapter } from '@platform';
+import { init, makeFetchTransport, type Breadcrumb, type ErrorEvent } from '@sentry/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildErrorReportingOptions,
+  initErrorReporting,
   removeDeviceKey,
   type ErrorReportingConfig,
 } from './errorReporting';
+
+vi.mock('@sentry/react', async importOriginal => ({
+  ...(await importOriginal()),
+  init: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.stubGlobal('__SENTRY_ENVIRONMENT__', 'test');
+  vi.stubGlobal('__SENTRY_RELEASE__', 'pyreportal@test');
+});
 
 const config: ErrorReportingConfig = {
   dsn: 'https://public@o1.ingest.de.sentry.io/2',
@@ -32,6 +44,9 @@ function scrubBreadcrumb(breadcrumb: Breadcrumb): Breadcrumb | null {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
 });
 
 describe('removeDeviceKey', () => {
@@ -145,5 +160,43 @@ describe('beforeBreadcrumb', () => {
   it('keeps other breadcrumbs', () => {
     const breadcrumb: Breadcrumb = { category: 'ui.click', message: 'button' };
     expect(scrubBreadcrumb(breadcrumb)).toEqual(breadcrumb);
+  });
+});
+
+describe('initErrorReporting', () => {
+  it('does not start without a DSN', () => {
+    vi.stubEnv('VITE_SENTRY_DSN', '');
+
+    expect(initErrorReporting()).toBe(false);
+    expect(init).not.toHaveBeenCalled();
+  });
+
+  it('starts with the platform API URL and device key', () => {
+    vi.stubEnv('VITE_SENTRY_DSN', config.dsn);
+    vi.spyOn(adapter, 'getApiBaseUrl').mockReturnValue(config.apiBaseUrl);
+    vi.spyOn(adapter, 'getDeviceApiKey').mockReturnValue(config.deviceApiKey);
+
+    expect(initErrorReporting()).toBe(true);
+    expect(init).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dsn: config.dsn,
+        tunnel: 'https://api.example.test/api/iot/error-reports',
+        transportOptions: expect.objectContaining({
+          headers: { Authorization: 'Bearer secret-device-key' },
+        }),
+      })
+    );
+  });
+
+  it('starts without an Authorization header if the device key is unavailable', () => {
+    vi.stubEnv('VITE_SENTRY_DSN', config.dsn);
+    vi.spyOn(adapter, 'getDeviceApiKey').mockImplementation(() => {
+      throw new Error('missing key');
+    });
+
+    expect(initErrorReporting()).toBe(true);
+    expect(init).toHaveBeenCalledWith(
+      expect.objectContaining({ transportOptions: expect.objectContaining({ headers: {} }) })
+    );
   });
 });
