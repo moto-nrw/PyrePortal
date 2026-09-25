@@ -50,6 +50,14 @@ jobs:
         run: pnpm run build
         env:
           VITE_API_BASE_URL: ${{ env.API_URL }}
+          # Sentry: DSN baked in; source maps uploaded, see vite.config.ts
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+
+      - name: Remove source maps
+        run: find dist -name '*.map' -delete
 
       - name: Prepare GitHub release
         if: github.ref == 'refs/heads/main'
@@ -104,6 +112,22 @@ jobs:
       - name: Cleanup secrets
         if: always()
         run: rm -f ~/.ssh/deploy_key
+
+      - name: Report deploy to Sentry
+        if: steps.deploy.outcome == 'success'
+        # A missing deploy marker must not fail or stall a finished deploy
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+        run: |
+          set -euo pipefail
+          # Same release name as vite.config.ts
+          VERSION=$(node -p "require('./package.json').version")
+          RELEASE="pyreportal@${VERSION}+${GITHUB_SHA::7}"
+          pnpm dlx @sentry/cli@3.8.0 deploys new --release "$RELEASE" --env "$DEPLOY_ENV"
 
       - name: Create GitHub release
         if: github.ref == 'refs/heads/main' && steps.release.outputs.create == 'true' && steps.deploy.outcome == 'success'
