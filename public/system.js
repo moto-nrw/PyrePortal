@@ -103,7 +103,7 @@ var SYSTEM = {
           if (typeof SYSTEM.onPrinterStatusChange != 'undefined') SYSTEM.onPrinterStatusChange(obj);
           break;
         case 'NFC':
-          if (typeof SYSTEM.onNfcScanned != 'undefined') SYSTEM.onNfcScanned(obj);
+          if (typeof SYSTEM.onNfcScanned === 'function') SYSTEM.onNfcScanned(obj);
           break;
         default:
       }
