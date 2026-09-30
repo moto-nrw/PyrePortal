@@ -16,7 +16,7 @@ import {
   formatRoomName,
   getNetworkErrorMessage,
   isNetworkRelatedError,
-  mapServerErrorToGerman,
+  mapApiErrorToGerman,
 } from '../services/api';
 import type { SessionHistoryEntry } from '../services/sessionStorage';
 import { useUserStore } from '../store/userStore';
@@ -55,7 +55,7 @@ function formatRecreationError(error: unknown): string {
   const rawMessage = error instanceof Error ? error.message : texts.recreationErrorFallback;
   return isNetworkRelatedError(error)
     ? getNetworkErrorMessage('sessionStart')
-    : mapServerErrorToGerman(rawMessage);
+    : mapApiErrorToGerman(error instanceof Error ? error : rawMessage);
 }
 
 /** Format an ISO timestamp as a short German date/time label */

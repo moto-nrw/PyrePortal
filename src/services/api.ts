@@ -11,7 +11,7 @@
 import { createLogger } from '../utils/logger';
 
 import { apiCall, buildAuthHeaders, getApiBaseUrl, hasDeviceApiKey } from './apiClient';
-import { isNotFoundError, mapAttendanceErrorToGerman, mapServerErrorToGerman } from './apiErrors';
+import { isNotFoundError, mapApiErrorToGerman, mapAttendanceErrorToGerman } from './apiErrors';
 
 export {
   ApiError,
@@ -322,7 +322,7 @@ export const api = {
       });
 
       // Use the error mapping function for user-friendly messages
-      const userMessage = mapServerErrorToGerman(errorMessage);
+      const userMessage = mapApiErrorToGerman(error);
 
       return {
         success: false,
@@ -770,8 +770,7 @@ export const api = {
 
       return response;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'toggle'));
+      throw new Error(mapAttendanceErrorToGerman(error, 'toggle'));
     }
   },
 
@@ -792,8 +791,7 @@ export const api = {
 
       return response;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(mapAttendanceErrorToGerman(errorMessage, 'feedback'));
+      throw new Error(mapAttendanceErrorToGerman(error, 'feedback'));
     }
   },
 

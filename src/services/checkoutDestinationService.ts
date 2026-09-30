@@ -6,7 +6,6 @@ import {
   getNetworkErrorMessage,
   isNetworkRelatedError,
   mapApiErrorToGerman,
-  mapServerErrorToGerman,
   type RfidScanResult,
   type Room,
 } from './api';
@@ -136,7 +135,7 @@ export const checkInToDestinationRoom = async (
     const errorMessage = error instanceof Error ? error.message : config.fallbackErrorMessage;
     const userFriendlyError = isNetworkRelatedError(error)
       ? config.networkErrorMessage
-      : mapServerErrorToGerman(errorMessage);
+      : mapApiErrorToGerman(error instanceof Error ? error : errorMessage);
 
     return {
       student_name: config.failTitle,

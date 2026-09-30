@@ -136,8 +136,11 @@ describe('RoomSelectionPage session lifecycle behavior', () => {
     renderPage();
     await confirmSessionStart(user);
 
+    // An unmatched API error shows the text of its error class (PyrePortal #408).
     await waitFor(() => {
-      expect(screen.getByText('Interner Fehler')).toBeInTheDocument();
+      expect(
+        screen.getByText('Das hat leider nicht geklappt. Bitte erneut versuchen.')
+      ).toBeInTheDocument();
     });
     expect(screen.queryByText('Session Konflikt')).not.toBeInTheDocument();
   });
