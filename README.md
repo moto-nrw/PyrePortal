@@ -133,7 +133,7 @@ X-Staff-PIN: <pin>
 X-Staff-ID: <staff-id>
 ```
 
-The API client and response types live in [`src/services/api.ts`](src/services/api.ts). Backend error strings are mapped to German UI messages in [`src/services/apiErrors.ts`](src/services/apiErrors.ts); changing backend text can change which message users see.
+The API client and response types live in [`src/services/api.ts`](src/services/api.ts). Backend error codes, and for now some backend error strings, are mapped to German UI messages in [`src/services/apiErrors.ts`](src/services/apiErrors.ts). The code list [`src/services/errorCodes.generated.ts`](src/services/errorCodes.generated.ts) is generated from project-phoenix's `error-registry.json` with `pnpm run sync:error-codes`.
 
 ## Documentation
 

@@ -13,7 +13,7 @@ import { ConflictModal } from '../components/ui/ConflictModal';
 import { usePagination } from '../hooks/usePagination';
 import {
   getNetworkErrorMessage,
-  mapServerErrorToGerman,
+  mapApiErrorToGerman,
   isNetworkRelatedError,
   type Room,
   type CurrentSession,
@@ -89,7 +89,7 @@ function RoomSelectionPage() {
     const rawMessage = error instanceof Error ? error.message : fallbackMessage;
     const userMessage = isNetworkRelatedError(error)
       ? getNetworkErrorMessage('retry')
-      : mapServerErrorToGerman(rawMessage);
+      : mapApiErrorToGerman(error instanceof Error ? error : rawMessage);
     setErrorMessage(userMessage);
     setShowErrorModal(true);
   }, []);

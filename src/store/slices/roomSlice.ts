@@ -1,4 +1,5 @@
 import { api, mapServerErrorToGerman, type Room } from '../../services/api';
+import { mapApiErrorToGerman } from '../../services/apiErrors';
 import { createLogger } from '../../utils/logger';
 import type { GetState, SetState, UserState } from '../userStore';
 
@@ -35,7 +36,10 @@ export const createRoomSlice = (set: SetState<UserState>, get: GetState<UserStat
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Fehler beim Laden der Räume';
       storeLogger.error('Failed to fetch available rooms', { error: errorMessage });
-      set({ error: mapServerErrorToGerman(errorMessage), isLoading: false });
+      set({
+        error: mapApiErrorToGerman(error instanceof Error ? error : errorMessage),
+        isLoading: false,
+      });
     }
   },
 
