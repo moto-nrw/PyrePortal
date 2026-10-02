@@ -3,6 +3,7 @@ import { createLogger, serializeError } from '../utils/logger';
 
 import { api, mapApiErrorToGerman, ApiError, formatRoomName } from './api';
 import type { RfidScanResult } from './api';
+import { toErrorCode } from './apiErrors';
 
 const logger = createLogger('scanProcessor');
 
@@ -142,8 +143,9 @@ export const processStudentBookkeeping = (params: StudentBookkeepingParams): voi
  */
 const getErrorTitle = (error: unknown): string => {
   if (error instanceof ApiError) {
-    if (error.code === 'ROOM_CAPACITY_EXCEEDED') return 'Raum voll';
-    if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED') return 'Aktivität voll';
+    const code = toErrorCode(error.code);
+    if (code === 'iot.room_capacity_exceeded') return 'Raum voll';
+    if (code === 'iot.activity_capacity_exceeded') return 'Aktivität voll';
   }
   return 'Scan fehlgeschlagen';
 };
@@ -176,7 +178,7 @@ const buildAlreadyInMessage = (error: unknown): string => {
 
 /** Domain outcomes are identified only by the backend's stable error code. */
 const isStudentAlreadyActiveError = (error: unknown): boolean =>
-  error instanceof ApiError && error.code === 'STUDENT_ALREADY_ACTIVE';
+  error instanceof ApiError && toErrorCode(error.code) === 'iot.student_already_active';
 
 /**
  * Preserve the identity supplied with a conflict, without guessing when details

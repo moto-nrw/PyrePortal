@@ -1,7 +1,16 @@
 /**
  * Error mapping for the PyrePortal API layer.
- * Maps backend error strings to German UI messages (contract with project-phoenix).
+ * Maps backend error codes and, until project-phoenix #2508 removes them,
+ * backend error strings to German UI messages (contract with project-phoenix).
  */
+
+import {
+  ERROR_CODE_CLASSES,
+  ERROR_CODES,
+  LEGACY_ERROR_CODES,
+  type ErrorClass,
+  type ErrorCode,
+} from './errorCodes.generated';
 
 /**
  * Structured API error response with optional details
@@ -75,7 +84,7 @@ type ErrorMapping = readonly [pattern: string | readonly string[], germanMessage
  * - /backend/api/iot/rfid/handlers.go
  * - /backend/api/iot/feedback/handlers.go
  */
-export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
+const BACKEND_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
   // 1. CAPACITY ERRORS (409)
   // Backend sends both lowercase (Go errors) and capitalized (JSON Message field)
   [
@@ -188,7 +197,13 @@ export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
     'failed to get person data for staff',
     'Personendaten für Mitarbeiter konnten nicht abgerufen werden.',
   ],
+];
 
+/**
+ * Generic HTTP status fallbacks. An ApiError resolves to the text of its error
+ * class instead; these only serve plain message strings.
+ */
+const HTTP_STATUS_MAPPINGS: readonly ErrorMapping[] = [
   // 11. GENERIC HTTP STATUS CODES - Fallbacks (must be after specific messages)
   [['401', 'Unauthorized'], 'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.'],
   [['403', 'Forbidden'], 'Keine Berechtigung für diese Aktion.'],
@@ -199,20 +214,33 @@ export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
     ['500', '502', '503', '504', 'Internal Server Error', 'Bad Gateway', 'Service Unavailable'],
     'Server nicht erreichbar. Bitte später versuchen.',
   ],
-] as const;
+];
+
+export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
+  ...BACKEND_MESSAGE_MAPPINGS,
+  ...HTTP_STATUS_MAPPINGS,
+];
+
+function findMappedMessage(
+  mappings: readonly ErrorMapping[],
+  errorMessage: string
+): string | undefined {
+  for (const [patterns, germanMessage] of mappings) {
+    const patternList = typeof patterns === 'string' ? [patterns] : patterns;
+    if (patternList.some(pattern => errorMessage.includes(pattern))) {
+      return germanMessage;
+    }
+  }
+  return undefined;
+}
 
 /**
  * Map server error messages to German user-friendly messages.
  * Uses a data-driven approach with ordered pattern matching.
  */
 export function mapServerErrorToGerman(errorMessage: string): string {
-  for (const [patterns, germanMessage] of ERROR_MESSAGE_MAPPINGS) {
-    const patternList = typeof patterns === 'string' ? [patterns] : patterns;
-    if (patternList.some(pattern => errorMessage.includes(pattern))) {
-      return germanMessage;
-    }
-  }
-  return errorMessage; // Fallback - return original for unknown errors
+  // Fallback - return original for unknown errors
+  return findMappedMessage(ERROR_MESSAGE_MAPPINGS, errorMessage) ?? errorMessage;
 }
 
 /** Type guard to check if value is a string or number */
@@ -297,38 +325,105 @@ function formatStudentAlreadyActiveError(details: Record<string, unknown>): stri
   return 'Schüler*in ist bereits angemeldet.';
 }
 
+const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set(ERROR_CODES);
+
 /**
- * German copy for the staff clock error codes the kiosk can provoke
- * (project-phoenix backend/api/iot/staffclock/errors.go).
+ * The registry code for a wire code. Accepts the code Phoenix sends today and
+ * the renamed `bereich.fehlername` code (project-phoenix #2506) alike, so both
+ * resolve to the same identity. Undefined for anything else.
  */
-const STAFF_CLOCK_MESSAGES: Readonly<Record<string, string>> = {
-  invalid_staff_clock_request: 'Die Stempel-Anfrage ist ungültig. Bitte erneut versuchen.',
-  invalid_rfid_tag: 'Das gelesene Armband ist ungültig. Bitte erneut scannen.',
-  rfid_tag_not_found: 'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.',
-  rfid_tag_inactive: 'Dieses Armband ist deaktiviert. Bitte an die Leitung wenden.',
-  rfid_tag_not_staff:
+export function toErrorCode(code: string | undefined): ErrorCode | undefined {
+  if (!code) return undefined;
+  if (KNOWN_ERROR_CODES.has(code)) return code as ErrorCode;
+  return LEGACY_ERROR_CODES[code];
+}
+
+/**
+ * German copy for the error codes the kiosk can provoke, keyed by registry
+ * code. Staff clock: project-phoenix #1654. Open-room destination booking:
+ * POST /api/iot/move-to-room, #3067.
+ */
+const CODE_MESSAGES: Readonly<Partial<Record<ErrorCode, string>>> = {
+  'iot.activity_capacity_exceeded': 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.',
+  'iot.room_capacity_exceeded': 'Raum ist voll. Kein Platz mehr verfügbar.',
+  'iot.student_already_active': 'Schüler*in ist bereits angemeldet.',
+  'iot.invalid_staff_clock_request': 'Die Stempel-Anfrage ist ungültig. Bitte erneut versuchen.',
+  'iot.invalid_rfid_tag': 'Das gelesene Armband ist ungültig. Bitte erneut scannen.',
+  'iot.rfid_tag_not_found': 'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.',
+  'iot.rfid_tag_inactive': 'Dieses Armband ist deaktiviert. Bitte an die Leitung wenden.',
+  'iot.rfid_tag_not_staff':
     'Dieses Armband gehört keinem Mitarbeitenden. Bitte das persönliche Armband verwenden.',
-  reopen_status_conflict: 'Der Arbeitsort wurde geändert. Bitte eine Begründung eingeben.',
-  planned_start_not_reached: 'Einstempeln ist vor dem geplanten Dienstbeginn nicht möglich.',
-  deviation_reason_required: 'Für diese Abweichung vom Dienstplan ist eine Begründung nötig.',
-  invalid_staff_clock_state: 'Diese Aktion passt nicht zum aktuellen Stempelstatus.',
-};
-
-/**
- * German copy for the refusals of the open-room destination booking
- * (project-phoenix POST /api/iot/move-to-room, #3067). Matched on the code.
- */
-const OPEN_ROOM_MESSAGES: Readonly<Record<string, string>> = {
-  room_not_found: 'Diesen Raum gibt es nicht mehr. Bitte eine Betreuungskraft fragen.',
-  room_not_released: 'Dieser Raum ist gerade nicht offen. Bitte einen anderen Ort wählen.',
-  student_not_present:
+  'iot.planned_start_not_reached': 'Einstempeln ist vor dem geplanten Dienstbeginn nicht möglich.',
+  'iot.deviation_reason_required': 'Für diese Abweichung vom Dienstplan ist eine Begründung nötig.',
+  'iot.invalid_staff_clock_state': 'Diese Aktion passt nicht zum aktuellen Stempelstatus.',
+  'iot.room_not_found': 'Diesen Raum gibt es nicht mehr. Bitte eine Betreuungskraft fragen.',
+  'rooms.not_released': 'Dieser Raum ist gerade nicht offen. Bitte einen anderen Ort wählen.',
+  'iot.student_not_present':
     'Das Kind ist heute noch nicht angemeldet. Bitte eine Betreuungskraft fragen.',
-  open_room_binary_mode: 'Offene Räume gibt es an dieser Schule nicht.',
+  'iot.open_room_binary_mode': 'Offene Räume gibt es an dieser Schule nicht.',
 };
 
 /**
- * Map API errors to German user-friendly messages with rich details support
- * Handles structured error responses (e.g., capacity errors with room/activity details)
+ * German copy per error class. An API error the kiosk has no specific text
+ * for shows the text of its class, never an empty or English message.
+ */
+const ERROR_CLASS_MESSAGES: Readonly<Record<ErrorClass, string>> = {
+  input: 'Die Angaben passen nicht. Bitte prüfen und erneut versuchen.',
+  permission: 'Das ist hier nicht erlaubt. Bitte an die Leitung wenden.',
+  business_rejection: 'Das geht gerade nicht. Bitte eine Betreuungskraft fragen.',
+  unavailable: 'moto ist gerade nicht erreichbar. Bitte gleich erneut versuchen.',
+  server: 'Das hat leider nicht geklappt. Bitte erneut versuchen.',
+};
+
+/**
+ * Error class of an API error: from the registry when the code is known,
+ * otherwise from the HTTP status the way Phoenix assigns its class codes
+ * (backend/api/common/problem.go ErrorClassCode).
+ */
+function getErrorClass(error: ApiError): ErrorClass {
+  const code = toErrorCode(error.code);
+  if (code) return ERROR_CODE_CLASSES[code];
+  switch (error.statusCode) {
+    case 401:
+    case 403:
+      return 'permission';
+    case 409:
+    case 410:
+    case 422:
+      return 'business_rejection';
+    case 408:
+    case 429:
+    case 499:
+    case 502:
+    case 503:
+    case 504:
+      return 'unavailable';
+    default:
+      return error.statusCode >= 500 ? 'server' : 'input';
+  }
+}
+
+/** Kiosk copy for the code of an API error, including its structured details. */
+function getCodeMessage(error: ApiError): string | undefined {
+  const code = toErrorCode(error.code);
+  if (!code) return undefined;
+  if (error.details) {
+    if (code === 'iot.activity_capacity_exceeded') {
+      return formatActivityCapacityError(error.details);
+    }
+    if (code === 'iot.room_capacity_exceeded') return formatRoomCapacityError(error.details);
+    // Duplicate active visit (Issue #844)
+    if (code === 'iot.student_already_active') {
+      return formatStudentAlreadyActiveError(error.details);
+    }
+  }
+  return CODE_MESSAGES[code];
+}
+
+/**
+ * Map API errors to German user-friendly messages with rich details support.
+ * Order for an ApiError: the kiosk text for its code, then a backend message
+ * pattern, then the text of its error class.
  */
 export function mapApiErrorToGerman(error: unknown): string {
   // Handle non-ApiError cases first
@@ -337,33 +432,11 @@ export function mapApiErrorToGerman(error: unknown): string {
     return mapServerErrorToGerman(message);
   }
 
-  // Activity capacity exceeded
-  if (error.code === 'ACTIVITY_CAPACITY_EXCEEDED' && error.details) {
-    return formatActivityCapacityError(error.details);
-  }
-
-  // Room capacity exceeded
-  if (error.code === 'ROOM_CAPACITY_EXCEEDED' && error.details) {
-    return formatRoomCapacityError(error.details);
-  }
-
-  // Duplicate active visit (Issue #844)
-  if (error.code === 'STUDENT_ALREADY_ACTIVE' && error.details) {
-    return formatStudentAlreadyActiveError(error.details);
-  }
-
-  // Staff clock errors carry stable codes (project-phoenix #1654), so they are
-  // matched on the code rather than on the message text.
-  if (error.code && STAFF_CLOCK_MESSAGES[error.code]) {
-    return STAFF_CLOCK_MESSAGES[error.code];
-  }
-
-  if (error.code && OPEN_ROOM_MESSAGES[error.code]) {
-    return OPEN_ROOM_MESSAGES[error.code];
-  }
-
-  // Fall back to message-based mapping
-  return mapServerErrorToGerman(error.message);
+  return (
+    getCodeMessage(error) ??
+    findMappedMessage(BACKEND_MESSAGE_MAPPINGS, error.message) ??
+    ERROR_CLASS_MESSAGES[getErrorClass(error)]
+  );
 }
 
 /**
@@ -429,6 +502,40 @@ export function getNetworkErrorMessage(context: NetworkErrorContext = 'generic')
   return NETWORK_ERROR_MESSAGES[context];
 }
 
+type AttendanceErrorContext = 'toggle' | 'feedback';
+
+/** Context-specific wording for 404 and 403 attendance errors. */
+function getAttendanceContextMessage(
+  errorMessage: string,
+  context: AttendanceErrorContext
+): string | undefined {
+  // 404 errors - context-specific messages
+  // Include lowercase 'not found' for consistency with main mapper
+  if (
+    errorMessage.includes('404') ||
+    errorMessage.includes('not found') ||
+    errorMessage.includes('Not Found')
+  ) {
+    switch (context) {
+      case 'toggle':
+        return 'Schüler nicht gefunden. RFID-Tag möglicherweise nicht zugewiesen.';
+      case 'feedback':
+        return 'Feedback-Service nicht erreichbar. Bitte später versuchen.';
+    }
+  }
+
+  // 403 errors - permission denied
+  if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+    switch (context) {
+      case 'toggle':
+        return 'Keine Berechtigung für An-/Abmeldung dieses Schülers.';
+      case 'feedback':
+        return 'Keine Berechtigung für Feedback-Übermittlung.';
+    }
+  }
+  return undefined;
+}
+
 /**
  * Map attendance-specific errors to German user-friendly messages
  * Provides context-aware error messages for attendance operations
@@ -437,12 +544,25 @@ export function getNetworkErrorMessage(context: NetworkErrorContext = 'generic')
  * mapServerErrorToGerman, then falls back to context-specific generic messages.
  */
 export function mapAttendanceErrorToGerman(
-  errorMessage: string,
-  context: 'toggle' | 'feedback'
+  error: unknown,
+  context: AttendanceErrorContext
 ): string {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
   // Network errors - use consolidated handler
   if (isNetworkRelatedError(errorMessage)) {
     return getNetworkErrorMessage('generic');
+  }
+
+  // An ApiError resolves by code and message pattern, then the context
+  // wording for 404/403, then the text of its error class.
+  if (error instanceof ApiError) {
+    return (
+      getCodeMessage(error) ??
+      findMappedMessage(BACKEND_MESSAGE_MAPPINGS, errorMessage) ??
+      getAttendanceContextMessage(errorMessage, context) ??
+      ERROR_CLASS_MESSAGES[getErrorClass(error)]
+    );
   }
 
   // ============================================================
@@ -469,30 +589,8 @@ export function mapAttendanceErrorToGerman(
   // Context-specific fallbacks for generic HTTP status codes
   // ============================================================
 
-  // 404 errors - context-specific messages
-  // Include lowercase 'not found' for consistency with main mapper
-  if (
-    errorMessage.includes('404') ||
-    errorMessage.includes('not found') ||
-    errorMessage.includes('Not Found')
-  ) {
-    switch (context) {
-      case 'toggle':
-        return 'Schüler nicht gefunden. RFID-Tag möglicherweise nicht zugewiesen.';
-      case 'feedback':
-        return 'Feedback-Service nicht erreichbar. Bitte später versuchen.';
-    }
-  }
-
-  // 403 errors - permission denied
-  if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
-    switch (context) {
-      case 'toggle':
-        return 'Keine Berechtigung für An-/Abmeldung dieses Schülers.';
-      case 'feedback':
-        return 'Keine Berechtigung für Feedback-Übermittlung.';
-    }
-  }
+  const contextMessage = getAttendanceContextMessage(errorMessage, context);
+  if (contextMessage) return contextMessage;
 
   // 401 errors - authentication issues
   if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {

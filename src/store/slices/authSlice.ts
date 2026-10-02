@@ -1,4 +1,5 @@
-import { api, mapServerErrorToGerman, type Teacher } from '../../services/api';
+import { api, type Teacher } from '../../services/api';
+import { mapApiErrorToGerman } from '../../services/apiErrors';
 import { createLogger } from '../../utils/logger';
 import type { GetState, SetState, UserState } from '../userStore';
 
@@ -97,7 +98,7 @@ export const createAuthSlice = (set: SetState<UserState>, get: GetState<UserStat
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       storeLogger.error('Failed to fetch teachers', { error: errorMessage });
       set({
-        error: mapServerErrorToGerman(errorMessage),
+        error: mapApiErrorToGerman(error instanceof Error ? error : errorMessage),
         isLoading: false,
       });
       throw error;

@@ -8,6 +8,7 @@ import {
   type CurrentSession,
   type DailyFeedbackRating,
 } from '../../services/api';
+import { mapApiErrorToGerman } from '../../services/apiErrors';
 import {
   createSessionRequestTracker,
   recreateSession as requestSessionRecreation,
@@ -58,7 +59,7 @@ const mapSessionValidationError = (error: unknown): string => {
     case 'Validierung fehlgeschlagen':
       return 'Die gespeicherte Sitzung ist nicht mehr gültig. Bitte erstellen Sie sie erneut.';
     default:
-      return mapServerErrorToGerman(rawMessage);
+      return mapApiErrorToGerman(error);
   }
 };
 
@@ -594,7 +595,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
             });
 
             set({
-              error: mapServerErrorToGerman(errorMessage),
+              error: mapApiErrorToGerman(error),
               isLoading: false,
             });
 

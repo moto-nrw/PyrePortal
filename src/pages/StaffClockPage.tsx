@@ -14,6 +14,7 @@ import {
   type StaffClockCommand,
   type StaffClockState,
 } from '../services/api';
+import { toErrorCode } from '../services/apiErrors';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { getSecureRandomInt } from '../utils/crypto';
@@ -452,7 +453,7 @@ function StaffClockPage() {
   const showFailure = (error: unknown) => {
     logger.error('Staff clock operation failed', { error: serializeError(error) });
     let message = error instanceof LocalizedError ? error.message : mapApiErrorToGerman(error);
-    if (error instanceof ApiError && error.code === 'planned_start_not_reached') {
+    if (error instanceof ApiError && toErrorCode(error.code) === 'iot.planned_start_not_reached') {
       const planned = error.details?.planned_start_time;
       if (planned) message = `Einstempeln ist erst ab ${planned} Uhr möglich.`;
     }
@@ -644,13 +645,11 @@ function StaffClockPage() {
       const error = outcome.error;
       if (
         error instanceof ApiError &&
-        (error.code === 'deviation_reason_required' || error.code === 'reopen_status_conflict')
+        toErrorCode(error.code) === 'iot.deviation_reason_required'
       ) {
         const minutes = error.details?.deviation_minutes;
         setReasonPrompt(
-          error.code === 'reopen_status_conflict'
-            ? 'Der gewählte Arbeitsort weicht vom heutigen Eintrag ab. Bitte begründen.'
-            : `Die Stempelzeit weicht${minutes ? ` um ${minutes} Minuten` : ''} vom Dienstplan ab. Bitte begründen.`
+          `Die Stempelzeit weicht${minutes ? ` um ${minutes} Minuten` : ''} vom Dienstplan ab. Bitte begründen.`
         );
         setPendingCommand(command);
         return;
@@ -662,7 +661,10 @@ function StaffClockPage() {
       // scanned — and on a shared kiosk the wristband may simply have been left
       // lying there. Drop the credential: whoever wants to act next scans, and
       // gets their read with it.
-      if (error instanceof ApiError && error.code === 'invalid_staff_clock_state') {
+      if (
+        error instanceof ApiError &&
+        toErrorCode(error.code) === 'iot.invalid_staff_clock_state'
+      ) {
         logger.warn('Staff clock action rejected as stale, dropping the cached credential');
         setPendingCommand(null);
         setReason('');
