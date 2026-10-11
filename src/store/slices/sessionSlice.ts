@@ -1,7 +1,6 @@
 import {
   api,
   getNetworkErrorMessage,
-  mapServerErrorToGerman,
   isNetworkRelatedError,
   type ActivityResponse,
   type Room,
@@ -552,18 +551,16 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         set({ isLoading: true, error: null });
 
         if (!authenticatedUser) {
-          const errorMsg = 'Keine Authentifizierung für das Laden von Aktivitäten';
           set({
-            error: mapServerErrorToGerman(errorMsg),
+            error: 'Keine Authentifizierung für das Laden von Aktivitäten',
             isLoading: false,
           });
           return null;
         }
 
         if (!authenticatedUser.pin) {
-          const errorMsg = 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.';
           set({
-            error: mapServerErrorToGerman(errorMsg),
+            error: 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.',
             isLoading: false,
           });
           return null;

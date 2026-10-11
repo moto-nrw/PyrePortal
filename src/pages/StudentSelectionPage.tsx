@@ -11,7 +11,7 @@ import {
 } from '../components/ui';
 import { usePagination } from '../hooks/usePagination';
 import { useStudentFilter, type AssignableEntity } from '../hooks/useStudentFilter';
-import { api } from '../services/api';
+import { api, mapApiErrorToGerman } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logUserAction, serializeError } from '../utils/logger';
@@ -132,7 +132,7 @@ function StudentSelectionPage() {
           error: error.message,
           stack: error.stack,
         });
-        setError(texts.loadError(error.message));
+        setError(texts.loadError(mapApiErrorToGerman(error)));
         setShowErrorModal(true);
       } finally {
         setIsLoading(false);

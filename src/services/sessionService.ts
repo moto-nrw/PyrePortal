@@ -42,16 +42,9 @@ export type SessionRecreationOutcome =
 export type SessionValidationOutcome =
   { status: 'success' } | { status: 'error' } | { status: 'stale' };
 
-/**
- * Detect a session conflict (HTTP 409) via ApiError.statusCode with the
- * historical message-string check as fallback.
- */
+/** Detect a session conflict (HTTP 409) by the status `apiCall` records on an ApiError. */
 export function isSessionConflictError(error: unknown): boolean {
-  if (error instanceof ApiError && error.statusCode === 409) {
-    return true;
-  }
-  const message = error instanceof Error ? error.message : String(error);
-  return message.includes('409') || message.includes('Conflict');
+  return error instanceof ApiError && error.statusCode === 409;
 }
 
 /**

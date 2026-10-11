@@ -24,7 +24,7 @@ PyrePortal is part of a three-repo system. All repos live side-by-side (`../`):
 | ------------------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
 | **project-phoenix** (`../project-phoenix/`) | Go backend + Next.js frontend | Provides `/api/iot/*` endpoints. Source of truth for all students, staff, rooms, sessions, tags. |
 
-**If the backend changes**: `src/services/apiErrors.ts` maps backend error codes to German UI text. The code list `src/services/errorCodes.generated.ts` is generated from project-phoenix `error-registry.json`; after a registry change run `pnpm run sync:error-codes` (reads `../project-phoenix/error-registry.json`, or pass a path) and commit the result. Both the current wire codes and the renamed `bereich.fehlername` codes resolve to the same text. Codes without kiosk text show the text of their error class. The remaining backend string patterns in `ERROR_MESSAGE_MAPPINGS` stay until Phoenix has renamed its codes; backend text changes still break those silently.
+**If the backend changes**: `src/services/apiErrors.ts` maps backend error codes to German UI text. The code list `src/services/errorCodes.generated.ts` is generated from project-phoenix `error-registry.json`; after a registry change run `pnpm run sync:error-codes` (reads `../project-phoenix/error-registry.json`, or pass a path) and commit the result. Both the current wire codes and the renamed `bereich.fehlername` codes resolve to the same text. Codes without kiosk text show the text of their error class. The kiosk never reads the text of a backend error: new kiosk copy needs a code from Phoenix, then an entry in `CODE_MESSAGES`.
 
 ## Project Overview
 

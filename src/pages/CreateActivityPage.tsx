@@ -98,11 +98,7 @@ function CreateActivityPage() {
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       // Check for authentication errors
-      if (
-        (error instanceof ApiError && error.statusCode === 401) ||
-        errorMessage.includes('401') ||
-        errorMessage.includes('Unauthorized')
-      ) {
+      if (error instanceof ApiError && error.statusCode === 401) {
         logger.warn('Authentication failed during activity fetch, redirecting to login', {
           error: errorMessage,
         });

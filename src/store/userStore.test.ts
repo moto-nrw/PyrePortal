@@ -30,7 +30,6 @@ vi.mock('../services/api', () => ({
     endSession: vi.fn(),
     submitDailyFeedback: vi.fn(),
   },
-  mapServerErrorToGerman: vi.fn((msg: string) => msg),
   isNetworkRelatedError: vi.fn(() => false),
   getNetworkErrorMessage: vi.fn(() => 'Netzwerkfehler'),
 }));

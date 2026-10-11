@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import type { ActivityResponse } from '../services/api';
+import { ApiError, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
 import CreateActivityPage from './CreateActivityPage';
@@ -321,7 +321,9 @@ describe('CreateActivityPage', () => {
   // -----------------------------------------------------------------------
 
   it('calls logout and redirects to / on 401 error', async () => {
-    mockFetchActivities = makeFetchActivitiesRejectMock(new Error('401 Unauthorized'));
+    mockFetchActivities = makeFetchActivitiesRejectMock(
+      new ApiError('API Error: 401 - Unauthorized', 401, 'iot.device_pin_invalid')
+    );
     useUserStore.setState({ fetchActivities: mockFetchActivities });
     renderPage();
 
@@ -331,8 +333,10 @@ describe('CreateActivityPage', () => {
     });
   });
 
-  it('calls logout and redirects to / on Unauthorized error', async () => {
-    mockFetchActivities = makeFetchActivitiesRejectMock(new Error('Unauthorized'));
+  it('calls logout and redirects to / on 401 without a kiosk code', async () => {
+    mockFetchActivities = makeFetchActivitiesRejectMock(
+      new ApiError('API Error: 401 - Unauthorized', 401, 'general.permission')
+    );
     useUserStore.setState({ fetchActivities: mockFetchActivities });
     renderPage();
 

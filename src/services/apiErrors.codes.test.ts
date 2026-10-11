@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ApiError,
+  isNetworkRelatedError,
+  isNotFoundError,
   mapApiErrorToGerman,
   mapAttendanceErrorToGerman,
   toErrorCode,
@@ -148,16 +150,7 @@ describe('mapApiErrorToGerman error class fallback', () => {
     expect(mapApiErrorToGerman(error)).toBe(CLASS_MESSAGES.business_rejection);
   });
 
-  it('keeps a matching backend text pattern ahead of the class text', () => {
-    const error = new ApiError(
-      'API Error: 401 - Unauthorized: invalid staff PIN',
-      401,
-      'general.permission'
-    );
-    expect(mapApiErrorToGerman(error)).toBe('Ungültiger PIN. Bitte erneut versuchen.');
-  });
-
-  it('leaves messages of plain errors to the text mapping', () => {
+  it('shows the message of plain errors unchanged', () => {
     expect(mapApiErrorToGerman(new Error('Zeitüberschreitung. Server antwortet nicht.'))).toBe(
       'Zeitüberschreitung. Server antwortet nicht.'
     );
@@ -193,5 +186,115 @@ describe('mapAttendanceErrorToGerman with ApiError', () => {
         'toggle'
       )
     ).toBe(CLASS_MESSAGES.server);
+  });
+});
+
+// project-phoenix #3939 / PyrePortal #409: the kiosk errors that had no code
+// of their own carry an iot.* code now. The kiosk shows its text by code only.
+describe('kiosk error codes from project-phoenix #3939', () => {
+  it.each([
+    [
+      'iot.device_api_key_required',
+      401,
+      'API-Schlüssel nicht konfiguriert. Bitte .env Datei prüfen.',
+    ],
+    [
+      'iot.device_api_key_format_invalid',
+      401,
+      'API-Schlüssel Format ungültig. Bearer Token erwartet.',
+    ],
+    [
+      'iot.device_api_key_invalid',
+      401,
+      'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.',
+    ],
+    ['iot.device_pin_required', 401, 'PIN nicht angegeben.'],
+    ['iot.device_pin_invalid', 401, 'Ungültiger PIN. Bitte erneut versuchen.'],
+    ['iot.device_inactive', 403, 'Gerät ist deaktiviert. Bitte Administrator kontaktieren.'],
+    ['iot.rfid_tag_unassigned', 404, 'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.'],
+    [
+      'iot.rfid_tag_not_student_or_staff',
+      404,
+      'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.',
+    ],
+    ['iot.person_not_student', 404, 'Person ist kein Schüler.'],
+    ['iot.pickup_student_rfid_required', 400, 'Bitte Schüler-Armband scannen.'],
+    ['iot.no_active_session', 404, 'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.'],
+    ['iot.no_session_to_end', 400, 'Keine aktive Sitzung zum Beenden vorhanden.'],
+    ['iot.no_active_groups_in_room', 404, 'Keine aktiven Gruppen im ausgewählten Raum.'],
+    [
+      'iot.no_room_available',
+      400,
+      'Für diese Aktivität fehlt ein Raum. Bitte einen Raum auswählen.',
+    ],
+    ['iot.no_attendance_record_today', 404, 'Schüler wurde heute noch nicht eingecheckt.'],
+    [
+      'iot.schulhof_not_configured',
+      500,
+      'Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
+    ],
+    [
+      'iot.wc_not_configured',
+      500,
+      'Toilette-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
+    ],
+    [
+      'iot.wc_needs_staff',
+      500,
+      'Toilette-Aktivität konnte nicht erstellt werden. Bitte zuerst Betreuer-RFID scannen.',
+    ],
+    ['iot.staff_not_found', 404, 'Mitarbeiter nicht gefunden.'],
+    ['iot.staff_rfid_tag_unassigned', 404, 'Mitarbeiter hat kein Armband zugewiesen.'],
+  ] as const)('shows the kiosk text for %s', (code, status, text) => {
+    expect(mapApiErrorToGerman(new ApiError('opaque', status, code))).toBe(text);
+  });
+
+  it('ignores the backend text of an error without a kiosk code', () => {
+    const error = new ApiError(
+      'API Error: 401 - Unauthorized: invalid staff PIN',
+      401,
+      'general.permission'
+    );
+    expect(mapApiErrorToGerman(error)).toBe(CLASS_MESSAGES.permission);
+  });
+
+  it('ignores the backend text in the attendance mapping', () => {
+    const error = new ApiError(
+      'API Error: 404 - Not Found: student has no attendance record for today',
+      404,
+      'iot.no_attendance_record_today'
+    );
+    expect(mapAttendanceErrorToGerman(error, 'toggle')).toBe(
+      'Schüler wurde heute noch nicht eingecheckt.'
+    );
+    const withoutCode = new ApiError('API Error: 404 - Not Found: RFID tag not found', 404);
+    expect(mapAttendanceErrorToGerman(withoutCode, 'feedback')).toBe(
+      'Feedback-Service nicht erreichbar. Bitte später versuchen.'
+    );
+  });
+
+  it('decides the attendance context text by status, not by message', () => {
+    const forbidden = new ApiError('opaque', 403, 'general.permission');
+    expect(mapAttendanceErrorToGerman(forbidden, 'feedback')).toBe(
+      'Keine Berechtigung für Feedback-Übermittlung.'
+    );
+    const notFoundText = new ApiError('API Error: 409 - Conflict: not found', 409);
+    expect(mapAttendanceErrorToGerman(notFoundText, 'toggle')).toBe(
+      CLASS_MESSAGES.business_rejection
+    );
+  });
+
+  it('never treats an answer of the server as a network error', () => {
+    const error = new ApiError(
+      'API Error: 500 - Internal Server Error: connection to database failed',
+      500,
+      'general.server'
+    );
+    expect(isNetworkRelatedError(error)).toBe(false);
+  });
+
+  it('detects a 404 by status only', () => {
+    expect(isNotFoundError(new ApiError('opaque', 404, 'iot.rfid_tag_not_found'))).toBe(true);
+    expect(isNotFoundError(new ApiError('API Error: 404 - x', 409))).toBe(false);
   });
 });

@@ -62,7 +62,7 @@ sets only the tag `platform`. Code: `src/services/errorReporting.ts`.
   after reconnecting. Without IndexedDB the kiosk runs without a buffer.
 - Release `pyreportal@<version>+<short SHA>`, environment from `DEPLOY_ENV`.
 - The relay's error texts are consumed by the SDK transport and never shown,
-  so they are not part of `ERROR_MESSAGE_MAPPINGS` (project-phoenix
+  so they have no kiosk text in `apiErrors.ts` (project-phoenix
   `docs/agents/contracts.md`, "Error reports relay").
 
 `deploy-gkt.yml` passes the secrets `VITE_SENTRY_DSN` and `SENTRY_AUTH_TOKEN` and

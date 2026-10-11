@@ -209,7 +209,7 @@ describe('checkInToDestinationRoom', () => {
       });
     });
 
-    it('maps non-network server errors through mapServerErrorToGerman', async () => {
+    it('maps non-network errors through mapApiErrorToGerman', async () => {
       mockedApi.processRfidScan.mockRejectedValue(new Error('some unexpected server error'));
 
       const result = await checkInToDestinationRoom({
@@ -222,7 +222,7 @@ describe('checkInToDestinationRoom', () => {
       expect(result.action).toBe('error');
       expect(result.showAsError).toBe(true);
       expect(result.student_name).toBe('Schulhof Check-in fehlgeschlagen');
-      // mapServerErrorToGerman falls back to a generic German message for unknown errors
+      // Not a network error, so no network text
       expect(result.message).not.toContain('Netzwerkfehler bei Schulhof-Anmeldung');
     });
   });

@@ -1,7 +1,7 @@
 /**
  * Error mapping for the PyrePortal API layer.
- * Maps backend error codes and, until project-phoenix #2508 removes them,
- * backend error strings to German UI messages (contract with project-phoenix).
+ * Maps backend error codes to German UI messages (contract with
+ * project-phoenix). The kiosk never reads the text of a backend error.
  */
 
 import {
@@ -61,186 +61,6 @@ export class ApiError extends Error {
     this.code = code;
     this.details = details;
   }
-}
-
-/**
- * Error message mapping entry.
- * Pattern can be a single string or array of strings (OR logic).
- */
-type ErrorMapping = readonly [pattern: string | readonly string[], germanMessage: string];
-
-/**
- * Error message mappings ordered by specificity.
- *
- * IMPORTANT: Order matters! Specific messages MUST come before generic patterns.
- * The first matching pattern wins.
- *
- * Backend error messages sourced from:
- * - /backend/auth/device/errors.go
- * - /backend/api/iot/common/errors.go
- * - /backend/api/iot/checkin/workflow.go
- * - /backend/api/iot/sessions/handlers.go
- * - /backend/api/iot/attendance/handlers.go
- * - /backend/api/iot/rfid/handlers.go
- * - /backend/api/iot/feedback/handlers.go
- */
-const BACKEND_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
-  // 1. CAPACITY ERRORS (409)
-  // Backend sends both lowercase (Go errors) and capitalized (JSON Message field)
-  [
-    ['ACTIVITY_CAPACITY_EXCEEDED', 'activity capacity exceeded', 'Activity capacity exceeded'],
-    'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.',
-  ],
-  [
-    ['ROOM_CAPACITY_EXCEEDED', 'room capacity exceeded', 'Room capacity exceeded'],
-    'Raum ist voll. Kein Platz mehr verfügbar.',
-  ],
-  // Duplicate active visit (Issue #844, backend migration 1.15.45 + checkin/workflow.go)
-  [
-    ['STUDENT_ALREADY_ACTIVE', 'student already has an active visit'],
-    'Schüler*in ist bereits angemeldet.',
-  ],
-
-  // 2. AUTHENTICATION ERRORS (401)
-  ['invalid device API key', 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.'],
-  ['device API key is required', 'API-Schlüssel nicht konfiguriert. Bitte .env Datei prüfen.'],
-  ['invalid API key format', 'API-Schlüssel Format ungültig. Bearer Token erwartet.'],
-  ['invalid staff PIN', 'Ungültiger PIN. Bitte erneut versuchen.'],
-  ['staff PIN is required', 'PIN nicht angegeben.'],
-
-  // 3. AUTHORIZATION ERRORS (403)
-  ['device is not active', 'Gerät ist deaktiviert. Bitte Administrator kontaktieren.'],
-
-  // 4. SESSION ERRORS (400/409)
-  [
-    'device is already running an activity session',
-    'Gerät führt bereits eine Aktivität durch. Bitte zuerst beenden.',
-  ],
-  ['no active session to end', 'Keine aktive Sitzung zum Beenden vorhanden.'],
-  ['no active session', 'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.'],
-  ['no room available', 'Für diese Aktivität fehlt ein Raum. Bitte einen Raum auswählen.'],
-  ['invalid session ID', 'Ungültige Sitzungs-ID.'],
-  ['activity_id is required', 'Aktivität muss ausgewählt werden.'],
-  ['at least one supervisor', 'Mindestens ein Betreuer muss ausgewählt werden.'], // Matches both variants
-
-  // 5. RFID ERRORS (400/404) - Only cases where "Armband nicht zugewiesen" is appropriate
-  [
-    ['RFID tag not found', 'RFID tag not assigned'],
-    'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.',
-  ],
-  ['student RFID tag required for pickup query', 'Bitte Schüler-Armband scannen.'],
-  ['RFID parameter is required', 'RFID-Tag fehlt in der Anfrage.'],
-
-  // Staff time tracking RFID errors (project-phoenix #1654)
-  ['invalid RFID tag', 'Das gelesene Armband ist ungültig. Bitte erneut scannen.'],
-  ['RFID tag is inactive', 'Dieses Armband ist deaktiviert. Bitte an die Leitung wenden.'],
-  [
-    'RFID tag is not assigned to staff',
-    'Dieses Armband gehört keinem Mitarbeitenden. Bitte das persönliche Armband verwenden.',
-  ],
-
-  // 6. ATTENDANCE/VISIT ERRORS (404)
-  ['student has no attendance record for today', 'Schüler wurde heute noch nicht eingecheckt.'],
-  ['person is not a student', 'Person ist kein Schüler.'],
-  ['no active groups in specified room', 'Keine aktiven Gruppen im ausgewählten Raum.'],
-
-  // 7. STAFF ERRORS (400/404)
-  ['invalid staff ID', 'Ungültige Mitarbeiter-ID.'],
-  ['staff not found', 'Mitarbeiter nicht gefunden.'],
-  ['staff has no RFID tag assigned', 'Mitarbeiter hat kein Armband zugewiesen.'],
-
-  // 8. FEEDBACK ERRORS (400/404)
-  ['student_id is required', 'Schüler-ID fehlt.'],
-  ['value is required', 'Bewertung fehlt.'],
-  ['student not found', 'Schüler nicht gefunden.'],
-
-  // 9. VALIDATION ERRORS (400)
-  ['room_id is required for check-in', 'Raum muss für Check-in ausgewählt werden.'],
-  ['tagId parameter is required', 'Tag-ID fehlt in der Anfrage.'],
-  ["destination must be 'zuhause' or 'unterwegs'", "Ziel muss 'zuhause' oder 'unterwegs' sein."],
-  [
-    'destination is required for confirm_daily_checkout',
-    'Ziel muss für endgültiges Auschecken angegeben werden.',
-  ],
-
-  // 10. INTERNAL SERVER ERRORS (500)
-  [
-    'schulhof activity not configured',
-    'Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
-  ],
-  [
-    'WC activity not configured',
-    'Toilette-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
-  ],
-  [
-    'WC activity auto-create requires staff context',
-    'Toilette-Aktivität konnte nicht erstellt werden. Bitte zuerst Betreuer-RFID scannen.',
-  ],
-  [
-    'failed to create Schulhof session',
-    'Schulhof-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.',
-  ],
-  [
-    'failed to create WC session',
-    'Toilette-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.',
-  ],
-  // Generic fallback — MUST stay AFTER specific 'failed to create Toilette/Schulhof session' entries (substring match)
-  ['failed to create session', 'Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.'],
-  ['failed to create visit record', 'Besuch konnte nicht erstellt werden. Bitte erneut versuchen.'],
-  ['failed to end visit record', 'Besuch konnte nicht beendet werden. Bitte erneut versuchen.'],
-  ['failed to get room information', 'Rauminformationen konnten nicht abgerufen werden.'],
-  ['failed to check room capacity', 'Raumkapazität konnte nicht geprüft werden.'],
-  ['failed to get activity information', 'Aktivitätsinformationen konnten nicht abgerufen werden.'],
-  ['failed to check activity capacity', 'Aktivitätskapazität konnte nicht geprüft werden.'],
-  ['error finding active groups in room', 'Aktive Gruppen im Raum konnten nicht gefunden werden.'],
-  [
-    'failed to get person data for staff',
-    'Personendaten für Mitarbeiter konnten nicht abgerufen werden.',
-  ],
-];
-
-/**
- * Generic HTTP status fallbacks. An ApiError resolves to the text of its error
- * class instead; these only serve plain message strings.
- */
-const HTTP_STATUS_MAPPINGS: readonly ErrorMapping[] = [
-  // 11. GENERIC HTTP STATUS CODES - Fallbacks (must be after specific messages)
-  [['401', 'Unauthorized'], 'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.'],
-  [['403', 'Forbidden'], 'Keine Berechtigung für diese Aktion.'],
-  [['404', 'not found', 'Not Found'], 'Ressource nicht gefunden. Bitte Konfiguration prüfen.'],
-  [['409', 'Conflict'], 'Konflikt bei der Anfrage. Bitte erneut versuchen.'],
-  [['400', 'Bad Request'], 'Ungültige Anfrage. Bitte Eingaben prüfen.'],
-  [
-    ['500', '502', '503', '504', 'Internal Server Error', 'Bad Gateway', 'Service Unavailable'],
-    'Server nicht erreichbar. Bitte später versuchen.',
-  ],
-];
-
-export const ERROR_MESSAGE_MAPPINGS: readonly ErrorMapping[] = [
-  ...BACKEND_MESSAGE_MAPPINGS,
-  ...HTTP_STATUS_MAPPINGS,
-];
-
-function findMappedMessage(
-  mappings: readonly ErrorMapping[],
-  errorMessage: string
-): string | undefined {
-  for (const [patterns, germanMessage] of mappings) {
-    const patternList = typeof patterns === 'string' ? [patterns] : patterns;
-    if (patternList.some(pattern => errorMessage.includes(pattern))) {
-      return germanMessage;
-    }
-  }
-  return undefined;
-}
-
-/**
- * Map server error messages to German user-friendly messages.
- * Uses a data-driven approach with ordered pattern matching.
- */
-export function mapServerErrorToGerman(errorMessage: string): string {
-  // Fallback - return original for unknown errors
-  return findMappedMessage(ERROR_MESSAGE_MAPPINGS, errorMessage) ?? errorMessage;
 }
 
 /** Type guard to check if value is a string or number */
@@ -341,7 +161,8 @@ export function toErrorCode(code: string | undefined): ErrorCode | undefined {
 /**
  * German copy for the error codes the kiosk can provoke, keyed by registry
  * code. Staff clock: project-phoenix #1654. Open-room destination booking:
- * POST /api/iot/move-to-room, #3067.
+ * POST /api/iot/move-to-room, #3067. Device auth, scan and session codes:
+ * project-phoenix #3939.
  */
 const CODE_MESSAGES: Readonly<Partial<Record<ErrorCode, string>>> = {
   'iot.activity_capacity_exceeded': 'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.',
@@ -361,6 +182,29 @@ const CODE_MESSAGES: Readonly<Partial<Record<ErrorCode, string>>> = {
   'iot.student_not_present':
     'Das Kind ist heute noch nicht angemeldet. Bitte eine Betreuungskraft fragen.',
   'iot.open_room_binary_mode': 'Offene Räume gibt es an dieser Schule nicht.',
+  'iot.device_api_key_required': 'API-Schlüssel nicht konfiguriert. Bitte .env Datei prüfen.',
+  'iot.device_api_key_format_invalid': 'API-Schlüssel Format ungültig. Bearer Token erwartet.',
+  'iot.device_api_key_invalid': 'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.',
+  'iot.device_pin_required': 'PIN nicht angegeben.',
+  'iot.device_pin_invalid': 'Ungültiger PIN. Bitte erneut versuchen.',
+  'iot.device_inactive': 'Gerät ist deaktiviert. Bitte Administrator kontaktieren.',
+  'iot.rfid_tag_unassigned': 'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.',
+  'iot.rfid_tag_not_student_or_staff': 'Armband ist nicht zugewiesen. Bitte an die Leitung wenden.',
+  'iot.person_not_student': 'Person ist kein Schüler.',
+  'iot.pickup_student_rfid_required': 'Bitte Schüler-Armband scannen.',
+  'iot.no_active_session': 'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.',
+  'iot.no_session_to_end': 'Keine aktive Sitzung zum Beenden vorhanden.',
+  'iot.no_active_groups_in_room': 'Keine aktiven Gruppen im ausgewählten Raum.',
+  'iot.no_room_available': 'Für diese Aktivität fehlt ein Raum. Bitte einen Raum auswählen.',
+  'iot.no_attendance_record_today': 'Schüler wurde heute noch nicht eingecheckt.',
+  'iot.schulhof_not_configured':
+    'Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
+  'iot.wc_not_configured':
+    'Toilette-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.',
+  'iot.wc_needs_staff':
+    'Toilette-Aktivität konnte nicht erstellt werden. Bitte zuerst Betreuer-RFID scannen.',
+  'iot.staff_not_found': 'Mitarbeiter nicht gefunden.',
+  'iot.staff_rfid_tag_unassigned': 'Mitarbeiter hat kein Armband zugewiesen.',
 };
 
 /**
@@ -422,21 +266,16 @@ function getCodeMessage(error: ApiError): string | undefined {
 
 /**
  * Map API errors to German user-friendly messages with rich details support.
- * Order for an ApiError: the kiosk text for its code, then a backend message
- * pattern, then the text of its error class.
+ * An ApiError shows the kiosk text for its code, otherwise the text of its
+ * error class. Any other error comes from the kiosk itself (network failure,
+ * own validation) and already carries its German text.
  */
 export function mapApiErrorToGerman(error: unknown): string {
-  // Handle non-ApiError cases first
   if (!(error instanceof ApiError)) {
-    const message = error instanceof Error ? error.message : String(error);
-    return mapServerErrorToGerman(message);
+    return error instanceof Error ? error.message : String(error);
   }
 
-  return (
-    getCodeMessage(error) ??
-    findMappedMessage(BACKEND_MESSAGE_MAPPINGS, error.message) ??
-    ERROR_CLASS_MESSAGES[getErrorClass(error)]
-  );
+  return getCodeMessage(error) ?? ERROR_CLASS_MESSAGES[getErrorClass(error)];
 }
 
 /**
@@ -457,11 +296,14 @@ const NETWORK_ERROR_PATTERNS = [
 ];
 
 /**
- * Check if an error (object or message) indicates a network-level error
- * Checks navigator.onLine first, then pattern-matches the error message
+ * Check if an error (object or message) indicates a network-level error.
+ * Checks navigator.onLine first. An ApiError is an answer of the server and
+ * never a network error; only messages of fetch and of the kiosk's own
+ * network errors (apiClient) are pattern-matched, never backend text.
  */
 export function isNetworkRelatedError(error: unknown): boolean {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
+  if (error instanceof ApiError) return false;
   const message =
     error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
   return NETWORK_ERROR_PATTERNS.some(pattern => message.includes(pattern));
@@ -506,16 +348,10 @@ type AttendanceErrorContext = 'toggle' | 'feedback';
 
 /** Context-specific wording for 404 and 403 attendance errors. */
 function getAttendanceContextMessage(
-  errorMessage: string,
+  error: ApiError,
   context: AttendanceErrorContext
 ): string | undefined {
-  // 404 errors - context-specific messages
-  // Include lowercase 'not found' for consistency with main mapper
-  if (
-    errorMessage.includes('404') ||
-    errorMessage.includes('not found') ||
-    errorMessage.includes('Not Found')
-  ) {
+  if (error.statusCode === 404) {
     switch (context) {
       case 'toggle':
         return 'Schüler nicht gefunden. RFID-Tag möglicherweise nicht zugewiesen.';
@@ -524,8 +360,7 @@ function getAttendanceContextMessage(
     }
   }
 
-  // 403 errors - permission denied
-  if (errorMessage.includes('403') || errorMessage.includes('Forbidden')) {
+  if (error.statusCode === 403) {
     switch (context) {
       case 'toggle':
         return 'Keine Berechtigung für An-/Abmeldung dieses Schülers.';
@@ -537,83 +372,30 @@ function getAttendanceContextMessage(
 }
 
 /**
- * Map attendance-specific errors to German user-friendly messages
- * Provides context-aware error messages for attendance operations
- *
- * This function first tries to match specific backend messages via
- * mapServerErrorToGerman, then falls back to context-specific generic messages.
+ * Map attendance-specific errors to German user-friendly messages.
+ * An ApiError shows the kiosk text for its code, then the context wording
+ * for 404/403, then the text of its error class. Network errors show the
+ * network text; any other error already carries its German text.
  */
 export function mapAttendanceErrorToGerman(
   error: unknown,
   context: AttendanceErrorContext
 ): string {
-  const errorMessage = error instanceof Error ? error.message : String(error);
-
-  // Network errors - use consolidated handler
-  if (isNetworkRelatedError(errorMessage)) {
+  if (isNetworkRelatedError(error)) {
     return getNetworkErrorMessage('generic');
   }
 
-  // An ApiError resolves by code and message pattern, then the context
-  // wording for 404/403, then the text of its error class.
   if (error instanceof ApiError) {
     return (
       getCodeMessage(error) ??
-      findMappedMessage(BACKEND_MESSAGE_MAPPINGS, errorMessage) ??
-      getAttendanceContextMessage(errorMessage, context) ??
+      getAttendanceContextMessage(error, context) ??
       ERROR_CLASS_MESSAGES[getErrorClass(error)]
     );
   }
 
-  // ============================================================
-  // Try specific backend messages first via main mapper
-  // If it returns the original message, it means no specific match was found
-  // ============================================================
-  const specificMessage = mapServerErrorToGerman(errorMessage);
-
-  // Check if a specific mapping was found (not returned unchanged)
-  // We check both exact match and common generic fallbacks
-  const isGenericFallback =
-    specificMessage === errorMessage ||
-    specificMessage === 'Ressource nicht gefunden. Bitte Konfiguration prüfen.' ||
-    specificMessage === 'Keine Berechtigung für diese Aktion.' ||
-    specificMessage === 'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.' ||
-    specificMessage === 'Ungültige Anfrage. Bitte Eingaben prüfen.';
-
-  // If a specific message was found, use it
-  if (!isGenericFallback) {
-    return specificMessage;
-  }
-
-  // ============================================================
-  // Context-specific fallbacks for generic HTTP status codes
-  // ============================================================
-
-  const contextMessage = getAttendanceContextMessage(errorMessage, context);
-  if (contextMessage) return contextMessage;
-
-  // 401 errors - authentication issues
-  if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
-    return 'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.';
-  }
-
-  // 400 errors - bad request
-  if (errorMessage.includes('400') || errorMessage.includes('Bad Request')) {
-    return 'Ungültige Anfrage. Bitte Eingaben prüfen.';
-  }
-
-  // Fallback - use generic mapper result (handles 5xx errors and other cases)
-  return specificMessage;
+  return error instanceof Error ? error.message : String(error);
 }
 
-/**
- * Detect 404 responses. Prefer the structured `ApiError.statusCode` set by
- * `apiCall`. Keep the substring fallback so errors that are not `ApiError`
- * instances (or wrapped messages) still resolve the same way as before.
- */
-export const isNotFoundError = (error: unknown, errorMessage: string): boolean => {
-  if (error instanceof ApiError && error.statusCode === 404) {
-    return true;
-  }
-  return errorMessage.includes('404');
-};
+/** Detect 404 responses by the HTTP status `apiCall` records on an ApiError. */
+export const isNotFoundError = (error: unknown): boolean =>
+  error instanceof ApiError && error.statusCode === 404;

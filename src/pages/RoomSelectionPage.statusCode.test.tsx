@@ -92,7 +92,7 @@ function renderPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Tests — 409 detection via ApiError.statusCode with string fallback
+// Tests — 409 detection via ApiError.statusCode
 // ---------------------------------------------------------------------------
 
 describe('RoomSelectionPage 409 status code detection', () => {
@@ -115,7 +115,7 @@ describe('RoomSelectionPage 409 status code detection', () => {
     });
   });
 
-  it('shows ConflictModal on raw Error containing "409" (string fallback)', async () => {
+  it('ignores "409" in the text of a raw Error', async () => {
     mockedApi.startSession.mockRejectedValueOnce(new Error('API Error: 409 - Conflict'));
 
     const user = userEvent.setup();
@@ -124,7 +124,8 @@ describe('RoomSelectionPage 409 status code detection', () => {
     await user.click(screen.getByText('Aufsicht starten'));
 
     await waitFor(() => {
-      expect(screen.getByText('Session Konflikt')).toBeInTheDocument();
+      expect(mockedApi.startSession).toHaveBeenCalled();
     });
+    expect(screen.queryByText('Session Konflikt')).not.toBeInTheDocument();
   });
 });
