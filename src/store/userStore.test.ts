@@ -1663,6 +1663,16 @@ describe('validateAndRecreateSession error text per reason', () => {
     );
   });
 
+  it('names supervisors that could not be loaded', async () => {
+    useUserStore.setState({ users: [], selectedSupervisors: [] });
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10 })]);
+    mockGetRooms.mockResolvedValueOnce([mockRoom({ id: 5 })]);
+    mockGetTeachers.mockResolvedValueOnce([]);
+    expect(await recreate()).toBe(
+      'Die Betreuer konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.'
+    );
+  });
+
   it('names supervisors that are no longer valid', async () => {
     useUserStore.setState({ users: [{ id: 77, name: 'Andere Person' }], selectedSupervisors: [] });
     mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10 })]);

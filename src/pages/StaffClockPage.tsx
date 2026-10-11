@@ -55,7 +55,7 @@ const MUTATION_GRACE_MS = 10_000;
 const UNRESOLVED_FENCE_MS = 20_000;
 const UNRESOLVED_FENCE_MESSAGE =
   'Die vorherige Stempelung wird noch verarbeitet. Bitte kurz warten und erneut scannen.';
-/** Internal marker distinguishing our own deadline from a backend error. */
+/** Message of our own mutation deadline; it is told apart by its TimeoutError type. */
 const TIMEOUT_SENTINEL = '__staff_clock_request_timeout__';
 /**
  * A clock action whose outcome is unknown is indeterminate, not failed: the
