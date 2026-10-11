@@ -326,7 +326,7 @@ describe('Logger', () => {
       consoleSpy.mockRestore();
     });
 
-    it('suppresses "not implemented yet" persist errors', async () => {
+    it('reports every persist error to the console', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockPersistLog.mockRejectedValueOnce(new Error('not implemented yet'));
 
@@ -342,10 +342,7 @@ describe('Logger', () => {
 
       // Wait a tick for the async handler
       await new Promise(resolve => setTimeout(resolve, 10));
-      expect(consoleSpy).not.toHaveBeenCalledWith(
-        'Failed to persist log:',
-        expect.stringContaining('not implemented')
-      );
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to persist log:', 'not implemented yet');
 
       consoleSpy.mockRestore();
     });

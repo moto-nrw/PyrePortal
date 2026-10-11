@@ -6,6 +6,7 @@ import {
   isNotFoundError,
   mapApiErrorToGerman,
   mapAttendanceErrorToGerman,
+  NetworkError,
   toErrorCode,
 } from './apiErrors';
 import { ERROR_CODE_CLASSES, ERROR_CODES, LEGACY_ERROR_CODES } from './errorCodes.generated';
@@ -296,5 +297,18 @@ describe('kiosk error codes from project-phoenix #3939', () => {
   it('detects a 404 by status only', () => {
     expect(isNotFoundError(new ApiError('opaque', 404, 'iot.rfid_tag_not_found'))).toBe(true);
     expect(isNotFoundError(new ApiError('API Error: 404 - x', 409))).toBe(false);
+  });
+});
+
+// PyrePortal #409: network errors are recognised by type, never by text.
+describe('isNetworkRelatedError by type', () => {
+  it('detects a NetworkError of the API client', () => {
+    expect(isNetworkRelatedError(new NetworkError('Keine Netzwerkverbindung.'))).toBe(true);
+  });
+
+  it('ignores network words in the text of other errors', () => {
+    expect(isNetworkRelatedError(new Error('Failed to fetch'))).toBe(false);
+    expect(isNetworkRelatedError(new Error('Netzwerk nicht verfügbar'))).toBe(false);
+    expect(isNetworkRelatedError('connection timeout')).toBe(false);
   });
 });

@@ -4,6 +4,7 @@ import {
   api,
   ApiError,
   isWCRoomAlias,
+  NetworkError,
   type OpenRoomMoveResponse,
   type RfidScanResponse,
   type Room,
@@ -170,7 +171,9 @@ describe('checkInToDestinationRoom', () => {
 
   describe('error handling', () => {
     it('maps network errors to the Schulhof network message', async () => {
-      mockedApi.processRfidScan.mockRejectedValue(new Error('Failed to fetch'));
+      mockedApi.processRfidScan.mockRejectedValue(
+        new NetworkError('Keine Netzwerkverbindung. Bitte WLAN prüfen.')
+      );
 
       const result = await checkInToDestinationRoom({
         destination: 'schulhof',
@@ -190,7 +193,9 @@ describe('checkInToDestinationRoom', () => {
     });
 
     it('maps network errors to the Toilette network message', async () => {
-      mockedApi.processRfidScan.mockRejectedValue(new Error('Failed to fetch'));
+      mockedApi.processRfidScan.mockRejectedValue(
+        new NetworkError('Keine Netzwerkverbindung. Bitte WLAN prüfen.')
+      );
 
       const result = await checkInToDestinationRoom({
         destination: 'toilette',
@@ -337,7 +342,9 @@ describe('moveToOpenRoom', () => {
   });
 
   it('maps network errors to the open-room network message', async () => {
-    mockedApi.moveToOpenRoom.mockRejectedValue(new Error('Failed to fetch'));
+    mockedApi.moveToOpenRoom.mockRejectedValue(
+      new NetworkError('Keine Netzwerkverbindung. Bitte WLAN prüfen.')
+    );
 
     const result = await moveToOpenRoom({ room, state: makeState(), pin: '1234' });
 

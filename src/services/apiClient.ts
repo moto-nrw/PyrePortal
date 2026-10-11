@@ -8,7 +8,7 @@ import { adapter } from '@platform';
 
 import { createLogger } from '../utils/logger';
 
-import { ApiError, getNetworkErrorMessage, type ApiErrorResponse } from './apiErrors';
+import { ApiError, NetworkError, type ApiErrorResponse } from './apiErrors';
 
 const logger = createLogger('API');
 
@@ -124,17 +124,16 @@ function handleNetworkError(error: unknown, endpoint: string, startTime: number)
 
   reportNetworkStatus(responseTime, false);
 
-  // Map error types to German messages
-  if (errorObj.name === 'TypeError' && errorObj.message.includes('fetch')) {
-    throw new Error('Keine Netzwerkverbindung. Bitte WLAN prüfen.');
-  }
+  // Map error types to German messages. fetch rejects with a TypeError when
+  // the network fails (the text differs per browser) and with an AbortError
+  // when its signal fires.
   if (errorObj.name === 'AbortError') {
     throw new Error('Zeitüberschreitung. Server antwortet nicht.');
   }
-  if (errorObj.message.includes('NetworkError') || errorObj.message.includes('network')) {
-    throw new Error(getNetworkErrorMessage('generic'));
+  if (errorObj.name === 'TypeError') {
+    throw new NetworkError('Keine Netzwerkverbindung. Bitte WLAN prüfen.');
   }
-  throw new Error('Verbindungsfehler. Bitte Netzwerkverbindung prüfen.');
+  throw new NetworkError('Verbindungsfehler. Bitte Netzwerkverbindung prüfen.');
 }
 
 /**

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { api, type CurrentSession } from '../services/api';
+import { api, NetworkError, type CurrentSession } from '../services/api';
 import type { SessionHistoryEntry, SessionSettings } from '../services/sessionStorage';
 import { useUserStore } from '../store/userStore';
 
@@ -177,7 +177,9 @@ describe('SessionHistoryPage session recreation behavior', () => {
   // =========================================================================
 
   it('shows the specific network error message when recreation fails with a network error', async () => {
-    mockedApi.startSession.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    mockedApi.startSession.mockRejectedValueOnce(
+      new NetworkError('Keine Netzwerkverbindung. Bitte WLAN prüfen.')
+    );
 
     const user = userEvent.setup();
     renderPage();

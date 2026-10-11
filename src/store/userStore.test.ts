@@ -1624,3 +1624,51 @@ describe('clearSessionState', () => {
     expect(useUserStore.getState().activeSupervisorTags.size).toBe(0);
   });
 });
+
+// ====================================================================
+// validateAndRecreateSession — text per validation reason (PyrePortal #409)
+// ====================================================================
+
+describe('validateAndRecreateSession error text per reason', () => {
+  const savedSession = {
+    activity_id: 10,
+    room_id: 5,
+    supervisor_ids: [1, 2],
+    saved_at: '2024-01-01',
+    activity_name: 'Fußball AG',
+    room_name: 'Turnhalle',
+    supervisor_names: ['Herr A', 'Frau B'],
+  };
+
+  const recreate = async () => {
+    setAuthenticated();
+    await useUserStore.getState().validateAndRecreateSession(savedSession);
+    return useUserStore.getState().error;
+  };
+
+  it('names a missing activity', async () => {
+    useUserStore.setState({ users: [{ id: 1, name: 'Herr A' }] });
+    mockGetActivities.mockResolvedValueOnce([]);
+    expect(await recreate()).toBe(
+      'Die gespeicherte Aktivität wurde gelöscht oder ist nicht mehr verfügbar. Bitte wählen Sie eine neue Aktivität aus.'
+    );
+  });
+
+  it('names a missing room', async () => {
+    useUserStore.setState({ users: [{ id: 1, name: 'Herr A' }] });
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10 })]);
+    mockGetRooms.mockResolvedValueOnce([]);
+    expect(await recreate()).toBe(
+      'Der gespeicherte Raum ist nicht mehr verfügbar. Bitte wählen Sie einen anderen Raum.'
+    );
+  });
+
+  it('names supervisors that are no longer valid', async () => {
+    useUserStore.setState({ users: [{ id: 77, name: 'Andere Person' }], selectedSupervisors: [] });
+    mockGetActivities.mockResolvedValueOnce([mockActivity({ id: 10 })]);
+    mockGetRooms.mockResolvedValueOnce([mockRoom({ id: 5 })]);
+    expect(await recreate()).toBe(
+      'Die gespeicherten Betreuer sind nicht mehr gültig. Bitte wählen Sie das Team erneut aus.'
+    );
+  });
+});

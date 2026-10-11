@@ -6,6 +6,7 @@ import {
   isNetworkRelatedError,
   isWCRoomAlias,
   mapApiErrorToGerman,
+  NetworkError,
   type RfidScanResult,
   setNetworkStatusCallback,
   WC_ROOM_ALIASES,
@@ -327,38 +328,19 @@ describe('isWCRoomAlias', () => {
 // ====================================================================
 
 describe('isNetworkRelatedError', () => {
-  it('detects network keyword', () => {
-    expect(isNetworkRelatedError(new Error('NetworkError when attempting to fetch'))).toBe(true);
+  it('detects a NetworkError of the API client', () => {
+    expect(isNetworkRelatedError(new NetworkError('Keine Netzwerkverbindung.'))).toBe(true);
   });
 
-  it('detects fetch error', () => {
-    expect(isNetworkRelatedError(new Error('Failed to fetch'))).toBe(true);
-  });
-
-  it('detects timeout', () => {
-    expect(isNetworkRelatedError(new Error('Request timed out'))).toBe(true);
-  });
-
-  it('detects connection error', () => {
-    expect(isNetworkRelatedError(new Error('Connection refused'))).toBe(true);
-  });
-
-  it('detects offline', () => {
-    expect(isNetworkRelatedError(new Error('Device is offline'))).toBe(true);
-  });
-
-  it('detects German network words', () => {
-    expect(isNetworkRelatedError('Netzwerk nicht verfügbar')).toBe(true);
-    expect(isNetworkRelatedError('Verbindung fehlgeschlagen')).toBe(true);
+  it('ignores network words in the text of other errors', () => {
+    expect(isNetworkRelatedError(new Error('NetworkError when attempting to fetch'))).toBe(false);
+    expect(isNetworkRelatedError(new Error('Request timed out'))).toBe(false);
+    expect(isNetworkRelatedError('Verbindung fehlgeschlagen')).toBe(false);
   });
 
   it('returns false for non-network errors', () => {
     expect(isNetworkRelatedError(new Error('Invalid PIN'))).toBe(false);
     expect(isNetworkRelatedError(new Error('Not found'))).toBe(false);
-  });
-
-  it('handles string input', () => {
-    expect(isNetworkRelatedError('failed to fetch data')).toBe(true);
   });
 
   it('detects navigator.onLine false', () => {
@@ -681,6 +663,23 @@ describe('api methods', () => {
   // ------------------------------------------------------------------
 
   describe('handleNetworkError', () => {
+    it('throws a NetworkError for a failed fetch', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      mockFetch.mockRejectedValueOnce(new TypeError('Load failed'));
+
+      // getFreshApi reloads the modules, so compare by name, not by class identity
+      await expect(freshApi.getTeachers()).rejects.toMatchObject({ name: 'NetworkError' });
+    });
+
+    it('treats a fetch abort as a timeout, not as a network error', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      mockFetch.mockRejectedValueOnce(new DOMException('The operation was aborted', 'AbortError'));
+
+      await expect(freshApi.getTeachers()).rejects.not.toMatchObject({ name: 'NetworkError' });
+    });
+
     it('throws German message for TypeError with fetch', async () => {
       const { api: freshApi } = await getFreshApi();
 
@@ -703,14 +702,14 @@ describe('api methods', () => {
       );
     });
 
-    it('throws German message for NetworkError', async () => {
+    it('throws the no-connection message for any failed fetch, whatever the browser text', async () => {
       const { api: freshApi } = await getFreshApi();
 
-      const networkError = new Error('NetworkError when attempting to fetch resource');
+      const networkError = new TypeError('NetworkError when attempting to fetch resource');
       mockFetch.mockRejectedValueOnce(networkError);
 
       await expect(freshApi.getTeachers()).rejects.toThrow(
-        'Netzwerkfehler. Bitte Verbindung prüfen.'
+        'Keine Netzwerkverbindung. Bitte WLAN prüfen.'
       );
     });
 
@@ -736,14 +735,14 @@ describe('api methods', () => {
       );
     });
 
-    it('throws German message for error containing "network"', async () => {
+    it('ignores network words in the text of other rejections', async () => {
       const { api: freshApi } = await getFreshApi();
 
       const networkError = new Error('A network issue occurred');
       mockFetch.mockRejectedValueOnce(networkError);
 
       await expect(freshApi.getTeachers()).rejects.toThrow(
-        'Netzwerkfehler. Bitte Verbindung prüfen.'
+        'Verbindungsfehler. Bitte Netzwerkverbindung prüfen.'
       );
     });
   });

@@ -279,34 +279,24 @@ export function mapApiErrorToGerman(error: unknown): string {
 }
 
 /**
- * Patterns that indicate a network-related error
- * Includes both English (technical) and German (translated) patterns
+ * A request that never reached the server (apiClient). Carries the German
+ * text to show; callers recognise it by type, never by its message.
  */
-const NETWORK_ERROR_PATTERNS = [
-  'network',
-  'netzwerk',
-  'failed to fetch',
-  'fetch',
-  'networkerror',
-  'timeout',
-  'timed out',
-  'connection',
-  'verbindung',
-  'offline',
-];
+export class NetworkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
 
 /**
- * Check if an error (object or message) indicates a network-level error.
- * Checks navigator.onLine first. An ApiError is an answer of the server and
- * never a network error; only messages of fetch and of the kiosk's own
- * network errors (apiClient) are pattern-matched, never backend text.
+ * Whether an error is a network-level error: the browser reports offline, or
+ * the API client could not reach the server. An answer of the server
+ * (ApiError) never is one.
  */
 export function isNetworkRelatedError(error: unknown): boolean {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return true;
-  if (error instanceof ApiError) return false;
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return NETWORK_ERROR_PATTERNS.some(pattern => message.includes(pattern));
+  return error instanceof NetworkError;
 }
 
 /**

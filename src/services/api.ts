@@ -21,6 +21,7 @@ export {
   isNotFoundError,
   isWCRoomAlias,
   mapApiErrorToGerman,
+  NetworkError,
   WC_ROOM_ALIASES,
 } from './apiErrors';
 export { initializeApi, setNetworkStatusCallback } from './apiClient';
