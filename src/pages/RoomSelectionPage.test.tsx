@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { api, type Room, type ActivityResponse } from '../services/api';
+import { api, ApiError, type Room, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
 import RoomSelectionPage from './RoomSelectionPage';
@@ -471,7 +471,7 @@ describe('RoomSelectionPage', () => {
 
   describe('409 conflict handling', () => {
     it('shows ConflictModal on 409 error', async () => {
-      mockedApi.startSession.mockRejectedValueOnce(new Error('409 Conflict'));
+      mockedApi.startSession.mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409));
 
       const user = userEvent.setup();
       renderPage();
@@ -483,8 +483,14 @@ describe('RoomSelectionPage', () => {
       });
     });
 
-    it('shows conflict modal with Conflict keyword', async () => {
-      mockedApi.startSession.mockRejectedValueOnce(new Error('Conflict detected'));
+    it('shows conflict modal for the conflict answer of the server', async () => {
+      mockedApi.startSession.mockRejectedValueOnce(
+        new ApiError(
+          'API Error: 409 - Conflict: Session conflict detected',
+          409,
+          'general.business_rejection'
+        )
+      );
 
       const user = userEvent.setup();
       renderPage();
@@ -497,7 +503,7 @@ describe('RoomSelectionPage', () => {
     });
 
     it('shows warning text in conflict modal', async () => {
-      mockedApi.startSession.mockRejectedValueOnce(new Error('409 Conflict'));
+      mockedApi.startSession.mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409));
 
       const user = userEvent.setup();
       renderPage();
@@ -510,7 +516,7 @@ describe('RoomSelectionPage', () => {
     });
 
     it('shows Trotzdem starten button in conflict modal', async () => {
-      mockedApi.startSession.mockRejectedValueOnce(new Error('409 Conflict'));
+      mockedApi.startSession.mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409));
 
       const user = userEvent.setup();
       renderPage();
@@ -523,7 +529,7 @@ describe('RoomSelectionPage', () => {
     });
 
     it('shows Neue Session label in conflict modal', async () => {
-      mockedApi.startSession.mockRejectedValueOnce(new Error('409 Conflict'));
+      mockedApi.startSession.mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409));
 
       const user = userEvent.setup();
       renderPage();
@@ -537,7 +543,7 @@ describe('RoomSelectionPage', () => {
 
     it('force start calls api with force=true', async () => {
       mockedApi.startSession
-        .mockRejectedValueOnce(new Error('409 Conflict'))
+        .mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409))
         .mockResolvedValueOnce({
           active_group_id: 99,
           activity_id: 10,
@@ -571,7 +577,7 @@ describe('RoomSelectionPage', () => {
 
     it('force start navigates to /nfc-scanning on success', async () => {
       mockedApi.startSession
-        .mockRejectedValueOnce(new Error('409 Conflict'))
+        .mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409))
         .mockResolvedValueOnce({
           active_group_id: 99,
           activity_id: 10,
@@ -599,7 +605,7 @@ describe('RoomSelectionPage', () => {
     });
 
     it('cancel button on conflict modal clears state', async () => {
-      mockedApi.startSession.mockRejectedValueOnce(new Error('409 Conflict'));
+      mockedApi.startSession.mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409));
 
       const user = userEvent.setup();
       renderPage();
@@ -622,7 +628,7 @@ describe('RoomSelectionPage', () => {
 
     it('shows error modal when force start fails', async () => {
       mockedApi.startSession
-        .mockRejectedValueOnce(new Error('409 Conflict'))
+        .mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409))
         .mockRejectedValueOnce(new Error('Server error'));
 
       const user = userEvent.setup();
@@ -806,7 +812,7 @@ describe('RoomSelectionPage', () => {
 
   describe('ConflictModal details', () => {
     async function openConflictModal() {
-      mockedApi.startSession.mockRejectedValueOnce(new Error('409 Conflict'));
+      mockedApi.startSession.mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409));
       const user = userEvent.setup();
       renderPage();
       await user.click(screen.getByText('Raum A'));
@@ -862,11 +868,13 @@ describe('RoomSelectionPage', () => {
 
     it('shows loading state on force start button', async () => {
       let resolveForce: (v: any) => void;
-      mockedApi.startSession.mockRejectedValueOnce(new Error('409 Conflict')).mockReturnValueOnce(
-        new Promise(resolve => {
-          resolveForce = resolve;
-        })
-      );
+      mockedApi.startSession
+        .mockRejectedValueOnce(new ApiError('API Error: 409 - Conflict', 409))
+        .mockReturnValueOnce(
+          new Promise(resolve => {
+            resolveForce = resolve;
+          })
+        );
 
       const user = await openConflictModal();
       await user.click(screen.getByText('Trotzdem starten'));

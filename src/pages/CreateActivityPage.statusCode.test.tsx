@@ -48,7 +48,7 @@ function makeFetchActivitiesRejectMock(error: Error) {
 }
 
 // ---------------------------------------------------------------------------
-// Tests — 401 detection via ApiError.statusCode with string fallback
+// Tests — 401 detection via ApiError.statusCode
 // ---------------------------------------------------------------------------
 
 describe('CreateActivityPage 401 status code detection', () => {
@@ -87,15 +87,15 @@ describe('CreateActivityPage 401 status code detection', () => {
     });
   });
 
-  it('calls logout and redirects to / on raw Error containing "401" (string fallback)', async () => {
-    useUserStore.setState({
-      fetchActivities: makeFetchActivitiesRejectMock(new Error('Request failed: 401')),
-    });
+  it('ignores "401" in the text of a raw Error', async () => {
+    const fetchActivities = makeFetchActivitiesRejectMock(new Error('Request failed: 401'));
+    useUserStore.setState({ fetchActivities });
     renderPage();
 
     await waitFor(() => {
-      expect(mockLogout).toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith('/');
+      expect(fetchActivities).toHaveBeenCalled();
     });
+    expect(mockLogout).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalledWith('/');
   });
 });

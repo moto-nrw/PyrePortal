@@ -35,28 +35,28 @@ function mockResponse(
 }
 
 // ====================================================================
-// isNotFoundError — typed status code detection with string fallback
+// isNotFoundError — typed status code detection
 // ====================================================================
 
 describe('isNotFoundError', () => {
   it('detects ApiError with statusCode 404 even without "404" in the message', () => {
     const error = new ApiError('no session', 404);
-    expect(isNotFoundError(error, error.message)).toBe(true);
+    expect(isNotFoundError(error)).toBe(true);
   });
 
-  it('detects raw Error messages containing "404" (string fallback)', () => {
+  it('ignores "404" in the text of a raw Error', () => {
     const error = new Error('API Error: 404 - Not Found');
-    expect(isNotFoundError(error, error.message)).toBe(true);
+    expect(isNotFoundError(error)).toBe(false);
   });
 
   it('rejects ApiError with a different status code', () => {
     const error = new ApiError('server exploded', 500);
-    expect(isNotFoundError(error, error.message)).toBe(false);
+    expect(isNotFoundError(error)).toBe(false);
   });
 
   it('rejects raw errors without "404" in the message', () => {
     const error = new Error('server error');
-    expect(isNotFoundError(error, error.message)).toBe(false);
+    expect(isNotFoundError(error)).toBe(false);
   });
 });
 

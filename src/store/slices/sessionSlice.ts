@@ -1,7 +1,6 @@
 import {
   api,
   getNetworkErrorMessage,
-  mapServerErrorToGerman,
   isNetworkRelatedError,
   type ActivityResponse,
   type Room,
@@ -40,27 +39,43 @@ const toActivitySummary = (a: ActivityResponse) => ({
   category: a.category_name,
 });
 
-const mapSessionValidationError = (error: unknown): string => {
-  const rawMessage = error instanceof Error ? error.message : 'Validierung fehlgeschlagen';
+/** Why a saved session cannot be recreated. */
+type SessionValidationReason =
+  'activity_unavailable' | 'room_unavailable' | 'supervisors_unloadable' | 'supervisors_invalid';
 
+const SESSION_VALIDATION_MESSAGES: Readonly<Record<SessionValidationReason, string>> = {
+  activity_unavailable:
+    'Die gespeicherte Aktivität wurde gelöscht oder ist nicht mehr verfügbar. Bitte wählen Sie eine neue Aktivität aus.',
+  room_unavailable:
+    'Der gespeicherte Raum ist nicht mehr verfügbar. Bitte wählen Sie einen anderen Raum.',
+  supervisors_unloadable:
+    'Die Betreuer konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.',
+  supervisors_invalid:
+    'Die gespeicherten Betreuer sind nicht mehr gültig. Bitte wählen Sie das Team erneut aus.',
+};
+
+/** A saved session failed its own check; the reason decides the text, not the message. */
+class SessionValidationError extends Error {
+  constructor(
+    readonly reason: SessionValidationReason,
+    message: string
+  ) {
+    super(message);
+    this.name = 'SessionValidationError';
+  }
+}
+
+const mapSessionValidationError = (error: unknown): string => {
   if (isNetworkRelatedError(error)) {
     return getNetworkErrorMessage('sessionValidation');
   }
-
-  switch (rawMessage) {
-    case 'Gespeicherte Aktivität nicht mehr verfügbar':
-      return 'Die gespeicherte Aktivität wurde gelöscht oder ist nicht mehr verfügbar. Bitte wählen Sie eine neue Aktivität aus.';
-    case 'Gespeicherter Raum nicht verfügbar':
-      return 'Der gespeicherte Raum ist nicht mehr verfügbar. Bitte wählen Sie einen anderen Raum.';
-    case 'Fehler beim Laden der Betreuer':
-      return 'Die Betreuer konnten nicht geladen werden. Bitte prüfen Sie Ihre Verbindung und versuchen Sie es erneut.';
-    case 'Keine gültigen Betreuer gefunden':
-      return 'Die gespeicherten Betreuer sind nicht mehr gültig. Bitte wählen Sie das Team erneut aus.';
-    case 'Validierung fehlgeschlagen':
-      return 'Die gespeicherte Sitzung ist nicht mehr gültig. Bitte erstellen Sie sie erneut.';
-    default:
-      return mapApiErrorToGerman(error);
+  if (error instanceof SessionValidationError) {
+    return SESSION_VALIDATION_MESSAGES[error.reason];
   }
+  if (!(error instanceof Error)) {
+    return 'Die gespeicherte Sitzung ist nicht mehr gültig. Bitte erstellen Sie sie erneut.';
+  }
+  return mapApiErrorToGerman(error);
 };
 
 /**
@@ -269,7 +284,7 @@ const resolveSupervisorsForSession = async (
     usersToSearch = getUpdatedUsers();
 
     if (usersToSearch.length === 0) {
-      throw new Error('Fehler beim Laden der Betreuer');
+      throw new SessionValidationError('supervisors_unloadable', 'Fehler beim Laden der Betreuer');
     }
   }
 
@@ -283,7 +298,7 @@ const resolveSupervisorsForSession = async (
       savedIds: supervisorIds,
       availableUsers: usersToSearch.map(u => u.id),
     });
-    throw new Error('Keine gültigen Betreuer gefunden');
+    throw new SessionValidationError('supervisors_invalid', 'Keine gültigen Betreuer gefunden');
   }
 
   return supervisors;
@@ -552,18 +567,16 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         set({ isLoading: true, error: null });
 
         if (!authenticatedUser) {
-          const errorMsg = 'Keine Authentifizierung für das Laden von Aktivitäten';
           set({
-            error: mapServerErrorToGerman(errorMsg),
+            error: 'Keine Authentifizierung für das Laden von Aktivitäten',
             isLoading: false,
           });
           return null;
         }
 
         if (!authenticatedUser.pin) {
-          const errorMsg = 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.';
           set({
-            error: mapServerErrorToGerman(errorMsg),
+            error: 'PIN nicht verfügbar. Bitte loggen Sie sich erneut ein.',
             isLoading: false,
           });
           return null;
@@ -719,7 +732,10 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         const activity = activities.find(a => a.id === entry.activity_id);
 
         if (!activity) {
-          throw new Error('Gespeicherte Aktivität nicht mehr verfügbar');
+          throw new SessionValidationError(
+            'activity_unavailable',
+            'Gespeicherte Aktivität nicht mehr verfügbar'
+          );
         }
 
         // Validate room is available
@@ -728,7 +744,10 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         const room = rooms.find(r => r.id === entry.room_id);
 
         if (!room) {
-          throw new Error('Gespeicherter Raum nicht verfügbar');
+          throw new SessionValidationError(
+            'room_unavailable',
+            'Gespeicherter Raum nicht verfügbar'
+          );
         }
 
         // Resolve supervisors - use current if already selected, otherwise validate saved ones

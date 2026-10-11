@@ -1,4 +1,16 @@
 /**
+ * Rejection of `withTimeout` when its deadline passes. Callers tell their own
+ * deadline from a failure of the wrapped promise by this type, never by the
+ * message.
+ */
+export class TimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TimeoutError';
+  }
+}
+
+/**
  * Frontend safety net for promises that can hang indefinitely.
  *
  * Tauri IPC calls into blocking hardware operations (SPI/RFID) can stall past
@@ -12,7 +24,7 @@ export function withTimeout<T>(
 ): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timeoutHandle = setTimeout(() => {
-      reject(new Error(timeoutMessage));
+      reject(new TimeoutError(timeoutMessage));
     }, timeoutMs);
 
     promise

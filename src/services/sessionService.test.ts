@@ -59,17 +59,10 @@ describe('isSessionConflictError', () => {
     expect(isSessionConflictError(new ApiError('Interner Fehler', 500))).toBe(false);
   });
 
-  it('falls back to "409" in the message string', () => {
-    expect(isSessionConflictError(new Error('HTTP 409: nope'))).toBe(true);
-  });
-
-  it('falls back to "Conflict" in the message string', () => {
-    expect(isSessionConflictError(new Error('Conflict detected'))).toBe(true);
-  });
-
-  it('handles non-Error values via String()', () => {
-    expect(isSessionConflictError('409 Conflict')).toBe(true);
-    expect(isSessionConflictError('boom')).toBe(false);
+  it('ignores "409" and "Conflict" in the text of other errors', () => {
+    expect(isSessionConflictError(new Error('HTTP 409: nope'))).toBe(false);
+    expect(isSessionConflictError(new Error('Conflict detected'))).toBe(false);
+    expect(isSessionConflictError('409 Conflict')).toBe(false);
   });
 });
 

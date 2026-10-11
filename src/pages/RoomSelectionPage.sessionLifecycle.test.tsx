@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-import { api, ApiError, type Room, type ActivityResponse } from '../services/api';
+import { api, ApiError, NetworkError, type Room, type ActivityResponse } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
 import RoomSelectionPage from './RoomSelectionPage';
@@ -221,7 +221,9 @@ describe('RoomSelectionPage session lifecycle behavior', () => {
   // =========================================================================
 
   it('shows network error message when startSession fails with a network error', async () => {
-    mockedApi.startSession.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    mockedApi.startSession.mockRejectedValueOnce(
+      new NetworkError('Keine Netzwerkverbindung. Bitte WLAN prüfen.')
+    );
 
     const user = userEvent.setup();
     renderPage();
@@ -239,7 +241,7 @@ describe('RoomSelectionPage session lifecycle behavior', () => {
   it('shows network error message when force start fails with a network error', async () => {
     mockedApi.startSession
       .mockRejectedValueOnce(new ApiError('Session Konflikt', 409))
-      .mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      .mockRejectedValueOnce(new NetworkError('Keine Netzwerkverbindung. Bitte WLAN prüfen.'));
 
     const user = userEvent.setup();
     renderPage();

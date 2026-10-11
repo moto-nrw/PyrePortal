@@ -94,7 +94,7 @@ actionName: async () => {
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     storeLogger.error('Action failed', { error: message });
-    set({ error: mapServerErrorToGerman(message), isLoading: false });
+    set({ error: mapApiErrorToGerman(error), isLoading: false });
   }
 };
 ```
@@ -192,7 +192,7 @@ actionName: async (param: ParamType): Promise<void> => {
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     storeLogger.error('Action failed', { error: errorMessage });
-    set({ error: mapServerErrorToGerman(errorMessage), isLoading: false });
+    set({ error: mapApiErrorToGerman(error), isLoading: false });
   }
 };
 ```
