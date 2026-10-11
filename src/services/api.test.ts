@@ -6,7 +6,7 @@ import {
   isNetworkRelatedError,
   isWCRoomAlias,
   mapApiErrorToGerman,
-  mapServerErrorToGerman,
+  NetworkError,
   type RfidScanResult,
   setNetworkStatusCallback,
   WC_ROOM_ALIASES,
@@ -68,249 +68,6 @@ describe('ApiError', () => {
 });
 
 // ====================================================================
-// mapServerErrorToGerman — error message mapping
-// ====================================================================
-
-describe('mapServerErrorToGerman', () => {
-  // Authentication errors
-  it('maps invalid device API key', () => {
-    expect(mapServerErrorToGerman('invalid device API key')).toBe(
-      'API-Schlüssel ungültig. Bitte Geräte-Konfiguration prüfen.'
-    );
-  });
-
-  it('maps invalid staff PIN', () => {
-    expect(mapServerErrorToGerman('invalid staff PIN')).toBe(
-      'Ungültiger PIN. Bitte erneut versuchen.'
-    );
-  });
-
-  // Capacity errors
-  it('maps activity capacity exceeded', () => {
-    expect(mapServerErrorToGerman('ACTIVITY_CAPACITY_EXCEEDED')).toBe(
-      'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.'
-    );
-  });
-
-  it('maps activity capacity exceeded lowercase', () => {
-    expect(mapServerErrorToGerman('activity capacity exceeded')).toBe(
-      'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.'
-    );
-  });
-
-  it('maps room capacity exceeded', () => {
-    expect(mapServerErrorToGerman('ROOM_CAPACITY_EXCEEDED')).toBe(
-      'Raum ist voll. Kein Platz mehr verfügbar.'
-    );
-  });
-
-  // Issue #844 — duplicate active visit (409). Substring + code variants
-  // are both registered so degraded paths or older response shapes still
-  // resolve to the friendly German copy instead of the generic 409 fallback.
-  it('maps STUDENT_ALREADY_ACTIVE code', () => {
-    expect(mapServerErrorToGerman('STUDENT_ALREADY_ACTIVE')).toBe(
-      'Schüler*in ist bereits angemeldet.'
-    );
-  });
-
-  it('maps "student already has an active visit" message', () => {
-    expect(mapServerErrorToGerman('student already has an active visit')).toBe(
-      'Schüler*in ist bereits angemeldet.'
-    );
-  });
-
-  // Device errors
-  it('maps device not active', () => {
-    expect(mapServerErrorToGerman('device is not active')).toBe(
-      'Gerät ist deaktiviert. Bitte Administrator kontaktieren.'
-    );
-  });
-
-  // Session errors
-  it('maps already running session', () => {
-    expect(mapServerErrorToGerman('device is already running an activity session')).toBe(
-      'Gerät führt bereits eine Aktivität durch. Bitte zuerst beenden.'
-    );
-  });
-
-  it('maps no active session to end', () => {
-    expect(mapServerErrorToGerman('no active session to end')).toBe(
-      'Keine aktive Sitzung zum Beenden vorhanden.'
-    );
-  });
-
-  // RFID errors
-  it('maps RFID tag not found', () => {
-    expect(mapServerErrorToGerman('RFID tag not found')).toBe(
-      'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.'
-    );
-  });
-
-  it('maps RFID tag not assigned', () => {
-    expect(mapServerErrorToGerman('RFID tag not assigned')).toBe(
-      'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.'
-    );
-  });
-
-  // Attendance errors
-  it('maps missing attendance record on daily checkout', () => {
-    expect(mapServerErrorToGerman('student has no attendance record for today')).toBe(
-      'Schüler wurde heute noch nicht eingecheckt.'
-    );
-  });
-
-  it('maps missing attendance record inside the full wire message', () => {
-    expect(
-      mapServerErrorToGerman(
-        'API Error: 404 - Not Found: student has no attendance record for today'
-      )
-    ).toBe('Schüler wurde heute noch nicht eingecheckt.');
-  });
-
-  // Internal server errors
-  it('maps schulhof not configured', () => {
-    expect(mapServerErrorToGerman('schulhof activity not configured')).toBe(
-      'Schulhof-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.'
-    );
-  });
-
-  it('maps WC not configured', () => {
-    expect(mapServerErrorToGerman('WC activity not configured')).toBe(
-      'Toilette-Aktivität nicht konfiguriert. Bitte Administrator kontaktieren.'
-    );
-  });
-
-  it('maps failed to create session (generic)', () => {
-    expect(mapServerErrorToGerman('failed to create session')).toBe(
-      'Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.'
-    );
-  });
-
-  it('maps failed to create Schulhof session (specific before generic)', () => {
-    expect(mapServerErrorToGerman('failed to create Schulhof session')).toBe(
-      'Schulhof-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.'
-    );
-  });
-
-  it('maps failed to create WC session (specific before generic)', () => {
-    expect(mapServerErrorToGerman('failed to create WC session')).toBe(
-      'Toilette-Sitzung konnte nicht erstellt werden. Bitte erneut versuchen.'
-    );
-  });
-
-  // HTTP status code fallbacks
-  it('maps 401/Unauthorized', () => {
-    expect(mapServerErrorToGerman('401')).toBe(
-      'Authentifizierung fehlgeschlagen. Bitte erneut anmelden.'
-    );
-  });
-
-  it('maps 404/Not Found', () => {
-    expect(mapServerErrorToGerman('Not Found')).toBe(
-      'Ressource nicht gefunden. Bitte Konfiguration prüfen.'
-    );
-  });
-
-  it('maps 500 server error', () => {
-    expect(mapServerErrorToGerman('Internal Server Error')).toBe(
-      'Server nicht erreichbar. Bitte später versuchen.'
-    );
-  });
-
-  it('maps 502 Bad Gateway', () => {
-    expect(mapServerErrorToGerman('Bad Gateway')).toBe(
-      'Server nicht erreichbar. Bitte später versuchen.'
-    );
-  });
-
-  // Fallback
-  it('returns original for unknown errors', () => {
-    expect(mapServerErrorToGerman('something completely unknown happened')).toBe(
-      'something completely unknown happened'
-    );
-  });
-
-  // Pattern matching specificity
-  it('matches substring patterns', () => {
-    expect(mapServerErrorToGerman('API Error: 404 - RFID tag not found for tag XYZ')).toBe(
-      'Armband ist nicht zugewiesen. Bitte an Betreuer wenden.'
-    );
-  });
-
-  // Validation errors
-  it('maps activity_id required', () => {
-    expect(mapServerErrorToGerman('activity_id is required')).toBe(
-      'Aktivität muss ausgewählt werden.'
-    );
-  });
-
-  it('maps supervisor required', () => {
-    expect(mapServerErrorToGerman('at least one supervisor')).toBe(
-      'Mindestens ein Betreuer muss ausgewählt werden.'
-    );
-  });
-
-  it('maps destination validation', () => {
-    expect(mapServerErrorToGerman("destination must be 'zuhause' or 'unterwegs'")).toBe(
-      "Ziel muss 'zuhause' oder 'unterwegs' sein."
-    );
-  });
-
-  // Additional mappings for coverage
-  it('maps device API key is required', () => {
-    expect(mapServerErrorToGerman('device API key is required')).toBe(
-      'API-Schlüssel nicht konfiguriert. Bitte .env Datei prüfen.'
-    );
-  });
-
-  it('maps invalid API key format', () => {
-    expect(mapServerErrorToGerman('invalid API key format')).toBe(
-      'API-Schlüssel Format ungültig. Bearer Token erwartet.'
-    );
-  });
-
-  it('maps staff PIN is required', () => {
-    expect(mapServerErrorToGerman('staff PIN is required')).toBe('PIN nicht angegeben.');
-  });
-
-  it('maps no active session', () => {
-    expect(mapServerErrorToGerman('no active session')).toBe(
-      'Keine aktive Sitzung. Bitte zuerst eine Aktivität starten.'
-    );
-  });
-
-  it('maps invalid session ID', () => {
-    expect(mapServerErrorToGerman('invalid session ID')).toBe('Ungültige Sitzungs-ID.');
-  });
-
-  it('maps RFID parameter is required', () => {
-    expect(mapServerErrorToGerman('RFID parameter is required')).toBe(
-      'RFID-Tag fehlt in der Anfrage.'
-    );
-  });
-
-  it('maps 403/Forbidden', () => {
-    expect(mapServerErrorToGerman('Forbidden')).toBe('Keine Berechtigung für diese Aktion.');
-  });
-
-  it('maps 409/Conflict', () => {
-    expect(mapServerErrorToGerman('Conflict')).toBe(
-      'Konflikt bei der Anfrage. Bitte erneut versuchen.'
-    );
-  });
-
-  it('maps 400/Bad Request', () => {
-    expect(mapServerErrorToGerman('Bad Request')).toBe('Ungültige Anfrage. Bitte Eingaben prüfen.');
-  });
-
-  it('maps 503 Service Unavailable', () => {
-    expect(mapServerErrorToGerman('Service Unavailable')).toBe(
-      'Server nicht erreichbar. Bitte später versuchen.'
-    );
-  });
-});
-
-// ====================================================================
 // mapApiErrorToGerman — structured error mapping
 // ====================================================================
 
@@ -319,9 +76,9 @@ describe('mapApiErrorToGerman', () => {
     expect(mapApiErrorToGerman('some string error')).toBe('some string error');
   });
 
-  it('handles regular Error', () => {
-    expect(mapApiErrorToGerman(new Error('invalid staff PIN'))).toBe(
-      'Ungültiger PIN. Bitte erneut versuchen.'
+  it('shows the German text of a kiosk error unchanged', () => {
+    expect(mapApiErrorToGerman(new Error('Keine Netzwerkverbindung. Bitte WLAN prüfen.'))).toBe(
+      'Keine Netzwerkverbindung. Bitte WLAN prüfen.'
     );
   });
 
@@ -389,9 +146,9 @@ describe('mapApiErrorToGerman', () => {
     expect(mapApiErrorToGerman(error)).toBe('Toilette ist voll (2/2 Plätze belegt).');
   });
 
-  it('handles activity capacity without details falls back to message mapping', () => {
+  it('handles activity capacity without details with the code text', () => {
     const error = new ApiError('ACTIVITY_CAPACITY_EXCEEDED', 409, 'ACTIVITY_CAPACITY_EXCEEDED');
-    // No details → falls through to mapServerErrorToGerman(error.message)
+    // No details → the plain text of the code
     expect(mapApiErrorToGerman(error)).toBe(
       'Aktivität ist voll. Maximale Teilnehmerzahl erreicht.'
     );
@@ -424,8 +181,8 @@ describe('mapApiErrorToGerman', () => {
     expect(mapApiErrorToGerman(error)).toBe('Raum A ist voll (25/25 Plätze belegt).');
   });
 
-  it('falls back to message mapping for other ApiErrors', () => {
-    const error = new ApiError('invalid staff PIN', 401);
+  it('maps the invalid PIN code of other ApiErrors', () => {
+    const error = new ApiError('invalid staff PIN', 401, 'iot.device_pin_invalid');
     expect(mapApiErrorToGerman(error)).toBe('Ungültiger PIN. Bitte erneut versuchen.');
   });
 
@@ -571,38 +328,19 @@ describe('isWCRoomAlias', () => {
 // ====================================================================
 
 describe('isNetworkRelatedError', () => {
-  it('detects network keyword', () => {
-    expect(isNetworkRelatedError(new Error('NetworkError when attempting to fetch'))).toBe(true);
+  it('detects a NetworkError of the API client', () => {
+    expect(isNetworkRelatedError(new NetworkError('Keine Netzwerkverbindung.'))).toBe(true);
   });
 
-  it('detects fetch error', () => {
-    expect(isNetworkRelatedError(new Error('Failed to fetch'))).toBe(true);
-  });
-
-  it('detects timeout', () => {
-    expect(isNetworkRelatedError(new Error('Request timed out'))).toBe(true);
-  });
-
-  it('detects connection error', () => {
-    expect(isNetworkRelatedError(new Error('Connection refused'))).toBe(true);
-  });
-
-  it('detects offline', () => {
-    expect(isNetworkRelatedError(new Error('Device is offline'))).toBe(true);
-  });
-
-  it('detects German network words', () => {
-    expect(isNetworkRelatedError('Netzwerk nicht verfügbar')).toBe(true);
-    expect(isNetworkRelatedError('Verbindung fehlgeschlagen')).toBe(true);
+  it('ignores network words in the text of other errors', () => {
+    expect(isNetworkRelatedError(new Error('NetworkError when attempting to fetch'))).toBe(false);
+    expect(isNetworkRelatedError(new Error('Request timed out'))).toBe(false);
+    expect(isNetworkRelatedError('Verbindung fehlgeschlagen')).toBe(false);
   });
 
   it('returns false for non-network errors', () => {
     expect(isNetworkRelatedError(new Error('Invalid PIN'))).toBe(false);
     expect(isNetworkRelatedError(new Error('Not found'))).toBe(false);
-  });
-
-  it('handles string input', () => {
-    expect(isNetworkRelatedError('failed to fetch data')).toBe(true);
   });
 
   it('detects navigator.onLine false', () => {
@@ -925,6 +663,23 @@ describe('api methods', () => {
   // ------------------------------------------------------------------
 
   describe('handleNetworkError', () => {
+    it('throws a NetworkError for a failed fetch', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      mockFetch.mockRejectedValueOnce(new TypeError('Load failed'));
+
+      // getFreshApi reloads the modules, so compare by name, not by class identity
+      await expect(freshApi.getTeachers()).rejects.toMatchObject({ name: 'NetworkError' });
+    });
+
+    it('treats a fetch abort as a timeout, not as a network error', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      mockFetch.mockRejectedValueOnce(new DOMException('The operation was aborted', 'AbortError'));
+
+      await expect(freshApi.getTeachers()).rejects.not.toMatchObject({ name: 'NetworkError' });
+    });
+
     it('throws German message for TypeError with fetch', async () => {
       const { api: freshApi } = await getFreshApi();
 
@@ -947,14 +702,14 @@ describe('api methods', () => {
       );
     });
 
-    it('throws German message for NetworkError', async () => {
+    it('throws the no-connection message for any failed fetch, whatever the browser text', async () => {
       const { api: freshApi } = await getFreshApi();
 
-      const networkError = new Error('NetworkError when attempting to fetch resource');
+      const networkError = new TypeError('NetworkError when attempting to fetch resource');
       mockFetch.mockRejectedValueOnce(networkError);
 
       await expect(freshApi.getTeachers()).rejects.toThrow(
-        'Netzwerkfehler. Bitte Verbindung prüfen.'
+        'Keine Netzwerkverbindung. Bitte WLAN prüfen.'
       );
     });
 
@@ -980,14 +735,14 @@ describe('api methods', () => {
       );
     });
 
-    it('throws German message for error containing "network"', async () => {
+    it('ignores network words in the text of other rejections', async () => {
       const { api: freshApi } = await getFreshApi();
 
       const networkError = new Error('A network issue occurred');
       mockFetch.mockRejectedValueOnce(networkError);
 
       await expect(freshApi.getTeachers()).rejects.toThrow(
-        'Netzwerkfehler. Bitte Verbindung prüfen.'
+        'Verbindungsfehler. Bitte Netzwerkverbindung prüfen.'
       );
     });
   });
@@ -1048,7 +803,7 @@ describe('api methods', () => {
 
       mockFetch.mockResolvedValueOnce(
         mockResponse(
-          { status: 'error', message: 'invalid staff PIN' },
+          { status: 'error', error: 'invalid staff PIN', code: 'iot.device_pin_invalid' },
           { status: 401, statusText: 'Unauthorized', ok: false }
         )
       );

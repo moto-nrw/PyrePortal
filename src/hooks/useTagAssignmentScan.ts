@@ -6,6 +6,7 @@ import { isRealScanningEnabled } from '../platform/adapter';
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
 import { createLogger, logError, logUserAction } from '../utils/logger';
+import { TimeoutError, withTimeout } from '../utils/withTimeout';
 
 const logger = createLogger('useTagAssignmentScan');
 
@@ -18,28 +19,6 @@ export const getAssignedPerson = (assignment: TagAssignmentCheck | null) => {
 };
 
 const SCAN_INVOKE_TIMEOUT_MS = 20_000;
-
-const withTimeout = <T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  timeoutMessage: string
-): Promise<T> => {
-  return new Promise<T>((resolve, reject) => {
-    const timeoutHandle = setTimeout(() => {
-      reject(new Error(timeoutMessage));
-    }, timeoutMs);
-
-    promise
-      .then(result => {
-        clearTimeout(timeoutHandle);
-        resolve(result);
-      })
-      .catch(error => {
-        clearTimeout(timeoutHandle);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      });
-  });
-};
 
 /**
  * Tag assignment scan workflow.
@@ -226,9 +205,8 @@ export function useTagAssignmentScan() {
 
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'RFID scanner invocation failed');
-      const timeoutError = error.message.toLowerCase().includes('zeitüberschreitung');
       setError(
-        timeoutError
+        error instanceof TimeoutError
           ? 'Scanner reagiert nicht mehr. Bitte Scanner neu starten und erneut versuchen.'
           : 'Verbindung zum Scanner unterbrochen. Bitte Scanner neu starten.'
       );

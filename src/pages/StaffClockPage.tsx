@@ -20,7 +20,7 @@ import { designSystem } from '../styles/designSystem';
 import { getSecureRandomInt } from '../utils/crypto';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
 import { pressHandlers } from '../utils/pressHandlers';
-import { withTimeout } from '../utils/withTimeout';
+import { TimeoutError, withTimeout } from '../utils/withTimeout';
 
 const logger = createLogger('StaffClockPage');
 const SCAN_TIMEOUT_MS = 20_000;
@@ -55,7 +55,7 @@ const MUTATION_GRACE_MS = 10_000;
 const UNRESOLVED_FENCE_MS = 20_000;
 const UNRESOLVED_FENCE_MESSAGE =
   'Die vorherige Stempelung wird noch verarbeitet. Bitte kurz warten und erneut scannen.';
-/** Internal marker distinguishing our own deadline from a backend error. */
+/** Message of our own mutation deadline; it is told apart by its TimeoutError type. */
 const TIMEOUT_SENTINEL = '__staff_clock_request_timeout__';
 /**
  * A clock action whose outcome is unknown is indeterminate, not failed: the
@@ -176,7 +176,7 @@ async function withRequestTimeout<T>(promise: Promise<T>, abort?: () => void): P
   try {
     return await withTimeout(promise, REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MESSAGE);
   } catch (error) {
-    if (error instanceof Error && error.message === REQUEST_TIMEOUT_MESSAGE) {
+    if (error instanceof TimeoutError) {
       logger.error('Staff clock request timed out');
       abort?.();
       throw new RequestTimeoutError();
@@ -212,7 +212,7 @@ async function settleMutation(
   try {
     return { kind: 'success', state: await withTimeout(mutation, timeoutMs, TIMEOUT_SENTINEL) };
   } catch (error) {
-    if (error instanceof Error && error.message === TIMEOUT_SENTINEL) {
+    if (error instanceof TimeoutError) {
       return { kind: 'indeterminate' };
     }
     // A structured client error means the handler examined the command and
@@ -359,7 +359,7 @@ async function scanStaffTag(): Promise<string> {
   } catch (error) {
     logger.error('Staff tag scan invocation failed', { error: serializeError(error) });
     throw new ScannerError(
-      error instanceof Error && error.message === SCAN_TIMEOUT_MESSAGE
+      error instanceof TimeoutError
         ? SCAN_TIMEOUT_MESSAGE
         : 'Verbindung zum Scanner unterbrochen. Bitte Scanner neu starten.'
     );
