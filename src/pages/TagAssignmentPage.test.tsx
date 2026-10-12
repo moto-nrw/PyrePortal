@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, type TagAssignmentCheck } from '../services/api';
 import { useUserStore } from '../store/userStore';
+import { TimeoutError } from '../utils/withTimeout';
 
 import TagAssignmentPage from './TagAssignmentPage';
 
@@ -1131,8 +1132,8 @@ describe('TagAssignmentPage', () => {
 
     it('RFID scan timeout error shows timeout message', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-      // Simulate a timeout by rejecting with the German timeout message
-      mockScanSingleTag.mockRejectedValue(new Error('RFID-Scan Zeitüberschreitung'));
+      // Simulate a timeout by rejecting with the kiosk's timeout error
+      mockScanSingleTag.mockRejectedValue(new TimeoutError('RFID-Scan Zeitüberschreitung'));
 
       renderPage();
       await user.click(screen.getByText('Scan starten'));

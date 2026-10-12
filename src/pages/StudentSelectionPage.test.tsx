@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
 
-import { api, type Student, type Teacher } from '../services/api';
+import { api, ApiError, type Student, type Teacher } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
 import StudentSelectionPage from './StudentSelectionPage';
@@ -239,6 +239,24 @@ describe('StudentSelectionPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/Fehler beim Laden/)).toBeInTheDocument();
     });
+  });
+
+  it('shows the class text instead of the backend text of a failed fetch', async () => {
+    mockedApi.getStudents.mockRejectedValue(
+      new ApiError('API Error: 500 - Internal Server Error: boom', 500, 'general.server')
+    );
+    mockedApi.getTeachers.mockResolvedValue([]);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          'Fehler beim Laden: Das hat leider nicht geklappt. Bitte erneut versuchen.'
+        )
+      ).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Internal Server Error/)).not.toBeInTheDocument();
   });
 
   it('handles non-Error fetch failure', async () => {

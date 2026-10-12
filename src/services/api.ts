@@ -21,7 +21,7 @@ export {
   isNotFoundError,
   isWCRoomAlias,
   mapApiErrorToGerman,
-  mapServerErrorToGerman,
+  NetworkError,
   WC_ROOM_ALIASES,
 } from './apiErrors';
 export { initializeApi, setNetworkStatusCallback } from './apiClient';
@@ -422,9 +422,8 @@ export const api = {
       // The server returns the session data directly in the data field
       return response.data;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means no current session, which is fine
-      if (isNotFoundError(error, errorMessage)) {
+      if (isNotFoundError(error)) {
         return null;
       }
       throw error;
@@ -504,9 +503,8 @@ export const api = {
 
       return response.data;
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
       // 404 means tag is not assigned, which is fine
-      if (isNotFoundError(error, errorMessage)) {
+      if (isNotFoundError(error)) {
         return { assigned: false };
       }
       throw error;

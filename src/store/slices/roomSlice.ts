@@ -1,4 +1,4 @@
-import { api, mapServerErrorToGerman, type Room } from '../../services/api';
+import { api, type Room } from '../../services/api';
 import { mapApiErrorToGerman } from '../../services/apiErrors';
 import { createLogger } from '../../utils/logger';
 import type { GetState, SetState, UserState } from '../userStore';
@@ -16,9 +16,8 @@ export const createRoomSlice = (set: SetState<UserState>, get: GetState<UserStat
     const { authenticatedUser } = get();
 
     if (!authenticatedUser?.pin) {
-      const errorMsg = 'Keine Authentifizierung für das Laden von Räumen';
       storeLogger.warn('Cannot fetch rooms: no authenticated user or PIN');
-      set({ error: mapServerErrorToGerman(errorMsg), isLoading: false });
+      set({ error: 'Keine Authentifizierung für das Laden von Räumen', isLoading: false });
       return;
     }
 

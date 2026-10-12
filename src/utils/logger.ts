@@ -335,10 +335,8 @@ class Logger {
     } catch (error) {
       // Avoid recursive logging by writing directly to console
       const errorMessage = error instanceof Error ? error.message : String(error);
-      if (!errorMessage.includes('not implemented yet')) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to persist log:', errorMessage);
-      }
+      // eslint-disable-next-line no-console
+      console.error('Failed to persist log:', errorMessage);
     }
   }
 }
