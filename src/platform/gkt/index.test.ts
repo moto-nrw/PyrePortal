@@ -452,11 +452,10 @@ describe('GKTAdapter', () => {
         }
       })();
 
-      // Either returns a string (cached) or throws
-      expect(
-        typeof result === 'string' ||
-          (result instanceof Error && result.message.includes('DEVICE_API_KEY'))
-      ).toBe(true);
+      // Either returns a string (cached) or throws a DEVICE_API_KEY error
+      if (typeof result === 'string') return;
+      expect(result).toBeInstanceOf(Error);
+      expect(result).toHaveProperty('message', expect.stringContaining('DEVICE_API_KEY'));
     });
   });
 
