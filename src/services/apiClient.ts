@@ -146,8 +146,10 @@ async function parseErrorResponse(
 ): Promise<{ message: string; code?: string; details?: ApiErrorResponse['details'] }> {
   try {
     const errorData = (await response.json()) as ApiErrorResponse;
-    // Extract error detail from response - check message first, then error field
-    const errorDetail = errorData.message ?? (errorData as { error?: string }).error;
+    // Diagnostic text only: `detail` (RFC 9457, Phoenix #2520), then the
+    // fields of older backends.
+    const errorDetail =
+      errorData.detail ?? errorData.message ?? (errorData as { error?: string }).error;
     const message = errorDetail ? `${baseMessage}: ${errorDetail}` : baseMessage;
     return { message, code: errorData.code, details: errorData.details };
   } catch {
