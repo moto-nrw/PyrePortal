@@ -620,6 +620,33 @@ describe('api methods', () => {
       }
     });
 
+    it('uses detail from the RFC 9457 envelope', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(
+          {
+            type: 'about:blank',
+            title: 'Unauthorized',
+            status: 401,
+            detail: 'invalid staff PIN',
+            code: 'iot.device_pin_invalid',
+          },
+          { status: 401, statusText: 'Unauthorized', ok: false }
+        )
+      );
+
+      try {
+        await freshApi.getTeachers();
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).name).toBe('ApiError');
+        const apiErr = error as ApiError;
+        expect(apiErr.message).toContain('invalid staff PIN');
+        expect(apiErr.code).toBe('iot.device_pin_invalid');
+      }
+    });
+
     it('uses error field when message is absent', async () => {
       const { api: freshApi } = await getFreshApi();
 
