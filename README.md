@@ -147,4 +147,4 @@ The API client and response types live in [`src/services/api.ts`](src/services/a
 
 Source-Available License -- see [LICENSE](LICENSE) for details.
 
-Copyright (c) 2024-2026 MOTO. For licensing inquiries: kontakt@moto.nrw
+Copyright (c) 2024-2026 MOTO. For licensing inquiries: kontakt@moto-ogs.de
