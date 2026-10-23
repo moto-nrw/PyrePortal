@@ -13,7 +13,8 @@ and production retain separate API URLs and directories.
   cannot identify GKT because the wrapper defines it in ordinary browsers too.
 - A detected GKT with a missing or broken wrapper fails NFC initialization. It
   must not silently switch to Wedge.
-- `?key=...`, staff authentication and API requests are unchanged. Pairing is
+- Staff authentication and API requests are unchanged. Credential import is
+  described in the rollout section below. Pairing is
   tracked separately in [#425](https://github.com/moto-nrw/PyrePortal/issues/425).
 
 `pnpm run dev` retains the browser mock. `pnpm run dev:kiosk` exercises automatic
@@ -85,6 +86,25 @@ after a successful `rsync`.
    Existing GKT URLs and keys stay unchanged; Wedge uses that same URL with its
    own device key.
 5. If hardware validation fails, keep production on the previous build. After a
-   production regression, restore the prior known-good `dist/` through the normal
-   deployment process, preserving the environment's API URL. Do not repoint
-   devices or rotate keys merely to roll back this frontend change.
+   production regression, restore only a known-good `dist/` that supports stored
+   credentials and fragment import, preserving the environment's API URL. A
+   pre-3841-a build requires query URLs and is not a compatible rollback after
+   credential migration. Roll forward instead; do not restore query-bearing
+   start links.
+
+## Credential rollout (#3841, slice 3841-a)
+
+Provision each device with `#key=<device-key>`. PyrePortal imports the key
+into localStorage and removes it from the address bar. Reloads and restarts
+do not put it back into the URL. Treat device storage and configured start
+links as credentials. A cleared browser profile needs a new fragment import.
+
+Legacy `?key=` links remain readable only for the transition. Their query
+reaches the web host before JavaScript can remove it. Change every configured
+start link to a fragment, then rotate all existing keys in the operator
+portal. Clear old query-bearing access logs and browser history under the
+applicable retention/evidence procedure; do not record keys in rollout proof.
+A fragment key wins if a legacy query key is also present. Follow-up 3841-k
+removes query import after human slice 3841-g confirms the device inventory.
+This describes implemented code, not evidence of a production rollout.
+The coordinated runbook is `project-phoenix/docs/operations/geraete-zugang-3841.md`.

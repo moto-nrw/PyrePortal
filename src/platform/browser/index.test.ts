@@ -78,6 +78,15 @@ describe('BrowserAdapter', () => {
       expect(adapter.getDeviceApiKey()).toBe('url-key');
     });
 
+    it('imports fragments into storage and never restores a credential in restart URLs', async () => {
+      window.history.pushState({}, '', '/#key=example-browser-credential');
+      expect(adapter.getDeviceApiKey()).toBe('example-browser-credential');
+      expect(window.location.hash).toBe('');
+      await adapter.restartApp();
+      expect(adapter.getDeviceApiKey()).toBe('example-browser-credential');
+      expect(window.location.href).toBe(`${window.location.origin}/`);
+    });
+
     it('uses VITE_DEVICE_API_KEY when no key is in the URL', () => {
       vi.stubEnv('VITE_DEVICE_API_KEY', 'env-key-456');
 
