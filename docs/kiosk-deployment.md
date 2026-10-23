@@ -88,9 +88,11 @@ after a successful `rsync`.
 5. If hardware validation fails, keep production on the previous build. After a
    production regression, restore only a known-good `dist/` that supports stored
    credentials and fragment import, preserving the environment's API URL. A
-   pre-3841-a build requires query URLs and is not a compatible rollback after
-   credential migration. Roll forward instead; do not restore query-bearing
-   start links.
+   pre-3841-a build still works with the migrated backend while configured start
+   URLs contain query keys: the Bearer credential is unchanged. It cannot import
+   fragment keys or use stored credentials, so it is incompatible once start
+   URLs have switched to fragments. After that switch, roll forward instead;
+   do not restore query-bearing start links.
 
 ## Credential rollout (#3841, slice 3841-a)
 
@@ -98,6 +100,11 @@ Provision each device with `#key=<device-key>`. PyrePortal imports the key
 into localStorage and removes it from the address bar. Reloads and restarts
 do not put it back into the URL. Treat device storage and configured start
 links as credentials. A cleared browser profile needs a new fragment import.
+If localStorage rejects the write, the key stays in module memory for the
+current page and takes precedence over an older stored key. The URL is still
+scrubbed, and a credential-free warning names the storage failure. This fallback
+does not survive a reload: fix device storage and reopen the configured fragment
+start link. A credential-free restart cannot recover an unsaved key.
 
 Legacy `?key=` links remain readable only for the transition. Their query
 reaches the web host before JavaScript can remove it. Change every configured

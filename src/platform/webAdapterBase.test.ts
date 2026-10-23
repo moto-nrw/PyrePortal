@@ -1,13 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { WebAdapterBase } from './webAdapterBase';
+import type { WebAdapterBase } from './webAdapterBase';
 
-class TestAdapter extends WebAdapterBase {}
+let TestAdapter: new () => WebAdapterBase;
 
 describe('WebAdapterBase', () => {
-  let adapter: TestAdapter;
+  let adapter: WebAdapterBase;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    const { WebAdapterBase: FreshWebAdapterBase } = await import('./webAdapterBase');
+    TestAdapter = class extends FreshWebAdapterBase {};
     localStorage.clear();
     adapter = new TestAdapter();
     window.history.pushState({}, '', '/');
@@ -36,16 +40,28 @@ describe('WebAdapterBase', () => {
       expect(window.location.href).toBe(`${window.location.origin}/?mode=wedge`);
     });
 
-    it('removes a query credential even when local storage is unavailable', () => {
-      window.history.pushState({}, '', '/?key=example-device-credential');
+    it.each([
+      ['?key=', false],
+      ['?key=', true],
+      ['#key=', false],
+      ['#key=', true],
+    ])('keeps a %s credential on write failure (stored key: %s)', (prefix, hasStoredKey) => {
+      if (hasStoredKey) localStorage.setItem('moto_device_api_key', 'example-old-credential');
+      window.history.pushState({}, '', `/${prefix}example-new-credential`);
+      const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const write = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
         throw new Error('Local storage unavailable');
       });
       try {
-        expect(() => adapter.getDeviceApiKey()).toThrow('Local storage unavailable');
-        expect(window.location.search).toBe('');
+        expect(adapter.getDeviceApiKey()).toBe('example-new-credential');
+        expect(window.location.href).toBe(`${window.location.origin}/`);
+        expect(new TestAdapter().getDeviceApiKey()).toBe('example-new-credential');
+        expect(warning).toHaveBeenCalledWith(
+          'Device credential could not be saved. Using memory only; reimport after reloading.'
+        );
       } finally {
         write.mockRestore();
+        warning.mockRestore();
       }
     });
 
