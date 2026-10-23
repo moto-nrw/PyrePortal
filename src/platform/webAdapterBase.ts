@@ -3,14 +3,15 @@
  *
  * Contains everything that does not depend on the NFC input source:
  * scan-callback management, the one-shot single-tag capture, config from
- * env vars, the `?key=` device key, localStorage session persistence and
- * the key-preserving restart. Subclasses provide `platform`, `initializeNfc`
+ * env vars, the `#key=` device key, localStorage session persistence and
+ * the credential-free restart. Subclasses provide `platform`, `initializeNfc`
  * and `persistLog`.
  */
 
 import type { SessionSettings } from '../services/sessionStorage';
 
 import type { NfcScanEvent, PlatformAdapter } from './adapter';
+import { readDeviceCredential } from './shared/deviceCredential';
 import {
   clearLastSessionFromLocalStorage,
   loadSessionSettingsFromLocalStorage,
@@ -32,7 +33,6 @@ export abstract class WebAdapterBase implements Omit<
   'platform' | 'initializeNfc' | 'persistLog'
 > {
   protected scanCallback: ScanCallback | null = null;
-  protected cachedApiKey: string | null = null;
   protected scanCounter = 0;
   private pendingSingleScan: PendingSingleScan | null = null;
 
@@ -105,16 +105,11 @@ export abstract class WebAdapterBase implements Omit<
   }
 
   getDeviceApiKey(): string {
-    const params = new URLSearchParams(window.location.search);
-    const key = params.get('key');
+    const key = readDeviceCredential();
     if (key) {
-      this.cachedApiKey = key;
       return key;
     }
-    if (this.cachedApiKey) {
-      return this.cachedApiKey;
-    }
-    throw new Error('DEVICE_API_KEY not found in URL. Expected ?key=...');
+    throw new Error('DEVICE_API_KEY not found in URL or local storage. Expected #key=...');
   }
 
   async saveSessionSettings(settings: SessionSettings): Promise<void> {
@@ -130,10 +125,8 @@ export abstract class WebAdapterBase implements Omit<
   }
 
   async restartApp(): Promise<void> {
-    if (this.cachedApiKey) {
-      window.location.href = `${window.location.origin}/?key=${encodeURIComponent(this.cachedApiKey)}`;
-    } else {
-      window.location.reload();
-    }
+    // Resolve before reload so a not-yet-imported legacy URL is also scrubbed.
+    readDeviceCredential();
+    window.location.reload();
   }
 }

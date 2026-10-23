@@ -92,7 +92,7 @@ On the Mac (backend from `../project-phoenix`, `docker compose up -d server`):
 
 ```bash
 pnpm run dev:wedge
-# open http://localhost:1420/?key=<device-api-key>
+# open http://localhost:1420/#key=<device-api-key>
 ```
 
 From an iPad/iPhone on the same network, the dev server must listen on the
@@ -100,12 +100,14 @@ LAN and point the API at the Mac's IP:
 
 ```bash
 BUILD_TARGET=wedge VITE_API_BASE_URL=http://<mac-ip>:8080 pnpm exec vite --host
-# on the tablet: http://<mac-ip>:1420/?key=<device-api-key>
+# on the tablet: http://<mac-ip>:1420/#key=<device-api-key>
 ```
 
 Notes:
 
-- The device API key comes from the `?key=` URL parameter, exactly like GKT.
+- The device API key is imported once from the `#key=` fragment, exactly like
+  GKT. It is stored in localStorage and removed from the address bar. See the
+  [credential rollout](kiosk-deployment.md#credential-rollout-3841-slice-3841-a).
 - Plain-HTTP pages reached via a LAN IP are not a browser "secure context";
   APIs like `crypto.randomUUID` do not exist there. Keep this in mind when
   adding dependencies on Web APIs (the logger already has a fallback).
@@ -117,7 +119,7 @@ Notes:
 ## Production deployment
 
 `pnpm run build` produces one production bundle for GKT and Wedge. The existing
-kiosk URL serves both device types with `?key=<device-api-key>`. No separate
+kiosk URL serves both device types with `#key=<device-api-key>`. No separate
 Wedge directory, domain or deployment is needed. `build:wedge` remains a
 compatibility alias for the same build.
 

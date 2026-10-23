@@ -110,7 +110,7 @@ function readDeviceApiKey(): string {
   try {
     return adapter.getDeviceApiKey();
   } catch (error) {
-    // A kiosk URL without ?key= still reports; the relay answers 401.
+    // A kiosk URL without an imported credential still reports; the relay answers 401.
     logger.warn('Error reporting starts without device key', { error: serializeError(error) });
     return '';
   }

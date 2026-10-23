@@ -120,7 +120,7 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,...
 ### Kiosk Deployment
 
 - `VITE_API_BASE_URL` is set by CI for staging or production. Local builds default to the production API.
-- The device API key is provided via the kiosk URL query parameter: `?key=...`.
+- The device API key is provided via the kiosk URL fragment: `#key=...`.
 
 ### Authentication Pattern
 
@@ -188,7 +188,7 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80,...
 
 GKT production scanning uses `SYSTEM.registerNfc` via `public/system.js`.
 
-The GKT scan path can be tested locally without a device: run `BUILD_TARGET=gkt VITE_API_BASE_URL=http://localhost:8080 pnpm run dev`, open `http://localhost:1420/?key=<device-api-key>`, and fire a scan from the DevTools console (`registerNfc` stores its callback as `SYSTEM.onNfcScanned`):
+The GKT scan path can be tested locally without a device: run `BUILD_TARGET=gkt VITE_API_BASE_URL=http://localhost:8080 pnpm run dev`, open `http://localhost:1420/#key=<device-api-key>`, and fire a scan from the DevTools console (`registerNfc` stores its callback as `SYSTEM.onNfcScanned`):
 
 ```js
 SYSTEM.onNfcScanned({ uid: '04:D6:94:82:97:6A:80', eventSource: 'NFC', eventNumber: 1 });
@@ -230,7 +230,7 @@ ESLint enforces import ordering, React hooks rules, security checks, and consist
 ### API Issues
 
 1. Check `VITE_API_BASE_URL` for browser builds or GKT build env.
-2. Check the GKT URL contains `?key=...`.
+2. Provision GKT once with `#key=...`; the app removes it and keeps the key in localStorage. Check reload authentication without printing the credential.
 3. Backend running: `curl http://localhost:8080/health`.
 
 ### Build Issues
