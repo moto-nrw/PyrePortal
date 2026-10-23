@@ -840,6 +840,30 @@ describe('api methods', () => {
       expect(result.error).toBe('Ungültiger PIN. Bitte erneut versuchen.');
     });
 
+    // Phoenix slice 3841-b rejects an unreadable/empty school PIN with the
+    // same established refusal, so deployed kiosks need no wire transition.
+    it('rejects the shared PIN refusal envelope without successful login data', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(
+          {
+            type: 'about:blank',
+            title: 'Unauthorized',
+            status: 401,
+            detail: 'invalid staff PIN',
+            instance: '/api/iot/ping',
+            code: 'iot.device_pin_invalid',
+            errors: [],
+            details: {},
+          },
+          { status: 401, statusText: 'Unauthorized', ok: false }
+        )
+      );
+      const result = await freshApi.validateGlobalPin('1234');
+      expect(result).toEqual({ success: false, error: 'Ungültiger PIN. Bitte erneut versuchen.' });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     it('returns failure on network error', async () => {
       const { api: freshApi } = await getFreshApi();
 
