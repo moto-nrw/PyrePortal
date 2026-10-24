@@ -1,8 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { adapter } = await import('./index');
+import type { PlatformAdapter } from '../adapter';
 
-beforeEach(() => {
+let adapter: PlatformAdapter;
+
+beforeEach(async () => {
+  vi.resetModules();
+  ({ adapter } = await import('./index'));
   vi.clearAllMocks();
   localStorage.clear();
   window.history.pushState({}, '', '/');
@@ -76,6 +80,34 @@ describe('BrowserAdapter', () => {
       window.history.pushState({}, '', '/?key=url-key');
 
       expect(adapter.getDeviceApiKey()).toBe('url-key');
+    });
+
+    it('imports fragments into storage and never restores a credential in restart URLs', async () => {
+      window.history.pushState({}, '', '/#key=example-browser-credential');
+      expect(adapter.getDeviceApiKey()).toBe('example-browser-credential');
+      expect(window.location.hash).toBe('');
+      await adapter.restartApp();
+      expect(adapter.getDeviceApiKey()).toBe('example-browser-credential');
+      expect(window.location.href).toBe(`${window.location.origin}/`);
+    });
+
+    it('keeps the imported key when storage cannot be read or written', () => {
+      vi.stubEnv('VITE_DEVICE_API_KEY', 'example-env-credential');
+      window.history.pushState({}, '', '/#key=example-browser-credential');
+      const read = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+        throw new Error('Storage unavailable');
+      });
+      const write = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('Storage unavailable');
+      });
+      try {
+        expect(adapter.getDeviceApiKey()).toBe('example-browser-credential');
+        expect(window.location.hash).toBe('');
+        expect(adapter.getDeviceApiKey()).toBe('example-browser-credential');
+      } finally {
+        read.mockRestore();
+        write.mockRestore();
+      }
     });
 
     it('uses VITE_DEVICE_API_KEY when no key is in the URL', () => {

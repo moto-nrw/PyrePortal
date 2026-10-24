@@ -17,8 +17,12 @@ import {
  * Used for rich error responses like capacity exceeded
  */
 export interface ApiErrorResponse {
-  status: string;
-  message: string;
+  /** HTTP status number (RFC 9457); backends before Phoenix #2520 send "error". */
+  status: number | string;
+  /** Diagnostic text since Phoenix #2520; never shown, never matched. */
+  detail?: string;
+  /** Diagnostic text of backends before Phoenix #2520. */
+  message?: string;
   code?: string;
   details?: {
     // Capacity fields — the backend sends current_occupancy/max_capacity for

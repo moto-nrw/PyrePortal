@@ -115,7 +115,9 @@ Run the real GKT frontend path against a local backend:
 BUILD_TARGET=gkt VITE_API_BASE_URL=http://localhost:8080 pnpm run dev
 ```
 
-Open `http://localhost:1420/?key=<device-api-key>`, then simulate a scan in the browser console:
+Open `http://localhost:1420/#key=<device-api-key>`, then simulate a scan in the browser console.
+The key is imported into localStorage and removed from the address bar; see
+[credential rollout](docs/kiosk-deployment.md#credential-rollout-3841-slice-3841-a).
 
 ```js
 SYSTEM.onNfcScanned({ uid: '04:D6:94:82:97:6A:80', eventSource: 'NFC', eventNumber: 1 });
@@ -147,4 +149,4 @@ The API client and response types live in [`src/services/api.ts`](src/services/a
 
 Source-Available License -- see [LICENSE](LICENSE) for details.
 
-Copyright (c) 2024-2026 MOTO. For licensing inquiries: kontakt@moto.nrw
+Copyright (c) 2024-2026 MOTO. For licensing inquiries: kontakt@moto-ogs.de

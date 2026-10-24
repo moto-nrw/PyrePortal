@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { WebAdapterBase } from './webAdapterBase';
+import type { WebAdapterBase } from './webAdapterBase';
 
-class TestAdapter extends WebAdapterBase {}
+let TestAdapter: new () => WebAdapterBase;
 
 describe('WebAdapterBase', () => {
-  let adapter: TestAdapter;
+  let adapter: WebAdapterBase;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    const { WebAdapterBase: FreshWebAdapterBase } = await import('./webAdapterBase');
+    TestAdapter = class extends FreshWebAdapterBase {};
+    localStorage.clear();
     adapter = new TestAdapter();
     window.history.pushState({}, '', '/');
   });
@@ -17,6 +22,49 @@ describe('WebAdapterBase', () => {
   });
 
   describe('getDeviceApiKey', () => {
+    it('imports a fragment credential, removes it, and survives a new adapter', () => {
+      window.history.pushState({}, '', '/kiosk?mode=wedge#key=example-device-credential&keep=1');
+      expect(adapter.getDeviceApiKey()).toBe('example-device-credential');
+      expect(window.location.search).toBe('?mode=wedge');
+      expect(window.location.hash).toBe('#keep=1');
+      expect(new TestAdapter().getDeviceApiKey()).toBe('example-device-credential');
+    });
+
+    it('scrubs every legacy query key and prefers the fragment during rotation', () => {
+      window.history.pushState(
+        {},
+        '',
+        '/?key=example-old-credential&key=duplicate&mode=wedge#key=example-new-credential'
+      );
+      expect(adapter.getDeviceApiKey()).toBe('example-new-credential');
+      expect(window.location.href).toBe(`${window.location.origin}/?mode=wedge`);
+    });
+
+    it.each([
+      ['?key=', false],
+      ['?key=', true],
+      ['#key=', false],
+      ['#key=', true],
+    ])('keeps a %s credential on write failure (stored key: %s)', (prefix, hasStoredKey) => {
+      if (hasStoredKey) localStorage.setItem('moto_device_api_key', 'example-old-credential');
+      window.history.pushState({}, '', `/${prefix}example-new-credential`);
+      const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const write = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('Local storage unavailable');
+      });
+      try {
+        expect(adapter.getDeviceApiKey()).toBe('example-new-credential');
+        expect(window.location.href).toBe(`${window.location.origin}/`);
+        expect(new TestAdapter().getDeviceApiKey()).toBe('example-new-credential');
+        expect(warning).toHaveBeenCalledWith(
+          'Device credential could not be saved. Using memory only; reimport after reloading.'
+        );
+      } finally {
+        write.mockRestore();
+        warning.mockRestore();
+      }
+    });
+
     it('reads the key from the URL and caches it', () => {
       window.history.pushState({}, '', '/?key=test-key-123');
       expect(adapter.getDeviceApiKey()).toBe('test-key-123');
@@ -47,13 +95,20 @@ describe('WebAdapterBase', () => {
   });
 
   describe('restartApp', () => {
-    it('navigates to origin with the cached key', async () => {
+    it('scrubs a legacy URL even when restart is called before reading the key', async () => {
+      window.history.pushState({}, '', '/?key=example-device-credential&mode=wedge');
+      await adapter.restartApp();
+      expect(window.location.search).toBe('?mode=wedge');
+      expect(new TestAdapter().getDeviceApiKey()).toBe('example-device-credential');
+    });
+
+    it('restarts without putting the credential back into the URL', async () => {
       window.history.pushState({}, '', '/?key=restart-key');
       adapter.getDeviceApiKey();
 
       await adapter.restartApp();
 
-      expect(window.location.href).toBe(`${window.location.origin}/?key=restart-key`);
+      expect(window.location.href).toBe(`${window.location.origin}/`);
     });
   });
 });

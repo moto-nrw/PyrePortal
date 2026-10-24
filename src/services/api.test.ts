@@ -620,6 +620,33 @@ describe('api methods', () => {
       }
     });
 
+    it('uses detail from the RFC 9457 envelope', async () => {
+      const { api: freshApi } = await getFreshApi();
+
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(
+          {
+            type: 'about:blank',
+            title: 'Unauthorized',
+            status: 401,
+            detail: 'invalid staff PIN',
+            code: 'iot.device_pin_invalid',
+          },
+          { status: 401, statusText: 'Unauthorized', ok: false }
+        )
+      );
+
+      try {
+        await freshApi.getTeachers();
+        expect.fail('Should have thrown');
+      } catch (error) {
+        expect((error as Error).name).toBe('ApiError');
+        const apiErr = error as ApiError;
+        expect(apiErr.message).toContain('invalid staff PIN');
+        expect(apiErr.code).toBe('iot.device_pin_invalid');
+      }
+    });
+
     it('uses error field when message is absent', async () => {
       const { api: freshApi } = await getFreshApi();
 
@@ -811,6 +838,30 @@ describe('api methods', () => {
       const result = await freshApi.validateGlobalPin('9999');
       expect(result.success).toBe(false);
       expect(result.error).toBe('Ungültiger PIN. Bitte erneut versuchen.');
+    });
+
+    // Phoenix slice 3841-b rejects an unreadable/empty school PIN with the
+    // same established refusal, so deployed kiosks need no wire transition.
+    it('rejects the shared PIN refusal envelope without successful login data', async () => {
+      const { api: freshApi } = await getFreshApi();
+      mockFetch.mockResolvedValueOnce(
+        mockResponse(
+          {
+            type: 'about:blank',
+            title: 'Unauthorized',
+            status: 401,
+            detail: 'invalid staff PIN',
+            instance: '/api/iot/ping',
+            code: 'iot.device_pin_invalid',
+            errors: [],
+            details: {},
+          },
+          { status: 401, statusText: 'Unauthorized', ok: false }
+        )
+      );
+      const result = await freshApi.validateGlobalPin('1234');
+      expect(result).toEqual({ success: false, error: 'Ungültiger PIN. Bitte erneut versuchen.' });
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('returns failure on network error', async () => {

@@ -8,6 +8,7 @@
 
 import type { SessionSettings } from '../../services/sessionStorage';
 import type { NfcScanEvent, PlatformAdapter } from '../adapter';
+import { readDeviceCredential } from '../shared/deviceCredential';
 import {
   clearLastSessionFromLocalStorage,
   loadSessionSettingsFromLocalStorage,
@@ -52,7 +53,7 @@ class BrowserAdapter implements PlatformAdapter {
   }
 
   getDeviceApiKey(): string {
-    const urlKey = new URLSearchParams(window.location.search).get('key');
+    const urlKey = readDeviceCredential();
     return urlKey ?? (import.meta.env.VITE_DEVICE_API_KEY as string) ?? 'dev-key';
   }
 
@@ -74,6 +75,7 @@ class BrowserAdapter implements PlatformAdapter {
   }
 
   async restartApp(): Promise<void> {
+    readDeviceCredential();
     window.location.reload();
   }
 }
