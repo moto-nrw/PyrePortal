@@ -3099,3 +3099,65 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     expect(screen.getByText('Du bist jetzt in Toilette')).toBeInTheDocument();
   });
 });
+
+describe('Scan page receipt and start count', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockRfidHookReturn = {
+      isScanning: false,
+      currentScan: null,
+      showModal: false,
+      startScanning: mockStartScanning,
+      stopScanning: mockStopScanning,
+    };
+    useUserStore.setState({ ...useUserStore.getInitialState(), ...defaultStoreState });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows the receipt at full strength without a fade and no result before the server answers', () => {
+    useUserStore.setState({
+      rfid: { ...defaultRfidState, processingQueue: new Set(['04:AA:BB:CC:DD:EE:FF']) },
+    });
+
+    renderPage();
+
+    const indicator = screen.getByTestId('rfid-processing-indicator');
+    expect(indicator).toHaveStyle({ opacity: '1' });
+    expect(indicator.style.transition).toBe('');
+    expect(screen.getByText('0')).toHaveStyle({ opacity: '0' });
+    expect(document.querySelector('dialog[open]')).toBeNull();
+  });
+
+  it('hides the receipt while no scan is processing', () => {
+    renderPage();
+
+    expect(screen.getByTestId('rfid-processing-indicator')).toHaveStyle({ opacity: '0' });
+    expect(screen.getByText('0')).toHaveStyle({ opacity: '1' });
+  });
+
+  it('starts with the count of the stored session and lets the poll correct it', async () => {
+    let answerPoll: (session: CurrentSession) => void = () => {};
+    mockedApi.getCurrentSession.mockReturnValueOnce(
+      new Promise(resolve => {
+        answerPoll = resolve;
+      })
+    );
+    useUserStore.setState({
+      currentSession: { ...defaultStoreState.currentSession, active_students: 12 },
+    });
+
+    renderPage();
+
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+
+    await act(async () => {
+      answerPoll(makeCurrentSession({ active_students: 13 }));
+    });
+
+    expect(screen.getByText('13')).toBeInTheDocument();
+  });
+});

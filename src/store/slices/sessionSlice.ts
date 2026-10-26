@@ -445,20 +445,16 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           duration: session.duration,
         });
 
-        // Resolve activity and room data using extracted helpers
-        const currentSelectedActivity = get().selectedActivity;
-        const sessionActivity = await resolveSessionActivity(
-          session,
-          currentSelectedActivity,
-          authenticatedUser.pin,
-          authenticatedUser.staffName
-        );
-        const sessionRoom = await resolveSessionRoom(
-          session,
-          get().selectedRoom,
-          get().rooms,
-          authenticatedUser.pin
-        );
+        // Resolve activity and room data in parallel; neither helper throws.
+        const [sessionActivity, sessionRoom] = await Promise.all([
+          resolveSessionActivity(
+            session,
+            get().selectedActivity,
+            authenticatedUser.pin,
+            authenticatedUser.staffName
+          ),
+          resolveSessionRoom(session, get().selectedRoom, get().rooms, authenticatedUser.pin),
+        ]);
 
         if (!isFetchStillCurrent()) {
           storeLogger.warn('Discarding stale fetchCurrentSession result after room lookup');

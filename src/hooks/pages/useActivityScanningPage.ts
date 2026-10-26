@@ -147,8 +147,9 @@ export function useActivityScanningPage() {
     }
   }, [currentSession, selectedRoom, fetchCurrentSession]);
 
-  // Track student count based on check-ins
-  const [studentCount, setStudentCount] = useState(0);
+  // Track student count based on check-ins. Start from the session the store
+  // already knows; the poll and authoritative scan counts correct it.
+  const [studentCount, setStudentCount] = useState(() => currentSession?.active_students ?? 0);
 
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
@@ -475,7 +476,6 @@ export function useActivityScanningPage() {
 
     if (isPickupQueryLoading) {
       logger.warn('Pickup query loading timed out, showing timeout error before reset', {
-        tagId: rfid.pickupQueryTagId,
         scanContextId: rfid.scanContextId,
       });
 
@@ -563,10 +563,7 @@ export function useActivityScanningPage() {
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
-      rfid: activeState.rfid,
-      studentName: activeState.studentName,
-    });
+    logger.info('Student confirmed nach Hause - calling confirm_daily_checkout');
 
     try {
       const response = await Promise.race([
@@ -612,7 +609,6 @@ export function useActivityScanningPage() {
       }
     } catch (error) {
       logger.error('Failed to confirm daily checkout', {
-        rfid: activeState.rfid,
         error: error instanceof Error ? error.message : String(error),
       });
       if (!isActiveDestination(activeState)) return;

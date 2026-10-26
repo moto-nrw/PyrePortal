@@ -170,12 +170,12 @@ export const useRfidScanning = () => {
 
       // Fast path for already-authenticated supervisors
       if (isActiveSupervisor(tagId)) {
-        logger.info('Active supervisor tag detected, redirecting immediately', { tagId });
+        logger.debug('Active supervisor tag detected, redirecting immediately', { tagId });
         showSupervisorRedirect();
         return;
       }
 
-      logger.info('Processing RFID scan', { tagId });
+      logger.debug('Processing RFID scan', { tagId });
 
       // Handle duplicate prevention (Layer 1: processing queue)
       if (!canProcessTag(tagId)) {
@@ -192,7 +192,7 @@ export const useRfidScanning = () => {
         isInProcessingQueue = true;
         recordTagScan(tagId, { timestamp: Date.now() });
 
-        logger.info('Starting network scan (cache disabled)');
+        logger.debug('Starting network scan (cache disabled)');
 
         // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
@@ -203,7 +203,6 @@ export const useRfidScanning = () => {
 
         logger.info('RFID scan completed via server', {
           action: result.action,
-          studentName: result.student_name,
           responseTime: Date.now() - startTime,
         });
 
@@ -305,7 +304,7 @@ export const useRfidScanning = () => {
 
       processedScanIds.set(scanKey, now);
 
-      logger.info('RFID scan event received', { tagId, scanId });
+      logger.debug('RFID scan event received', { tagId, scanId });
       void processScan(tagId);
     },
     [processScan]
