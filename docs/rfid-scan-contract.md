@@ -43,6 +43,32 @@ success confirms the backend has already stored the supervisor assignment.
 replace the source room's count. Existing display-only optimistic deltas
 remain when a count is missing; they never determine an attendance write.
 
+## A scan keeps the session alive (project-phoenix #5004)
+
+A successful student scan refreshes the device's running session, the session
+`POST /api/iot/session/activity` refreshes, in the scan's own request
+transaction. After such a scan the kiosk needs no activity call. This covers
+`POST /api/iot/checkin` with a student card in both presence modes (check-in,
+checkout with or without `room_id`, room change, a check-in into a room that is
+not the kiosk's own, such as WC) and `POST /api/iot/pickup-query`.
+
+Exempt, with the session left as it was:
+
+- a supervisor card (`supervisor_authenticated`);
+- a refused scan (every error status);
+- a device without a running session (nothing to keep alive; the scan still
+  answers as before).
+
+A failed refresh only logs on the server and keeps the scan's writes; only a
+failure of Phoenix's transaction savepoint itself fails the scan, as a server
+error the kiosk already handles. `POST /api/iot/session/activity` itself is
+unchanged and stays the call for everything outside this promise.
+
+Source of truth: project-phoenix `docs/agents/contracts.md`, "A scan keeps the
+session alive". Deploy Phoenix (moto-nrw/project-phoenix#5040) first. Until
+moto-nrw/PyrePortal#479 drops it, the kiosk still sends the activity call after
+a scan; the call is redundant but harmless.
+
 ## Released rooms as destinations (project-phoenix #3067)
 
 `GET /api/iot/rooms/available` flags `is_open_room` and `is_schulhof`. The
