@@ -96,9 +96,9 @@ async function startScan(tagId: string) {
     onScan({ tagId, scanId: ++scanId });
     await vi.advanceTimersByTimeAsync(0);
   });
-  return async (activeStudents: number) => {
+  return async (activeStudents?: number) => {
     await act(async () => {
-      reply.resolve(checkIn(activeStudents));
+      reply.resolve({ ...checkIn(activeStudents ?? 0), active_students: activeStudents });
       await vi.advanceTimersByTimeAsync(0);
     });
   };
@@ -166,6 +166,42 @@ describe('useActivityScanningPage student count order', () => {
 
     await answerScanA(13);
     expect(result.current.studentCount).toBe(14);
+  });
+
+  it('applies both legacy check-in deltas when answers arrive in reverse order only once', async () => {
+    const { result } = await renderPage();
+
+    const answerScanA = await startScan('04:AA:AA:AA:AA:AA:01');
+    const answerScanB = await startScan('04:BB:BB:BB:BB:BB:02');
+    await answerScanB();
+    expect(result.current.studentCount).toBe(11);
+
+    await answerScanA();
+    expect(result.current.studentCount).toBe(12);
+
+    const scanResult = useUserStore.getState().rfid.currentScan;
+    await act(async () => useUserStore.getState().hideScanModal());
+    await act(async () => {
+      useUserStore.getState().setScanResult(scanResult);
+      useUserStore.getState().showScanModal();
+    });
+    expect(result.current.studentCount).toBe(12);
+  });
+
+  it('discards a legacy delta from the previous count scope', async () => {
+    const { result } = await renderPage();
+    const answerScanA = await startScan('04:AA:AA:AA:AA:AA:01');
+    holdNextPoll();
+    await act(async () => {
+      useUserStore.setState({
+        selectedActivity: { ...useUserStore.getState().selectedActivity!, id: 2 },
+        currentSession: session({ active_group_id: 200, activity_id: 2, active_students: 3 }),
+      });
+    });
+    expect(result.current.studentCount).toBe(3);
+
+    await answerScanA();
+    expect(result.current.studentCount).toBe(3);
   });
 
   it('keeps the count of a newer poll when an earlier scan answers late', async () => {
