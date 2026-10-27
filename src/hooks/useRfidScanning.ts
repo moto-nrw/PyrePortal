@@ -8,6 +8,7 @@ import {
 } from '../dev/mockScanSource';
 import { isRealScanningEnabled } from '../platform/adapter';
 import type { NfcScanEvent } from '../platform/adapter';
+import { countScopeOf } from '../services/activityScanningRules';
 import { api } from '../services/api';
 import type { RfidScanResult } from '../services/api';
 import {
@@ -142,6 +143,7 @@ export const useRfidScanning = () => {
         lockPickupQueryTag(tagId);
         addToProcessingQueue(tagId);
         const requestSequence = nextRequestSequence();
+        const requestScope = countScopeOf(currentState);
         if (freshRfid.scanMode === 'pickupQueryTimedOut') {
           showScanModal();
         }
@@ -156,7 +158,7 @@ export const useRfidScanning = () => {
             return;
           }
 
-          setScanResult({ ...outcome.result, requestSequence });
+          setScanResult({ ...outcome.result, requestSequence, requestScope });
           showScanModal();
 
           if (outcome.status === 'success') {
@@ -188,6 +190,7 @@ export const useRfidScanning = () => {
       let isInProcessingQueue = false;
       const startTime = Date.now();
       const requestSequence = nextRequestSequence();
+      const requestScope = countScopeOf(currentState);
 
       try {
         // Initialize scan tracking inside try so finally can reliably clean up.
@@ -211,7 +214,7 @@ export const useRfidScanning = () => {
 
         // Include scannedTagId so ActivityScanningPage can use it directly
         // instead of looking it up from recentTagScans (fixes race condition)
-        setScanResult({ ...result, scannedTagId: tagId, requestSequence });
+        setScanResult({ ...result, scannedTagId: tagId, requestSequence, requestScope });
 
         // Handle supervisor authentication (handled outcomes end the scan here)
         const supervisorOutcome = evaluateSupervisorScan({
@@ -247,7 +250,7 @@ export const useRfidScanning = () => {
         await updateSessionActivityQuietly(freshUser.pin, 'scan');
       } catch (error) {
         logger.error('Failed to process RFID scan', { error: serializeError(error) });
-        const errorResult = { ...createScanErrorResult(error), requestSequence };
+        const errorResult = { ...createScanErrorResult(error), requestSequence, requestScope };
         setScanResult(errorResult);
         showScanModal();
 

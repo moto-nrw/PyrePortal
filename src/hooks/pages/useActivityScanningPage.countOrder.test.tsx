@@ -168,7 +168,7 @@ describe('useActivityScanningPage student count order', () => {
     expect(result.current.studentCount).toBe(14);
   });
 
-  it('applies both legacy check-in deltas when answers arrive in reverse order only once', async () => {
+  it('applies a legacy delta only onto a count older than its scan, and only once', async () => {
     const { result } = await renderPage();
 
     const answerScanA = await startScan('04:AA:AA:AA:AA:AA:01');
@@ -176,8 +176,9 @@ describe('useActivityScanningPage student count order', () => {
     await answerScanB();
     expect(result.current.studentCount).toBe(11);
 
+    // A started before the value B produced; the next poll counts A in.
     await answerScanA();
-    expect(result.current.studentCount).toBe(12);
+    expect(result.current.studentCount).toBe(11);
 
     const scanResult = useUserStore.getState().rfid.currentScan;
     await act(async () => useUserStore.getState().hideScanModal());
@@ -185,7 +186,36 @@ describe('useActivityScanningPage student count order', () => {
       useUserStore.getState().setScanResult(scanResult);
       useUserStore.getState().showScanModal();
     });
-    expect(result.current.studentCount).toBe(12);
+    expect(result.current.studentCount).toBe(11);
+  });
+
+  it('does not add a legacy delta onto a newer poll that already counts the booking', async () => {
+    const { result } = await renderPage();
+
+    const answerScan = await startScan('04:AA:AA:AA:AA:AA:01');
+    mockedApi.getCurrentSession.mockResolvedValueOnce(session({ active_students: 11 }));
+    await nextPollTick();
+    expect(result.current.studentCount).toBe(11);
+
+    await answerScan();
+    expect(result.current.studentCount).toBe(11);
+  });
+
+  it('discards a scan answer that started before the page was opened again', async () => {
+    const firstVisit = await renderPage();
+    const answerScan = await startScan('04:AA:AA:AA:AA:AA:01');
+    firstVisit.unmount();
+
+    useUserStore.setState({
+      selectedActivity: { ...useUserStore.getState().selectedActivity!, id: 3, name: 'Lese-AG' },
+      currentSession: session({ active_group_id: 300, activity_id: 3, active_students: 3 }),
+    });
+    holdNextPoll();
+    const { result } = await renderPage();
+    expect(result.current.studentCount).toBe(3);
+
+    await answerScan(13);
+    expect(result.current.studentCount).toBe(3);
   });
 
   it('discards a legacy delta from the previous count scope', async () => {

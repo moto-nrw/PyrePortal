@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router';
 
 import {
+  countScopeOf,
   createPickupQueryTimeoutResult,
   getCheckinCountDelta,
   getCheckoutCountDelta,
@@ -23,7 +24,7 @@ import { selectOpenRoomDestinations } from '../../services/checkoutDestinationSe
 import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 import { createLogger, serializeError } from '../../utils/logger';
-import { nextRequestSequence } from '../../utils/requestSequence';
+import { currentRequestSequence, nextRequestSequence } from '../../utils/requestSequence';
 import { useRfidScanning } from '../useRfidScanning';
 
 import { BOOKING_TIMEOUT_MS, useCheckoutDestination } from './useCheckoutDestination';
@@ -152,27 +153,17 @@ export function useActivityScanningPage() {
   // already knows; the poll and authoritative scan counts correct it.
   const [studentCount, setStudentCount] = useState(() => currentSession?.active_students ?? 0);
 
-  // Every source of the count (scan answer, poll) is stamped with
-  // nextRequestSequence() when its request starts. An absolute count applies when
-  // its request started after the one behind the shown value; the store's
-  // start value counts as oldest.
-  const appliedCountSequenceRef = useRef(0);
-  const countScopeStartRef = useRef(0);
-  const appliedDeltaScansRef = useRef(new WeakSet<ExtendedScanResult>());
-  const applyStudentCount = (sequence: number, next: number): boolean => {
+  // Every source of the count (scan answer, poll) is stamped with the global
+  // nextRequestSequence() when its request starts. An answer, absolute count
+  // or legacy delta alike, applies only when its request started after the one
+  // behind the shown value. The shown value starts at the sequence of mount
+  // time, so requests started before this page are discarded.
+  const appliedCountSequenceRef = useRef(currentRequestSequence());
+  const applyStudentCount = (sequence: number, next: SetStateAction<number>): boolean => {
     if (sequence <= appliedCountSequenceRef.current) return false;
     appliedCountSequenceRef.current = sequence;
     setStudentCount(next);
     return true;
-  };
-
-  // Deltas are independent bookings, not snapshots. Keep their scope guard and
-  // deduplication separate from the ordering of absolute counts.
-  const applyStudentDelta = (sequence: number, scan: ExtendedScanResult, delta: number) => {
-    if (sequence <= countScopeStartRef.current || appliedDeltaScansRef.current.has(scan)) return;
-    appliedDeltaScansRef.current.add(scan);
-    appliedCountSequenceRef.current = Math.max(appliedCountSequenceRef.current, sequence);
-    setStudentCount(prev => Math.max(0, prev + delta));
   };
 
   // Schulhof room ID (discovered dynamically from server)
@@ -291,12 +282,13 @@ export function useActivityScanningPage() {
     if (!authenticatedUser?.pin) return;
 
     const sequence = nextRequestSequence();
+    const scope = countScopeOf(useUserStore.getState());
     try {
       const session = await api.getCurrentSession(authenticatedUser.pin);
       logger.debug('Session info received', { session });
 
       const count = session?.active_students ?? 0;
-      if (!applyStudentCount(sequence, count)) {
+      if (countScopeOf(useUserStore.getState()) !== scope || !applyStudentCount(sequence, count)) {
         logger.debug('Discarding session count older than the shown count', { count });
         return;
       }
@@ -326,15 +318,13 @@ export function useActivityScanningPage() {
 
   // A new activity, room or session starts the count over: answers to requests
   // started before the change belong to the old one and are discarded.
-  const countScopeKey = `${selectedActivity?.id}:${selectedRoom?.id}:${currentSession?.active_group_id}`;
+  const countScopeKey = countScopeOf({ selectedActivity, selectedRoom, currentSession });
   const countScopeKeyRef = useRef(countScopeKey);
   useEffect(() => {
     if (countScopeKeyRef.current === countScopeKey) return;
     countScopeKeyRef.current = countScopeKey;
     logger.debug('Count scope changed, discarding older count answers');
-    countScopeStartRef.current = nextRequestSequence();
-    appliedDeltaScansRef.current = new WeakSet();
-    applyStudentCount(countScopeStartRef.current, currentSession?.active_students ?? 0);
+    applyStudentCount(nextRequestSequence(), currentSession?.active_students ?? 0);
     void fetchSessionInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countScopeKey]);
@@ -432,9 +422,13 @@ export function useActivityScanningPage() {
 
     // Use authoritative server count when available, otherwise fall back to optimistic delta
     const hasAuthoritativeCount = currentScan.active_students != null;
-    // Kiosk requests attach their start sequence; a result without one is
-    // ordered as if it started now.
+    // Kiosk requests attach their start sequence and scope; a result without
+    // them is ordered as if it started now in the current scope.
     const scanSequence = currentScan.requestSequence ?? nextRequestSequence();
+    const isOwnScope = (currentScan.requestScope ?? countScopeKey) === countScopeKey;
+    const applyScanCount = (next: SetStateAction<number>) => {
+      if (isOwnScope) applyStudentCount(scanSequence, next);
+    };
 
     // Run action-specific side effects (e.g. checkout destination state) regardless of count source
     switch (currentScan.action) {
@@ -442,7 +436,7 @@ export function useActivityScanningPage() {
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
           const delta = getCheckinCountDelta(extendedScan);
-          if (delta !== 0) applyStudentDelta(scanSequence, extendedScan, delta);
+          if (delta !== 0) applyScanCount(prev => Math.max(0, prev + delta));
         }
         break;
       case 'checked_out_daily':
@@ -459,14 +453,14 @@ export function useActivityScanningPage() {
         const delta = getCheckoutCountDelta();
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount && delta !== 0)
-          applyStudentDelta(scanSequence, extendedScan, delta);
+          applyScanCount(prev => Math.max(0, prev + delta));
         break;
       }
       case 'transferred':
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
           const delta = getTransferCountDelta(currentScan, selectedRoom?.name);
-          if (delta !== 0) applyStudentDelta(scanSequence, extendedScan, delta);
+          if (delta !== 0) applyScanCount(prev => Math.max(0, prev + delta));
         }
         break;
     }
@@ -474,7 +468,7 @@ export function useActivityScanningPage() {
     // Apply authoritative count after side effects
     // Skip for Schulhof scans: active_students refers to the Schulhof room, not our room
     if (shouldApplyAuthoritativeCount(extendedScan)) {
-      applyStudentCount(scanSequence, currentScan.active_students!);
+      applyScanCount(currentScan.active_students!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows

@@ -931,6 +931,8 @@ export interface RfidScanResult extends Omit<RfidScanResponse, 'action'> {
   scannedTagId?: string;
   /** Order of the request that produced this result (`nextRequestSequence`), attached by the kiosk. */
   requestSequence?: number;
+  /** `countScopeOf` the store when that request started, attached by the kiosk. */
+  requestScope?: string;
 }
 
 /**
