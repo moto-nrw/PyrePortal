@@ -102,16 +102,12 @@ function TeamManagementPage() {
     freezeSortOrder();
 
     logger.info('Toggling supervisor selection', {
-      username: user.name,
-      userId: user.id,
       wasSelected: selectedSupervisors.some(s => s.id === user.id),
     });
 
     toggleSupervisor(user);
 
     logUserAction('team_supervisor_toggle', {
-      username: user.name,
-      userId: user.id,
       selected: !selectedSupervisors.some(s => s.id === user.id),
     });
   };
@@ -127,13 +123,11 @@ function TeamManagementPage() {
     setIsSaving(true);
     logger.info('Saving team supervisors', {
       count: selectedSupervisors.length,
-      supervisors: selectedSupervisors.map(s => ({ id: s.id, name: s.name })),
       hasActiveSession: !!currentSession,
     });
 
     logUserAction('team_supervisors_save', {
       count: selectedSupervisors.length,
-      supervisorIds: selectedSupervisors.map(s => s.id),
       hasActiveSession: !!currentSession,
     });
 

@@ -385,7 +385,12 @@ export const api = {
    * Endpoint: POST /api/iot/session/start
    */
   async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
-    logger.info('Starting session', { ...request });
+    logger.info('Starting session', {
+      activityId: request.activity_id,
+      roomId: request.room_id,
+      supervisorCount: request.supervisor_ids.length,
+      force: request.force,
+    });
 
     const response = await apiCall<{
       status: string;

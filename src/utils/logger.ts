@@ -123,6 +123,96 @@ export function serializeError(error: unknown): Record<string, unknown> {
   return { message: String(error) };
 }
 
+// Keys whose values name or identify a person or a wristband. Compared in
+// lowercase without "_" or "-". Entries above DEBUG are persisted on the
+// device, so these values only survive at DEBUG (off in production).
+const PERSONAL_DATA_KEYS = new Set([
+  'availableusers',
+  'displayname',
+  'entityname',
+  'firstname',
+  'fullname',
+  'lastname',
+  'newrfid',
+  'oldrfid',
+  'personid',
+  'pickupquerytagid',
+  'previoustag',
+  'rfid',
+  'savedids',
+  'scannedtag',
+  'scannedtagid',
+  'selectedsupervisors',
+  'staffid',
+  'staffids',
+  'staffname',
+  'studentid',
+  'studentids',
+  'studentname',
+  'studentrfid',
+  'supervisorid',
+  'supervisorids',
+  'supervisorname',
+  'supervisors',
+  'tagid',
+  'tagids',
+  'teacherid',
+  'teacherids',
+  'uid',
+  'userid',
+  'username',
+  'users',
+]);
+
+// RFID UIDs as normalized by the platform adapters (e.g. 04:D6:94:82:97:6A:80).
+const TAG_ID_PATTERN = /\b[0-9a-f][0-9a-f](?::[0-9a-f][0-9a-f]){3,}\b/gi;
+
+const MAX_REDACTION_DEPTH = 8;
+
+const REDACTED = '[redacted]';
+
+const isPersonalDataKey = (key: string): boolean =>
+  PERSONAL_DATA_KEYS.has(key.replace(/[_-]/g, '').toLowerCase());
+
+const redactValue = (value: unknown, depth: number, seen: WeakSet<object>): unknown => {
+  if (typeof value === 'string') {
+    return value.replace(TAG_ID_PATTERN, REDACTED);
+  }
+  if (value === null || typeof value !== 'object' || value instanceof Date) {
+    return value;
+  }
+  if (value instanceof Error) {
+    return redactValue(serializeError(value), depth, seen);
+  }
+  if (depth >= MAX_REDACTION_DEPTH || seen.has(value)) {
+    return REDACTED;
+  }
+  seen.add(value);
+  if (Array.isArray(value)) {
+    return value.map(item => redactValue(item, depth + 1, seen));
+  }
+  // Maps, Sets and class instances may hold tags or people in ways keys cannot show.
+  const prototype: unknown = Object.getPrototypeOf(value);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return REDACTED;
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [
+      key,
+      isPersonalDataKey(key) ? REDACTED : redactValue(entry, depth + 1, seen),
+    ])
+  );
+};
+
+/**
+ * Remove names, wristband tag IDs and person IDs from log data.
+ * Applied to every entry above DEBUG before it reaches memory, console or
+ * the persisted device log.
+ */
+function redactPersonalData(data: Record<string, unknown>): Record<string, unknown> {
+  return redactValue(data, 0, new WeakSet()) as Record<string, unknown>;
+}
+
 /**
  * Logger class for PyrePortal application
  */
@@ -251,15 +341,16 @@ class Logger {
 
     const timestamp = new Date().toISOString();
     const levelName = LogLevel[level];
+    const keepsPersonalData = level === LogLevel.DEBUG;
 
     // Create log entry
     const logEntry: LogEntry = {
       timestamp,
       level: levelName,
       source: this.source,
-      message,
+      message: keepsPersonalData ? message : message.replace(TAG_ID_PATTERN, REDACTED),
       sessionId: this.sessionId,
-      ...(data && { data }),
+      ...(data && { data: keepsPersonalData ? data : redactPersonalData(data) }),
       ...this.config.contextInfo,
     };
 

@@ -295,8 +295,8 @@ const resolveSupervisorsForSession = async (
 
   if (supervisors.length === 0) {
     storeLogger.warn('No valid supervisors found', {
-      savedIds: supervisorIds,
-      availableUsers: usersToSearch.map(u => u.id),
+      savedCount: supervisorIds.length,
+      availableCount: usersToSearch.length,
     });
     throw new SessionValidationError('supervisors_invalid', 'Keine gültigen Betreuer gefunden');
   }
@@ -581,10 +581,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         // Create new fetch promise
         fetchPromise = (async () => {
           try {
-            storeLogger.info('Fetching activities from API', {
-              staffId: authenticatedUser.staffId,
-              staffName: authenticatedUser.staffName,
-            });
+            storeLogger.info('Fetching activities from API');
 
             const activitiesData = await api.getActivities(authenticatedUser.pin);
 
@@ -598,10 +595,7 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
 
-            storeLogger.error('Failed to fetch activities', {
-              error: errorMessage,
-              staffId: authenticatedUser.staffId,
-            });
+            storeLogger.error('Failed to fetch activities', { error: errorMessage });
 
             set({
               error: mapApiErrorToGerman(error),
@@ -831,20 +825,14 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
       }
 
       try {
-        storeLogger.info('Submitting daily feedback', {
-          studentId,
-          rating,
-        });
+        storeLogger.info('Submitting daily feedback', { rating });
 
         await api.submitDailyFeedback(authenticatedUser.pin, {
           student_id: studentId,
           value: rating,
         });
 
-        storeLogger.info('Daily feedback submitted successfully', {
-          studentId,
-          rating,
-        });
+        storeLogger.info('Daily feedback submitted successfully', { rating });
 
         return true;
       } catch (error) {

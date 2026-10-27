@@ -4,7 +4,7 @@
  * The global test setup mocks ../utils/logger, so we must unmock it here
  * and mock only the platform adapter (which logger imports for persistLog).
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it, vi, beforeEach, onTestFinished } from 'vitest';
 
 // Unmock the logger so we test the real implementation
 vi.unmock('../utils/logger');
@@ -28,6 +28,7 @@ const {
   logNavigation,
   logError,
   getRuntimeConfig,
+  logger: appLogger,
 } = await import('./logger');
 
 beforeEach(() => {
@@ -397,5 +398,116 @@ describe('convenience functions', () => {
   it('logError logs error details', () => {
     const err = new Error('test');
     expect(() => logError(err, 'test context')).not.toThrow();
+  });
+});
+
+describe('personal data in logs above DEBUG', () => {
+  const TAG = '04:D6:94:82:97:6A:80';
+
+  const createPersistingLogger = () => {
+    const log = createLogger('RedactionTest', {
+      level: LogLevel.DEBUG,
+      persistLevel: LogLevel.DEBUG,
+      persist: true,
+      consoleOutput: false,
+    });
+    log.clearInMemoryLogs();
+    return log;
+  };
+
+  const persistedEntries = async (count: number) => {
+    await vi.waitFor(() => {
+      expect(mockPersistLog).toHaveBeenCalledTimes(count);
+    });
+    return mockPersistLog.mock.calls.map(
+      ([entry]) => JSON.parse(entry) as { level: string; message: string; data?: unknown }
+    );
+  };
+
+  it.each(['info', 'warn', 'error'] as const)(
+    'redacts names, tag IDs and person IDs at %s before persisting',
+    async level => {
+      const log = createPersistingLogger();
+
+      log[level](`Scan ${TAG} failed`, {
+        studentName: 'Mila Beispiel',
+        staff_name: 'Jona Beispiel',
+        tagId: TAG,
+        student_rfid: TAG,
+        studentId: 98765,
+        supervisorIds: [7, 8],
+        endpoint: `/api/iot/rfid/${TAG}`,
+        errorDetails: { student_id: 98765, student_name: 'Mila Beispiel', room_name: 'Raum A' },
+        supervisors: [{ id: 7, name: 'Jona Beispiel' }],
+        error: new Error(`Tag ${TAG} unknown`),
+        action: 'checked_in',
+        roomId: 10,
+        count: 2,
+      });
+
+      const [entry] = await persistedEntries(1);
+      const text = JSON.stringify(entry);
+      expect(text).not.toContain(TAG);
+      expect(text).not.toContain('Mila');
+      expect(text).not.toContain('Jona');
+      expect(text).not.toContain('98765');
+      expect(entry.message).toBe('Scan [redacted] failed');
+      expect(entry.data).toMatchObject({
+        studentName: '[redacted]',
+        staff_name: '[redacted]',
+        tagId: '[redacted]',
+        student_rfid: '[redacted]',
+        studentId: '[redacted]',
+        supervisorIds: '[redacted]',
+        endpoint: '/api/iot/rfid/[redacted]',
+        errorDetails: {
+          student_id: '[redacted]',
+          student_name: '[redacted]',
+          room_name: 'Raum A',
+        },
+        supervisors: '[redacted]',
+        error: { name: 'Error', message: 'Tag [redacted] unknown' },
+        action: 'checked_in',
+        roomId: 10,
+        count: 2,
+      });
+    }
+  );
+
+  it('keeps the data of DEBUG entries, which production does not persist', () => {
+    const log = createPersistingLogger();
+
+    log.debug('Processing RFID scan', { tagId: TAG, studentName: 'Mila Beispiel' });
+
+    expect(log.getInMemoryLogs()[0].data).toEqual({ tagId: TAG, studentName: 'Mila Beispiel' });
+  });
+
+  it('redacts the details of user actions', async () => {
+    appLogger.updateConfig({ level: LogLevel.NONE, persistLevel: LogLevel.INFO, persist: true });
+    onTestFinished(() => appLogger.updateConfig({ level: LogLevel.NONE, persist: false }));
+
+    logUserAction('entity_selection', { tagId: TAG, username: 'Jona Beispiel', type: 'student' });
+
+    const entries = await persistedEntries(1);
+    expect(entries[0].data).toEqual({
+      action: 'entity_selection',
+      tagId: '[redacted]',
+      username: '[redacted]',
+      type: 'student',
+    });
+  });
+
+  it('handles cyclic data and collections without exposing their contents', async () => {
+    const log = createPersistingLogger();
+    const cyclic: Record<string, unknown> = { roomId: 10 };
+    cyclic.self = cyclic;
+
+    log.info('Cyclic payload', { cyclic, queue: new Set([TAG]) });
+
+    const [entry] = await persistedEntries(1);
+    expect(entry.data).toEqual({
+      cyclic: { roomId: 10, self: '[redacted]' },
+      queue: '[redacted]',
+    });
   });
 });

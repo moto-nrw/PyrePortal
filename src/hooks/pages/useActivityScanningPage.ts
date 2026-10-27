@@ -634,10 +634,7 @@ export function useActivityScanningPage() {
 
     const { submitDailyFeedback } = useUserStore.getState();
 
-    logger.info('Submitting feedback', {
-      studentId: currentScan.student_id,
-      rating,
-    });
+    logger.info('Submitting feedback', { rating });
 
     // Guard against null student_id (shouldn't happen for real student scans)
     if (currentScan.student_id === null) {

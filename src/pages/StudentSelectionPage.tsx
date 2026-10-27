@@ -169,10 +169,7 @@ function StudentSelectionPage() {
         ? `student-${entity.data.student_id}`
         : `teacher-${entity.data.staff_id}`;
 
-    logger.info('Entity selected', {
-      type: entity.type,
-      id: entityId,
-    });
+    logger.info('Entity selected', { type: entity.type });
 
     setSelectedEntityId(entityId);
 
