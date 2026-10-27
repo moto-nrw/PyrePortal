@@ -231,6 +231,8 @@ export function useActivityScanningPage() {
   // Clear stale checkout/feedback/farewell state when a new scan arrives.
   // A "new scan" is detected by: different RFID tag, different visit_id, or
   // a check-in arriving while we're in a checkout flow (always means new scan).
+  // An error or info result ends the flow too: feedback and farewell would
+  // otherwise hide it, such as the notice of a timed-out scan (#479).
   useEffect(() => {
     if (!currentScan || !checkoutDestinationState) return;
 
@@ -241,14 +243,17 @@ export function useActivityScanningPage() {
       currentScan.visit_id != null &&
       currentScan.visit_id !== feedbackVisitIdRef.current;
     const isCheckinDuringCheckoutFlow = currentScan.action === 'checked_in';
+    const isNotice = isNonActionableScan(currentScan);
 
-    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow) {
+    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow || isNotice) {
       logger.debug('Clearing stale checkout state for new scan', {
         reason: isDifferentTag
           ? 'different_tag'
           : isDifferentVisit
             ? 'different_visit'
-            : 'checkin_during_checkout',
+            : isCheckinDuringCheckoutFlow
+              ? 'checkin_during_checkout'
+              : 'notice',
         oldRfid: checkoutDestinationState.rfid,
         newRfid: currentRfid,
         newAction: currentScan.action,

@@ -110,6 +110,12 @@ server may have booked it, and a second scan could undo the booking. The kiosk
 aborts the request, frees the tag and the queue, and never retries; an answer
 after the deadline is not shown.
 
+The notice is the newest scan result and replaces whatever is on screen. An
+error or info result ends an open checkout flow (destination chooser, feedback,
+farewell), so neither this notice nor another refused scan is hidden behind
+that view. A destination booking still in flight then is not shown, as after
+any new scan.
+
 The existing home-confirmation failure behavior intentionally remains:
 feedback or farewell continues using the scan's feedback flag. Changing that
 behavior requires a separate product decision.
