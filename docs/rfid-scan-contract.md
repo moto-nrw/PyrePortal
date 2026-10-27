@@ -65,9 +65,10 @@ error the kiosk already handles. `POST /api/iot/session/activity` itself is
 unchanged and stays the call for everything outside this promise.
 
 Source of truth: project-phoenix `docs/agents/contracts.md`, "A scan keeps the
-session alive". Deploy Phoenix (moto-nrw/project-phoenix#5040) first. Until
-moto-nrw/PyrePortal#479 drops it, the kiosk still sends the activity call after
-a scan; the call is redundant but harmless.
+session alive". Since moto-nrw/PyrePortal#479 the kiosk sends no activity call
+after a scan or a pickup query: each scan is one request. This needs Phoenix
+with moto-nrw/project-phoenix#5040 (release 1.2.0); with an older backend,
+scans no longer keep the session alive.
 
 ## Released rooms as destinations (project-phoenix #3067)
 
@@ -102,6 +103,12 @@ translation, but text does not determine an attendance outcome.
 The processing queue and adapter scan IDs suppress concurrent duplicate
 hardware events, not legitimate sequential scans. Failed requests release the
 queue. No automatic attendance retry or background write is introduced.
+
+A `/api/iot/checkin` scan without an answer after 8 s (`SCAN_TIMEOUT_MS`) shows
+"Scan nicht bestätigt" and asks not to scan again but to ask the staff: the
+server may have booked it, and a second scan could undo the booking. The kiosk
+aborts the request, frees the tag and the queue, and never retries; an answer
+after the deadline is not shown.
 
 The existing home-confirmation failure behavior intentionally remains:
 feedback or farewell continues using the scan's feedback flag. Changing that

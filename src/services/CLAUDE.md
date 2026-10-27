@@ -120,7 +120,9 @@ API calls report network quality through the callback registered by the app. Thi
 
 ## Timeout Prevention
 
-Session timeout prevention runs through keepalive calls such as:
+A successful student scan and a pickup query keep the session alive in the
+backend (project-phoenix #5004), so the scan flow sends no keepalive. Other
+flows that need one call:
 
 ```typescript
 await api.updateSessionActivity(pin);
