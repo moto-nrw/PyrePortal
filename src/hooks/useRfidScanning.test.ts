@@ -12,7 +12,7 @@ import {
 } from '../services/api';
 import { useUserStore } from '../store/userStore';
 
-import { useRfidScanning } from './useRfidScanning';
+import { SCAN_TIMEOUT_MS, useRfidScanning } from './useRfidScanning';
 
 // ====================================================================
 // Mock modules
@@ -729,7 +729,8 @@ describe('useRfidScanning', () => {
           room_id: 10,
         }),
         '1234',
-        7
+        7,
+        expect.any(AbortSignal)
       );
     });
 
@@ -755,7 +756,8 @@ describe('useRfidScanning', () => {
           room_id: 10,
         }),
         '1234',
-        undefined
+        undefined,
+        expect.any(AbortSignal)
       );
     });
 
@@ -793,8 +795,15 @@ describe('useRfidScanning', () => {
       expect(state.rfid.currentScan?.action).toBe('checked_out');
     });
 
-    it('calls updateSessionActivity after successful scan', async () => {
-      mockedProcessRfidScan.mockResolvedValue(makeCheckinResult());
+    // project-phoenix #5004: a successful student scan keeps the session alive.
+    it.each([
+      'checked_in',
+      'checked_out',
+      'checked_out_daily',
+      'transferred',
+      'no_action',
+    ] as const)('sends exactly one request for a %s scan', async action => {
+      mockedProcessRfidScan.mockResolvedValue(makeCheckinResult({ action }));
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -804,12 +813,15 @@ describe('useRfidScanning', () => {
 
       await triggerMockScanAndDrain();
 
-      expect(mockedUpdateSessionActivity).toHaveBeenCalledWith('1234');
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
+      expect(mockedUpdateSessionActivity).not.toHaveBeenCalled();
+      expect(useUserStore.getState().rfid.currentScan?.action).toBe(action);
     });
 
-    it('handles updateSessionActivity failure gracefully', async () => {
-      mockedProcessRfidScan.mockResolvedValue(makeCheckinResult());
-      mockedUpdateSessionActivity.mockRejectedValue(new Error('Activity update failed'));
+    it('sends no activity call after a supervisor or a refused scan', async () => {
+      mockedProcessRfidScan
+        .mockResolvedValueOnce(makeSupervisorResult(99, 'Herr Meier'))
+        .mockRejectedValueOnce(new Error('Scan refused'));
 
       const { result } = renderHook(() => useRfidScanning());
 
@@ -818,11 +830,15 @@ describe('useRfidScanning', () => {
       });
 
       await triggerMockScanAndDrain();
+      expect(useUserStore.getState().rfid.currentScan?.action).toBe('supervisor_authenticated');
 
-      // Should still show success modal despite activity update failure
-      const state = useUserStore.getState();
-      expect(state.rfid.showModal).toBe(true);
-      expect(state.rfid.currentScan?.action).toBe('checked_in');
+      useUserStore.getState().hideScanModal();
+      useUserStore.setState({ activeSupervisorTags: new Set<string>() });
+      await triggerMockScanAndDrain();
+      expect(useUserStore.getState().rfid.currentScan?.action).toBe('error');
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(2);
+      expect(mockedUpdateSessionActivity).not.toHaveBeenCalled();
     });
 
     it('shows session expired when no authenticated user', async () => {
@@ -1761,7 +1777,8 @@ describe('useRfidScanning', () => {
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
         '1234',
-        1
+        1,
+        expect.any(AbortSignal)
       );
     });
 
@@ -1826,12 +1843,14 @@ describe('useRfidScanning', () => {
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:AA:BB:CC:DD:EE:FF' }),
         '1234',
-        1
+        1,
+        expect.any(AbortSignal)
       );
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         expect.objectContaining({ student_rfid: '04:11:22:33:44:55:66' }),
         '1234',
-        1
+        1,
+        expect.any(AbortSignal)
       );
     });
   });
@@ -1961,6 +1980,121 @@ describe('useRfidScanning', () => {
   });
 
   // ------------------------------------------------------------------
+  // Scan timeout (PyrePortal #479)
+  // ------------------------------------------------------------------
+
+  describe('scan timeout', () => {
+    beforeEach(() => {
+      setRealScanning();
+      mockAdapterGetServiceStatus.mockResolvedValue({ is_running: true });
+      setAuthenticated();
+      setRoom();
+      setSession();
+    });
+
+    const startAndCaptureOnScan = async () => {
+      const { result } = renderHook(() => useRfidScanning());
+      await act(async () => {
+        await result.current.startScanning();
+      });
+      const lastStartCall =
+        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
+      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
+      expect(onScan).toBeDefined();
+      return onScan as (event: NfcScanEvent) => void;
+    };
+
+    const scanAndPassTimeout = async (onScan: (event: NfcScanEvent) => void, scanId: number) => {
+      await act(async () => {
+        onScan({ tagId: MOCK_TAG, scanId });
+        await vi.advanceTimersByTimeAsync(SCAN_TIMEOUT_MS);
+        await drainMicrotasks();
+      });
+    };
+
+    it('keeps the tag in processing until the timeout passes', async () => {
+      mockedProcessRfidScan.mockImplementation(() => new Promise<RfidScanResponse>(() => {}));
+      const onScan = await startAndCaptureOnScan();
+
+      await act(async () => {
+        onScan({ tagId: MOCK_TAG, scanId: 1 });
+        await vi.advanceTimersByTimeAsync(SCAN_TIMEOUT_MS - 1);
+      });
+
+      const state = useUserStore.getState().rfid;
+      expect(state.processingQueue.has(MOCK_TAG)).toBe(true);
+      expect(state.showModal).toBe(false);
+    });
+
+    it('ends a hanging scan with a not-confirmed notice, frees the tag and never retries', async () => {
+      mockedProcessRfidScan.mockImplementation(() => new Promise<RfidScanResponse>(() => {}));
+      const onScan = await startAndCaptureOnScan();
+
+      await scanAndPassTimeout(onScan, 1);
+
+      const state = useUserStore.getState().rfid;
+      expect(state.showModal).toBe(true);
+      expect(state.currentScan).toMatchObject({
+        student_name: 'Scan nicht bestätigt',
+        student_id: null,
+        action: 'error',
+        message: 'Bitte nicht noch einmal scannen. Bitte die Betreuung fragen.',
+        showAsError: true,
+      });
+      expect(state.processingQueue.size).toBe(0);
+      const signal = mockedProcessRfidScan.mock.calls[0]?.[3];
+      expect(signal?.aborted).toBe(true);
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(SCAN_TIMEOUT_MS * 4);
+      });
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(1);
+      expect(mockedUpdateSessionActivity).not.toHaveBeenCalled();
+    });
+
+    it('ignores an answer that arrives after the timeout', async () => {
+      let resolveLate: ((value: RfidScanResponse) => void) | undefined;
+      mockedProcessRfidScan.mockImplementationOnce(
+        () =>
+          new Promise<RfidScanResponse>(resolve => {
+            resolveLate = resolve;
+          })
+      );
+      const onScan = await startAndCaptureOnScan();
+
+      await scanAndPassTimeout(onScan, 1);
+      const notice = useUserStore.getState().rfid.currentScan;
+
+      await act(async () => {
+        resolveLate?.(makeCheckinResult({ active_students: 6 }));
+        await drainMicrotasks();
+      });
+
+      const state = useUserStore.getState().rfid;
+      expect(state.currentScan).toBe(notice);
+      expect(state.recentTagScans.get(MOCK_TAG)?.result).toBeUndefined();
+    });
+
+    it('processes a new scan of the same tag after the timeout', async () => {
+      mockedProcessRfidScan
+        .mockImplementationOnce(() => new Promise<RfidScanResponse>(() => {}))
+        .mockResolvedValueOnce(makeCheckinResult());
+      const onScan = await startAndCaptureOnScan();
+
+      await scanAndPassTimeout(onScan, 1);
+      useUserStore.getState().hideScanModal();
+
+      await act(async () => {
+        onScan({ tagId: MOCK_TAG, scanId: 2 });
+        await drainMicrotasks();
+      });
+
+      expect(mockedProcessRfidScan).toHaveBeenCalledTimes(2);
+      expect(useUserStore.getState().rfid.currentScan?.action).toBe('checked_in');
+    });
+  });
+
+  // ------------------------------------------------------------------
   // Pickup query mode
   // ------------------------------------------------------------------
 
@@ -2000,9 +2134,11 @@ describe('useRfidScanning', () => {
         await drainMicrotasks();
       });
 
+      expect(mockedQueryPickupInfo).toHaveBeenCalledTimes(1);
       expect(mockedQueryPickupInfo).toHaveBeenCalledWith({ student_rfid: MOCK_TAG }, '1234');
       expect(mockedProcessRfidScan).not.toHaveBeenCalled();
-      expect(mockedUpdateSessionActivity).toHaveBeenCalledWith('1234');
+      // project-phoenix #5004: the pickup query keeps the session alive.
+      expect(mockedUpdateSessionActivity).not.toHaveBeenCalled();
 
       const state = useUserStore.getState();
       expect(state.rfid.currentScan?.action).toBe('pickup_info');
@@ -2047,62 +2183,17 @@ describe('useRfidScanning', () => {
       expect(state.rfid.currentScan?.active_students).toBeUndefined();
     });
 
-    it('keeps the pickup result visible when pickup-query keepalive fails', async () => {
+    it('releases the pickup query tag as soon as the result is shown', async () => {
       setAuthenticated();
       setRoom();
       setSession();
+
       mockedQueryPickupInfo.mockResolvedValue(
         makeCheckinResult({
           action: 'pickup_info',
           pickup_time: '15:30',
         })
       );
-      mockedUpdateSessionActivity.mockRejectedValue(new Error('Activity update failed'));
-
-      const { result } = renderHook(() => useRfidScanning());
-      useUserStore.getState().startPickupQueryMode();
-
-      await act(async () => {
-        await result.current.startScanning();
-      });
-
-      const lastStartCall =
-        mockAdapterStartScanning.mock.calls[mockAdapterStartScanning.mock.calls.length - 1];
-      const onScan = lastStartCall?.[0] as ((event: NfcScanEvent) => void) | undefined;
-
-      expect(onScan).toBeDefined();
-
-      await act(async () => {
-        onScan?.({ tagId: MOCK_TAG, scanId: 4 });
-        await drainMicrotasks();
-      });
-
-      const state = useUserStore.getState();
-      expect(mockedUpdateSessionActivity).toHaveBeenCalledWith('1234');
-      expect(state.rfid.showModal).toBe(true);
-      expect(state.rfid.currentScan?.action).toBe('pickup_info');
-    });
-
-    it('releases the pickup query tag before waiting for keepalive to finish', async () => {
-      setAuthenticated();
-      setRoom();
-      setSession();
-
-      let resolveKeepalive: (() => void) | undefined;
-      mockedQueryPickupInfo.mockResolvedValue(
-        makeCheckinResult({
-          action: 'pickup_info',
-          pickup_time: '15:30',
-        })
-      );
-      mockedUpdateSessionActivity
-        .mockImplementationOnce(
-          () =>
-            new Promise<void>(resolve => {
-              resolveKeepalive = resolve;
-            })
-        )
-        .mockResolvedValue(undefined);
       mockedProcessRfidScan.mockResolvedValue(makeCheckinResult());
 
       const { result } = renderHook(() => useRfidScanning());
@@ -2138,13 +2229,9 @@ describe('useRfidScanning', () => {
       expect(mockedProcessRfidScan).toHaveBeenCalledWith(
         { student_rfid: MOCK_TAG, action: 'checkin', room_id: 10 },
         '1234',
-        1
+        1,
+        expect.any(AbortSignal)
       );
-
-      await act(async () => {
-        resolveKeepalive?.();
-        await Promise.resolve();
-      });
     });
 
     it('routes a GKT scan after pickup timeout to pickup lookup before rearming', async () => {

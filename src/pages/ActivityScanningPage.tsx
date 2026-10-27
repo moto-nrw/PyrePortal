@@ -285,6 +285,7 @@ const ActivityScanningPage: React.FC = () => {
     selectedRoom,
     authenticatedUser,
     currentScan,
+    currentScanId,
     studentCount,
     processingQueueSize,
     scanContextId,
@@ -958,7 +959,7 @@ const ActivityScanningPage: React.FC = () => {
               ? `pickup-query-prompt-${scanContextId}`
               : showFeedbackPrompt
                 ? `feedback-${checkoutDestinationState?.studentId}`
-                : `${currentScan?.student_id ?? 'none'}-${currentScan?.action ?? 'none'}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
+                : `${currentScanId ?? 'none'}-${checkoutDestinationState?.showingFarewell ?? false}-${showFeedbackPrompt}`
           }
           closeOnContentClick={
             !shouldKeepPickupQueryModalOpen &&

@@ -43,6 +43,20 @@ const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | un
   return undefined;
 };
 
+// Each shown result gets its own identity, so a new result restarts the modal
+// close timer even when it looks like the previous one, such as a second
+// timeout notice or a second refused scan.
+const resultIds = new WeakMap<object, number>();
+let lastResultId = 0;
+const resultIdOf = (result: object): number => {
+  let id = resultIds.get(result);
+  if (id === undefined) {
+    id = ++lastResultId;
+    resultIds.set(result, id);
+  }
+  return id;
+};
+
 /**
  * View model for the activity scanning page.
  *
@@ -231,6 +245,8 @@ export function useActivityScanningPage() {
   // Clear stale checkout/feedback/farewell state when a new scan arrives.
   // A "new scan" is detected by: different RFID tag, different visit_id, or
   // a check-in arriving while we're in a checkout flow (always means new scan).
+  // An error or info result ends the flow too: feedback and farewell would
+  // otherwise hide it, such as the notice of a timed-out scan (#479).
   useEffect(() => {
     if (!currentScan || !checkoutDestinationState) return;
 
@@ -241,14 +257,17 @@ export function useActivityScanningPage() {
       currentScan.visit_id != null &&
       currentScan.visit_id !== feedbackVisitIdRef.current;
     const isCheckinDuringCheckoutFlow = currentScan.action === 'checked_in';
+    const isNotice = isNonActionableScan(currentScan);
 
-    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow) {
+    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow || isNotice) {
       logger.debug('Clearing stale checkout state for new scan', {
         reason: isDifferentTag
           ? 'different_tag'
           : isDifferentVisit
             ? 'different_visit'
-            : 'checkin_during_checkout',
+            : isCheckinDuringCheckoutFlow
+              ? 'checkin_during_checkout'
+              : 'notice',
         oldRfid: checkoutDestinationState.rfid,
         newRfid: currentRfid,
         newAction: currentScan.action,
@@ -715,6 +734,7 @@ export function useActivityScanningPage() {
     authenticatedUser,
     // Scan state
     currentScan,
+    currentScanId: currentScan ? resultIdOf(currentScan) : null,
     studentCount,
     processingQueueSize: rfid.processingQueue.size,
     scanContextId: rfid.scanContextId,
