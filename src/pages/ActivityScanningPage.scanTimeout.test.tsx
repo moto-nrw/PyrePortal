@@ -279,6 +279,43 @@ describe('ActivityScanningPage scan timeout notice', () => {
     expect(screen.getByText(NOTICE_TITLE)).toBeInTheDocument();
   });
 
+  it('gives a second timeout notice its full display time', async () => {
+    mockedApi.processRfidScan
+      .mockImplementationOnce(hangingScan)
+      .mockImplementationOnce(hangingScan);
+    await renderPage();
+    const displayTime = useUserStore.getState().rfid.modalDisplayTime;
+
+    await scan(TAG_A);
+    await advance(1400);
+    await scan(TAG_B);
+    await advance(SCAN_TIMEOUT_MS - 1400);
+    expect(screen.getByText(NOTICE_TITLE)).toBeInTheDocument();
+    await advance(1400);
+    expect(useUserStore.getState().rfid.processingQueue.size).toBe(0);
+
+    // Notice B appeared now; the timer of notice A would close it after 100 ms.
+    await advance(displayTime - 100);
+    expect(screen.getByText(NOTICE_TITLE)).toBeInTheDocument();
+    await advance(200);
+    expect(screen.queryByText(NOTICE_TITLE)).not.toBeInTheDocument();
+  });
+
+  it('gives a second refused scan its full display time', async () => {
+    mockedApi.processRfidScan
+      .mockRejectedValueOnce(new Error('refused'))
+      .mockRejectedValueOnce(new Error('refused'));
+    await renderPage();
+    const displayTime = useUserStore.getState().rfid.modalDisplayTime;
+
+    await scan(TAG_A);
+    await advance(displayTime - 100);
+    await scan(TAG_B);
+    await advance(displayTime - 100);
+
+    expect(screen.getByText('Scan fehlgeschlagen')).toBeInTheDocument();
+  });
+
   it('keeps the pickup query unavailable while a scan is unanswered', async () => {
     mockedApi.processRfidScan.mockImplementationOnce(hangingScan);
     await renderPage();

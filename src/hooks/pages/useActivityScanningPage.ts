@@ -43,6 +43,20 @@ const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | un
   return undefined;
 };
 
+// Each shown result gets its own identity, so a new result restarts the modal
+// close timer even when it looks like the previous one, such as a second
+// timeout notice or a second refused scan.
+const resultIds = new WeakMap<object, number>();
+let lastResultId = 0;
+const resultIdOf = (result: object): number => {
+  let id = resultIds.get(result);
+  if (id === undefined) {
+    id = ++lastResultId;
+    resultIds.set(result, id);
+  }
+  return id;
+};
+
 /**
  * View model for the activity scanning page.
  *
@@ -720,6 +734,7 @@ export function useActivityScanningPage() {
     authenticatedUser,
     // Scan state
     currentScan,
+    currentScanId: currentScan ? resultIdOf(currentScan) : null,
     studentCount,
     processingQueueSize: rfid.processingQueue.size,
     scanContextId: rfid.scanContextId,
