@@ -8,6 +8,7 @@ import {
 } from '../dev/mockScanSource';
 import { isRealScanningEnabled } from '../platform/adapter';
 import type { NfcScanEvent } from '../platform/adapter';
+import { countScopeOf } from '../services/activityScanningRules';
 import { api } from '../services/api';
 import type { RfidScanResult } from '../services/api';
 import {
@@ -22,6 +23,7 @@ import {
 import { resolveStaffAttributionId } from '../store/slices/authSlice';
 import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
+import { nextRequestSequence } from '../utils/requestSequence';
 
 const logger = createLogger('useRfidScanning');
 const PROCESSED_SCAN_ID_TTL_MS = 30_000;
@@ -140,6 +142,8 @@ export const useRfidScanning = () => {
 
         lockPickupQueryTag(tagId);
         addToProcessingQueue(tagId);
+        const requestSequence = nextRequestSequence();
+        const requestScope = countScopeOf(currentState);
         if (freshRfid.scanMode === 'pickupQueryTimedOut') {
           showScanModal();
         }
@@ -154,7 +158,7 @@ export const useRfidScanning = () => {
             return;
           }
 
-          setScanResult(outcome.result);
+          setScanResult({ ...outcome.result, requestSequence, requestScope });
           showScanModal();
 
           if (outcome.status === 'success') {
@@ -170,12 +174,12 @@ export const useRfidScanning = () => {
 
       // Fast path for already-authenticated supervisors
       if (isActiveSupervisor(tagId)) {
-        logger.info('Active supervisor tag detected, redirecting immediately', { tagId });
+        logger.debug('Active supervisor tag detected, redirecting immediately', { tagId });
         showSupervisorRedirect();
         return;
       }
 
-      logger.info('Processing RFID scan', { tagId });
+      logger.debug('Processing RFID scan', { tagId });
 
       // Handle duplicate prevention (Layer 1: processing queue)
       if (!canProcessTag(tagId)) {
@@ -185,6 +189,8 @@ export const useRfidScanning = () => {
 
       let isInProcessingQueue = false;
       const startTime = Date.now();
+      const requestSequence = nextRequestSequence();
+      const requestScope = countScopeOf(currentState);
 
       try {
         // Initialize scan tracking inside try so finally can reliably clean up.
@@ -192,7 +198,7 @@ export const useRfidScanning = () => {
         isInProcessingQueue = true;
         recordTagScan(tagId, { timestamp: Date.now() });
 
-        logger.info('Starting network scan (cache disabled)');
+        logger.debug('Starting network scan (cache disabled)');
 
         // Make API call (server is single source of truth)
         const result = await api.processRfidScan(
@@ -203,13 +209,12 @@ export const useRfidScanning = () => {
 
         logger.info('RFID scan completed via server', {
           action: result.action,
-          studentName: result.student_name,
           responseTime: Date.now() - startTime,
         });
 
         // Include scannedTagId so ActivityScanningPage can use it directly
         // instead of looking it up from recentTagScans (fixes race condition)
-        setScanResult({ ...result, scannedTagId: tagId });
+        setScanResult({ ...result, scannedTagId: tagId, requestSequence, requestScope });
 
         // Handle supervisor authentication (handled outcomes end the scan here)
         const supervisorOutcome = evaluateSupervisorScan({
@@ -245,7 +250,7 @@ export const useRfidScanning = () => {
         await updateSessionActivityQuietly(freshUser.pin, 'scan');
       } catch (error) {
         logger.error('Failed to process RFID scan', { error: serializeError(error) });
-        const errorResult = createScanErrorResult(error);
+        const errorResult = { ...createScanErrorResult(error), requestSequence, requestScope };
         setScanResult(errorResult);
         showScanModal();
 
@@ -305,7 +310,7 @@ export const useRfidScanning = () => {
 
       processedScanIds.set(scanKey, now);
 
-      logger.info('RFID scan event received', { tagId, scanId });
+      logger.debug('RFID scan event received', { tagId, scanId });
       void processScan(tagId);
     },
     [processScan]

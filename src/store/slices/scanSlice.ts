@@ -72,10 +72,7 @@ export const createScanSlice = (set: SetState<UserState>, get: GetState<UserStat
     const isAlreadySelected = selectedSupervisors.some(s => s.id === staffId);
 
     if (isAlreadySelected) {
-      storeLogger.info('Supervisor already in selectedSupervisors via RFID', {
-        staffId,
-        staffName,
-      });
+      storeLogger.info('Supervisor already in selectedSupervisors via RFID');
       return true; // Already present - second scan
     }
 
@@ -86,8 +83,6 @@ export const createScanSlice = (set: SetState<UserState>, get: GetState<UserStat
     });
 
     storeLogger.info('Supervisor added to selectedSupervisors via RFID', {
-      staffId,
-      staffName,
       totalSupervisors: selectedSupervisors.length + 1,
     });
 

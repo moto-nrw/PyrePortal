@@ -357,6 +357,52 @@ describe('fetchCurrentSession', () => {
     expect(state.selectedRoom!.name).toBe('Turnhalle');
   });
 
+  it('loads activities and rooms in parallel once the session is known', async () => {
+    setAuthenticated();
+    mockGetCurrentSession.mockResolvedValueOnce({
+      active_group_id: 1,
+      activity_id: 10,
+      activity_name: 'Fußball AG',
+      device_id: 1,
+      start_time: '2024-01-01T10:00:00Z',
+      duration: '2h',
+      room_id: 5,
+      room_name: 'Turnhalle',
+      is_active: true,
+    });
+
+    let resolveActivities: (activities: ActivityResponse[]) => void = () => undefined;
+    let resolveRooms: (rooms: Room[]) => void = () => undefined;
+    mockGetActivities.mockImplementationOnce(
+      () =>
+        new Promise<ActivityResponse[]>(resolve => {
+          resolveActivities = resolve;
+        })
+    );
+    mockGetRooms.mockImplementationOnce(
+      () =>
+        new Promise<Room[]>(resolve => {
+          resolveRooms = resolve;
+        })
+    );
+
+    const fetchPromise = useUserStore.getState().fetchCurrentSession();
+
+    // Both lookups start before either answers.
+    await vi.waitFor(() => {
+      expect(mockGetActivities).toHaveBeenCalledTimes(1);
+      expect(mockGetRooms).toHaveBeenCalledTimes(1);
+    });
+
+    resolveRooms([mockRoom({ id: 5, name: 'Turnhalle', color: '#F4D35E' })]);
+    resolveActivities([mockActivity({ id: 10, name: 'Fußball AG', max_participants: 12 })]);
+    await fetchPromise;
+
+    const state = useUserStore.getState();
+    expect(state.selectedActivity?.max_participants).toBe(12);
+    expect(state.selectedRoom?.color).toBe('#F4D35E');
+  });
+
   it('handles API error gracefully', async () => {
     setAuthenticated();
     mockGetCurrentSession.mockRejectedValueOnce(new Error('Server down'));

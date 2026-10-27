@@ -76,14 +76,10 @@ function StaffSelectionPage() {
     freezeSortOrder();
 
     logger.info('Toggling supervisor selection', {
-      username: user.name,
-      userId: user.id,
       wasSelected: selectedSupervisors.some(s => s.id === user.id),
     });
     toggleSupervisor(user);
     logUserAction('supervisor_toggle', {
-      username: user.name,
-      userId: user.id,
       selected: !selectedSupervisors.some(s => s.id === user.id),
     });
   };
@@ -93,14 +89,8 @@ function StaffSelectionPage() {
       logger.warn('Attempted to continue without selecting supervisors');
       return;
     }
-    logger.info('Continuing with selected supervisors', {
-      count: selectedSupervisors.length,
-      supervisors: selectedSupervisors.map(s => ({ id: s.id, name: s.name })),
-    });
-    logUserAction('supervisors_selected', {
-      count: selectedSupervisors.length,
-      supervisorIds: selectedSupervisors.map(s => s.id),
-    });
+    logger.info('Continuing with selected supervisors', { count: selectedSupervisors.length });
+    logUserAction('supervisors_selected', { count: selectedSupervisors.length });
     logNavigation('StaffSelectionPage', 'RoomSelectionPage');
     void navigate('/rooms');
   };

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 
+import { countScopeOf } from '../../services/activityScanningRules';
 import type { RfidScanResult } from '../../services/api';
 import {
   checkInToDestinationRoom,
@@ -9,6 +10,7 @@ import {
 } from '../../services/checkoutDestinationService';
 import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
+import { nextRequestSequence } from '../../utils/requestSequence';
 
 export type CheckoutDestination = 'schulhof' | 'raumwechsel' | 'toilette';
 export const BOOKING_TIMEOUT_MS = 15000;
@@ -72,6 +74,8 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     const activeState = reserveBooking();
     if (!activeState) return;
     const activeScan = useUserStore.getState().rfid.currentScan;
+    const requestSequence = nextRequestSequence();
+    const requestScope = countScopeOf(useUserStore.getState());
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -97,7 +101,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
         (activeScan && useUserStore.getState().rfid.currentScan !== activeScan)
       )
         return;
-      setScanResult(result);
+      setScanResult({ ...result, requestSequence, requestScope });
       setCheckoutDestinationState(null);
       showScanModal();
       // Modal will auto-close via useModalTimeout hook

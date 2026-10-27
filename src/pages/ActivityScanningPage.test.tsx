@@ -3099,3 +3099,127 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     expect(screen.getByText('Du bist jetzt in Toilette')).toBeInTheDocument();
   });
 });
+
+describe('Scan page receipt and start count', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockRfidHookReturn = {
+      isScanning: false,
+      currentScan: null,
+      showModal: false,
+      startScanning: mockStartScanning,
+      stopScanning: mockStopScanning,
+    };
+    useUserStore.setState({ ...useUserStore.getInitialState(), ...defaultStoreState });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('shows the receipt at full strength without a fade and no result before the server answers', () => {
+    useUserStore.setState({
+      rfid: { ...defaultRfidState, processingQueue: new Set(['04:AA:BB:CC:DD:EE:FF']) },
+    });
+
+    renderPage();
+
+    const indicator = screen.getByTestId('rfid-processing-indicator');
+    expect(indicator).toHaveStyle({ opacity: '1' });
+    expect(indicator.style.transition).toBe('');
+    expect(screen.getByText('0')).toHaveStyle({ opacity: '0' });
+    expect(document.querySelector('dialog[open]')).toBeNull();
+  });
+
+  it('hides the receipt while no scan is processing', () => {
+    renderPage();
+
+    expect(screen.getByTestId('rfid-processing-indicator')).toHaveStyle({ opacity: '0' });
+    expect(screen.getByText('0')).toHaveStyle({ opacity: '1' });
+  });
+
+  it('starts with the count of the stored session and lets the poll correct it', async () => {
+    let answerPoll: (session: CurrentSession) => void = () => {};
+    mockedApi.getCurrentSession.mockReturnValueOnce(
+      new Promise(resolve => {
+        answerPoll = resolve;
+      })
+    );
+    useUserStore.setState({
+      currentSession: { ...defaultStoreState.currentSession, active_students: 12 },
+    });
+
+    renderPage();
+
+    expect(screen.getByText('12')).toBeInTheDocument();
+    expect(screen.queryByText('0')).not.toBeInTheDocument();
+
+    await act(async () => {
+      answerPoll(makeCurrentSession({ active_students: 13 }));
+    });
+
+    expect(screen.getByText('13')).toBeInTheDocument();
+  });
+
+  const deferSessionPoll = () => {
+    let answer: (session: CurrentSession) => void = () => {};
+    mockedApi.getCurrentSession.mockReturnValueOnce(
+      new Promise(resolve => {
+        answer = resolve;
+      })
+    );
+    return (activeStudents: number) =>
+      answer(makeCurrentSession({ active_students: activeStudents }));
+  };
+
+  it('keeps a confirmed scan count when an older poll answers later', async () => {
+    const answerPoll = deferSessionPoll();
+    const view = renderPage();
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Max Mustermann',
+        action: 'checked_in',
+        room_name: 'Raum 101',
+        active_students: 13,
+      },
+      showModal: true,
+    };
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('13')).toBeInTheDocument();
+
+    await act(async () => {
+      answerPoll(12);
+    });
+
+    expect(screen.getByText('13')).toBeInTheDocument();
+    expect(screen.queryByText('12')).not.toBeInTheDocument();
+  });
+
+  it('keeps a newer poll count when an older poll answers later', async () => {
+    const answerOlderPoll = deferSessionPoll();
+    const answerNewerPoll = deferSessionPoll();
+    renderPage();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15000);
+    });
+    expect(mockedApi.getCurrentSession).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      answerNewerPoll(14);
+    });
+    expect(screen.getByText('14')).toBeInTheDocument();
+
+    await act(async () => {
+      answerOlderPoll(12);
+    });
+    expect(screen.getByText('14')).toBeInTheDocument();
+  });
+});

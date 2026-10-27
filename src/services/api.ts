@@ -385,7 +385,12 @@ export const api = {
    * Endpoint: POST /api/iot/session/start
    */
   async startSession(pin: string, request: SessionStartRequest): Promise<SessionStartResponse> {
-    logger.info('Starting session', { ...request });
+    logger.info('Starting session', {
+      activityId: request.activity_id,
+      roomId: request.room_id,
+      supervisorCount: request.supervisor_ids.length,
+      force: request.force,
+    });
 
     const response = await apiCall<{
       status: string;
@@ -924,6 +929,10 @@ export interface RfidScanResult extends Omit<RfidScanResponse, 'action'> {
   isOpenRoom?: boolean;
   /** The tag that triggered this result, attached by the kiosk. */
   scannedTagId?: string;
+  /** Order of the request that produced this result (`nextRequestSequence`), attached by the kiosk. */
+  requestSequence?: number;
+  /** `countScopeOf` the store when that request started, attached by the kiosk. */
+  requestScope?: string;
 }
 
 /**

@@ -877,7 +877,7 @@ const ActivityScanningPage: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Main Student Count Display / RFID Processing Spinner (cross-fade) */}
+                {/* Main Student Count Display / RFID Processing Spinner (swaps without a fade) */}
                 <div
                   style={{
                     display: 'flex',
@@ -904,6 +904,7 @@ const ActivityScanningPage: React.FC = () => {
                     {studentCount ?? 0}
                   </div>
                   <div
+                    data-testid="rfid-processing-indicator"
                     style={{
                       position: 'absolute',
                       width: '140px',
@@ -915,7 +916,6 @@ const ActivityScanningPage: React.FC = () => {
                         'radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px))',
                       animation:
                         processingQueueSize > 0 ? 'rfid-center-spin 0.8s linear infinite' : 'none',
-                      transition: 'opacity 0.3s ease',
                       opacity: processingQueueSize > 0 ? 1 : 0,
                       pointerEvents: 'none',
                     }}

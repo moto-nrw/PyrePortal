@@ -88,9 +88,7 @@ export const evaluateSupervisorScan = (params: SupervisorScanParams): Supervisor
   addActiveSupervisorTag(tagId);
 
   logger.info('Supervisor authenticated successfully', {
-    supervisorName: staffName,
     message: result.message,
-    staffId,
     isRepeatSupervisor,
     alreadySelected,
   });
