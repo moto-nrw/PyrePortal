@@ -94,7 +94,15 @@ export default tseslint.config(
       ],
       // Additional adjustments for PyrePortal
       '@typescript-eslint/no-explicit-any': 'warn',
-      'no-console': 'warn',
+      // Console output bypasses the logger's personal-data filter.
+      'no-console': 'error',
+    },
+  },
+  // GKT bridge: sensor payloads carry NFC UIDs, so console output stays reviewed.
+  {
+    files: ['public/**/*.js'],
+    rules: {
+      'no-console': 'error',
     },
   },
   // General configuration

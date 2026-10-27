@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router';
 
 import {
@@ -151,6 +151,18 @@ export function useActivityScanningPage() {
   // already knows; the poll and authoritative scan counts correct it.
   const [studentCount, setStudentCount] = useState(() => currentSession?.active_students ?? 0);
 
+  // Count writes are ordered by when their data was requested: a poll answer
+  // whose request started before a newer scan or poll result was applied
+  // must not overwrite that result.
+  const countOrderRef = useRef({ issued: 0, applied: 0 });
+  const issueCountStamp = () => ++countOrderRef.current.issued;
+  const applyStudentCount = (stamp: number, next: SetStateAction<number>): boolean => {
+    if (stamp < countOrderRef.current.applied) return false;
+    countOrderRef.current.applied = stamp;
+    setStudentCount(next);
+    return true;
+  };
+
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
 
@@ -266,17 +278,20 @@ export function useActivityScanningPage() {
   const fetchSessionInfo = async () => {
     if (!authenticatedUser?.pin) return;
 
+    const stamp = issueCountStamp();
     try {
       const session = await api.getCurrentSession(authenticatedUser.pin);
       logger.debug('Session info received', { session });
 
+      const count = session?.active_students ?? 0;
+      if (!applyStudentCount(stamp, count)) {
+        logger.debug('Discarding session count older than the shown count', { count });
+        return;
+      }
       if (session) {
-        const count = session.active_students ?? 0;
         logger.info('Setting student count', { count });
-        setStudentCount(count);
       } else {
         logger.warn('No session info received');
-        setStudentCount(0);
       }
     } catch (error) {
       logger.error('Failed to fetch session info', { error: serializeError(error) });
@@ -397,7 +412,7 @@ export function useActivityScanningPage() {
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
           const delta = getCheckinCountDelta(extendedScan);
-          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
+          if (delta !== 0) applyStudentCount(issueCountStamp(), prev => Math.max(0, prev + delta));
         }
         break;
       case 'checked_out_daily':
@@ -414,14 +429,14 @@ export function useActivityScanningPage() {
         const delta = getCheckoutCountDelta();
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount && delta !== 0)
-          setStudentCount(prev => Math.max(0, prev + delta));
+          applyStudentCount(issueCountStamp(), prev => Math.max(0, prev + delta));
         break;
       }
       case 'transferred':
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
           const delta = getTransferCountDelta(currentScan, selectedRoom?.name);
-          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
+          if (delta !== 0) applyStudentCount(issueCountStamp(), prev => Math.max(0, prev + delta));
         }
         break;
     }
@@ -429,7 +444,7 @@ export function useActivityScanningPage() {
     // Apply authoritative count after side effects
     // Skip for Schulhof scans: active_students refers to the Schulhof room, not our room
     if (shouldApplyAuthoritativeCount(extendedScan)) {
-      setStudentCount(currentScan.active_students!);
+      applyStudentCount(issueCountStamp(), currentScan.active_students!);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows

@@ -3160,4 +3160,66 @@ describe('Scan page receipt and start count', () => {
 
     expect(screen.getByText('13')).toBeInTheDocument();
   });
+
+  const deferSessionPoll = () => {
+    let answer: (session: CurrentSession) => void = () => {};
+    mockedApi.getCurrentSession.mockReturnValueOnce(
+      new Promise(resolve => {
+        answer = resolve;
+      })
+    );
+    return (activeStudents: number) =>
+      answer(makeCurrentSession({ active_students: activeStudents }));
+  };
+
+  it('keeps a confirmed scan count when an older poll answers later', async () => {
+    const answerPoll = deferSessionPoll();
+    const view = renderPage();
+
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Max Mustermann',
+        action: 'checked_in',
+        room_name: 'Raum 101',
+        active_students: 13,
+      },
+      showModal: true,
+    };
+    view.rerender(
+      <MemoryRouter>
+        <ActivityScanningPage />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('13')).toBeInTheDocument();
+
+    await act(async () => {
+      answerPoll(12);
+    });
+
+    expect(screen.getByText('13')).toBeInTheDocument();
+    expect(screen.queryByText('12')).not.toBeInTheDocument();
+  });
+
+  it('keeps a newer poll count when an older poll answers later', async () => {
+    const answerOlderPoll = deferSessionPoll();
+    const answerNewerPoll = deferSessionPoll();
+    renderPage();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(15000);
+    });
+    expect(mockedApi.getCurrentSession).toHaveBeenCalledTimes(2);
+
+    await act(async () => {
+      answerNewerPoll(14);
+    });
+    expect(screen.getByText('14')).toBeInTheDocument();
+
+    await act(async () => {
+      answerOlderPoll(12);
+    });
+    expect(screen.getByText('14')).toBeInTheDocument();
+  });
 });
