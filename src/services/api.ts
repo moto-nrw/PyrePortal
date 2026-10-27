@@ -929,6 +929,8 @@ export interface RfidScanResult extends Omit<RfidScanResponse, 'action'> {
   isOpenRoom?: boolean;
   /** The tag that triggered this result, attached by the kiosk. */
   scannedTagId?: string;
+  /** Order of the request that produced this result (`nextRequestSequence`), attached by the kiosk. */
+  requestSequence?: number;
 }
 
 /**

@@ -9,6 +9,7 @@ import {
 } from '../../services/checkoutDestinationService';
 import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
+import { nextRequestSequence } from '../../utils/requestSequence';
 
 export type CheckoutDestination = 'schulhof' | 'raumwechsel' | 'toilette';
 export const BOOKING_TIMEOUT_MS = 15000;
@@ -72,6 +73,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
     const activeState = reserveBooking();
     if (!activeState) return;
     const activeScan = useUserStore.getState().rfid.currentScan;
+    const requestSequence = nextRequestSequence();
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
@@ -97,7 +99,7 @@ export function useCheckoutDestination({ schulhofRoomId, wcRoomId }: UseCheckout
         (activeScan && useUserStore.getState().rfid.currentScan !== activeScan)
       )
         return;
-      setScanResult(result);
+      setScanResult({ ...result, requestSequence });
       setCheckoutDestinationState(null);
       showScanModal();
       // Modal will auto-close via useModalTimeout hook

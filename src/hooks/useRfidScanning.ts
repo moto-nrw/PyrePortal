@@ -22,6 +22,7 @@ import {
 import { resolveStaffAttributionId } from '../store/slices/authSlice';
 import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
+import { nextRequestSequence } from '../utils/requestSequence';
 
 const logger = createLogger('useRfidScanning');
 const PROCESSED_SCAN_ID_TTL_MS = 30_000;
@@ -140,6 +141,7 @@ export const useRfidScanning = () => {
 
         lockPickupQueryTag(tagId);
         addToProcessingQueue(tagId);
+        const requestSequence = nextRequestSequence();
         if (freshRfid.scanMode === 'pickupQueryTimedOut') {
           showScanModal();
         }
@@ -154,7 +156,7 @@ export const useRfidScanning = () => {
             return;
           }
 
-          setScanResult(outcome.result);
+          setScanResult({ ...outcome.result, requestSequence });
           showScanModal();
 
           if (outcome.status === 'success') {
@@ -185,6 +187,7 @@ export const useRfidScanning = () => {
 
       let isInProcessingQueue = false;
       const startTime = Date.now();
+      const requestSequence = nextRequestSequence();
 
       try {
         // Initialize scan tracking inside try so finally can reliably clean up.
@@ -208,7 +211,7 @@ export const useRfidScanning = () => {
 
         // Include scannedTagId so ActivityScanningPage can use it directly
         // instead of looking it up from recentTagScans (fixes race condition)
-        setScanResult({ ...result, scannedTagId: tagId });
+        setScanResult({ ...result, scannedTagId: tagId, requestSequence });
 
         // Handle supervisor authentication (handled outcomes end the scan here)
         const supervisorOutcome = evaluateSupervisorScan({
@@ -244,7 +247,7 @@ export const useRfidScanning = () => {
         await updateSessionActivityQuietly(freshUser.pin, 'scan');
       } catch (error) {
         logger.error('Failed to process RFID scan', { error: serializeError(error) });
-        const errorResult = createScanErrorResult(error);
+        const errorResult = { ...createScanErrorResult(error), requestSequence };
         setScanResult(errorResult);
         showScanModal();
 
