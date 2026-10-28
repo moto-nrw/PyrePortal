@@ -42,6 +42,10 @@ export interface ApiErrorResponse {
     // more of them; only the two the kiosk renders are declared.
     planned_start_time?: string;
     deviation_minutes?: string;
+    // Module the school has not booked (project-phoenix #4896): the key, and
+    // its name for people.
+    module?: string;
+    module_label?: string;
   };
 }
 
@@ -149,6 +153,34 @@ function formatStudentAlreadyActiveError(details: Record<string, unknown>): stri
   return 'Schüler*in ist bereits angemeldet.';
 }
 
+/**
+ * Kiosk copy for a module the school has not booked (project-phoenix #4896).
+ * Every kiosk route needs NFC-Anwesenheit; stamping also needs Zeiterfassung.
+ */
+const MODULE_NOT_BOOKED_MESSAGES: ReadonlyMap<string, string> = new Map([
+  [
+    'nfc_anwesenheit',
+    'Anwesenheit mit Armband ist an dieser Schule nicht gebucht. Bitte an die Leitung wenden.',
+  ],
+  ['zeiterfassung', 'Stempeln ist an dieser Schule nicht gebucht. Bitte an die Leitung wenden.'],
+]);
+
+const MODULE_NOT_BOOKED_FALLBACK =
+  'Diese Funktion ist an dieser Schule nicht gebucht. Bitte an die Leitung wenden.';
+
+/** Format the message for a module the school has not booked. */
+function formatModuleNotBookedError(details: Record<string, unknown>): string {
+  const moduleKey = details.module;
+  const message =
+    typeof moduleKey === 'string' ? MODULE_NOT_BOOKED_MESSAGES.get(moduleKey) : undefined;
+  if (message) return message;
+  const label = details.module_label;
+  if (typeof label === 'string' && label.length > 0) {
+    return `${label} ist an dieser Schule nicht gebucht. Bitte an die Leitung wenden.`;
+  }
+  return MODULE_NOT_BOOKED_FALLBACK;
+}
+
 const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set(ERROR_CODES);
 
 /**
@@ -209,6 +241,7 @@ const CODE_MESSAGES: Readonly<Partial<Record<ErrorCode, string>>> = {
     'Toilette-Aktivität konnte nicht erstellt werden. Bitte zuerst Betreuer-RFID scannen.',
   'iot.staff_not_found': 'Mitarbeiter nicht gefunden.',
   'iot.staff_rfid_tag_unassigned': 'Mitarbeiter hat kein Armband zugewiesen.',
+  'module.not_booked': MODULE_NOT_BOOKED_FALLBACK,
 };
 
 /**
@@ -264,6 +297,7 @@ function getCodeMessage(error: ApiError): string | undefined {
     if (code === 'iot.student_already_active') {
       return formatStudentAlreadyActiveError(error.details);
     }
+    if (code === 'module.not_booked') return formatModuleNotBookedError(error.details);
   }
   return CODE_MESSAGES[code];
 }
