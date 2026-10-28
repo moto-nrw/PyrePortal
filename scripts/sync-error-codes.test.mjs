@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,7 +76,7 @@ test('invalid codes, duplicate codes and invalid classes still fail', () => {
 
 test('an explicit missing, malformed, empty or wrong-domain source never falls back', () =>
   fixture(directory => {
-    assert.throws(() => readRegistry(join(directory, 'missing.json')));
+    assert.throws(() => readRegistry(join(directory, 'missing.json')), { code: 'ENOENT' });
     assert.throws(() => readRegistry(directory), /no error registry fragments/);
     writeFileSync(join(directory, 'care.json'), 'not json');
     assert.throws(() => readRegistry(directory));
@@ -99,6 +99,27 @@ test('defaults prefer canonical fragments, with legacy fallback only while the d
     mkdirSync(canonical);
     assert.equal(defaultRegistryPath(checkout), canonical);
     assert.throws(() => readRegistry(defaultRegistryPath(checkout)), /no error registry fragments/);
+  }));
+
+test('a present but broken canonical source never falls back to the legacy sibling', () =>
+  fixture(directory => {
+    const checkout = join(directory, 'PyrePortal');
+    const producer = join(directory, 'project-phoenix');
+    mkdirSync(checkout);
+    mkdirSync(producer);
+    writeRegistry(join(producer, 'error-registry.json'), [care]);
+    const canonical = join(producer, 'error-registry');
+    symlinkSync('missing-canonical-source', canonical);
+    assert.equal(defaultRegistryPath(checkout), canonical);
+    assert.throws(() => readRegistry(defaultRegistryPath(checkout)), { code: 'ENOENT' });
+  }));
+
+test('a producer discovery error is not hidden by worktree fallback', () =>
+  fixture(directory => {
+    const checkout = join(directory, 'PyrePortal');
+    mkdirSync(checkout);
+    writeFileSync(join(directory, 'project-phoenix'), 'not a directory');
+    assert.throws(() => defaultRegistryPath(checkout), { code: 'ENOTDIR' });
   }));
 
 test('--check reports stale output without modifying the checked-in kiosk mapping', () =>

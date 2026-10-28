@@ -7,7 +7,7 @@
 //
 // Defaults prefer the sibling error-registry/ directory. Explicit legacy JSON
 // inputs remain supported during producer rollout and for historical fixtures.
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -76,10 +76,17 @@ ${legacy.map(entry => `  ${q(entry.legacy)}: ${q(entry.code)},`).join('\n')}
 
 /** Discover every domain, then validate one combined registry during generation. */
 export function readRegistry(path) {
-  if (!statSync(path).isDirectory()) return JSON.parse(readFileSync(path, 'utf8'));
-  const files = readdirSync(path)
-    .filter(file => file.endsWith('.json'))
-    .sort();
+  let names;
+  try {
+    names = readdirSync(path);
+  } catch (error) {
+    // Dispatch using the operation itself, not a stale filesystem precheck.
+    // Only a non-directory can be a historical aggregate. Missing/unreadable
+    // sources must fail, never become a reason to choose another registry.
+    if (error.code !== 'ENOTDIR') throw error;
+    return JSON.parse(readFileSync(path, 'utf8'));
+  }
+  const files = names.filter(file => file.endsWith('.json')).sort();
   if (files.length === 0) throw new Error(`${path}: no error registry fragments`);
   const codes = [];
   for (const file of files) {
@@ -101,10 +108,17 @@ export function readRegistry(path) {
 
 function siblingRegistry(checkout) {
   const producer = join(checkout, '..', 'project-phoenix');
-  const fragments = join(producer, 'error-registry');
-  if (existsSync(fragments)) return fragments;
-  const legacy = join(producer, 'error-registry.json');
-  return existsSync(legacy) ? legacy : null;
+  let names;
+  try {
+    names = readdirSync(producer);
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+  // Discovery does not assert a source's type or readability. The direct read
+  // remains authoritative, including when a selected source changes/disappears.
+  if (names.includes('error-registry')) return join(producer, 'error-registry');
+  return names.includes('error-registry.json') ? join(producer, 'error-registry.json') : null;
 }
 
 export function defaultRegistryPath(checkout = root) {
