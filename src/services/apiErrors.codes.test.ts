@@ -312,3 +312,38 @@ describe('isNetworkRelatedError by type', () => {
     expect(isNetworkRelatedError('connection timeout')).toBe(false);
   });
 });
+
+// project-phoenix #4896: a school without a booked module refuses kiosk
+// routes with module.not_booked; details.module names the module.
+describe('mapApiErrorToGerman for a module the school has not booked', () => {
+  const notBooked = (details?: { module?: string; module_label?: string }) =>
+    new ApiError('module not booked', 403, 'module.not_booked', details);
+
+  it('explains missing NFC attendance', () => {
+    expect(
+      mapApiErrorToGerman(notBooked({ module: 'nfc_anwesenheit', module_label: 'NFC-Anwesenheit' }))
+    ).toBe(
+      'Anwesenheit mit Armband ist an dieser Schule nicht gebucht. Bitte an die Leitung wenden.'
+    );
+  });
+
+  it('explains missing time tracking at the staff clock', () => {
+    expect(
+      mapApiErrorToGerman(notBooked({ module: 'zeiterfassung', module_label: 'Zeiterfassung' }))
+    ).toBe('Stempeln ist an dieser Schule nicht gebucht. Bitte an die Leitung wenden.');
+  });
+
+  it('names another module by its label', () => {
+    expect(
+      mapApiErrorToGerman(notBooked({ module: 'mittagessen', module_label: 'Mittagessen' }))
+    ).toBe('Mittagessen ist an dieser Schule nicht gebucht. Bitte an die Leitung wenden.');
+  });
+
+  it('falls back without details, never to the generic permission text', () => {
+    const message = mapApiErrorToGerman(notBooked());
+    expect(message).toBe(
+      'Diese Funktion ist an dieser Schule nicht gebucht. Bitte an die Leitung wenden.'
+    );
+    expect(message).not.toBe(CLASS_MESSAGES.permission);
+  });
+});
