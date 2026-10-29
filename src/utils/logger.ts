@@ -124,9 +124,18 @@ export function serializeError(error: unknown): Record<string, unknown> {
 }
 
 // Keys whose values name or identify a person or a wristband. Compared in
-// lowercase without "_" or "-". Entries above DEBUG are persisted on the
-// device, so these values only survive at DEBUG (off in production).
+// lowercase without "_" or "-". All levels share the same output protection.
 const PERSONAL_DATA_KEYS = new Set([
+  'apikey',
+  'authorization',
+  'password',
+  'pin',
+  'staffpin',
+  'deviceapikey',
+  'token',
+  'accesstoken',
+  'refreshtoken',
+  'secret',
   'availableusers',
   'displayname',
   'entityname',
@@ -178,6 +187,9 @@ const redactValue = (value: unknown, depth: number, seen: WeakSet<object>): unkn
   if (typeof value === 'string') {
     return value.replace(TAG_ID_PATTERN, REDACTED);
   }
+  if (typeof value === 'bigint' || typeof value === 'function' || typeof value === 'symbol') {
+    return REDACTED;
+  }
   if (value === null || typeof value !== 'object' || value instanceof Date) {
     return value;
   }
@@ -206,11 +218,16 @@ const redactValue = (value: unknown, depth: number, seen: WeakSet<object>): unkn
 
 /**
  * Remove names, wristband tag IDs and person IDs from log data.
- * Applied to every entry above DEBUG before it reaches memory, console or
+ * Applied to every entry before it reaches memory, console or
  * the persisted device log.
  */
 function redactPersonalData(data: Record<string, unknown>): Record<string, unknown> {
-  return redactValue(data, 0, new WeakSet()) as Record<string, unknown>;
+  try {
+    return redactValue(data, 0, new WeakSet()) as Record<string, unknown>;
+  } catch {
+    // Proxies and throwing getters cannot be inspected safely. Fail closed.
+    return { message: REDACTED };
+  }
 }
 
 /**
@@ -341,18 +358,17 @@ class Logger {
 
     const timestamp = new Date().toISOString();
     const levelName = LogLevel[level];
-    const keepsPersonalData = level === LogLevel.DEBUG;
 
     // Create log entry
-    const logEntry: LogEntry = {
+    const logEntry = redactPersonalData({
       timestamp,
       level: levelName,
       source: this.source,
-      message: keepsPersonalData ? message : message.replace(TAG_ID_PATTERN, REDACTED),
+      message,
       sessionId: this.sessionId,
-      ...(data && { data: keepsPersonalData ? data : redactPersonalData(data) }),
+      ...(data && { data }),
       ...this.config.contextInfo,
-    };
+    }) as unknown as LogEntry;
 
     // Store in memory (with circular buffer behavior)
     this.storeInMemory(logEntry);

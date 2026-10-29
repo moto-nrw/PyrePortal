@@ -6,6 +6,8 @@
  */
 import { describe, expect, it, vi, beforeEach, onTestFinished } from 'vitest';
 
+import type { PlatformAdapter } from '../platform/adapter';
+
 // Unmock the logger so we test the real implementation
 vi.unmock('../utils/logger');
 
@@ -401,7 +403,7 @@ describe('convenience functions', () => {
   });
 });
 
-describe('personal data in logs above DEBUG', () => {
+describe('personal data at every log level', () => {
   const TAG = '04:D6:94:82:97:6A:80';
 
   const createPersistingLogger = () => {
@@ -424,7 +426,7 @@ describe('personal data in logs above DEBUG', () => {
     );
   };
 
-  it.each(['info', 'warn', 'error'] as const)(
+  it.each(['debug', 'info', 'warn', 'error'] as const)(
     'redacts names, tag IDs and person IDs at %s before persisting',
     async level => {
       const log = createPersistingLogger();
@@ -474,13 +476,98 @@ describe('personal data in logs above DEBUG', () => {
     }
   );
 
-  it('keeps the data of DEBUG entries, which production does not persist', () => {
-    const log = createPersistingLogger();
-
-    log.debug('Processing RFID scan', { tagId: TAG, studentName: 'Mila Beispiel' });
-
-    expect(log.getInMemoryLogs()[0].data).toEqual({ tagId: TAG, studentName: 'Mila Beispiel' });
+  // #487 intentionally replaces the former DEBUG raw-data contract.
+  it('filters runtime-enabled DEBUG before every output channel', async () => {
+    vi.resetModules();
+    localStorage.setItem('pyrePortalDebugLogging', 'true');
+    vi.stubEnv('TEST', '');
+    vi.stubEnv('DEV', false);
+    onTestFinished(() => {
+      localStorage.removeItem('pyrePortalDebugLogging');
+      vi.unstubAllEnvs();
+      vi.resetModules();
+    });
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    onTestFinished(() => debugSpy.mockRestore());
+    const runtime = await import('./logger');
+    const runtimePersist = vi.mocked((await import('@platform')).adapter.persistLog);
+    const log = runtime.createLogger('RuntimeDebug');
+    log.clearInMemoryLogs();
+    log.debug(`Scan ${TAG}`, {
+      studentName: 'Synthetic Person',
+      tagId: TAG,
+      nested: { staff_name: 'Synthetic Staff', api_key: 'synthetic-credential' },
+      action: 'checked_in',
+      duration: 12,
+      count: 2,
+    });
+    expect(runtimePersist).toHaveBeenCalledTimes(1);
+    const outputs = [
+      log.exportLogs(),
+      JSON.stringify(debugSpy.mock.calls),
+      runtimePersist.mock.calls[0][0],
+    ];
+    for (const output of outputs) {
+      expect(output).not.toContain(TAG);
+      expect(output).not.toContain('Synthetic Person');
+      expect(output).not.toContain('Synthetic Staff');
+      expect(output).not.toContain('synthetic-credential');
+      expect(output).toContain('checked_in');
+    }
+    expect(log.getInMemoryLogs()[0].data).toMatchObject({ duration: 12, count: 2 });
   });
+
+  it('filters context overrides and unsafe values after configuration updates', async () => {
+    const log = createPersistingLogger();
+    log.updateConfig({
+      contextInfo: {
+        student_name: 'Synthetic Person',
+        data: { token: 'synthetic-token', amount: 3 },
+      },
+    });
+    log.debug('Context');
+    const [entry] = await persistedEntries(1);
+    expect(entry).toMatchObject({
+      student_name: '[redacted]',
+      data: { token: '[redacted]', amount: 3 },
+    });
+    const unsafe = { toJSON: () => 'Synthetic Person' };
+    log.updateConfig({ contextInfo: {} });
+    log.debug('Unsafe', { unsafe, bigint: 1n });
+    const entries = await persistedEntries(2);
+    expect(JSON.stringify(entries[1])).not.toContain('Synthetic Person');
+    expect(() => log.exportLogs()).not.toThrow();
+  });
+
+  it.each(['gkt', 'gkt-fallback', 'wedge', 'browser'] as const)(
+    'sends only filtered DEBUG entries through %s',
+    async target => {
+      const native = vi.fn();
+      if (target === 'gkt-fallback')
+        native.mockImplementation(() => {
+          throw new Error('unavailable');
+        });
+      vi.stubGlobal('SYSTEM', { log2: native });
+      const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      onTestFinished(() => {
+        vi.unstubAllGlobals();
+        consoleSpy.mockRestore();
+      });
+      const platform = target.startsWith('gkt')
+        ? await import('../platform/gkt')
+        : target === 'wedge'
+          ? await import('../platform/wedge')
+          : await vi.importActual<{ adapter: PlatformAdapter }>('../platform/browser');
+      mockPersistLog.mockImplementationOnce(entry => platform.adapter.persistLog(entry));
+      const log = createPersistingLogger();
+      log.debug(`Scan ${TAG}`, { student_name: 'Synthetic Person', tagId: TAG, action: 'scan' });
+      await vi.waitFor(() => expect(target === 'gkt' ? native : consoleSpy).toHaveBeenCalled());
+      const output = JSON.stringify(target === 'gkt' ? native.mock.calls : consoleSpy.mock.calls);
+      expect(output).not.toContain(TAG);
+      expect(output).not.toContain('Synthetic Person');
+      expect(output).toContain('scan');
+    }
+  );
 
   it('redacts the details of user actions', async () => {
     appLogger.updateConfig({ level: LogLevel.NONE, persistLevel: LogLevel.INFO, persist: true });
