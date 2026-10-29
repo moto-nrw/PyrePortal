@@ -6,6 +6,8 @@
  */
 import { describe, expect, it, vi, beforeEach, onTestFinished } from 'vitest';
 
+import type { PlatformAdapter } from '../platform/adapter';
+
 // Unmock the logger so we test the real implementation
 vi.unmock('../utils/logger');
 
@@ -555,7 +557,7 @@ describe('personal data at every log level', () => {
         ? await import('../platform/gkt')
         : target === 'wedge'
           ? await import('../platform/wedge')
-          : await vi.importActual<typeof import('../platform/browser')>('../platform/browser');
+          : await vi.importActual<{ adapter: PlatformAdapter }>('../platform/browser');
       mockPersistLog.mockImplementationOnce(entry => platform.adapter.persistLog(entry));
       const log = createPersistingLogger();
       log.debug(`Scan ${TAG}`, { student_name: 'Synthetic Person', tagId: TAG, action: 'scan' });
