@@ -96,9 +96,13 @@ async function startScan(tagId: string) {
     onScan({ tagId, scanId: ++scanId });
     await vi.advanceTimersByTimeAsync(0);
   });
-  return async (activeStudents?: number) => {
+  return async (activeStudents?: number, fields: Partial<RfidScanResponse> = {}) => {
     await act(async () => {
-      reply.resolve({ ...checkIn(activeStudents ?? 0), active_students: activeStudents });
+      reply.resolve({
+        ...checkIn(activeStudents ?? 0),
+        active_students: activeStudents,
+        ...fields,
+      });
       await vi.advanceTimersByTimeAsync(0);
     });
   };
@@ -108,9 +112,9 @@ async function startScan(tagId: string) {
 function holdNextPoll() {
   const reply = deferred<CurrentSession>();
   mockedApi.getCurrentSession.mockReturnValueOnce(reply.promise);
-  return async (activeStudents: number) => {
+  return async (activeStudents: number, fields: Partial<CurrentSession> = {}) => {
     await act(async () => {
-      reply.resolve(session({ active_students: activeStudents }));
+      reply.resolve(session({ active_students: activeStudents, ...fields }));
       await vi.advanceTimersByTimeAsync(0);
     });
   };
@@ -283,5 +287,229 @@ describe('useActivityScanningPage student count order', () => {
 
     await answerPollAfterChange(4);
     expect(result.current.studentCount).toBe(4);
+  });
+
+  it('orders a scan started before a poll by revision, not request start', async () => {
+    const { result } = await renderPage();
+    // Start just before the poll, keeping the answer within the 8s scan timeout.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(14000);
+    });
+    const answerScan = await startScan('revision-race');
+    mockedApi.getCurrentSession.mockResolvedValueOnce(
+      session({ active_students: 10, active_students_revision: 5 })
+    );
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000);
+    });
+    await answerScan(11, { active_students_session_id: 100, active_students_revision: 6 });
+    expect(result.current.studentCount).toBe(11);
+    mockedApi.getCurrentSession.mockResolvedValueOnce(
+      session({ active_students: 10, active_students_revision: 5 })
+    );
+    await nextPollTick();
+    expect(result.current.studentCount).toBe(11);
+  });
+
+  it.each(['session', 'room'] as const)(
+    'keeps only greater %s revisions, including zero',
+    async kind => {
+      const { result } = await renderPage();
+      const fields = (revision: number): Partial<RfidScanResponse> =>
+        kind === 'session'
+          ? { active_students_session_id: 100, active_students_revision: revision }
+          : { active_students_room_id: 1, active_students_room_revision: revision };
+      const answerA = await startScan('revision-a');
+      const answerB = await startScan('revision-b');
+      await answerB(12, fields(0));
+      expect(result.current.studentCount).toBe(12);
+      await answerA(99, fields(0));
+      expect(result.current.studentCount).toBe(12);
+      const answerC = await startScan('revision-c');
+      await answerC(13, fields(2));
+      expect(result.current.studentCount).toBe(13);
+      const answerD = await startScan('revision-d');
+      await answerD(99, fields(1));
+      expect(result.current.studentCount).toBe(13);
+      const answerE = await startScan('revision-e');
+      await answerE(99, fields(2));
+      expect(result.current.studentCount).toBe(13);
+      const answerF = await startScan('revision-f');
+      await answerF(14, fields(3));
+      expect(result.current.studentCount).toBe(14);
+      expect(mockedApi.processRfidScan).toHaveBeenCalledTimes(6);
+    }
+  );
+
+  it.each(['session', 'room'] as const)(
+    'accepts a higher %s revision from an earlier scan',
+    async kind => {
+      const { result } = await renderPage();
+      const fields = (revision: number): Partial<RfidScanResponse> =>
+        kind === 'session'
+          ? { active_students_session_id: 100, active_students_revision: revision }
+          : { active_students_room_id: 1, active_students_room_revision: revision };
+      const answerA = await startScan('earlier-a');
+      const answerB = await startScan('earlier-b');
+      await answerB(12, fields(1));
+      await answerA(13, fields(2));
+      expect(result.current.studentCount).toBe(13);
+    }
+  );
+
+  it('initializes the session revision from the store and ignores equal poll revisions', async () => {
+    useUserStore.setState({
+      currentSession: session({ active_students: 7, active_students_revision: 4 }),
+    });
+    mockedApi.getCurrentSession.mockResolvedValueOnce(
+      session({ active_students: 99, active_students_revision: 4 })
+    );
+    const { result } = await renderPage();
+    expect(result.current.studentCount).toBe(7);
+  });
+
+  it('never applies foreign or unscoped revisions as legacy counts', async () => {
+    const { result } = await renderPage();
+    for (const fields of [
+      { active_students_session_id: 999, active_students_revision: 900 },
+      { active_students_revision: 900 },
+      { active_students_room_id: 999, active_students_room_revision: 900 },
+      { active_students_room_revision: 900 },
+    ]) {
+      const answer = await startScan(`foreign-${JSON.stringify(fields)}`);
+      await answer(99, fields);
+      expect(result.current.studentCount).toBe(10);
+    }
+    mockedApi.getCurrentSession.mockResolvedValueOnce(
+      session({ active_group_id: 999, active_students: 99, active_students_revision: 900 })
+    );
+    await nextPollTick();
+    expect(result.current.studentCount).toBe(10);
+  });
+
+  it('does not compare room and session revisions', async () => {
+    const { result } = await renderPage();
+    const answerRoom = await startScan('room-count');
+    await answerRoom(20, { active_students_room_id: 1, active_students_room_revision: 100 });
+    const answerSession = await startScan('session-count');
+    await answerSession(3, { active_students_session_id: 100, active_students_revision: 1 });
+    expect(result.current.studentCount).toBe(3);
+    const answerRoomAgain = await startScan('room-count-again');
+    await answerRoomAgain(21, { active_students_room_id: 1, active_students_room_revision: 101 });
+    expect(result.current.studentCount).toBe(21);
+  });
+
+  it.each(['session', 'room'] as const)(
+    'resets %s revisions and rejects old scope answers',
+    async kind => {
+      const { result } = await renderPage();
+      const fields = (id: number, revision: number): Partial<RfidScanResponse> =>
+        kind === 'session'
+          ? { active_students_session_id: id, active_students_revision: revision }
+          : { active_students_room_id: id, active_students_room_revision: revision };
+      const oldId = kind === 'session' ? 100 : 1;
+      const answer = await startScan('old-count');
+      await answer(12, fields(oldId, 100));
+      const answerOldScan = await startScan('old-pending');
+      const answerOldPoll = holdNextPoll();
+      await nextPollTick();
+      holdNextPoll();
+      await act(async () => {
+        useUserStore.setState({
+          selectedRoom: { id: 2, name: 'Raum 2', is_occupied: true },
+          currentSession: session({
+            active_group_id: 200,
+            room_id: 2,
+            active_students: 3,
+            active_students_revision: 0,
+          }),
+        });
+      });
+      await answerOldScan(99, fields(oldId, 200));
+      await answerOldPoll(99, { active_students_revision: 200 });
+      expect(result.current.studentCount).toBe(3);
+      const newAnswer = await startScan('new-count');
+      await newAnswer(4, fields(kind === 'session' ? 200 : 2, 1));
+      expect(result.current.studentCount).toBe(4);
+    }
+  );
+
+  it('rejects a revisioned answer from before remount in the same scope', async () => {
+    const first = await renderPage();
+    const answer = await startScan('before-remount');
+    first.unmount();
+    const { result } = await renderPage();
+    await answer(99, { active_students_session_id: 100, active_students_revision: 999 });
+    expect(result.current.studentCount).toBe(10);
+  });
+
+  it('starts a new revision on session change without changing activity or room', async () => {
+    const { result } = await renderPage();
+    const answer = await startScan('session-before-switch');
+    await answer(12, { active_students_session_id: 100, active_students_revision: 100 });
+    holdNextPoll();
+    await act(async () => {
+      useUserStore.setState({
+        currentSession: session({
+          active_group_id: 200,
+          active_students: 3,
+          active_students_revision: 0,
+        }),
+      });
+    });
+    const newAnswer = await startScan('session-after-switch');
+    await newAnswer(4, { active_students_session_id: 200, active_students_revision: 1 });
+    expect(result.current.studentCount).toBe(4);
+  });
+
+  it('keeps an equal poll revision idempotent even when its count differs', async () => {
+    const answerPoll = holdNextPoll();
+    const { result } = await renderPage();
+    const answer = await startScan('equal-poll');
+    await answer(12, { active_students_session_id: 100, active_students_revision: 0 });
+    await answerPoll(99, { active_students_revision: 0 });
+    expect(result.current.studentCount).toBe(12);
+  });
+
+  it('rejects a revisioned response after leaving and returning to the same scope', async () => {
+    const { result } = await renderPage();
+    const answerOld = await startScan('previous-scope-visit');
+    holdNextPoll();
+    await act(async () => {
+      useUserStore.setState({ currentSession: session({ active_group_id: 200 }) });
+    });
+    holdNextPoll();
+    await act(async () => {
+      useUserStore.setState({ currentSession: session({ active_students: 3 }) });
+    });
+    await answerOld(99, { active_students_room_id: 1, active_students_room_revision: 999 });
+    expect(result.current.studentCount).toBe(3);
+  });
+
+  it('uses legacy request ordering when a room count omits its revision', async () => {
+    const { result } = await renderPage();
+    const answerA = await startScan('legacy-room-a');
+    const answerB = await startScan('legacy-room-b');
+    await answerB(12, { active_students_room_id: 1 });
+    await answerA(99, { active_students_room_id: 1 });
+    expect(result.current.studentCount).toBe(12);
+  });
+
+  it('preserves destination revisions without applying their count to this room', async () => {
+    const { result } = await renderPage();
+    await act(async () => {
+      useUserStore.getState().setScanResult({
+        ...checkIn(99),
+        isOpenRoom: true,
+        active_students_room_id: 2,
+        active_students_room_revision: 999,
+      });
+      useUserStore.getState().showScanModal();
+    });
+    expect(result.current.studentCount).toBe(10);
+    expect(useUserStore.getState().rfid.currentScan).toMatchObject({
+      active_students_room_id: 2,
+      active_students_room_revision: 999,
+    });
   });
 });
