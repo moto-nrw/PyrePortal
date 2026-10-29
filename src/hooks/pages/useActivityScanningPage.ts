@@ -167,15 +167,31 @@ export function useActivityScanningPage() {
   // already knows; the poll and authoritative scan counts correct it.
   const [studentCount, setStudentCount] = useState(() => currentSession?.active_students ?? 0);
 
-  // Every source of the count (scan answer, poll) is stamped with the global
-  // nextRequestSequence() when its request starts. An answer, absolute count
-  // or legacy delta alike, applies only when its request started after the one
-  // behind the shown value. The shown value starts at the sequence of mount
-  // time, so requests started before this page are discarded.
-  const appliedCountSequenceRef = useRef(currentRequestSequence());
-  const applyStudentCount = (sequence: number, next: SetStateAction<number>): boolean => {
-    if (sequence <= appliedCountSequenceRef.current) return false;
-    appliedCountSequenceRef.current = sequence;
+  // Request order remains the fallback for old backends. The scope boundary
+  // is separate: a higher server revision may arrive from an earlier request,
+  // but never from before this page or count scope was opened.
+  const countScopeStartRef = useRef(currentRequestSequence());
+  const appliedCountSequenceRef = useRef(countScopeStartRef.current);
+  const countRevisionsRef = useRef<{ session?: number; room?: number }>({
+    session:
+      currentSession?.active_students != null ? currentSession.active_students_revision : undefined,
+  });
+  const applyStudentCount = (
+    sequence: number,
+    next: SetStateAction<number>,
+    revision?: { kind: 'session' | 'room'; value: number }
+  ): boolean => {
+    if (sequence <= countScopeStartRef.current) return false;
+    if (revision) {
+      const previous = countRevisionsRef.current[revision.kind];
+      // Equal revisions can carry different counts from concurrent writers.
+      // Keep the first value until a later snapshot has a greater revision.
+      if (previous != null && revision.value <= previous) return false;
+      countRevisionsRef.current[revision.kind] = revision.value;
+    } else if (sequence <= appliedCountSequenceRef.current) {
+      return false;
+    }
+    appliedCountSequenceRef.current = Math.max(appliedCountSequenceRef.current, sequence);
     setStudentCount(next);
     return true;
   };
@@ -307,7 +323,17 @@ export function useActivityScanningPage() {
       logger.debug('Session info received', { session });
 
       const count = session?.active_students ?? 0;
-      if (countScopeOf(useUserStore.getState()) !== scope || !applyStudentCount(sequence, count)) {
+      const state = useUserStore.getState();
+      const revision = session?.active_students_revision;
+      if (
+        countScopeOf(state) !== scope ||
+        (revision != null && session?.active_group_id !== state.currentSession?.active_group_id) ||
+        !applyStudentCount(
+          sequence,
+          count,
+          revision != null ? { kind: 'session', value: revision } : undefined
+        )
+      ) {
         logger.debug('Discarding session count older than the shown count', { count });
         return;
       }
@@ -343,7 +369,15 @@ export function useActivityScanningPage() {
     if (countScopeKeyRef.current === countScopeKey) return;
     countScopeKeyRef.current = countScopeKey;
     logger.debug('Count scope changed, discarding older count answers');
-    applyStudentCount(nextRequestSequence(), currentSession?.active_students ?? 0);
+    countScopeStartRef.current = nextRequestSequence();
+    appliedCountSequenceRef.current = countScopeStartRef.current;
+    countRevisionsRef.current = {
+      session:
+        currentSession?.active_students != null
+          ? currentSession.active_students_revision
+          : undefined,
+    };
+    setStudentCount(currentSession?.active_students ?? 0);
     void fetchSessionInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countScopeKey]);
@@ -487,7 +521,31 @@ export function useActivityScanningPage() {
     // Apply authoritative count after side effects
     // Skip for Schulhof scans: active_students refers to the Schulhof room, not our room
     if (shouldApplyAuthoritativeCount(extendedScan)) {
-      applyScanCount(currentScan.active_students!);
+      if (isOwnScope) {
+        if (currentScan.active_students_room_revision != null) {
+          if (
+            currentScan.active_students_room_id != null &&
+            currentScan.active_students_room_id === selectedRoom?.id
+          ) {
+            applyStudentCount(scanSequence, currentScan.active_students!, {
+              kind: 'room',
+              value: currentScan.active_students_room_revision,
+            });
+          }
+        } else if (currentScan.active_students_revision != null) {
+          if (
+            currentScan.active_students_session_id != null &&
+            currentScan.active_students_session_id === currentSession?.active_group_id
+          ) {
+            applyStudentCount(scanSequence, currentScan.active_students!, {
+              kind: 'session',
+              value: currentScan.active_students_revision,
+            });
+          }
+        } else {
+          applyScanCount(currentScan.active_students!);
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
