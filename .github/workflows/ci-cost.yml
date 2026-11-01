@@ -1,0 +1,29 @@
+name: CI cost
+
+# Keeps a sticky comment with the estimated runner cost of all CI runs of a
+# pull request. The action lives in project-phoenix (.github/actions/ci-cost)
+# and is shared by both repos. workflow_run runs the default-branch version
+# with a write token; the action reads the API and never runs PR code.
+on:
+  workflow_run:
+    # Every pull_request workflow, so the comment refreshes after the last one.
+    workflows: [PyrePortal CI, SonarCloud Analysis, CodeQL Analysis]
+    types: [completed]
+permissions: {}
+
+concurrency:
+  # Each run recounts all runs of the pull request, so a newer queued run may
+  # replace an older one without losing anything.
+  group: ci-cost-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  comment:
+    if: github.event.workflow_run.event == 'pull_request'
+    permissions:
+      actions: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      # Our own org repo: development keeps both repos on one price table.
+      - uses: moto-nrw/project-phoenix/.github/actions/ci-cost@development
