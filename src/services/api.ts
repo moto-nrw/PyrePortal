@@ -749,7 +749,7 @@ export const api = {
     pin: string,
     rfid: string,
     action: 'confirm' | 'cancel' | 'confirm_daily_checkout',
-    destination?: 'zuhause' | 'unterwegs',
+    destination?: 'zuhause' | 'unterwegs' | 'unterricht',
     staffId?: number,
     signal?: AbortSignal
   ): Promise<AttendanceToggleResponse> {

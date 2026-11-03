@@ -4,6 +4,7 @@ import {
   faFaceSmile,
   faFaceMeh,
   faFaceFrown,
+  faChalkboardUser,
   faRestroom,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -31,6 +32,7 @@ const texts = {
   destinationSchulhof: 'Schulhof',
   destinationToilette: 'Toilette',
   destinationNachHause: 'nach Hause',
+  destinationUnterricht: 'zum Unterricht',
   pickupTimeToday: 'Abholzeit heute',
   pickupTimeValue: (time: string) => `${time} Uhr`,
   noPickupTimeToday: 'Für heute ist keine Abholzeit hinterlegt.',
@@ -45,6 +47,7 @@ const texts = {
   pickupQueryHeading: 'Abholzeit abfragen',
   feedbackHeading: (firstName: string) => `Wie war dein Tag, ${firstName}?`,
   farewellHeading: (firstName: string) => `Tschüss, ${firstName}!`,
+  classFarewellHeading: (firstName: string) => `Bis später, ${firstName}!`,
   supervisorRoomFallback: 'diesen Raum',
   supervisorHeading: (name: string, roomName: string) => `${name} betreut jetzt ${roomName}`,
   pickupInfoHeading: (firstName: string) => `Abholzeit für ${firstName}`,
@@ -217,6 +220,9 @@ const ICON_SCHULHOF = (
 
 // Phosphor house-line, tinted via currentColor
 const ICON_NACH_HAUSE = <HouseLineIcon size={48} color="currentColor" />;
+const ICON_UNTERRICHT = (
+  <FontAwesomeIcon icon={faChalkboardUser} style={{ fontSize: '48px', color: 'currentColor' }} />
+);
 
 /** Reusable destination button for checkout modal */
 function DestinationButton({
@@ -301,6 +307,8 @@ const ActivityScanningPage: React.FC = () => {
     deviceConfig,
     showFeedbackPrompt,
     handleNachHause,
+    handleZumUnterricht,
+    classDestinationAvailable,
     handleFeedbackSubmit,
     isAwaitingPickupQueryScan,
     isPickupQueryLoading,
@@ -565,6 +573,17 @@ const ActivityScanningPage: React.FC = () => {
       if (destinations.length === 0) {
         setCheckoutDestinationState(null);
         return null;
+      }
+
+      // Joins the chooser last. A school that switched every destination off
+      // keeps the neutral confirmation above.
+      if (classDestinationAvailable) {
+        destinations.push({
+          destination: 'zum_unterricht',
+          label: texts.destinationUnterricht,
+          icon: ICON_UNTERRICHT,
+          onClick: () => void handleZumUnterricht(),
+        });
       }
 
       const gridColumns = destinationGridColumns(destinations.length);
@@ -1014,6 +1033,14 @@ const ActivityScanningPage: React.FC = () => {
                 }
                 // The large house belongs only to the confirmed farewell state.
                 if (checkoutDestinationState?.showingFarewell) {
+                  if (checkoutDestinationState.wentToClass) {
+                    return (
+                      <FontAwesomeIcon
+                        icon={faChalkboardUser}
+                        style={{ fontSize: '72px', color: scanFamily.accent }}
+                      />
+                    );
+                  }
                   return <HouseLineIcon size={80} color={scanFamily.accent} />;
                 }
                 // Supervisor authentication icon
@@ -1131,7 +1158,9 @@ const ActivityScanningPage: React.FC = () => {
               // Farewell state after "nach Hause" feedback
               if (checkoutDestinationState?.showingFarewell) {
                 const firstName = checkoutDestinationState.studentName.split(' ')[0];
-                return texts.farewellHeading(firstName);
+                return checkoutDestinationState.wentToClass
+                  ? texts.classFarewellHeading(firstName)
+                  : texts.farewellHeading(firstName);
               }
 
               // Supervisor authentication - prefer custom message (e.g., redirect hint)

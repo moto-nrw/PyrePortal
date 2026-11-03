@@ -19,6 +19,8 @@ export interface CheckoutDestinationState {
   studentId: number | null;
   dailyCheckoutAvailable: boolean;
   showingFarewell: boolean;
+  /** The child went to class and comes back later: no "Tschüss", no feedback. */
+  wentToClass?: boolean;
 }
 
 /** Destination rooms a student can check into directly from the checkout modal. */
