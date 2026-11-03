@@ -2,6 +2,7 @@ import process from 'node:process';
 
 import { defineConfig } from '@playwright/test';
 
+import { SECURE_CHROME_LAUNCH_OPTIONS } from './screenshots/secure-chrome';
 import { SCREENSHOT_TAG } from './screenshots/tags';
 
 /**
@@ -15,6 +16,10 @@ import { SCREENSHOT_TAG } from './screenshots/tags';
  * deterministic. The dev server is always started by Playwright
  * (reuseExistingServer: false) so this pin is guaranteed to apply —
  * stop any already-running dev server on port 1420 first.
+ *
+ * Browser: the system Google Chrome with the sandbox on, never the bundled
+ * Chromium (see screenshots/secure-chrome.ts). globalSetup aborts the run when
+ * that Chrome is older than MIN_CHROME_VERSION.
  */
 export default defineConfig({
   testDir: './screenshots',
@@ -22,8 +27,11 @@ export default defineConfig({
   timeout: 30_000,
   retries: 0,
   workers: 1, // Sequential — screens depend on prior navigation state
+  globalSetup: './screenshots/global-setup.ts',
 
   use: {
+    browserName: 'chromium',
+    launchOptions: { ...SECURE_CHROME_LAUNCH_OPTIONS },
     baseURL: 'http://localhost:1420',
     viewport: { width: 1280, height: 800 },
     actionTimeout: 10_000,

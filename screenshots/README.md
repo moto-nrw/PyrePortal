@@ -26,7 +26,29 @@ Convert the video for platforms that need mp4 (requires ffmpeg):
 ffmpeg -i screenshots/output/user-journey.webm -c:v libx264 -pix_fmt yuv420p screenshots/output/user-journey.mp4
 ```
 
+## Browser
+
+Playwright launches the system **Google Chrome** (`channel: 'chrome'`) with
+the Chromium sandbox enabled. It does not use or download its own bundled
+Chromium: the one shipped with Playwright 1.64.1 (156.0.8078.4) has known
+critical vulnerabilities, and Playwright turns the sandbox off by default.
+The options live in `secure-chrome.ts`.
+
+Before any test, `global-setup.ts` starts Chrome once and stops the run if its
+version is below `MIN_CHROME_VERSION` (156.0.8078.73). Update Chrome when that
+happens:
+
+- macOS/Windows: keep a regular Google Chrome installation up to date.
+- Linux and CI: `pnpm exec playwright install --with-deps chrome` installs
+  the current stable Chrome to `/opt/google/chrome` (needs sudo).
+
+`pnpm exec playwright install chromium` is no longer needed. This is an
+interim measure until a Playwright release bundles a patched Chromium
+(moto-nrw/PyrePortal#496, moto-nrw/project-phoenix#5612).
+
 ## Prerequisites
+
+Google Chrome 156.0.8078.73 or newer must be installed (see [Browser](#browser)).
 
 1. **Local backend** (project-phoenix) on `http://localhost:8080` with demo
    seed data:

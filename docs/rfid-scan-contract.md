@@ -136,7 +136,8 @@ Browser screenshot comparison uses deterministic API responses and a fixed
 bridge simulation and must be reported separately.
 
 Run the repeatable visual parity check without a live backend (port 1420 must
-be free):
+be free, Google Chrome 156.0.8078.73 or newer must be installed, see
+[screenshots/README.md](../screenshots/README.md#browser)):
 
 ```bash
 VITE_API_BASE_URL=http://localhost:8080 VITE_DEVICE_API_KEY=local-test-only pnpm exec playwright test screenshots/rfid-parity.spec.ts
