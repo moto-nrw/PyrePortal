@@ -53,6 +53,24 @@ describe('checkInToDestinationRoom', () => {
     mockedApi.processRfidScan.mockResolvedValue(serverResult);
   });
 
+  it.each([
+    { active_students_session_id: 100, active_students_revision: 0 },
+    { active_students_room_id: 77, active_students_room_revision: 0 },
+  ])('preserves the destination count revision fields %o', async fields => {
+    mockedApi.processRfidScan.mockResolvedValueOnce({
+      ...serverResult,
+      active_students: 5,
+      ...fields,
+    });
+    const result = await checkInToDestinationRoom({
+      destination: 'schulhof',
+      roomId: 77,
+      state: makeState(),
+      pin: '1234',
+    });
+    expect(result).toMatchObject({ active_students: 5, ...fields, isSchulhof: true });
+  });
+
   describe('room not configured', () => {
     it('returns the Schulhof error result without calling the server', async () => {
       const result = await checkInToDestinationRoom({

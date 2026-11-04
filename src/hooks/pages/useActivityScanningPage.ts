@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router';
 
 import {
+  countScopeOf,
   createPickupQueryTimeoutResult,
   getCheckinCountDelta,
   getCheckoutCountDelta,
@@ -23,6 +24,7 @@ import { selectOpenRoomDestinations } from '../../services/checkoutDestinationSe
 import { resolveStaffAttributionId } from '../../store/slices/authSlice';
 import { useUserStore } from '../../store/userStore';
 import { createLogger, serializeError } from '../../utils/logger';
+import { currentRequestSequence, nextRequestSequence } from '../../utils/requestSequence';
 import { useRfidScanning } from '../useRfidScanning';
 
 import { BOOKING_TIMEOUT_MS, useCheckoutDestination } from './useCheckoutDestination';
@@ -39,6 +41,20 @@ const findRoomByAliases = (rooms: Room[], aliases: readonly string[]): Room | un
     if (match) return match;
   }
   return undefined;
+};
+
+// Each shown result gets its own identity, so a new result restarts the modal
+// close timer even when it looks like the previous one, such as a second
+// timeout notice or a second refused scan.
+const resultIds = new WeakMap<object, number>();
+let lastResultId = 0;
+const resultIdOf = (result: object): number => {
+  let id = resultIds.get(result);
+  if (id === undefined) {
+    id = ++lastResultId;
+    resultIds.set(result, id);
+  }
+  return id;
 };
 
 /**
@@ -147,8 +163,38 @@ export function useActivityScanningPage() {
     }
   }, [currentSession, selectedRoom, fetchCurrentSession]);
 
-  // Track student count based on check-ins
-  const [studentCount, setStudentCount] = useState(0);
+  // Track student count based on check-ins. Start from the session the store
+  // already knows; the poll and authoritative scan counts correct it.
+  const [studentCount, setStudentCount] = useState(() => currentSession?.active_students ?? 0);
+
+  // Request order remains the fallback for old backends. The scope boundary
+  // is separate: a higher server revision may arrive from an earlier request,
+  // but never from before this page or count scope was opened.
+  const countScopeStartRef = useRef(currentRequestSequence());
+  const appliedCountSequenceRef = useRef(countScopeStartRef.current);
+  const countRevisionsRef = useRef<{ session?: number; room?: number }>({
+    session:
+      currentSession?.active_students != null ? currentSession.active_students_revision : undefined,
+  });
+  const applyStudentCount = (
+    sequence: number,
+    next: SetStateAction<number>,
+    revision?: { kind: 'session' | 'room'; value: number }
+  ): boolean => {
+    if (sequence <= countScopeStartRef.current) return false;
+    if (revision) {
+      const previous = countRevisionsRef.current[revision.kind];
+      // Equal revisions can carry different counts from concurrent writers.
+      // Keep the first value until a later snapshot has a greater revision.
+      if (previous != null && revision.value <= previous) return false;
+      countRevisionsRef.current[revision.kind] = revision.value;
+    } else if (sequence <= appliedCountSequenceRef.current) {
+      return false;
+    }
+    appliedCountSequenceRef.current = Math.max(appliedCountSequenceRef.current, sequence);
+    setStudentCount(next);
+    return true;
+  };
 
   // Schulhof room ID (discovered dynamically from server)
   const [schulhofRoomId, setSchulhofRoomId] = useState<number | null>(null);
@@ -215,6 +261,8 @@ export function useActivityScanningPage() {
   // Clear stale checkout/feedback/farewell state when a new scan arrives.
   // A "new scan" is detected by: different RFID tag, different visit_id, or
   // a check-in arriving while we're in a checkout flow (always means new scan).
+  // An error or info result ends the flow too: feedback and farewell would
+  // otherwise hide it, such as the notice of a timed-out scan (#479).
   useEffect(() => {
     if (!currentScan || !checkoutDestinationState) return;
 
@@ -225,14 +273,17 @@ export function useActivityScanningPage() {
       currentScan.visit_id != null &&
       currentScan.visit_id !== feedbackVisitIdRef.current;
     const isCheckinDuringCheckoutFlow = currentScan.action === 'checked_in';
+    const isNotice = isNonActionableScan(currentScan);
 
-    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow) {
+    if (isDifferentTag || isDifferentVisit || isCheckinDuringCheckoutFlow || isNotice) {
       logger.debug('Clearing stale checkout state for new scan', {
         reason: isDifferentTag
           ? 'different_tag'
           : isDifferentVisit
             ? 'different_visit'
-            : 'checkin_during_checkout',
+            : isCheckinDuringCheckoutFlow
+              ? 'checkin_during_checkout'
+              : 'notice',
         oldRfid: checkoutDestinationState.rfid,
         newRfid: currentRfid,
         newAction: currentScan.action,
@@ -265,17 +316,31 @@ export function useActivityScanningPage() {
   const fetchSessionInfo = async () => {
     if (!authenticatedUser?.pin) return;
 
+    const sequence = nextRequestSequence();
+    const scope = countScopeOf(useUserStore.getState());
     try {
       const session = await api.getCurrentSession(authenticatedUser.pin);
       logger.debug('Session info received', { session });
 
+      const count = session?.active_students ?? 0;
+      const state = useUserStore.getState();
+      const revision = session?.active_students_revision;
+      if (
+        countScopeOf(state) !== scope ||
+        (revision != null && session?.active_group_id !== state.currentSession?.active_group_id) ||
+        !applyStudentCount(
+          sequence,
+          count,
+          revision != null ? { kind: 'session', value: revision } : undefined
+        )
+      ) {
+        logger.debug('Discarding session count older than the shown count', { count });
+        return;
+      }
       if (session) {
-        const count = session.active_students ?? 0;
         logger.info('Setting student count', { count });
-        setStudentCount(count);
       } else {
         logger.warn('No session info received');
-        setStudentCount(0);
       }
     } catch (error) {
       logger.error('Failed to fetch session info', { error: serializeError(error) });
@@ -295,6 +360,27 @@ export function useActivityScanningPage() {
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticatedUser?.pin]); // fetchSessionInfo is stable within this component lifecycle
+
+  // A new activity, room or session starts the count over: answers to requests
+  // started before the change belong to the old one and are discarded.
+  const countScopeKey = countScopeOf({ selectedActivity, selectedRoom, currentSession });
+  const countScopeKeyRef = useRef(countScopeKey);
+  useEffect(() => {
+    if (countScopeKeyRef.current === countScopeKey) return;
+    countScopeKeyRef.current = countScopeKey;
+    logger.debug('Count scope changed, discarding older count answers');
+    countScopeStartRef.current = nextRequestSequence();
+    appliedCountSequenceRef.current = countScopeStartRef.current;
+    countRevisionsRef.current = {
+      session:
+        currentSession?.active_students != null
+          ? currentSession.active_students_revision
+          : undefined,
+    };
+    setStudentCount(currentSession?.active_students ?? 0);
+    void fetchSessionInfo();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countScopeKey]);
 
   // Refresh room availability while the kiosk stays open.
   useEffect(() => {
@@ -389,6 +475,13 @@ export function useActivityScanningPage() {
 
     // Use authoritative server count when available, otherwise fall back to optimistic delta
     const hasAuthoritativeCount = currentScan.active_students != null;
+    // Kiosk requests attach their start sequence and scope; a result without
+    // them is ordered as if it started now in the current scope.
+    const scanSequence = currentScan.requestSequence ?? nextRequestSequence();
+    const isOwnScope = (currentScan.requestScope ?? countScopeKey) === countScopeKey;
+    const applyScanCount = (next: SetStateAction<number>) => {
+      if (isOwnScope) applyStudentCount(scanSequence, next);
+    };
 
     // Run action-specific side effects (e.g. checkout destination state) regardless of count source
     switch (currentScan.action) {
@@ -396,7 +489,7 @@ export function useActivityScanningPage() {
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
           const delta = getCheckinCountDelta(extendedScan);
-          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
+          if (delta !== 0) applyScanCount(prev => Math.max(0, prev + delta));
         }
         break;
       case 'checked_out_daily':
@@ -413,14 +506,14 @@ export function useActivityScanningPage() {
         const delta = getCheckoutCountDelta();
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount && delta !== 0)
-          setStudentCount(prev => Math.max(0, prev + delta));
+          applyScanCount(prev => Math.max(0, prev + delta));
         break;
       }
       case 'transferred':
         // Legacy: optimistic delta fallback for servers that don't provide active_students
         if (!hasAuthoritativeCount) {
           const delta = getTransferCountDelta(currentScan, selectedRoom?.name);
-          if (delta !== 0) setStudentCount(prev => Math.max(0, prev + delta));
+          if (delta !== 0) applyScanCount(prev => Math.max(0, prev + delta));
         }
         break;
     }
@@ -428,7 +521,31 @@ export function useActivityScanningPage() {
     // Apply authoritative count after side effects
     // Skip for Schulhof scans: active_students refers to the Schulhof room, not our room
     if (shouldApplyAuthoritativeCount(extendedScan)) {
-      setStudentCount(currentScan.active_students!);
+      if (isOwnScope) {
+        if (currentScan.active_students_room_revision != null) {
+          if (
+            currentScan.active_students_room_id != null &&
+            currentScan.active_students_room_id === selectedRoom?.id
+          ) {
+            applyStudentCount(scanSequence, currentScan.active_students!, {
+              kind: 'room',
+              value: currentScan.active_students_room_revision,
+            });
+          }
+        } else if (currentScan.active_students_revision != null) {
+          if (
+            currentScan.active_students_session_id != null &&
+            currentScan.active_students_session_id === currentSession?.active_group_id
+          ) {
+            applyStudentCount(scanSequence, currentScan.active_students!, {
+              kind: 'session',
+              value: currentScan.active_students_revision,
+            });
+          }
+        } else {
+          applyScanCount(currentScan.active_students!);
+        }
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentScan, showModal]); // Only update when scan modal shows
@@ -475,7 +592,6 @@ export function useActivityScanningPage() {
 
     if (isPickupQueryLoading) {
       logger.warn('Pickup query loading timed out, showing timeout error before reset', {
-        tagId: rfid.pickupQueryTagId,
         scanContextId: rfid.scanContextId,
       });
 
@@ -563,10 +679,7 @@ export function useActivityScanningPage() {
     const controller = new AbortController();
     let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
-    logger.info('Student confirmed nach Hause - calling confirm_daily_checkout', {
-      rfid: activeState.rfid,
-      studentName: activeState.studentName,
-    });
+    logger.info('Student confirmed nach Hause - calling confirm_daily_checkout');
 
     try {
       const response = await Promise.race([
@@ -612,7 +725,6 @@ export function useActivityScanningPage() {
       }
     } catch (error) {
       logger.error('Failed to confirm daily checkout', {
-        rfid: activeState.rfid,
         error: error instanceof Error ? error.message : String(error),
       });
       if (!isActiveDestination(activeState)) return;
@@ -638,10 +750,7 @@ export function useActivityScanningPage() {
 
     const { submitDailyFeedback } = useUserStore.getState();
 
-    logger.info('Submitting feedback', {
-      studentId: currentScan.student_id,
-      rating,
-    });
+    logger.info('Submitting feedback', { rating });
 
     // Guard against null student_id (shouldn't happen for real student scans)
     if (currentScan.student_id === null) {
@@ -683,6 +792,7 @@ export function useActivityScanningPage() {
     authenticatedUser,
     // Scan state
     currentScan,
+    currentScanId: currentScan ? resultIdOf(currentScan) : null,
     studentCount,
     processingQueueSize: rfid.processingQueue.size,
     scanContextId: rfid.scanContextId,

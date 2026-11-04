@@ -708,7 +708,7 @@ function StaffClockPage() {
       if (requestId !== requestIdRef.current) return;
       setScannedTag(tag);
       setClockState(state);
-      logUserAction('Staff card scanned', { staffId: state.staff_id });
+      logUserAction('Staff card scanned');
     } catch (error) {
       // Already abandoned (back button): that run owns nothing on this page.
       if (requestId !== requestIdRef.current) return;

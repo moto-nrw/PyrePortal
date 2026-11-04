@@ -20,6 +20,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Verify canonical error registry compatibility
+        run: node --test scripts/sync-error-codes.test.mjs
+
       - name: Lint frontend code
         run: pnpm run lint
 

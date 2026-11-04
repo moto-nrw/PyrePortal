@@ -169,24 +169,11 @@ function StudentSelectionPage() {
         ? `student-${entity.data.student_id}`
         : `teacher-${entity.data.staff_id}`;
 
-    const entityName =
-      entity.type === 'student'
-        ? `${entity.data.first_name} ${entity.data.last_name}`
-        : entity.data.display_name;
-
-    logger.info('Entity selected', {
-      type: entity.type,
-      name: entityName,
-      id: entityId,
-    });
+    logger.info('Entity selected', { type: entity.type });
 
     setSelectedEntityId(entityId);
 
-    logUserAction('entity_selection', {
-      type: entity.type,
-      name: entityName,
-      tagId: state.scannedTag,
-    });
+    logUserAction('entity_selection', { type: entity.type });
   };
 
   const handleAssignTag = async () => {
@@ -219,11 +206,7 @@ function StudentSelectionPage() {
           ? `${selectedEntity.data.first_name} ${selectedEntity.data.last_name}`
           : selectedEntity.data.display_name;
 
-      logger.info('Assigning tag to entity', {
-        type: selectedEntity.type,
-        tagId: state.scannedTag,
-        entityName,
-      });
+      logger.info('Assigning tag to entity', { type: selectedEntity.type });
 
       // Route to correct endpoint based on entity type
       const result =
@@ -242,11 +225,7 @@ function StudentSelectionPage() {
       if (result.success) {
         clearTagScan(state.scannedTag);
 
-        logUserAction('tag_assignment_complete', {
-          type: selectedEntity.type,
-          tagId: state.scannedTag,
-          entityName,
-        });
+        logUserAction('tag_assignment_complete', { type: selectedEntity.type });
 
         // Navigate back with success message
         void navigate('/tag-assignment', {

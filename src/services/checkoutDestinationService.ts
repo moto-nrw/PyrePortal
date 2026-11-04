@@ -99,11 +99,7 @@ export const checkInToDestinationRoom = async (
   }
 
   try {
-    logger.info(`Checking student into ${config.logLabel}`, {
-      rfid: state.rfid,
-      studentName: state.studentName,
-      roomId,
-    });
+    logger.info(`Checking student into ${config.logLabel}`, { roomId });
 
     const result = await api.processRfidScan(
       {
@@ -191,7 +187,7 @@ export const moveToOpenRoom = async (params: MoveToOpenRoomParams): Promise<Rfid
   const { room, state, pin, staffId, signal } = params;
 
   try {
-    logger.info('Booking student into open room', { rfid: state.rfid, roomId: room.id });
+    logger.info('Booking student into open room', { roomId: room.id });
 
     const result = await api.moveToOpenRoom(
       { student_rfid: state.rfid, room_id: room.id },

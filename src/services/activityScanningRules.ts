@@ -150,3 +150,11 @@ export const getModalTimeoutDuration = (params: ModalTimeoutParams): number => {
 /** Both server checkout outcomes use the same kiosk presentation. */
 export const isCheckoutAction = (action: RfidScanResult['action'] | undefined): boolean =>
   action === 'checked_out' || action === 'checked_out_daily';
+
+/** The activity, room and session a student count belongs to. */
+export const countScopeOf = (state: {
+  selectedActivity: { id: number } | null;
+  selectedRoom: { id: number } | null;
+  currentSession: { active_group_id: number } | null;
+}): string =>
+  `${state.selectedActivity?.id}:${state.selectedRoom?.id}:${state.currentSession?.active_group_id}`;

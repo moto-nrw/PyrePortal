@@ -116,7 +116,7 @@ export function useTagAssignmentScan() {
     setScannedTag(tagId);
 
     try {
-      logUserAction('RFID tag scanned', { tagId });
+      logUserAction('RFID tag scanned');
 
       // Check if tag is already assigned
       const assignment = await checkTagAssignment(tagId);
@@ -187,7 +187,7 @@ export function useTagAssignmentScan() {
       }
 
       if (result.success && result.tag_id) {
-        logUserAction('RFID tag scanned successfully', { tagId: result.tag_id });
+        logUserAction('RFID tag scanned successfully');
         void handleTagScanned(result.tag_id, scanRequestId);
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';

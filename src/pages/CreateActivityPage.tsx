@@ -67,10 +67,7 @@ function CreateActivityPage() {
 
     setIsFetching(true);
     try {
-      logger.info('Fetching activities for teacher', {
-        staffId: authenticatedUser.staffId,
-        staffName: authenticatedUser.staffName,
-      });
+      logger.info('Fetching activities for teacher');
 
       performance.mark('activities-fetch-start');
       const activitiesData = await fetchActivities();

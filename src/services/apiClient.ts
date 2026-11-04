@@ -107,6 +107,17 @@ async function ensureInitialized(): Promise<void> {
   }
 }
 
+// Segments after these collections are wristband tags or person IDs.
+const PERSONAL_PATH_SEGMENT = /\/(rfid|students|staff)\/[^/]+/g;
+
+/**
+ * Endpoint as a template for logs: no query string (it can carry staff IDs)
+ * and no tag or person ID in the path.
+ */
+function toLogEndpoint(endpoint: string): string {
+  return endpoint.split('?')[0].replace(PERSONAL_PATH_SEGMENT, '/$1/:id');
+}
+
 /**
  * Handle network-level fetch errors and convert to user-friendly German messages
  * Extracted to reduce cognitive complexity in apiCall
@@ -116,7 +127,7 @@ function handleNetworkError(error: unknown, endpoint: string, startTime: number)
   const responseTime = Date.now() - startTime;
 
   logger.warn('Network error', {
-    endpoint,
+    endpoint: toLogEndpoint(endpoint),
     responseTime,
     errorName: errorObj.name,
     errorMessage: errorObj.message,
@@ -186,14 +197,19 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
     const baseMessage = `API Error: ${response.status} - ${response.statusText}`;
     const { message, code, details } = await parseErrorResponse(response, baseMessage);
 
+    // Details can describe the student (e.g. STUDENT_ALREADY_ACTIVE); only
+    // their field names reach the persisted log.
     logger.warn('API request failed', {
-      endpoint,
+      endpoint: toLogEndpoint(endpoint),
       status: response.status,
       responseTime,
       error: message,
       errorCode: code,
-      errorDetails: details,
+      errorDetailFields: details ? Object.keys(details) : undefined,
     });
+    if (details) {
+      logger.debug('API request failure details', { endpoint, errorDetails: details });
+    }
 
     throw new ApiError(message, response.status, code, details);
   }

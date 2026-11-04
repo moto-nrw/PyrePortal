@@ -228,7 +228,6 @@ function RoomSelectionPage() {
       activityId: selectedActivity.id,
       roomId: selectedRoom.id,
       supervisorCount: selectedSupervisors.length,
-      supervisorIds: selectedSupervisors.map(s => s.id),
     });
 
     performance.mark('session-start-begin');

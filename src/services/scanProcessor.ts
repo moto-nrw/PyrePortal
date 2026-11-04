@@ -1,5 +1,6 @@
 import { useUserStore } from '../store/userStore';
 import { createLogger, serializeError } from '../utils/logger';
+import { TimeoutError } from '../utils/withTimeout';
 
 import { api, mapApiErrorToGerman, ApiError, formatRoomName } from './api';
 import type { RfidScanResult } from './api';
@@ -88,9 +89,7 @@ export const evaluateSupervisorScan = (params: SupervisorScanParams): Supervisor
   addActiveSupervisorTag(tagId);
 
   logger.info('Supervisor authenticated successfully', {
-    supervisorName: staffName,
     message: result.message,
-    staffId,
     isRepeatSupervisor,
     alreadySelected,
   });
@@ -195,6 +194,17 @@ const extractAlreadyActiveStudentId = (error: unknown): number | null => {
  * Creates an error result for display when scan fails.
  */
 export const createScanErrorResult = (error: unknown): ScanDisplayResult => {
+  // The server may still have booked the scan, so a second scan could undo it.
+  if (error instanceof TimeoutError) {
+    return {
+      student_name: 'Scan nicht bestätigt',
+      student_id: null,
+      action: 'error',
+      message: 'Bitte nicht noch einmal scannen. Bitte die Betreuung fragen.',
+      showAsError: true,
+    };
+  }
+
   // Special handling for "already checked in" scenario
   if (isStudentAlreadyActiveError(error)) {
     return {
@@ -268,30 +278,5 @@ export const runPickupQuery = async (params: PickupQueryParams): Promise<PickupQ
     }
 
     return { status: 'error', result: createScanErrorResult(error) };
-  }
-};
-
-/**
- * Updates session activity (fire-and-forget semantics: failures are logged,
- * never surfaced to the user).
- */
-export const updateSessionActivityQuietly = async (
-  pin: string,
-  context: 'scan' | 'pickup'
-): Promise<void> => {
-  try {
-    await api.updateSessionActivity(pin);
-    logger.debug(
-      context === 'pickup'
-        ? 'Session activity updated after pickup query'
-        : 'Session activity updated'
-    );
-  } catch (activityError) {
-    logger.warn(
-      context === 'pickup'
-        ? 'Failed to update session activity after pickup query'
-        : 'Failed to update session activity',
-      { error: activityError }
-    );
   }
 };

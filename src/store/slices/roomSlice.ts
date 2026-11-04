@@ -23,10 +23,7 @@ export const createRoomSlice = (set: SetState<UserState>, get: GetState<UserStat
 
     set({ isLoading: true, error: null });
     try {
-      storeLogger.info('Fetching available rooms from API', {
-        staffId: authenticatedUser.staffId,
-        staffName: authenticatedUser.staffName,
-      });
+      storeLogger.info('Fetching available rooms from API');
 
       const rooms = await api.getRooms(authenticatedUser.pin);
 

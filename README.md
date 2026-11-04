@@ -70,6 +70,7 @@ Project Phoenix is the source of truth for students, staff, rooms, sessions, att
 - Node.js 22.12 or newer
 - pnpm 10
 - A local [Project Phoenix](https://github.com/moto-nrw/project-phoenix) backend for end-to-end flows
+- Google Chrome 156.0.8078.73 or newer for `pnpm run screenshots`. Playwright uses the installed Chrome with its sandbox enabled and no longer downloads its own Chromium (see [screenshots/README.md](screenshots/README.md#browser))
 
 ### Setup
 

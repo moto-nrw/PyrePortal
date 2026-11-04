@@ -26,6 +26,7 @@ var SYSTEM = {
     try {
       GKTKiosk.log(facility, 1, msg);
     } catch (e) {
+      // eslint-disable-next-line no-console -- fallback outside the GKT shell; callers pass no sensor values
       console.log('[' + facility + ']: ' + msg);
     }
   },
@@ -76,10 +77,12 @@ var SYSTEM = {
     SYSTEM.execute('tspprinterstatus /dev/usb/lp0', callback, true, 30000, 'PRINTER');
   },
   onReceiveIntent: function (obj) {
+    // Intent extras can carry sensor values such as NFC UIDs; never log them.
+    // eslint-disable-next-line no-console
     console.log('receice intent :' + obj.action);
-    console.log(obj);
     if (obj.extras != 'undefined') {
       obj = obj.extras;
+      // eslint-disable-next-line no-console
       console.log('receice source :' + obj.EventSource);
       switch (obj.eventSource) {
         case 'printer':
@@ -206,7 +209,7 @@ var SYSTEM = {
    *   @return void
    **/
   unknownBarcode: function (bc) {
-    SYSTEM.log2('SCANNER', 'unknown barcode ' + bc);
+    SYSTEM.log2('SCANNER', 'unknown barcode');
   },
   /**
    *	to log unknown nfc
@@ -214,7 +217,7 @@ var SYSTEM = {
    *   @return void
    **/
   unknownNfc: function (bc) {
-    SYSTEM.log2('NFC', 'unknown nfc ' + bc);
+    SYSTEM.log2('NFC', 'unknown nfc');
   },
   /**
    *	todo
@@ -337,7 +340,9 @@ var SYSTEM = {
   onSensorEvent: function (jsondata) {
     //old style interface
     var handled = false;
-    console.log(jsondata);
+    // Sensor payloads carry NFC UIDs and barcodes; log only the source.
+    // eslint-disable-next-line no-console
+    console.log('sensor event: ' + jsondata.eventSource);
     switch (jsondata.eventSource) {
       case 'barcode':
         if (SYSTEM.registerBarcode(jsondata.barcode)) handled = true;
@@ -357,7 +362,6 @@ var SYSTEM = {
           handled = true;
         break;
       case 'nfc':
-        console.log(jsondata);
         if (typeof SYSTEM.onNfcScanned === 'function') {
           SYSTEM.onNfcScanned(jsondata);
           handled = true;
@@ -373,9 +377,8 @@ var SYSTEM = {
     }
   },
   registerBarcode: function (barcode) {
-    console.log(barcode);
     if (barcode) {
-      SYSTEM.log2('SCANNER', barcode);
+      SYSTEM.log2('SCANNER', 'barcode received');
       if (typeof onBarcodeScanned != 'undefined') {
         try {
           if (onBarcodeScanned(barcode) == false) {

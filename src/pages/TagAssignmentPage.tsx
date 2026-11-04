@@ -129,7 +129,6 @@ function TagAssignmentPage() {
     }
 
     logUserAction('Navigating to student selection', {
-      tagId: scannedTag,
       currentlyAssigned: tagAssignment.assigned,
     });
 
