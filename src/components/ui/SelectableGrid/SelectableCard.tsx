@@ -72,7 +72,8 @@ export const SelectableCard = memo(function SelectableCard({
       onPointerLeave={handlePointerUp}
       style={{
         width: '100%',
-        height: '160px',
+        // A two-line name with a two-line badge needs a little more (#499).
+        minHeight: '160px',
         backgroundColor: designSystem.colors.white,
         border: isSelected
           ? `3px solid ${designSystem.entityColors.selected.icon}`
@@ -131,6 +132,7 @@ export const SelectableCard = memo(function SelectableCard({
         style={{
           width: '64px',
           height: '64px',
+          flexShrink: 0,
           backgroundColor,
           borderRadius: '50%',
           display: 'flex',
@@ -169,9 +171,24 @@ export const SelectableCard = memo(function SelectableCard({
             color:
               badgeColor === 'blue' ? designSystem.brand.blueText : designSystem.brand.greenText,
             fontWeight: 600,
+            maxWidth: '100%',
+            flexShrink: 0,
           }}
         >
-          {badge}
+          {/* Long school names („Gast aus …“) wrap onto at most two lines (#499). */}
+          <span
+            style={{
+              display: '-webkit-box',
+              WebkitBoxOrient: 'vertical',
+              WebkitLineClamp: 2,
+              overflow: 'hidden',
+              lineHeight: '1.25',
+              textAlign: 'center',
+              overflowWrap: 'anywhere',
+            }}
+          >
+            {badge}
+          </span>
         </span>
       )}
     </button>

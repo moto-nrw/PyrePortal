@@ -267,7 +267,9 @@ function StudentSelectionPage() {
     if (entity.type === 'student') {
       return {
         name: `${entity.data.first_name} ${entity.data.last_name}`,
-        badge: entity.data.school_class ?? texts.studentBadge,
+        badge: entity.data.holiday_guest_school
+          ? `Gast aus ${entity.data.holiday_guest_school}`
+          : (entity.data.school_class ?? texts.studentBadge),
         badgeColor: 'green' as const,
       };
     }

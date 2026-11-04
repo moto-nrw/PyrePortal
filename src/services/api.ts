@@ -843,6 +843,8 @@ export interface Student {
   school_class: string;
   group_name: string;
   rfid_tag?: string;
+  /** School a holiday guest comes from, only during its week; older servers omit it (#499). */
+  holiday_guest_school?: string;
 }
 
 /**
