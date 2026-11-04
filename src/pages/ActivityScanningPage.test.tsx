@@ -1696,6 +1696,90 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
   // nach Hause + feedback flow
   // =======================================================================
 
+  // =======================================================================
+  // zum Unterricht (project-phoenix #5656)
+  // =======================================================================
+
+  it('offers zum Unterricht outside the nach Hause time gate', async () => {
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action,
+        daily_checkout_available: false,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+      },
+      showModal: true,
+    };
+    renderPage();
+    expect(await screen.findByRole('button', { name: 'zum Unterricht' })).toBeInTheDocument();
+    expect(screen.queryByText('nach Hause')).not.toBeInTheDocument();
+  });
+
+  it('checks out to class and says goodbye without a feedback prompt', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.toggleAttendance.mockResolvedValueOnce({
+      status: 'success',
+      data: { action: 'checked_out_class', feedback_enabled: true },
+    } as never);
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action,
+        daily_checkout_available: true,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+        visit_id: 100,
+      },
+      showModal: true,
+    };
+
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'zum Unterricht' }));
+
+    await waitFor(() => {
+      expect(mockedApi.toggleAttendance).toHaveBeenCalledWith(
+        '1234',
+        '04:AA:BB:CC:DD:EE:FF',
+        'confirm_daily_checkout',
+        'unterricht',
+        1,
+        expect.any(AbortSignal)
+      );
+    });
+    expect(await screen.findByText('Bis später, Lisa!')).toBeInTheDocument();
+    expect(screen.queryByText('Wie war dein Tag, Lisa?')).not.toBeInTheDocument();
+    expect(screen.queryByText('Tschüss, Lisa!')).not.toBeInTheDocument();
+  });
+
+  it('shows a failed class checkout instead of saying goodbye', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    mockedApi.toggleAttendance.mockRejectedValueOnce(new Error('Bad Request'));
+    mockRfidHookReturn = {
+      ...mockRfidHookReturn,
+      currentScan: {
+        student_id: 42,
+        student_name: 'Lisa Schmidt',
+        action,
+        daily_checkout_available: false,
+        scannedTagId: '04:AA:BB:CC:DD:EE:FF',
+      },
+      showModal: true,
+    };
+
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'zum Unterricht' }));
+
+    await waitFor(() => {
+      expect(useUserStore.getState().rfid.currentScan).toEqual(
+        expect.objectContaining({ student_name: 'Abmeldung nicht bestätigt', showAsError: true })
+      );
+    });
+    expect(screen.queryByText('Bis später, Lisa!')).not.toBeInTheDocument();
+  });
+
   it('handles nach Hause click and shows feedback prompt', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     mockedApi.toggleAttendance.mockResolvedValueOnce({

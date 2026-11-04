@@ -33,6 +33,17 @@ Both checkout actions keep the existing destination buttons and timing.
 Selecting home still calls `/api/iot/attendance/toggle` with
 `confirm_daily_checkout`; this refactor does not change attendance writes.
 
+Selecting `zum Unterricht` (project-phoenix #5656) calls the same route with
+`destination: "unterricht"`. Phoenix closes the stay with the class reason and
+answers `checked_out_class`; the child reads "Im Unterricht" until the next scan
+checks them in again. The button joins an existing chooser in detailed presence
+mode, so a school that switched every destination off keeps its neutral
+confirmation. It does not follow `daily_checkout_available`: children mostly
+leave for class before the "nach Hause" time. A binary-mode scan has already
+closed the attendance, so the door kiosk keeps its flow. Deploy the Phoenix change
+first: an older backend refuses the destination with 400, and the kiosk shows that
+failure.
+
 Detailed results include `visit_id` (possibly null), checkout/feedback flags,
 and optional `active_students` and `pickup_time`. `previous_room` is only
 included for a transfer when known. Binary results omit the visit ID and
