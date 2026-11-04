@@ -72,7 +72,7 @@ export const SelectableCard = memo(function SelectableCard({
       onPointerLeave={handlePointerUp}
       style={{
         width: '100%',
-        // A two-line name with a two-line badge needs a little more (#499).
+        // A two-line name with a two-line badge needs a little more height.
         minHeight: '160px',
         backgroundColor: designSystem.colors.white,
         border: isSelected
@@ -175,14 +175,14 @@ export const SelectableCard = memo(function SelectableCard({
             flexShrink: 0,
           }}
         >
-          {/* Long school names („Gast aus …“) wrap onto at most two lines (#499). */}
+          {/* Long badges wrap onto at most two lines. */}
           <span
             style={{
               display: '-webkit-box',
               WebkitBoxOrient: 'vertical',
               WebkitLineClamp: 2,
               overflow: 'hidden',
-              lineHeight: '1.25',
+              lineHeight: '1.2',
               textAlign: 'center',
               overflowWrap: 'anywhere',
             }}

@@ -13,7 +13,7 @@ export const EmptySlot = memo(function EmptySlot({ icon }: EmptySlotProps) {
   return (
     <div
       style={{
-        height: '160px',
+        minHeight: '160px', // grows with its row, like SelectableCard
         backgroundColor: 'rgba(249, 250, 251, 0.4)',
         border: '1px dashed #E5E7EB',
         borderRadius: '24px',
