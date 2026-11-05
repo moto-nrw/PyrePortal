@@ -26,6 +26,7 @@ const texts = {
   invalidSelectionError: 'Ungültige Auswahl',
   assignFailedError: 'Armband konnte nicht zugewiesen werden. Bitte erneut versuchen.',
   studentBadge: 'Schüler',
+  holidayGuestBadge: (school: string) => `Gast aus ${school}`,
   staffBadge: 'Betreuer',
   filterAll: 'Alle',
   filterStaff: 'Betreuer',
@@ -267,7 +268,9 @@ function StudentSelectionPage() {
     if (entity.type === 'student') {
       return {
         name: `${entity.data.first_name} ${entity.data.last_name}`,
-        badge: entity.data.school_class ?? texts.studentBadge,
+        badge: entity.data.holiday_guest_school
+          ? texts.holidayGuestBadge(entity.data.holiday_guest_school)
+          : (entity.data.school_class ?? texts.studentBadge),
         badgeColor: 'green' as const,
       };
     }

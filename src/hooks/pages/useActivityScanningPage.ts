@@ -236,6 +236,12 @@ export function useActivityScanningPage() {
     [deviceConfig, rooms, selectedRoom?.id]
   );
 
+  // "zum Unterricht" (project-phoenix #5656) is not tied to the "nach Hause"
+  // time gate: children mostly leave for class in the morning, before it opens.
+  // A confirmed binary-mode scan has already closed the attendance, so the
+  // button only exists in detailed presence mode.
+  const classDestinationAvailable = deviceConfig?.presence_mode === 'detailed';
+
   // Compute how many destination buttons will be visible (drives modal size)
   const destinationCount = useMemo(() => {
     if (!checkoutDestinationState || checkoutDestinationState.showingFarewell) return 0;
@@ -244,8 +250,18 @@ export function useActivityScanningPage() {
     if (schulhofRoomId && deviceConfig?.checkout.schulhof_enabled !== false) count++;
     if (wcRoomId && deviceConfig?.checkout.wc_enabled !== false) count++;
     if (checkoutDestinationState.dailyCheckoutAvailable) count++;
+    // It joins an existing chooser. A school that switched every destination off
+    // keeps its neutral confirmation.
+    if (classDestinationAvailable && count > 0) count++;
     return count;
-  }, [deviceConfig, schulhofRoomId, wcRoomId, checkoutDestinationState, openRoomDestinations]);
+  }, [
+    deviceConfig,
+    schulhofRoomId,
+    wcRoomId,
+    checkoutDestinationState,
+    openRoomDestinations,
+    classDestinationAvailable,
+  ]);
 
   // Pickup query prompt state
   const [isAwaitingPickupQueryScan, setIsAwaitingPickupQueryScan] = useState(false);
@@ -744,6 +760,65 @@ export function useActivityScanningPage() {
     }
   };
 
+  // Handle "zum Unterricht" button - the child leaves for class and comes back
+  // later. No feedback prompt: the day is not over. Unlike "nach Hause" a failure
+  // is shown: the child would otherwise read "Unterwegs" and nobody would know.
+  const handleZumUnterricht = async () => {
+    if (!checkoutDestinationState || !authenticatedUser?.pin || isBookingInFlight()) return;
+    const activeState = reserveBooking();
+    if (!activeState) return;
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const showFailure = () => {
+      setScanResult({
+        student_name: 'Abmeldung nicht bestätigt',
+        student_id: activeState.studentId,
+        action: 'error',
+        message: 'Die Abmeldung ist nicht bestätigt. Bitte die Betreuung fragen.',
+        showAsError: true,
+      });
+      setCheckoutDestinationState(null);
+      showScanModal();
+    };
+
+    try {
+      const response = await Promise.race([
+        api.toggleAttendance(
+          authenticatedUser.pin,
+          activeState.rfid,
+          'confirm_daily_checkout',
+          'unterricht',
+          resolveStaffAttributionId(authenticatedUser, selectedSupervisors),
+          controller.signal
+        ),
+        new Promise<null>(resolve => {
+          timeoutId = setTimeout(() => {
+            resolve(null);
+            controller.abort();
+          }, BOOKING_TIMEOUT_MS);
+        }),
+      ]);
+      if (!isActiveDestination(activeState)) return;
+      if (response === null) {
+        showFailure();
+        return;
+      }
+      logger.info('Class checkout confirmed');
+      setCheckoutDestinationState(prev =>
+        prev ? { ...prev, showingFarewell: true, wentToClass: true } : null
+      );
+    } catch (error) {
+      logger.error('Failed to confirm class checkout', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      if (isActiveDestination(activeState)) showFailure();
+    } finally {
+      clearTimeout(timeoutId);
+      releaseBooking(activeState);
+    }
+  };
+
   // Handle feedback submission
   const handleFeedbackSubmit = async (rating: DailyFeedbackRating) => {
     if (!checkoutDestinationState || !currentScan) return;
@@ -810,6 +885,8 @@ export function useActivityScanningPage() {
     // Feedback flow
     showFeedbackPrompt,
     handleNachHause,
+    handleZumUnterricht,
+    classDestinationAvailable,
     handleFeedbackSubmit,
     // Pickup query flow
     isAwaitingPickupQueryScan,

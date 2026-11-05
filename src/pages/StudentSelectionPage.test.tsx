@@ -205,6 +205,36 @@ describe('StudentSelectionPage', () => {
     });
   });
 
+  it('shows the home school of a holiday guest instead of "Feriengast"', async () => {
+    mockedApi.getStudents.mockResolvedValue([
+      {
+        ...mockStudents[0],
+        school_class: 'Feriengast',
+        holiday_guest_school: 'Grundschule Melle',
+      },
+    ]);
+    mockedApi.getTeachers.mockResolvedValue([]);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Gast aus Grundschule Melle')).toBeInTheDocument();
+    });
+    expect(screen.queryByText('Feriengast')).not.toBeInTheDocument();
+  });
+
+  it('keeps "Feriengast" when the server sends no home school', async () => {
+    mockedApi.getStudents.mockResolvedValue([{ ...mockStudents[0], school_class: 'Feriengast' }]);
+    mockedApi.getTeachers.mockResolvedValue([]);
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Feriengast')).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/Gast aus/)).not.toBeInTheDocument();
+  });
+
   it('shows teacher with "Betreuer" badge', async () => {
     mockedApi.getStudents.mockResolvedValue([]);
     mockedApi.getTeachers.mockResolvedValue(mockTeachers);

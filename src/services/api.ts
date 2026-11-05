@@ -749,7 +749,7 @@ export const api = {
     pin: string,
     rfid: string,
     action: 'confirm' | 'cancel' | 'confirm_daily_checkout',
-    destination?: 'zuhause' | 'unterwegs',
+    destination?: 'zuhause' | 'unterwegs' | 'unterricht',
     staffId?: number,
     signal?: AbortSignal
   ): Promise<AttendanceToggleResponse> {
@@ -843,6 +843,8 @@ export interface Student {
   school_class: string;
   group_name: string;
   rfid_tag?: string;
+  /** School a holiday guest comes from, only during its week; older servers omit it (#499). */
+  holiday_guest_school?: string;
 }
 
 /**
