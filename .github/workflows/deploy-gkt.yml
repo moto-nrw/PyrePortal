@@ -24,12 +24,12 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
+      # Starts product-screenshots.yml for a new release.
+      actions: write
     env:
       API_URL: ${{ github.ref == 'refs/heads/main' && vars.GKT_PROD_API_URL || vars.GKT_STAGING_API_URL }}
       DEPLOY_DIR: ${{ github.ref == 'refs/heads/main' && '/var/www/pyreportal' || '/var/www/pyreportal-staging' }}
       DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
-    outputs:
-      release_tag: ${{ steps.create-release.outcome == 'success' && steps.release.outputs.tag || '' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -142,6 +142,18 @@ jobs:
             --title "${{ steps.release.outputs.tag }}" \
             --generate-notes
 
+      # Ein eigener Lauf auf dem Tag, nicht Teil dieses Laufs: Er hält die
+      # Concurrency-Gruppe des Deploys nicht bis zu 60 Minuten fest, und ein
+      # Fehler färbt weder Deploy noch Release rot. workflow_dispatch ist das
+      # einzige Ereignis, das GITHUB_TOKEN auslösen darf.
+      - name: Start product screenshots
+        if: steps.create-release.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: gh workflow run product-screenshots.yml --ref "$TAG" -f version="$TAG"
+
       - name: Notify Slack
         if: always() && steps.deploy.outcome != 'skipped'
         uses: ./.github/actions/notify-deploy-slack
@@ -157,16 +169,3 @@ jobs:
           commit_url: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           sha: ${{ github.sha }}
           actor: ${{ github.actor }}
-
-  # Produkt-Screenshots des neuen Release (screenshots/README.md). Ein von
-  # GITHUB_TOKEN angelegtes Release löst kein release-Event aus, deshalb der
-  # direkte Aufruf. Ein Fehler hier betrifft weder Deploy noch Release.
-  product-screenshots:
-    name: Product screenshots
-    needs: deploy
-    if: needs.deploy.outputs.release_tag != ''
-    permissions:
-      contents: write
-    uses: ./.github/workflows/product-screenshots.yml
-    with:
-      version: ${{ needs.deploy.outputs.release_tag }}

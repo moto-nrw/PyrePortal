@@ -11,9 +11,10 @@ name: Product screenshots
 # zum festen Link auf die neuesten Bilder.
 #
 # Auslöser:
-#   - deploy-gkt.yml ruft den Workflow nach jedem neuen Release auf
-#     (workflow_call). Ein von GITHUB_TOKEN angelegtes Release löst das
-#     release-Event nicht aus.
+#   - deploy-gkt.yml startet den Workflow nach jedem neuen Release per
+#     workflow_dispatch auf dem Tag vX.Y.Z. Ein von GITHUB_TOKEN angelegtes
+#     Release löst das release-Event nicht aus; als eigener Lauf hält er den
+#     nächsten Deploy nicht auf.
 #   - release: ein von Hand veröffentlichtes Release.
 #   - workflow_dispatch: von Hand, etwa nach einer Korrektur der Journey.
 #     Fotografiert den Stand, von dem aus der Lauf startet: main für den
@@ -38,12 +39,6 @@ on:
       version:
         description: 'Release-Version, etwa 1.12.0 (leer: neuestes Release)'
         required: false
-        type: string
-  workflow_call:
-    inputs:
-      version:
-        description: 'Release-Tag, etwa v1.12.0'
-        required: true
         type: string
   pull_request:
     paths:
@@ -101,37 +96,30 @@ jobs:
 
     env:
       # Wegwerf-Stack mit synthetischen Daten, Werte wie im Workflow von
-      # project-phoenix. Nichts davon ist ein echtes Geheimnis.
+      # project-phoenix. Passwörter und Schlüssel erzeugt "Generate throwaway
+      # secrets" bei jedem Lauf neu.
       DB_DSN: postgres://postgres:postgres@localhost:5432/phoenix_screenshots?sslmode=disable
       DB_MAX_OPEN_CONNS: '40'
       DB_MAX_IDLE_CONNS: '40'
       DB_CONN_MAX_LIFETIME: 30m
       DB_CONN_MAX_IDLE_TIME: 10m
-      PHOENIX_AUTH_PASSWORD: phoenix_auth_test
-      PHOENIX_DEMO_PASSWORD: phoenix_demo_test
       APP_ENV: development
       LOG_LEVEL: info
       LOG_TEXTLOGGING: 'true'
-      AUTH_JWT_SECRET: ci-test-secret-must-be-at-least-32-chars-long
       AUTH_JWT_EXPIRY: 12h
       AUTH_JWT_REFRESH_EXPIRY: 168h
       OPERATOR_EMAIL: operator@example.com
-      OPERATOR_PASSWORD: Screenshots1234%
       OPERATOR_DISPLAY_NAME: CI Operator
       ADMIN_EMAIL: admin@example.com
-      ADMIN_PASSWORD: Screenshots1234%
       FRONTEND_URL: http://localhost:3000
       PARENTS_URL: http://eltern.localhost:3000
       # Cloudflare's documented always-passing Turnstile test keys.
       TURNSTILE_SITE_KEY: 1x00000000000000000000AA
       TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
-      # The development key ring of project-phoenix's .env.example.
-      HEALTH_DATA_KEYS: dev:bW90by1kZXYtb25seS1oZWFsdGgta2V5LTMyYnl0ZXM=
       SCHOOL_URL: http://schule.localhost:3000
       CATERER_URL: http://caterer.localhost:3000
       TRAEGER_URL: http://traeger.localhost:3000
       TENANT_DOMAIN: localhost
-      METRICS_BEARER_TOKEN: ci-metrics-token
       # Seeder input for the device PIN; the capture enters the same PIN.
       OGS_DEVICE_PIN: '1234'
       SCREENSHOT_PIN: '1234'
@@ -154,7 +142,6 @@ jobs:
       NEXT_PUBLIC_TRAEGER_HOSTNAME: traeger.localhost:3000
       NEXT_PUBLIC_APP_ENV: development
       NEXTAUTH_URL: http://localhost:3000
-      NEXTAUTH_SECRET: ci-product-screenshots-throwaway-secret
       AUTH_TRUST_HOST: 'true'
       # The kiosk dev server on :1420 calls the API from the browser.
       ENABLE_CORS: 'true'
@@ -198,6 +185,28 @@ jobs:
             echo "version=${version}"
             echo "publish=${publish}"
           } >> "${GITHUB_OUTPUT}"
+
+      # Nur für diesen Lauf, maskiert. Feste Werte gehören nicht ins öffentliche Repo.
+      - name: Generate throwaway secrets
+        run: |
+          secret() { openssl rand -hex 24; }
+          {
+            for name in PHOENIX_AUTH_PASSWORD PHOENIX_DEMO_PASSWORD AUTH_JWT_SECRET METRICS_BEARER_TOKEN NEXTAUTH_SECRET; do
+              value=$(secret)
+              echo "::add-mask::${value}" >&2
+              echo "${name}=${value}"
+            done
+            # Logins need upper and lower case, a digit and a special character;
+            # hex covers lower case and digits.
+            login="$(secret)Q%"
+            echo "::add-mask::${login}" >&2
+            echo "OPERATOR_PASSWORD=${login}"
+            echo "ADMIN_PASSWORD=${login}"
+            # Key ring for health data: key ID and 32 random bytes in base64.
+            health_key=$(openssl rand -base64 32)
+            echo "::add-mask::${health_key}" >&2
+            echo "HEALTH_DATA_KEYS=ci:${health_key}"
+          } >> "${GITHUB_ENV}"
 
       - name: Resolve project-phoenix release
         id: phoenix

@@ -2,7 +2,7 @@ on:
   workflow_call:
     outputs:
       version:
-        description: "The validated version string"
+        description: 'The validated version string'
         value: ${{ jobs.version_check.outputs.version }}
 
 defaults:

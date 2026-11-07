@@ -9,14 +9,18 @@ the product screenshots of project-phoenix (`moto-product-screenshots/v1`).
 Every release `vX.Y.Z` carries the product screenshots as assets:
 
 - `product-screenshots-<version>.zip` — the images of exactly that release.
-- `product-screenshots.zip` — the same file under a fixed name. The newest one
-  is always at
+- `product-screenshots.zip` — the same file under a fixed name, so the latest
+  release's images are at
   <https://github.com/moto-nrw/PyrePortal/releases/latest/download/product-screenshots.zip>.
+  The capture takes about 15 minutes after the release is created; until then,
+  or if that run failed, the link answers 404 and the files are on the previous
+  release.
 
-`.github/workflows/product-screenshots.yml` creates them. `deploy-gkt.yml`
-calls it after the production deploy created a new release. A manual run
-(Actions, "Product screenshots", Run workflow on `main` or a tag `vX.Y.Z`)
-replaces the assets of that release. Pull requests that change the tooling run
+`.github/workflows/product-screenshots.yml` creates them. After the production
+deploy created a new release, `deploy-gkt.yml` starts it as its own run on the
+tag `vX.Y.Z`, so it neither holds up the next deploy nor turns the deploy red.
+A manual run (Actions, "Product screenshots", Run workflow on `main` or a tag
+`vX.Y.Z`) replaces the assets of that release; use it after a failed run. Pull requests that change the tooling run
 it once as a test, without attaching anything. The backend in CI is the newest
 release of project-phoenix, seeded with `--product-screenshots`; the VM clock
 is set to the last Tuesday, 10:00 Berlin.
