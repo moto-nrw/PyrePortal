@@ -1,7 +1,7 @@
 {
   "name": "pyreportal",
   "private": true,
-  "version": "1.11.0",
+  "version": "1.11.1",
   "type": "module",
   "packageManager": "pnpm@10.34.4+sha512.8768be55200ae3f2226b6527fcca2687e14bc4e5f12d7721a0f25da3df47915177058648db4177baf348120fa0ba2752d8d8d93f6beaf1fe64ae18da8de961af",
   "scripts": {
@@ -25,7 +25,8 @@
     "sync:error-codes": "node scripts/sync-error-codes.mjs",
     "screenshots": "playwright test --config playwright.config.ts",
     "prepare": "lefthook install || true",
-    "dev:kiosk": "BUILD_TARGET=kiosk VITE_API_BASE_URL=http://localhost:8080 vite"
+    "dev:kiosk": "BUILD_TARGET=kiosk VITE_API_BASE_URL=http://localhost:8080 vite",
+    "screenshots:product": "playwright test --config playwright.config.ts --project=product"
   },
   "dependencies": {
     "@fontsource/geist-sans": "^5.2.5",
@@ -67,6 +68,7 @@
     "postcss": "^8.5.32",
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.1",

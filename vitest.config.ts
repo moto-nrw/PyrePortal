@@ -24,7 +24,7 @@ export default defineConfig({
     pool: 'forks',
     forks: { execArgv: ['--max-old-space-size=4096'] },
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'screenshots/**/*.test.ts'],
     exclude: ['**/node_modules/**', '**/dist/**', '**/src-tauri/**'],
     coverage: {
       provider: 'v8',

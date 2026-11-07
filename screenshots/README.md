@@ -1,29 +1,63 @@
 # Screenshot & Video Tooling
 
-Automated capture of the full PyrePortal user journey (GKT tablet, 1280x800)
-via Playwright. Produces marketing-ready PNGs for every screen state plus a
-video of the whole flow.
+Automated capture of the full PyrePortal user journey via Playwright, once per
+device, framed into marketing-ready product screenshots. Same output format as
+the product screenshots of project-phoenix (`moto-product-screenshots/v1`).
+
+## Where the latest screenshots are
+
+Every release `vX.Y.Z` carries the product screenshots as assets:
+
+- `product-screenshots-<version>.zip` — the images of exactly that release.
+- `product-screenshots.zip` — the same file under a fixed name, so the latest
+  release's images are at
+  <https://github.com/moto-nrw/PyrePortal/releases/latest/download/product-screenshots.zip>.
+  The capture takes about 15 minutes after the release is created; until then,
+  or if that run failed, the link answers 404 and the files are on the previous
+  release.
+
+`.github/workflows/product-screenshots.yml` creates them. After the production
+deploy created a new release, `deploy-gkt.yml` starts it as its own run on the
+tag `vX.Y.Z`, so it neither holds up the next deploy nor turns the deploy red.
+A manual run (Actions, "Product screenshots", Run workflow on `main` or a tag
+`vX.Y.Z`) replaces the assets of that release; use it after a failed run. Pull requests that change the tooling run
+it once as a test, without attaching anything. The backend in CI is the newest
+release of project-phoenix, seeded with `--product-screenshots`; the VM clock
+is set to the last Tuesday, 10:00 Berlin.
+
+## Devices
+
+| Device | Viewport (CSS px) | Scale | Raw image | Frame                                |
+| ------ | ----------------- | ----- | --------- | ------------------------------------ |
+| `gkt`  | 1280×800          | 2     | 2560×1600 | GKT kiosk with NFC reader            |
+| `ipad` | 1210×834          | 2     | 2420×1668 | iPad Pro 11" landscape (Wedge kiosk) |
+
+Devices and screen rectangles live in `devices.ts`, the frames in `bezels/`
+(see `bezels/README.md`).
 
 ## Output
 
-`screenshots/output/`:
+Raw captures: `screenshots/output/raw/<device>/<shot id>.png`, plus
+`captured.json` (route per shot) and `user-journey.webm`.
 
-| File                      | Content                                              |
-| ------------------------- | ---------------------------------------------------- |
-| `01`–`22` PNGs            | Landing, PIN, Home, Armband zuweisen, Team, Aufsicht |
-| `23-checkin-modal`        | "Hallo, {Name}!" check-in modal                      |
-| `24-checkout-destination` | "Wohin geht {Name}?" checkout question               |
-| `25-feedback-prompt`      | "Wie war dein Tag?" smiley feedback                  |
-| `26-farewell`             | "Tschüss, {Name}!"                                   |
-| `27/28-pickup-query-*`    | Abholzeit prompt + result                            |
-| `29-scan-error`           | Error modal (deliberate: unknown wristband)          |
-| `30/31` PNGs              | Home with active session, end-session confirm        |
-| `user-journey.webm`       | Video recording of the entire run                    |
+Product screenshots: `screenshots/output/product/` (CI: the release ZIP):
 
-Convert the video for platforms that need mp4 (requires ffmpeg):
+| Path                                | Content                                            |
+| ----------------------------------- | -------------------------------------------------- |
+| `<shot id>/roh-<device>.png`        | raw image in device resolution                     |
+| `<shot id>/<device>.png`            | mockup in the device frame, transparent background |
+| `<shot id>/[roh-]<device>-<w>.webp` | both as WebP, w = 640/960/1280/1600/2400/3200      |
+| `videos/user-journey-<device>.webm` | video of the whole run per device                  |
+| `manifest.json`                     | version, time, shots with title, route and files   |
+
+The shot list with IDs and titles is `shots.ts`; IDs stay the same across
+releases. WebP widths above the source width are upscaled and marked
+`hochskaliert` in the manifest (the GKT mockup is 1688 px wide).
+
+Convert a video for platforms that need mp4 (requires ffmpeg):
 
 ```bash
-ffmpeg -i screenshots/output/user-journey.webm -c:v libx264 -pix_fmt yuv420p screenshots/output/user-journey.mp4
+ffmpeg -i user-journey-gkt.webm -c:v libx264 -pix_fmt yuv420p user-journey-gkt.mp4
 ```
 
 ## Browser
@@ -92,10 +126,17 @@ Google Chrome 156.0.8078.73 or newer must be installed (see [Browser](#browser))
 ## Run
 
 ```bash
-pnpm run screenshots                     # everything
-pnpm run screenshots -- --grep "23"      # a single step
-SCREENSHOT_PIN=9999 pnpm run screenshots # different staff PIN
+pnpm run screenshots:product                     # both devices, then framing
+pnpm run screenshots --project=gkt            # raw images of one device
+pnpm run screenshots --project=rfid-parity    # RFID parity check, no backend
+SCREENSHOT_PIN=9999 pnpm run screenshots:product # different staff PIN
+pnpm exec vitest run screenshots/                # framing and manifest tests
 ```
+
+`SHOT_OUT` and `SHOT_VERSION` set output directory and manifest version
+(defaults: `screenshots/output/product`, `package.json`). The backend must
+allow the dev server's origin: `ENABLE_CORS=true` and
+`CORS_ALLOWED_ORIGINS=http://localhost:1420`.
 
 ## How determinism works
 
@@ -116,9 +157,11 @@ settle delay — see the `settleMs` parameter of `screenshot()`.
 
 ## Adding a new capture
 
-Add a step to the serial flow in `capture.spec.ts`: navigate/click, wait for
-a text unique to the target state, then `screenshot(page, 'NN-name')`. Keep
-waits keyed on visible German UI text, not timeouts.
+Add the shot to `shots.ts` (ID and title, in journey order), then a step to
+the serial flow in `capture.spec.ts`: navigate/click, wait for a text unique
+to the target state, then `screenshot(page, '<shot id>')`. Keep waits keyed on
+visible German UI text, not timeouts. A listed shot that a device did not
+capture fails the `product` project before anything is written.
 
 ## Notes
 

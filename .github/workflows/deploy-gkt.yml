@@ -24,6 +24,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
+      # Starts product-screenshots.yml for a new release.
+      actions: write
     env:
       API_URL: ${{ github.ref == 'refs/heads/main' && vars.GKT_PROD_API_URL || vars.GKT_STAGING_API_URL }}
       DEPLOY_DIR: ${{ github.ref == 'refs/heads/main' && '/var/www/pyreportal' || '/var/www/pyreportal-staging' }}
@@ -130,6 +132,7 @@ jobs:
           pnpm dlx @sentry/cli@3.8.0 deploys new --release "$RELEASE" --env "$DEPLOY_ENV"
 
       - name: Create GitHub release
+        id: create-release
         if: github.ref == 'refs/heads/main' && steps.release.outputs.create == 'true' && steps.deploy.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -138,6 +141,18 @@ jobs:
             --target "${{ github.sha }}" \
             --title "${{ steps.release.outputs.tag }}" \
             --generate-notes
+
+      # Ein eigener Lauf auf dem Tag, nicht Teil dieses Laufs: Er hält die
+      # Concurrency-Gruppe des Deploys nicht bis zu 60 Minuten fest, und ein
+      # Fehler färbt weder Deploy noch Release rot. workflow_dispatch ist das
+      # einzige Ereignis, das GITHUB_TOKEN auslösen darf.
+      - name: Start product screenshots
+        if: steps.create-release.outcome == 'success'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: gh workflow run product-screenshots.yml --ref "$TAG" -f version="$TAG"
 
       - name: Notify Slack
         if: always() && steps.deploy.outcome != 'skipped'
