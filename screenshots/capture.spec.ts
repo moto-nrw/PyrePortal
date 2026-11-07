@@ -189,6 +189,9 @@ test.describe('PyrePortal User Journey', () => {
       viewport: device.viewport,
       deviceScaleFactor: device.deviceScaleFactor,
       hasTouch: device.hasTouch,
+      // The kiosks run in Berlin; CI runners run in UTC.
+      timezoneId: 'Europe/Berlin',
+      locale: 'de-DE',
       recordVideo: { dir: outputDir, size: device.viewport },
     });
     // Disable the random mock-scan interval; scans are injected explicitly.
