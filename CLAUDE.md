@@ -158,6 +158,7 @@ Key rules:
 - Run `./scripts/check-version.sh` before release work.
 - One kiosk deployment serves GKT/GKTL and Wedge. See `docs/kiosk-deployment.md`.
 - Version source is `package.json`.
+- Every new release gets product screenshots (GKT and iPad mockups) as release assets; the newest are at `releases/latest/download/product-screenshots.zip`. See `screenshots/README.md`.
 - This repo is public. Never commit secrets, API keys, `.env` files, PINs, or credentials.
 
 ## Adding New Features

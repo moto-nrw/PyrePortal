@@ -1,0 +1,418 @@
+name: Product screenshots
+
+# Produkt-Screenshots des Kiosks bei jedem Release, gleich aufgebaut wie
+# .github/workflows/product-screenshots.yml in project-phoenix: Backend von
+# project-phoenix starten und seeden, die Kiosk-Journey auf beiden Geräten
+# fotografieren (gkt mit GKT-Rahmen, ipad mit Apple-Bezel für Wedge), rahmen,
+# als Artefakt anhängen (7 Tage) und an das GitHub-Release vX.Y.Z hängen:
+# einmal als product-screenshots-<version>.zip und einmal als
+# product-screenshots.zip. Die zweite Datei macht
+# https://github.com/moto-nrw/PyrePortal/releases/latest/download/product-screenshots.zip
+# zum festen Link auf die neuesten Bilder.
+#
+# Auslöser:
+#   - deploy-gkt.yml startet den Workflow nach jedem neuen Release per
+#     workflow_dispatch auf dem Tag vX.Y.Z. Ein von GITHUB_TOKEN angelegtes
+#     Release löst das release-Event nicht aus; als eigener Lauf hält er den
+#     nächsten Deploy nicht auf.
+#   - release: ein von Hand veröffentlichtes Release.
+#   - workflow_dispatch: von Hand, etwa nach einer Korrektur der Journey.
+#     Fotografiert den Stand, von dem aus der Lauf startet: main für den
+#     aktuellen Stand, der Tag vX.Y.Z für genau dieses Release. Ohne Version
+#     gilt das neueste Release. Läufe von anderen Branches hängen nichts an.
+#   - pull_request: Änderungen an Pipeline oder Workflow fotografieren einmal
+#     zur Probe, ohne Release-Anhang.
+#
+# Backend: das neueste Release vX.Y.Z von project-phoenix, also der Stand der
+# Produktion. Der Lauf stellt die Uhr der VM auf den letzten Dienstag, 10:00
+# Berlin: Abholzeiten und Betreuungstage gelten nur an Werktagen.
+#
+# Capture und Anhängen sind getrennte Jobs; nur der zweite darf ins Repo
+# schreiben und läuft nur nach einem erfolgreichen Capture. Ein kaputter Shot
+# bricht vor jeder Ausgabe ab, das Release bleibt dann unverändert.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release-Version, etwa 1.12.0 (leer: neuestes Release)'
+        required: false
+        type: string
+  pull_request:
+    paths:
+      - '.github/workflows/product-screenshots.yml'
+      - 'screenshots/**'
+      - 'playwright.config.ts'
+
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  GOTOOLCHAIN: local
+
+jobs:
+  capture:
+    name: Capture and frame
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v')
+    # Standard-Runner sind für dieses öffentliche Repository kostenlos.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Ein neuer Push auf denselben PR ersetzt dessen Probelauf.
+    concurrency:
+      group: product-screenshots-capture-${{ github.event_name == 'pull_request' && github.head_ref || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: phoenix_screenshots
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          TZ: Europe/Berlin
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 10
+      mailpit:
+        # The seeder's operator login enrolls MFA and reads the code from mailpit.
+        image: axllent/mailpit:v1.30
+        ports:
+          - 1025:1025
+          - 8025:8025
+
+    env:
+      # Wegwerf-Stack mit synthetischen Daten, Werte wie im Workflow von
+      # project-phoenix. Passwörter und Schlüssel erzeugt "Generate throwaway
+      # secrets" bei jedem Lauf neu.
+      DB_DSN: postgres://postgres:postgres@localhost:5432/phoenix_screenshots?sslmode=disable
+      DB_MAX_OPEN_CONNS: '40'
+      DB_MAX_IDLE_CONNS: '40'
+      DB_CONN_MAX_LIFETIME: 30m
+      DB_CONN_MAX_IDLE_TIME: 10m
+      APP_ENV: development
+      LOG_LEVEL: info
+      LOG_TEXTLOGGING: 'true'
+      AUTH_JWT_EXPIRY: 12h
+      AUTH_JWT_REFRESH_EXPIRY: 168h
+      OPERATOR_EMAIL: operator@example.com
+      OPERATOR_DISPLAY_NAME: CI Operator
+      ADMIN_EMAIL: admin@example.com
+      FRONTEND_URL: http://localhost:3000
+      PARENTS_URL: http://eltern.localhost:3000
+      # Cloudflare's documented always-passing Turnstile test keys.
+      TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+      TURNSTILE_SECRET_KEY: 1x0000000000000000000000000000000AA
+      SCHOOL_URL: http://schule.localhost:3000
+      CATERER_URL: http://caterer.localhost:3000
+      TRAEGER_URL: http://traeger.localhost:3000
+      TENANT_DOMAIN: localhost
+      # Seeder input for the device PIN; the capture enters the same PIN.
+      OGS_DEVICE_PIN: '1234'
+      SCREENSHOT_PIN: '1234'
+      EMAIL_SMTP_HOST: localhost
+      EMAIL_SMTP_PORT: 1025
+      EMAIL_FROM_ADDRESS: noreply@localhost
+      EMAIL_FROM_NAME: moto CI
+      MAILPIT_URL: http://localhost:8025
+      # The schedulers would mutate seeded rows before the capture.
+      CLEANUP_SCHEDULER_ENABLED: 'false'
+      SESSION_END_SCHEDULER_ENABLED: 'false'
+      # The backend validates these at startup, although no Next.js runs here.
+      API_URL: http://localhost:8080
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+      NEXT_PUBLIC_TENANT_DOMAIN: localhost
+      NEXT_PUBLIC_OPERATOR_HOSTNAME: operator.localhost:3000
+      NEXT_PUBLIC_PARENTS_HOSTNAME: eltern.localhost:3000
+      NEXT_PUBLIC_SCHOOL_HOSTNAME: schule.localhost:3000
+      NEXT_PUBLIC_CATERER_HOSTNAME: caterer.localhost:3000
+      NEXT_PUBLIC_TRAEGER_HOSTNAME: traeger.localhost:3000
+      NEXT_PUBLIC_APP_ENV: development
+      NEXTAUTH_URL: http://localhost:3000
+      AUTH_TRUST_HOST: 'true'
+      # The kiosk dev server on :1420 calls the API from the browser.
+      ENABLE_CORS: 'true'
+      CORS_ALLOWED_ORIGINS: http://localhost:1420
+
+    steps:
+      # Version aus Eingabe, Release-Event oder neuestem Release. Eingaben
+      # kommen über env, nie direkt in das Skript.
+      - name: Resolve version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          publish=true
+          if [ -n "${INPUT_VERSION}" ]; then
+            tag=${INPUT_VERSION}
+          elif [ "${GITHUB_EVENT_NAME}" = release ]; then
+            tag=${RELEASE_TAG}
+          elif [ "${GITHUB_EVENT_NAME}" = pull_request ]; then
+            tag="0.0.0-pr.${PR_NUMBER}"
+            publish=false
+          else
+            tag=$(gh release list --repo "${GITHUB_REPOSITORY}" --exclude-drafts --limit 100 \
+              --json tagName,createdAt \
+              --jq '[.[] | select(.tagName | test("^v[0-9]+[.][0-9]+[.][0-9]+$"))] | sort_by(.createdAt) | last | .tagName // ""')
+            if [ -z "${tag}" ]; then
+              echo "::error::Es gibt noch kein Release vX.Y.Z. Die Version beim Start angeben."
+              exit 1
+            fi
+          fi
+          version=${tag#v}
+          if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::${tag} ist keine Version wie 1.12.0 oder v1.12.0."
+            exit 1
+          fi
+          echo "Version ${version}, Release-Anhang: ${publish}"
+          {
+            echo "version=${version}"
+            echo "publish=${publish}"
+          } >> "${GITHUB_OUTPUT}"
+
+      # Nur für diesen Lauf, maskiert. Feste Werte gehören nicht ins öffentliche Repo.
+      - name: Generate throwaway secrets
+        run: |
+          secret() { openssl rand -hex 24; }
+          {
+            for name in PHOENIX_AUTH_PASSWORD PHOENIX_DEMO_PASSWORD AUTH_JWT_SECRET METRICS_BEARER_TOKEN NEXTAUTH_SECRET; do
+              value=$(secret)
+              echo "::add-mask::${value}" >&2
+              echo "${name}=${value}"
+            done
+            # Logins need upper and lower case, a digit and a special character;
+            # hex covers lower case and digits.
+            login="$(secret)Q%"
+            echo "::add-mask::${login}" >&2
+            echo "OPERATOR_PASSWORD=${login}"
+            echo "ADMIN_PASSWORD=${login}"
+            # Key ring for health data: key ID and 32 random bytes in base64.
+            health_key=$(openssl rand -base64 32)
+            echo "::add-mask::${health_key}" >&2
+            echo "HEALTH_DATA_KEYS=ci:${health_key}"
+          } >> "${GITHUB_ENV}"
+
+      - name: Resolve project-phoenix release
+        id: phoenix
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=$(gh release list --repo moto-nrw/project-phoenix --exclude-drafts --limit 100 \
+            --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | test("^v[0-9]+[.][0-9]+[.][0-9]+$"))] | sort_by(.createdAt) | last | .tagName // ""')
+          if [ -z "${tag}" ]; then
+            echo "::error::project-phoenix hat kein Release vX.Y.Z."
+            exit 1
+          fi
+          echo "Backend: project-phoenix ${tag}"
+          echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Checkout project-phoenix
+        uses: actions/checkout@v7
+        with:
+          repository: moto-nrw/project-phoenix
+          ref: ${{ steps.phoenix.outputs.tag }}
+          path: phoenix
+          persist-credentials: false
+
+      - name: Setup Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: phoenix/backend/go.mod
+          cache: true
+          cache-dependency-path: phoenix/backend/go.sum
+
+      - name: Build backend and dev tools binaries
+        working-directory: phoenix/backend
+        run: |
+          go build -o "${RUNNER_TEMP}/phoenix" .
+          go build -o "${RUNNER_TEMP}/devtools" ./cmd/devtools
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Systemweites Google Chrome statt des gebündelten Chromium (#496):
+      # --force aktualisiert das veraltete Chrome des Runner-Images;
+      # screenshots/global-setup.ts lehnt ungepatchte Versionen ab.
+      - name: Install Google Chrome
+        run: pnpm exec playwright install --with-deps --force chrome
+
+      # Erst nach allen Downloads: ein Zertifikat von gestern wäre sonst noch
+      # nicht gültig. "Restore the runner clock" stellt die Uhr vor jedem
+      # Upload zurück.
+      - name: Move the runner clock to Tuesday 10:00 Berlin
+        run: |
+          now=$(date +%s)
+          today=$(TZ=Europe/Berlin date -d "@${now}" +%F)
+          back=$(( ($(TZ=Europe/Berlin date -d "@${now}" +%u) + 5) % 7 ))
+          target=$(TZ=Europe/Berlin date -d "$(TZ=Europe/Berlin date -d "${today} -${back} days" +%F) 10:00" +%s)
+          if [ "${target}" -gt "${now}" ]; then
+            target=$(TZ=Europe/Berlin date -d "$(TZ=Europe/Berlin date -d "${today} -$((back + 7)) days" +%F) 10:00" +%s)
+          fi
+          # Ohne Zeitsynchronisation, sonst stellt sie die Uhr wieder vor.
+          sudo timedatectl set-ntp false
+          sudo systemctl stop chrony.service systemd-timesyncd.service 2>/dev/null || true
+          sudo date -s "@${target}" > /dev/null
+          echo $(( now - target )) > "${RUNNER_TEMP}/clock-shift"
+          echo "Uhr der VM auf $(TZ=Europe/Berlin date '+%A, %F %T %Z') gestellt"
+
+      - name: Run migrations
+        working-directory: phoenix/backend
+        run: '"${RUNNER_TEMP}/phoenix" migrate'
+
+      - name: Start backend
+        working-directory: phoenix/backend
+        env:
+          PORT: '8080'
+        run: |
+          "${RUNNER_TEMP}/phoenix" serve > "${RUNNER_TEMP}/server.log" 2>&1 &
+          echo $! > "${RUNNER_TEMP}/server.pid"
+          for _ in $(seq 1 60); do
+            if curl -fsS http://localhost:8080/health > /dev/null; then
+              echo "server up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "server did not become healthy in 60s"
+          exit 1
+
+      # Writes phoenix/backend/.seed-state.json with the device API keys.
+      - name: Seed demo data
+        working-directory: phoenix/backend
+        run: |
+          "${RUNNER_TEMP}/devtools" seed \
+            --email "${OPERATOR_EMAIL}" \
+            --password "${OPERATOR_PASSWORD}" \
+            --pin "${OGS_DEVICE_PIN}" \
+            --url http://localhost:8080 \
+            --product-screenshots
+
+      # Der Checkout fragt "Wohin geht …?" erst ab der Checkout-Uhrzeit der
+      # Schule (Standard 15:00) und das Tages-Feedback nur, wenn es an ist.
+      - name: Enable checkout and feedback for the kiosk
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d phoenix_screenshots -v ON_ERROR_STOP=1 -c "
+            INSERT INTO config.setting_values (tenant_id, setting_key, value)
+            SELECT t.id, s.key, s.val::jsonb
+            FROM platform.schools t,
+                 (VALUES ('feedback.enabled', 'true'),
+                         ('operations.student_daily_checkout_time', '\"00:01\"')) AS s(key, val)
+            ON CONFLICT (tenant_id, setting_key) DO UPDATE SET value = EXCLUDED.value"
+
+      # Der Schlüssel eines Wegwerf-Geräts dieses Laufs; trotzdem maskiert.
+      - name: Read the device API key
+        run: |
+          key=$(jq -r '(.profiles[.default_profile].devices // .devices)
+            | to_entries | map(select(.value.api_key)) | sort_by(.key) | first.value.api_key // ""' \
+            phoenix/backend/.seed-state.json)
+          if [ -z "${key}" ]; then
+            echo "::error::Der Seed hat kein Gerät mit API-Schlüssel angelegt."
+            exit 1
+          fi
+          echo "::add-mask::${key}"
+          echo "VITE_DEVICE_API_KEY=${key}" >> "${GITHUB_ENV}"
+
+      - name: Capture and frame all shots
+        env:
+          VITE_API_BASE_URL: http://localhost:8080
+          SHOT_OUT: ${{ runner.temp }}/product-screenshots
+          SHOT_VERSION: ${{ steps.version.outputs.version }}
+        run: pnpm run screenshots:product
+
+      - name: Restore the runner clock
+        if: always()
+        run: |
+          seconds=$(cat "${RUNNER_TEMP}/clock-shift" 2>/dev/null || echo 0)
+          if [ "${seconds}" -eq 0 ]; then
+            exit 0
+          fi
+          sudo date -s "@$(( $(date +%s) + seconds ))" > /dev/null
+          sudo timedatectl set-ntp true || true
+          echo "Uhr der VM wieder echt: $(TZ=Europe/Berlin date '+%A, %F %T %Z')"
+
+      - name: Upload screenshots
+        uses: actions/upload-artifact@v7
+        with:
+          name: product-screenshots-${{ steps.version.outputs.version }}
+          path: ${{ runner.temp }}/product-screenshots/
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Upload Playwright output
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: product-screenshots-failure-${{ github.run_id }}
+          path: |
+            screenshots/test-results/
+            screenshots/output/raw/
+          retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Backend log
+        if: always()
+        run: tail -n 200 "${RUNNER_TEMP}/server.log" || true
+
+      - name: Stop backend
+        if: always()
+        run: kill "$(cat "${RUNNER_TEMP}/server.pid")" 2>/dev/null || true
+
+  release-asset:
+    name: Attach to GitHub release
+    needs: capture
+    # Nur main und Tags vX.Y.Z.
+    if: >-
+      needs.capture.outputs.publish == 'true' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download screenshots
+        uses: actions/download-artifact@v8
+        with:
+          name: product-screenshots-${{ needs.capture.outputs.version }}
+          path: ${{ runner.temp }}/product-screenshots
+
+      # --clobber ersetzt beide ZIPs, wenn dasselbe Release erneut läuft.
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.capture.outputs.version }}
+        run: |
+          zip_file="${RUNNER_TEMP}/product-screenshots-${VERSION}.zip"
+          latest_file="${RUNNER_TEMP}/product-screenshots.zip"
+          (cd "${RUNNER_TEMP}/product-screenshots" && zip -qr "${zip_file}" .)
+          cp "${zip_file}" "${latest_file}"
+          gh release upload "v${VERSION}" "${zip_file}" "${latest_file}" --clobber --repo "${GITHUB_REPOSITORY}"
