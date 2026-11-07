@@ -28,6 +28,8 @@ jobs:
       API_URL: ${{ github.ref == 'refs/heads/main' && vars.GKT_PROD_API_URL || vars.GKT_STAGING_API_URL }}
       DEPLOY_DIR: ${{ github.ref == 'refs/heads/main' && '/var/www/pyreportal' || '/var/www/pyreportal-staging' }}
       DEPLOY_ENV: ${{ github.ref == 'refs/heads/main' && 'production' || 'staging' }}
+    outputs:
+      release_tag: ${{ steps.create-release.outcome == 'success' && steps.release.outputs.tag || '' }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -130,6 +132,7 @@ jobs:
           pnpm dlx @sentry/cli@3.8.0 deploys new --release "$RELEASE" --env "$DEPLOY_ENV"
 
       - name: Create GitHub release
+        id: create-release
         if: github.ref == 'refs/heads/main' && steps.release.outputs.create == 'true' && steps.deploy.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -154,3 +157,16 @@ jobs:
           commit_url: ${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}
           sha: ${{ github.sha }}
           actor: ${{ github.actor }}
+
+  # Produkt-Screenshots des neuen Release (screenshots/README.md). Ein von
+  # GITHUB_TOKEN angelegtes Release löst kein release-Event aus, deshalb der
+  # direkte Aufruf. Ein Fehler hier betrifft weder Deploy noch Release.
+  product-screenshots:
+    name: Product screenshots
+    needs: deploy
+    if: needs.deploy.outputs.release_tag != ''
+    permissions:
+      contents: write
+    uses: ./.github/workflows/product-screenshots.yml
+    with:
+      version: ${{ needs.deploy.outputs.release_tag }}

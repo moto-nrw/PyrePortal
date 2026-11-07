@@ -28,7 +28,7 @@ The script checks that `package.json` is greater than the latest GitHub release 
 8. Let the kiosk deployment workflow deploy production and create the GitHub release for the version in `package.json`.
 9. Verify the production kiosk environment and confirm that the `v<version>` tag and GitHub release target the deployed commit.
 
-The production workflow creates a metadata-only GitHub release with generated notes after a successful deployment. Re-running the workflow for the same commit is idempotent; reusing an existing version for a different commit fails before deployment.
+The production workflow creates a metadata-only GitHub release with generated notes after a successful deployment, then calls `.github/workflows/product-screenshots.yml`, which attaches `product-screenshots-<version>.zip` and `product-screenshots.zip` (GKT and iPad mockups, see `screenshots/README.md`). A failed screenshot run does not affect deploy or release; rerun it by hand on the tag `v<version>`. Re-running the workflow for the same commit is idempotent; reusing an existing version for a different commit fails before deployment.
 
 ## Rules
 

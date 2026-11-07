@@ -94,17 +94,18 @@ Mock tags must exist in the connected Project Phoenix database.
 
 ### Commands
 
-| Command                | Purpose                                |
-| ---------------------- | -------------------------------------- |
-| `pnpm run dev`         | Start browser/mock development         |
-| `pnpm run dev:wedge`   | Start local Wedge development          |
-| `pnpm run build:gkt`   | Alias for the unified kiosk build      |
-| `pnpm run build:wedge` | Alias for the unified kiosk build      |
-| `pnpm run build`       | Build one bundle for GKT and Wedge     |
-| `pnpm run check`       | Run ESLint and TypeScript checks       |
-| `pnpm run test`        | Run Vitest                             |
-| `pnpm run screenshots` | Capture the Playwright screenshot flow |
-| `pnpm run format`      | Format supported files with Prettier   |
+| Command                        | Purpose                                                |
+| ------------------------------ | ------------------------------------------------------ |
+| `pnpm run dev`                 | Start browser/mock development                         |
+| `pnpm run dev:wedge`           | Start local Wedge development                          |
+| `pnpm run build:gkt`           | Alias for the unified kiosk build                      |
+| `pnpm run build:wedge`         | Alias for the unified kiosk build                      |
+| `pnpm run build`               | Build one bundle for GKT and Wedge                     |
+| `pnpm run check`               | Run ESLint and TypeScript checks                       |
+| `pnpm run test`                | Run Vitest                                             |
+| `pnpm run screenshots`         | Capture the Playwright screenshot flow                 |
+| `pnpm run screenshots:product` | Capture both devices and frame the product screenshots |
+| `pnpm run format`              | Format supported files with Prettier                   |
 
 See [Kiosk deployment](docs/kiosk-deployment.md) for runtime selection, CI and rollout checks.
 
@@ -143,7 +144,7 @@ The API client and response types live in [`src/services/api.ts`](src/services/a
 - [Terminal fallback contract](docs/terminal-fallback-contract.md): room/activity semantics, Phoenix web fallback parity, and verification limits
 
 - [Wedge reader setup](docs/wedge-reader-setup.md): hardware, reader configuration, local testing and rollout
-- [Screenshot and video tooling](screenshots/README.md): deterministic Playwright capture flow
+- [Screenshot and video tooling](screenshots/README.md): deterministic Playwright capture flow and the product screenshots attached to every release
 - [Contributor guidance](CLAUDE.md): repository architecture and implementation rules
 
 ## License

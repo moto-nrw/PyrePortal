@@ -2,12 +2,16 @@ import fs from 'node:fs';
 
 import { test, type Page } from '@playwright/test';
 
+import { DEVICES, type DeviceId } from './devices';
+import { CAPTURED_FILE, type CapturedShots, type ShotId } from './shots';
 import { SCREENSHOT_TAG, UNKNOWN_TAG } from './tags';
 
 /**
- * Automated screenshot + video capture for PyrePortal (GKT tablet version).
+ * Automated screenshot + video capture for PyrePortal.
  *
- * Viewport: 1280x800 — GKT-Kiosk 10.1" TFT-LCD (16:10)
+ * Runs once per device project (playwright.config.ts): `gkt` (GKT-Kiosk,
+ * 1280x800, 16:10) and `ipad` (Wedge on an iPad Pro 11" in landscape), each
+ * with deviceScaleFactor 2. The `product` project then frames the raw images.
  * Product: NFC-basiertes Check-In Terminal für die digitale Ganztagsbetreuung.
  *
  * Captures the full user journey by driving the UI with real clicks.
@@ -18,33 +22,39 @@ import { SCREENSHOT_TAG, UNKNOWN_TAG } from './tags';
  *     window.__PYREPORTAL_MOCK_SCAN__ hook; the random auto-scan interval
  *     is disabled via window.__PYREPORTAL_DISABLE_AUTOSCAN__.
  *
- * The whole run is also recorded as screenshots/output/user-journey.webm.
+ * Raw images land in screenshots/output/raw/<device>/<shot id>.png together
+ * with captured.json (the route of each shot) and user-journey.webm.
  *
  * Prerequisites: local backend with seeded demo data (see screenshots/README.md).
  *
  * Usage:
- *   pnpm run screenshots                     # capture all screens + video
- *   pnpm run screenshots -- --grep "03"      # capture one specific step
- *   SCREENSHOT_PIN=9999 pnpm run screenshots # use a different PIN
+ *   pnpm run screenshots                         # both devices, then framing
+ *   pnpm run screenshots --project=gkt           # raw images of one device
+ *   SCREENSHOT_PIN=9999 pnpm run screenshots     # use a different PIN
  */
 
-const OUTPUT_DIR = './screenshots/output';
+const RAW_DIR = './screenshots/output/raw';
 
 // Must be a valid PIN on whichever backend VITE_API_BASE_URL points at.
 const STAFF_PIN = process.env.SCREENSHOT_PIN ?? '1234';
+
+let outputDir = RAW_DIR;
+const captured: Record<string, CapturedShots[string]> = {};
 
 // --- Helpers ---
 
 /**
  * Capture a screenshot after a short settle delay (animations/fades).
  * Use a small settleMs for short-lived modals (check-in: 1.5s, farewell: 1.5s).
+ * `aufsicht-konflikt` only appears on a 409 and is not part of the shot list.
  */
-async function screenshot(page: Page, name: string, settleMs = 500) {
+async function screenshot(page: Page, id: ShotId | 'aufsicht-konflikt', settleMs = 500) {
   await page.waitForTimeout(settleMs);
   await page.screenshot({
-    path: `${OUTPUT_DIR}/${name}.png`,
+    path: `${outputDir}/${id}.png`,
     fullPage: false,
   });
+  captured[id] = { pfad: new URL(page.url()).pathname };
 }
 
 async function enterPin(page: Page, pin: string) {
@@ -169,10 +179,17 @@ test.describe('PyrePortal User Journey', () => {
 
   let page: Page;
 
-  test.beforeAll(async ({ browser }) => {
+  test.beforeAll(async ({ browser }, testInfo) => {
+    const device = DEVICES[testInfo.project.name as DeviceId];
+    if (!device) throw new Error(`Unknown screenshot device project "${testInfo.project.name}"`);
+    outputDir = `${RAW_DIR}/${device.id}`;
+    fs.rmSync(outputDir, { recursive: true, force: true });
+    fs.mkdirSync(outputDir, { recursive: true });
     page = await browser.newPage({
-      viewport: { width: 1280, height: 800 },
-      recordVideo: { dir: OUTPUT_DIR, size: { width: 1280, height: 800 } },
+      viewport: device.viewport,
+      deviceScaleFactor: device.deviceScaleFactor,
+      hasTouch: device.hasTouch,
+      recordVideo: { dir: outputDir, size: device.viewport },
     });
     // Disable the random mock-scan interval; scans are injected explicitly.
     await page.addInitScript(() => {
@@ -185,8 +202,9 @@ test.describe('PyrePortal User Journey', () => {
     await page.close();
     if (video) {
       const recordedPath = await video.path();
-      fs.renameSync(recordedPath, `${OUTPUT_DIR}/user-journey.webm`);
+      fs.renameSync(recordedPath, `${outputDir}/user-journey.webm`);
     }
+    fs.writeFileSync(`${outputDir}/${CAPTURED_FILE}`, `${JSON.stringify(captured, null, 2)}\n`);
   });
 
   // ----------------------------------------------------------
@@ -196,20 +214,20 @@ test.describe('PyrePortal User Journey', () => {
   test('01 — Landing Page', async () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '01-landing');
+    await screenshot(page, 'start');
   });
 
   test('02 — PIN Entry', async () => {
     await page.click('button:has-text("Anmelden")');
     await page.waitForURL('**/pin');
-    await screenshot(page, '02-pin-entry');
+    await screenshot(page, 'pin-eingabe');
   });
 
   test('03 — Home (after PIN)', async () => {
     await enterPin(page, STAFF_PIN);
     await page.waitForURL('**/home', { timeout: 10_000 });
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '03-home');
+    await screenshot(page, 'startseite');
   });
 
   // ----------------------------------------------------------
@@ -220,18 +238,18 @@ test.describe('PyrePortal User Journey', () => {
     await page.click('button:has-text("Armband identifizieren")');
     await page.waitForURL('**/tag-assignment');
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '04-tag-assignment');
+    await screenshot(page, 'armband-identifizieren');
   });
 
   test('05 — Scanning modal', async () => {
     await page.click('button:has-text("Scan starten")');
     await page.waitForSelector('text=Armband wird erkannt', { timeout: 5_000 });
-    await screenshot(page, '05-scanning-modal', 300);
+    await screenshot(page, 'armband-scan-laeuft', 300);
   });
 
   test('06 — Tag recognized (Armband erkannt)', async () => {
     await page.waitForSelector('text=Armband erkannt', { timeout: 15_000 });
-    await screenshot(page, '06-tag-recognized', 300);
+    await screenshot(page, 'armband-erkannt', 300);
   });
 
   test('07 — Student Selection (unfiltered)', async () => {
@@ -244,7 +262,7 @@ test.describe('PyrePortal User Journey', () => {
     }
     await page.waitForURL('**/student-selection');
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '07-student-selection');
+    await screenshot(page, 'kind-auswaehlen');
   });
 
   test('08 — Filter by grade', async () => {
@@ -257,7 +275,7 @@ test.describe('PyrePortal User Journey', () => {
       await grade1.click();
     }
     await page.waitForTimeout(500);
-    await screenshot(page, '08-student-filtered');
+    await screenshot(page, 'kind-nach-klasse-filtern');
   });
 
   test('09 — Filter by OGS group + select a student', async () => {
@@ -268,18 +286,18 @@ test.describe('PyrePortal User Journey', () => {
     await page.waitForTimeout(300);
     await page.click('button:has-text("Alle Gruppen")');
     await page.waitForSelector('text=OGS-Gruppe wählen', { timeout: 5_000 });
-    await screenshot(page, '09a-group-picker', 300);
+    await screenshot(page, 'ogs-gruppe-waehlen', 300);
     await page.click('dialog[open] button:has-text("Sternengruppe")');
     await page.waitForTimeout(500);
     await clickCard(page, 0);
-    await screenshot(page, '09-student-selected');
+    await screenshot(page, 'kind-ausgewaehlt');
   });
 
   test('10 — Assign tag (Armband zuweisen)', async () => {
     await page.locator('button', { hasText: 'Armband zuweisen' }).click();
     await page.waitForURL('**/tag-assignment', { timeout: 10_000 });
     await page.waitForSelector('text=Erfolgreich', { timeout: 10_000 });
-    await screenshot(page, '10-assignment-success', 300);
+    await screenshot(page, 'armband-zugewiesen', 300);
   });
 
   // ----------------------------------------------------------
@@ -290,27 +308,27 @@ test.describe('PyrePortal User Journey', () => {
     await page.click('button:has-text("Zurück")');
     await page.waitForURL('**/home');
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '11-home-return');
+    await screenshot(page, 'startseite-zurueck');
   });
 
   test('12 — Team Management', async () => {
     await page.click('button:has-text("Team anpassen")');
     await page.waitForURL('**/team-management');
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '12-team-management');
+    await screenshot(page, 'team-anpassen');
   });
 
   test('13 — Select team members', async () => {
     // Select the first two available staff cards (names vary per backend)
     await clickCard(page, 0);
     await clickCard(page, 1);
-    await screenshot(page, '13-team-selected');
+    await screenshot(page, 'team-ausgewaehlt');
   });
 
   test('14 — Save team', async () => {
     await page.click('button:has-text("Team speichern")');
     await page.waitForSelector('text=Team erfolgreich', { timeout: 10_000 });
-    await screenshot(page, '14-team-saved', 300);
+    await screenshot(page, 'team-gespeichert', 300);
   });
 
   // ----------------------------------------------------------
@@ -344,37 +362,37 @@ test.describe('PyrePortal User Journey', () => {
   test('16 — Activity Selection', async () => {
     await page.waitForURL('**/activity-selection', { timeout: 5_000 });
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '16-activity-selection');
+    await screenshot(page, 'aktivitaet-waehlen');
   });
 
   test('17 — Select activity', async () => {
     await clickCard(page, 0);
-    await screenshot(page, '17-activity-selected');
+    await screenshot(page, 'aktivitaet-ausgewaehlt');
   });
 
   test('18 — Staff Selection', async () => {
     await page.click('button:has-text("Weiter")');
     await page.waitForURL('**/staff-selection');
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '18-staff-selection');
+    await screenshot(page, 'betreuer-waehlen');
   });
 
   test('19 — Select staff', async () => {
     await clickCard(page, 0);
-    await screenshot(page, '19-staff-selected');
+    await screenshot(page, 'betreuer-ausgewaehlt');
   });
 
   test('20 — Room Selection', async () => {
     await page.click('button:has-text("Weiter")');
     await page.waitForURL('**/rooms');
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '20-room-selection');
+    await screenshot(page, 'raum-waehlen');
   });
 
   test('21 — Select room → Confirmation', async () => {
     await clickCard(page, 0);
     await page.waitForSelector('text=Aufsicht starten?', { timeout: 5_000 });
-    await screenshot(page, '21-confirm-session', 300);
+    await screenshot(page, 'aufsicht-starten-bestaetigen', 300);
   });
 
   test('22 — Start session → NFC Scanning', async () => {
@@ -386,13 +404,13 @@ test.describe('PyrePortal User Journey', () => {
     // Handle 409 conflict: if "Trotzdem starten" appears, click it
     const forceBtn = page.locator('button:has-text("Trotzdem starten")');
     if ((await forceBtn.count()) > 0) {
-      await screenshot(page, '22a-session-conflict', 300);
+      await screenshot(page, 'aufsicht-konflikt', 300);
       await forceBtn.click();
     }
 
     await page.waitForURL('**/nfc-scanning', { timeout: 15_000 });
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '22-nfc-scanning');
+    await screenshot(page, 'nfc-scan-bereit');
   });
 
   // ----------------------------------------------------------
@@ -408,7 +426,7 @@ test.describe('PyrePortal User Journey', () => {
     // Check-in modal body: "Du bist jetzt in <Raum>" — auto-closes after
     // 1.5s, capture fast (the title is a backend-provided greeting)
     await page.waitForSelector('text=Du bist jetzt in', { timeout: 15_000 });
-    await screenshot(page, '23-checkin-modal', 200);
+    await screenshot(page, 'einchecken', 200);
   });
 
   test('24 — Checkout: destination question', async () => {
@@ -417,20 +435,20 @@ test.describe('PyrePortal User Journey', () => {
     await injectScan(page, SCREENSHOT_TAG);
     // Second scan of a checked-in student → "Wohin geht <Name>?" (stays 7s)
     await page.waitForSelector('text=Wohin geht', { timeout: 15_000 });
-    await screenshot(page, '24-checkout-destination', 300);
+    await screenshot(page, 'auschecken-wohin', 300);
   });
 
   test('25 — Checkout: feedback prompt', async () => {
     await page.click('dialog[open] button:has-text("nach Hause")');
     await page.waitForSelector('text=Wie war dein Tag', { timeout: 10_000 });
-    await screenshot(page, '25-feedback-prompt', 300);
+    await screenshot(page, 'tages-feedback', 300);
   });
 
   test('26 — Checkout: farewell', async () => {
     await page.click('dialog[open] button:has-text("Gut")');
     // Farewell modal: "Tschüss, <Name>!" — auto-closes after 1.5s, capture fast
     await page.waitForSelector('text=Tschüss,', { timeout: 10_000 });
-    await screenshot(page, '26-farewell', 150);
+    await screenshot(page, 'verabschiedung', 150);
   });
 
   // ----------------------------------------------------------
@@ -444,7 +462,7 @@ test.describe('PyrePortal User Journey', () => {
     await page.waitForSelector('text=Bitte halte dein Armband an das Lesegerät', {
       timeout: 10_000,
     });
-    await screenshot(page, '27-pickup-query-prompt', 300);
+    await screenshot(page, 'abholzeit-abfragen', 300);
   });
 
   test('28 — Pickup query result', async () => {
@@ -452,7 +470,7 @@ test.describe('PyrePortal User Journey', () => {
     await injectScan(page, SCREENSHOT_TAG);
     // Shows either the pickup time or "keine Abholzeit hinterlegt" (both valid)
     await page.waitForSelector('text=/Abholzeit für|keine Abholzeit/', { timeout: 15_000 });
-    await screenshot(page, '28-pickup-query-result', 300);
+    await screenshot(page, 'abholzeit-ergebnis', 300);
   });
 
   test('29 — Error modal (unknown tag)', async () => {
@@ -461,7 +479,7 @@ test.describe('PyrePortal User Journey', () => {
     await injectScan(page, UNKNOWN_TAG);
     // Deliberate error-state capture: unassigned wristband → red modal
     await page.waitForSelector('text=Scan fehlgeschlagen', { timeout: 15_000 });
-    await screenshot(page, '29-scan-error', 200);
+    await screenshot(page, 'scan-fehler', 200);
   });
 
   // ----------------------------------------------------------
@@ -477,13 +495,13 @@ test.describe('PyrePortal User Journey', () => {
     await page.waitForURL('**/home', { timeout: 10_000 });
     await page.waitForSelector('button:has-text("Aufsicht beenden")', { timeout: 10_000 });
     await page.waitForLoadState('networkidle');
-    await screenshot(page, '30-home-active-session');
+    await screenshot(page, 'startseite-aktive-aufsicht');
   });
 
   test('31 — End session confirmation', async () => {
     await page.click('button:has-text("Aufsicht beenden")');
     await page.waitForSelector('text=Aufsicht beenden?', { timeout: 5_000 });
-    await screenshot(page, '31-end-session-confirm', 300);
+    await screenshot(page, 'aufsicht-beenden', 300);
     // Confirm so the demo session doesn't linger on the backend
     await page.click('button:has-text("Ja, beenden")');
     await page.waitForTimeout(1000);
@@ -499,12 +517,12 @@ test.describe('PyrePortal User Journey', () => {
     test.setTimeout(30_000);
     await waitForModalClosed(page);
     await page.waitForSelector('button:has-text("Letzte Aufsichten")', { timeout: 10_000 });
-    await screenshot(page, '32-home-history-shortcut', 300);
+    await screenshot(page, 'startseite-letzte-aufsichten', 300);
 
     await page.click('button:has-text("Letzte Aufsichten")');
     await page.waitForURL('**/session-history');
     await page.waitForSelector('text=Antippen startet die Aufsicht neu.');
-    await screenshot(page, '32a-session-history-page', 300);
+    await screenshot(page, 'aufsichtsverlauf', 300);
   });
 
   test('33 — Recreate confirmation (Neue Aufsicht starten?)', async () => {
@@ -512,7 +530,7 @@ test.describe('PyrePortal User Journey', () => {
     // First history row (rows carry the "Zuletzt:" timestamp label)
     await page.locator('button', { hasText: 'Zuletzt:' }).first().click();
     await page.waitForSelector('text=Neue Aufsicht starten?', { timeout: 15_000 });
-    await screenshot(page, '33-history-recreate-confirm', 300);
+    await screenshot(page, 'aufsicht-neu-starten', 300);
     // Cancel — the journey must not start another session here
     await page.click('dialog[open] button:has-text("Abbrechen")');
   });
@@ -521,7 +539,7 @@ test.describe('PyrePortal User Journey', () => {
     await waitForModalClosed(page);
     await page.click('button:has-text("Alle löschen")');
     await page.waitForSelector('text=Verlauf löschen?', { timeout: 5_000 });
-    await screenshot(page, '34-history-clear-confirm', 300);
+    await screenshot(page, 'verlauf-loeschen', 300);
     await page.click('dialog[open] button:has-text("Abbrechen")');
   });
 });
