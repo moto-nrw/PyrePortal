@@ -23,6 +23,9 @@ jobs:
       - name: Verify canonical error registry compatibility
         run: node --test scripts/sync-error-codes.test.mjs
 
+      - name: Verify optional Devbox browser setup
+        run: node --test scripts/devbox-init.test.mjs
+
       - name: Lint frontend code
         run: pnpm run lint
 
