@@ -328,6 +328,15 @@ export function useActivityScanningPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array - only run on mount/unmount
 
+  // Answers that arrive after the page closed must not touch the session.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Function to fetch current session info
   const fetchSessionInfo = async () => {
     if (!authenticatedUser?.pin) return;
@@ -337,12 +346,28 @@ export function useActivityScanningPage() {
     try {
       const session = await api.getCurrentSession(authenticatedUser.pin);
       logger.debug('Session info received', { session });
+      if (!isMountedRef.current) return;
+
+      const state = useUserStore.getState();
+      if (countScopeOf(state) !== scope) {
+        logger.debug('Discarding session info of an earlier count scope');
+        return;
+      }
+
+      // The server reports no session for this device: it ended (day end,
+      // force start on another device). The kiosk must not keep scanning
+      // into it.
+      if (!session && state.currentSession) {
+        logger.warn('Server reports no session for this device, reconciling', {
+          localActiveGroupId: state.currentSession.active_group_id,
+        });
+        void state.reconcileSession();
+        return;
+      }
 
       const count = session?.active_students ?? 0;
-      const state = useUserStore.getState();
       const revision = session?.active_students_revision;
       if (
-        countScopeOf(state) !== scope ||
         (revision != null && session?.active_group_id !== state.currentSession?.active_group_id) ||
         !applyStudentCount(
           sequence,

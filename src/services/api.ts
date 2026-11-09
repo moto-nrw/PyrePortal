@@ -24,7 +24,7 @@ export {
   NetworkError,
   WC_ROOM_ALIASES,
 } from './apiErrors';
-export { initializeApi, setNetworkStatusCallback } from './apiClient';
+export { initializeApi, setApiErrorCallback, setNetworkStatusCallback } from './apiClient';
 export { fetchSchoolName, getSchoolName, onSchoolNameLoaded } from './schoolName';
 
 const logger = createLogger('API');

@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 
+import { KioskNotice } from './components/KioskNotice';
 import ProtectedRoute from './components/ProtectedRoute';
 import { RfidServiceInitializer } from './components/RfidServiceInitializer';
 import NetworkStatus from './components/ui/NetworkStatus';
@@ -17,7 +18,7 @@ import StaffSelectionPage from './pages/StaffSelectionPage';
 import StudentSelectionPage from './pages/StudentSelectionPage';
 import TagAssignmentPage from './pages/TagAssignmentPage';
 import TeamManagementPage from './pages/TeamManagementPage';
-import { setNetworkStatusCallback } from './services/api';
+import { setApiErrorCallback, setNetworkStatusCallback } from './services/api';
 import { useUserStore } from './store/userStore';
 import ErrorBoundary from './utils/errorBoundary';
 import { createLogger, getRuntimeConfig, logger } from './utils/logger';
@@ -27,6 +28,7 @@ function App() {
     selectedRoom,
     selectedActivity,
     updateNetworkQuality,
+    handleAccessError,
     networkStatus: storeNetworkStatus,
   } = useUserStore();
   // Starts health-check monitoring; results are written directly to the store
@@ -50,6 +52,13 @@ function App() {
     return () => setNetworkStatusCallback(null);
   }, [updateNetworkQuality]);
 
+  // Every refused request can end the login centrally (PIN changed, device
+  // without access, module not booked).
+  useEffect(() => {
+    setApiErrorCallback(handleAccessError);
+    return () => setApiErrorCallback(null);
+  }, [handleAccessError]);
+
   // Conditions for protected routes with additional requirements
   // Note: Authentication is handled by ProtectedRoute component
   const hasActiveSession = !!selectedActivity && !!selectedRoom;
@@ -57,6 +66,7 @@ function App() {
   return (
     <ErrorBoundary>
       <RfidServiceInitializer />
+      <KioskNotice />
       {/* Network Status Indicator - shown on all pages when poor/offline */}
       {(storeNetworkStatus.quality === 'poor' || storeNetworkStatus.quality === 'offline') && (
         <div

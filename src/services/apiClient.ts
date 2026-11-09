@@ -25,6 +25,25 @@ let networkStatusCallback: NetworkStatusCallback | null = null;
 const POOR_THRESHOLD_MS = 1000;
 
 /**
+ * Called with every error answer of the server and the staff PIN the request
+ * carried, so the app can react centrally (for example log out when the
+ * stored PIN is refused).
+ */
+type ApiErrorCallback = (error: ApiError, requestPin: string | undefined) => void;
+let apiErrorCallback: ApiErrorCallback | null = null;
+
+/** Register a callback to receive every error answer of the server. */
+export function setApiErrorCallback(callback: ApiErrorCallback | null): void {
+  apiErrorCallback = callback;
+}
+
+/** The X-Staff-PIN a request carried, if any. */
+function requestPinOf(headers: RequestInit['headers']): string | undefined {
+  if (!headers) return undefined;
+  return new Headers(headers).get('X-Staff-PIN') ?? undefined;
+}
+
+/**
  * Register a callback to receive network status updates from API calls
  */
 export function setNetworkStatusCallback(callback: NetworkStatusCallback | null): void {
@@ -211,7 +230,15 @@ export async function apiCall<T>(endpoint: string, options: RequestInit = {}): P
       logger.debug('API request failure details', { endpoint, errorDetails: details });
     }
 
-    throw new ApiError(message, response.status, code, details);
+    const apiError = new ApiError(message, response.status, code, details);
+    try {
+      apiErrorCallback?.(apiError, requestPinOf(options.headers));
+    } catch (callbackError) {
+      logger.error('API error callback failed', {
+        error: callbackError instanceof Error ? callbackError.message : String(callbackError),
+      });
+    }
+    throw apiError;
   }
 
   logger.debug('API request completed', {
