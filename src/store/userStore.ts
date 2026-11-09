@@ -21,7 +21,7 @@ import { createNetworkSlice } from './slices/networkSlice';
 import { createRoomSlice } from './slices/roomSlice';
 import { createScanSlice, type RecentTagScan, type RfidState } from './slices/scanSlice';
 import { createSessionSlice } from './slices/sessionSlice';
-import { createUiSlice } from './slices/uiSlice';
+import { createUiSlice, type KioskNotice } from './slices/uiSlice';
 
 export { RECENT_SCAN_CACHE_TTL_MS } from './slices/scanSlice';
 
@@ -37,6 +37,7 @@ export interface UserState {
   currentSession: CurrentSession | null;
   isLoading: boolean;
   error: string | null;
+  kioskNotice: KioskNotice | null;
   selectedSupervisors: User[]; // Selected supervisors for multi-supervisor sessions
   activeSupervisorTags: Set<string>; // Locally tracked supervisor tagIds for instant re-entry
 
@@ -64,6 +65,8 @@ export interface UserState {
   selectRoom: (roomId: number) => void;
   fetchCurrentSession: () => Promise<void>;
   logout: () => Promise<void>;
+  handleAccessError: (error: unknown, requestPin: string | undefined) => void;
+  dismissKioskNotice: () => void;
 
   // Activity-related actions
   fetchActivities: () => Promise<ActivityResponse[] | null>;
@@ -115,6 +118,7 @@ export interface UserState {
 
   // Session state cleanup action
   clearSessionState: () => void;
+  reconcileSession: () => Promise<void>;
 }
 
 // Define the type for the Zustand set function
@@ -132,7 +136,7 @@ const createUserStore = (set: SetState<UserState>, get: GetState<UserState>) => 
   ...createRoomSlice(set, get),
   ...createSessionSlice(set, get),
   ...createScanSlice(set, get),
-  ...createUiSlice(),
+  ...createUiSlice(set),
   ...createNetworkSlice(set),
 });
 

@@ -11,6 +11,7 @@ import type { NfcScanEvent } from '../platform/adapter';
 import { countScopeOf } from '../services/activityScanningRules';
 import { api } from '../services/api';
 import type { RfidScanResult } from '../services/api';
+import { isSessionLostError } from '../services/apiErrors';
 import {
   createScanErrorResult,
   createSessionExpiredResult,
@@ -259,6 +260,12 @@ export const useRfidScanning = () => {
         const errorResult = { ...createScanErrorResult(error), requestSequence, requestScope };
         setScanResult(errorResult);
         showScanModal();
+
+        // The server says the device runs no session: take over its state
+        // instead of scanning on. The scan itself is not repeated (#486).
+        if (isSessionLostError(error)) {
+          void useUserStore.getState().reconcileSession();
+        }
 
         // For STUDENT_ALREADY_ACTIVE (issue #844) the backend tells us
         // exactly which student is on the reader. Cache the result like

@@ -1,5 +1,9 @@
 import { api, type Teacher } from '../../services/api';
-import { mapApiErrorToGerman } from '../../services/apiErrors';
+import {
+  getAccessLossReason,
+  mapApiErrorToGerman,
+  type AccessLossReason,
+} from '../../services/apiErrors';
 import { createLogger } from '../../utils/logger';
 import type { GetState, SetState, UserState } from '../userStore';
 
@@ -49,6 +53,20 @@ export function resolveStaffAttributionId(
 
   return undefined;
 }
+
+const ACCESS_LOSS_TITLE = 'Abgemeldet';
+
+/** Kiosk copy per reason; a missing module shows the module's own text. */
+const accessLossMessage = (reason: AccessLossReason, error: unknown): string => {
+  switch (reason) {
+    case 'pin':
+      return 'Die PIN hat sich geändert. Bitte mit der neuen PIN anmelden.';
+    case 'device':
+      return 'Dieses Gerät hat keinen Zugang mehr zu moto. Bitte an die Leitung wenden.';
+    case 'module':
+      return mapApiErrorToGerman(error);
+  }
+};
 
 export const createAuthSlice = (set: SetState<UserState>, get: GetState<UserState>) => ({
   // Initial state
@@ -103,6 +121,33 @@ export const createAuthSlice = (set: SetState<UserState>, get: GetState<UserStat
       });
       throw error;
     }
+  },
+
+  // Central reaction to an error answer of any request: when the server no
+  // longer accepts the login (stored PIN refused, device without access,
+  // module NFC-Anwesenheit not booked) the kiosk logs out at once. It sends no
+  // further request: every one would be refused the same way.
+  handleAccessError: (error: unknown, requestPin: string | undefined) => {
+    const reason = getAccessLossReason(error);
+    if (!reason) return;
+    const { authenticatedUser } = get();
+    if (!authenticatedUser) return;
+    // A PIN typed on the PIN page that differs from the stored one says
+    // nothing about the login; only a refused stored PIN does.
+    if (reason === 'pin' && requestPin !== authenticatedUser.pin) return;
+
+    storeLogger.warn('Server no longer accepts the kiosk login, logging out', { reason });
+    get().invalidateSessionRecreation();
+    set({
+      authenticatedUser: null,
+      selectedRoom: null,
+      selectedActivity: null,
+      currentSession: null,
+      selectedSupervisors: [],
+      activeSupervisorTags: new Set<string>(),
+      isValidatingLastSession: false,
+      kioskNotice: { title: ACCESS_LOSS_TITLE, message: accessLossMessage(reason, error) },
+    });
   },
 
   logout: async () => {

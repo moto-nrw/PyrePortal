@@ -26,6 +26,7 @@ import type { GetState, SetState, UserState } from '../userStore';
 
 import type { User } from './authSlice';
 import { RFID_SESSION_INITIAL_STATE } from './scanSlice';
+import type { KioskNotice } from './uiSlice';
 
 // Create a store-specific logger instance
 const storeLogger = createLogger('UserStore');
@@ -316,6 +317,12 @@ const SESSION_INITIAL_STATE = {
   activeSupervisorTags: new Set<string>(),
 };
 
+/** Shown on /home after the server ended or moved the session of this device. */
+const SESSION_ENDED_NOTICE: KioskNotice = {
+  title: 'Aufsicht beendet',
+  message: 'Die Aufsicht an diesem Gerät ist beendet. Bitte bei Bedarf eine neue Aufsicht starten.',
+};
+
 export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserState>) => {
   // Race guard for session recreation: stale async responses are discarded
   const recreationTracker = createSessionRequestTracker();
@@ -500,6 +507,30 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         const errorMessage = error instanceof Error ? error.message : String(error);
         storeLogger.error('Failed to fetch current session', { error: errorMessage });
         // Don't set error state for session check, just log it
+      }
+    },
+
+    // Called when the server hints that the local session is no longer the
+    // device's session: a poll or a scan answer names none or another one,
+    // or a request is refused with a session code. The server's answer is
+    // authoritative: fetchCurrentSession adopts the device's current session
+    // or clears the local one, which takes the kiosk to /home. Scans are
+    // never repeated here (PyrePortal #486).
+    reconcileSession: async () => {
+      const localSession = get().currentSession;
+      if (!localSession) return;
+
+      storeLogger.info('Reconciling local session with the server', {
+        activeGroupId: localSession.active_group_id,
+      });
+      await get().fetchCurrentSession();
+
+      const { authenticatedUser, currentSession } = get();
+      if (authenticatedUser && currentSession === null) {
+        storeLogger.warn('Server no longer reports the local session, left it', {
+          activeGroupId: localSession.active_group_id,
+        });
+        set({ kioskNotice: SESSION_ENDED_NOTICE });
       }
     },
 
