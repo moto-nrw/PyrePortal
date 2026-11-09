@@ -23,7 +23,7 @@
   "shell": {
     "init_hook": [
       "lefthook install --force > /dev/null 2>&1 || true",
-      "which agent-browser > /dev/null 2>&1 || (pnpm add -g agent-browser > /dev/null 2>&1 && agent-browser install > /dev/null 2>&1)",
+      "command -v agent-browser > /dev/null 2>&1 || (pnpm add -g agent-browser > /dev/null 2>&1 && agent-browser install > /dev/null 2>&1) || echo 'Warning: optional agent-browser setup failed. Retry manually: pnpm add -g agent-browser && agent-browser install' >&2",
       "[ ! -d node_modules ] && echo 'installing frontend deps...' && pnpm install --silent || true",
       "echo \"node $(node -v | sed 's/v//') pnpm $(pnpm -v) rust $(rustc --version 2>/dev/null | cut -d' ' -f2 || echo 'n/a') | bat eza fzf rg fd tree jq glow btop curl lazygit gh\""
     ]
