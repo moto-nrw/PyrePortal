@@ -112,6 +112,7 @@ function HomeViewPage() {
   // state decides what the kiosk shows.
   const endCurrentSession = async () => {
     logUserAction('Ending current session');
+    const endingSessionId = currentSession?.active_group_id;
     try {
       await api.endSession(authenticatedUser!.pin);
       await fetchCurrentSession();
@@ -119,8 +120,14 @@ function HomeViewPage() {
     } catch (error) {
       logger.error('Failed to end session', { error: serializeError(error) });
       await fetchCurrentSession();
-      // A session that is already gone counts as ended.
-      if (isSessionLostError(error) || useUserStore.getState().currentSession === null) {
+      const shownSession = useUserStore.getState().currentSession;
+      // The server no longer runs the session that was to end: it counts as ended.
+      if (shownSession?.active_group_id !== endingSessionId) {
+        logUserAction('Session was already ended');
+        return;
+      }
+      // The server said so, but the check afterwards did not answer.
+      if (isSessionLostError(error)) {
         logUserAction('Session was already ended');
         useUserStore.getState().clearSessionState();
         return;

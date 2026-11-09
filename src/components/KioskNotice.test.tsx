@@ -21,14 +21,15 @@ describe('KioskNotice', () => {
     expect(screen.queryByText(notice.title)).not.toBeInTheDocument();
   });
 
-  it('shows the notice of the store and closes on tap', () => {
+  it('shows the notice of the store and closes on a tap beside it', () => {
     useUserStore.setState({ kioskNotice: notice });
     render(<KioskNotice />);
 
     expect(screen.getByText(notice.title)).toBeInTheDocument();
     expect(screen.getByText(notice.message)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText(notice.message));
+    const dialog = screen.getByText(notice.title).closest('dialog')!;
+    fireEvent.click(dialog);
     expect(useUserStore.getState().kioskNotice).toBeNull();
   });
 

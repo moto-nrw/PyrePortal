@@ -101,6 +101,22 @@ describe('HomeViewPage ending a session (#512)', () => {
     expect(isFailureShown()).toBe(false);
   });
 
+  it('trusts the server saying there is no session when the check afterwards fails', async () => {
+    mockedApi.endSession.mockRejectedValue(
+      new ApiError('API Error: 400', 400, 'iot.no_session_to_end')
+    );
+    mockedApi.getCurrentSession
+      .mockResolvedValueOnce(activeSession)
+      .mockRejectedValue(new NetworkError('Keine Netzwerkverbindung.'));
+
+    await endSessionFromHome();
+
+    await waitFor(() => {
+      expect(useUserStore.getState().currentSession).toBeNull();
+    });
+    expect(isFailureShown()).toBe(false);
+  });
+
   it('shows a message and keeps the session when the server still runs it', async () => {
     mockedApi.endSession.mockRejectedValue(new ApiError('API Error: 500', 500));
 

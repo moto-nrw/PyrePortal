@@ -11,7 +11,7 @@ export const KIOSK_NOTICE_TIMEOUT_MS = 15_000;
 
 /**
  * Shows the store's kiosk notice above every page, such as why the kiosk
- * left the scanning page or logged out. Closes on tap or after a while.
+ * left the scanning page or logged out. Closes on a tap beside it or after a while.
  */
 export function KioskNotice() {
   const kioskNotice = useUserStore(state => state.kioskNotice);
@@ -25,7 +25,6 @@ export function KioskNotice() {
       backgroundColor={designSystem.colors.white}
       timeout={KIOSK_NOTICE_TIMEOUT_MS}
       timeoutResetKey={kioskNotice ? `${kioskNotice.title}:${kioskNotice.message}` : null}
-      closeOnContentClick
     >
       <div
         style={{ marginBottom: designSystem.spacing.lg, color: designSystem.pastel.blue.accent }}
