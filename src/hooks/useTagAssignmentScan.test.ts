@@ -265,4 +265,70 @@ describe('useTagAssignmentScan', () => {
     expect(result.current.scannedTag).toBeNull();
     expect(result.current.tagAssignment).toBeNull();
   });
+  it.each(['gkt', 'wedge', 'browser'])(
+    'recovers from a rejected check on %s without retrying',
+    async platform => {
+      setPlatform(platform);
+      mockScanSingleTag.mockResolvedValue({ success: true, tag_id: 'TAG-A' });
+      const check = vi
+        .spyOn(api, 'checkTagAssignment')
+        .mockRejectedValueOnce(new Error('offline'))
+        .mockResolvedValueOnce(unassignedTag);
+      const { result } = renderHook(() => useTagAssignmentScan());
+      await act(async () => {
+        void result.current.startScanning();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(result.current.showErrorModal).toBe(true);
+      act(() => result.current.closeErrorModal());
+      expect(result.current.scannedTag).toBeNull();
+      expect(result.current.isLoading).toBe(false);
+      expect(check).toHaveBeenCalledTimes(1);
+      await act(async () => {
+        void result.current.startScanning();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(result.current.tagAssignment).toEqual(unassignedTag);
+      expect(check).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it.each(['gkt', 'wedge', 'browser'])(
+    'times out a hanging check and ignores its late response on %s',
+    async platform => {
+      setPlatform(platform);
+      mockScanSingleTag.mockResolvedValue({ success: true, tag_id: 'TAG-A' });
+      let resolveOld!: (value: TagAssignmentCheck) => void;
+      const check = vi
+        .spyOn(api, 'checkTagAssignment')
+        .mockImplementationOnce(
+          () =>
+            new Promise(resolve => {
+              resolveOld = resolve;
+            })
+        )
+        .mockResolvedValueOnce(unassignedTag);
+      const { result } = renderHook(() => useTagAssignmentScan());
+      await act(async () => {
+        void result.current.startScanning();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      expect(result.current.isLoading).toBe(true);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
+      expect(result.current.showErrorModal).toBe(true);
+      act(() => result.current.closeErrorModal());
+      expect(result.current.scannedTag).toBeNull();
+      await act(async () => {
+        void result.current.startScanning();
+        await vi.advanceTimersByTimeAsync(2000);
+      });
+      await act(async () => {
+        resolveOld(assignedStudentTag);
+      });
+      expect(result.current.tagAssignment).toEqual(unassignedTag);
+      expect(check).toHaveBeenCalledTimes(2);
+    }
+  );
 });

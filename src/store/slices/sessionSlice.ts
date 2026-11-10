@@ -537,8 +537,8 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
     // Load the supervisors of the active session from the backend into the
     // local supervisor selection. Errors propagate to the caller on purpose
     // (pages log them in their own initialization error handling).
-    loadSessionSupervisors: async (): Promise<void> => {
-      const { authenticatedUser } = get();
+    loadSessionSupervisors: async (isCurrent = () => true): Promise<void> => {
+      const { authenticatedUser, currentSession, selectedSupervisors } = get();
 
       if (!authenticatedUser?.pin) {
         storeLogger.warn('Cannot load session supervisors: no authenticated user or PIN');
@@ -546,6 +546,13 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
       }
 
       const sessionDetails = await api.getCurrentSession(authenticatedUser.pin);
+      if (
+        !isCurrent() ||
+        get().authenticatedUser !== authenticatedUser ||
+        get().currentSession !== currentSession ||
+        get().selectedSupervisors !== selectedSupervisors
+      )
+        return;
       if (sessionDetails && 'supervisors' in sessionDetails) {
         const currentSupervisors =
           sessionDetails.supervisors?.map(sup => ({
