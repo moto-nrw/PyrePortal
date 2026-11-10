@@ -119,7 +119,11 @@ export function useTagAssignmentScan() {
       logUserAction('RFID tag scanned');
 
       // Check if tag is already assigned
-      const assignment = await checkTagAssignment(tagId);
+      const assignment = await withTimeout(
+        checkTagAssignment(tagId),
+        SCAN_INVOKE_TIMEOUT_MS,
+        'Tag assignment check timed out'
+      );
       if (!isCurrentScanRequest(scanRequestId)) {
         logger.debug('RFID tag assignment result ignored after scan cancellation', { tagId });
         return;
@@ -133,6 +137,8 @@ export function useTagAssignmentScan() {
 
       const error = err instanceof Error ? err : new Error(String(err));
       logError(error, 'Failed to process scanned tag');
+      setScannedTag(null);
+      setTagAssignment(null);
       setError('Armband konnte nicht überprüft werden. Bitte Internetverbindung prüfen.');
       setShowErrorModal(true);
     } finally {
@@ -152,6 +158,7 @@ export function useTagAssignmentScan() {
     scanCancelledRef.current = false;
 
     clearStates();
+    setShowErrorModal(false);
     setShowScanner(true);
     setIsLoading(true);
 
@@ -188,7 +195,7 @@ export function useTagAssignmentScan() {
 
       if (result.success && result.tag_id) {
         logUserAction('RFID tag scanned successfully');
-        void handleTagScanned(result.tag_id, scanRequestId);
+        await handleTagScanned(result.tag_id, scanRequestId);
       } else {
         const errorMessage = result.error ?? 'Unknown scanning error';
         logError(new Error(errorMessage), 'RFID scanning failed');

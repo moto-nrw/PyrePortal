@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router';
 
 import {
@@ -44,6 +44,7 @@ function TeamManagementPage() {
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const draftEdited = useRef(false);
   const navigate = useNavigate();
 
   // Create stable logger instance for this component
@@ -76,16 +77,20 @@ function TeamManagementPage() {
     }
   }, [authenticatedUser, currentSession, navigate, logger]);
 
+  const activeGroupId = currentSession?.active_group_id;
+
   // Fetch teachers and initialize supervisors
   useEffect(() => {
+    let active = true;
+    draftEdited.current = false;
     const initializePage = async () => {
       try {
         // Always refresh to pick up newly added supervisors
         await fetchTeachers(true);
 
         // Always refresh supervisors from backend when there's an active session
-        if (currentSession) {
-          await loadSessionSupervisors();
+        if (active && activeGroupId !== undefined) {
+          await loadSessionSupervisors(() => active && !draftEdited.current);
         }
       } catch (error) {
         logger.error('Failed to initialize team management page', { error: serializeError(error) });
@@ -95,9 +100,14 @@ function TeamManagementPage() {
     if (authenticatedUser) {
       void initializePage();
     }
-  }, [authenticatedUser, currentSession, fetchTeachers, loadSessionSupervisors, logger]);
+    return () => {
+      active = false;
+    };
+  }, [authenticatedUser, activeGroupId, fetchTeachers, loadSessionSupervisors, logger]);
 
   const handleUserToggle = (user: { id: number; name: string }) => {
+    if (isSaving) return;
+    draftEdited.current = true;
     // Freeze sort order on first interaction so items don't move
     freezeSortOrder();
 
@@ -113,6 +123,8 @@ function TeamManagementPage() {
   };
 
   const handleSave = async () => {
+    if (isSaving) return;
+    draftEdited.current = true;
     if (selectedSupervisors.length === 0) {
       logger.warn('Attempted to save without selecting supervisors');
       setErrorMessage(texts.noSupervisorSelectedError);
@@ -203,6 +215,7 @@ function TeamManagementPage() {
             icon="person"
             colorType="person"
             isSelected={isUserSelected(user.id)}
+            isDisabled={isSaving}
             onClick={() => handleUserToggle(user)}
           />
         )}

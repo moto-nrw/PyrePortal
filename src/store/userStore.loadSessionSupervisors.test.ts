@@ -119,4 +119,32 @@ describe('loadSessionSupervisors', () => {
 
     await expect(useUserStore.getState().loadSessionSupervisors()).rejects.toThrow('Network error');
   });
+  it.each(['leave', 'auth', 'session', 'selection'])(
+    'ignores delayed supervisors after %s changes',
+    async change => {
+      let resolveSession!: (value: CurrentSession) => void;
+      mockedApi.getCurrentSession.mockImplementationOnce(
+        () =>
+          new Promise(resolve => {
+            resolveSession = resolve;
+          })
+      );
+      let active = true;
+      const pending = useUserStore.getState().loadSessionSupervisors(() => active);
+      if (change === 'leave') active = false;
+      if (change === 'auth')
+        useUserStore.setState({ authenticatedUser: { ...baseUser, staffId: 2 } });
+      if (change === 'session')
+        useUserStore.setState({
+          currentSession: { ...sessionWithSupervisors, active_group_id: 43 },
+        });
+      const newer = [{ id: 9, name: 'Neues Team' }];
+      if (change === 'selection') useUserStore.getState().setSelectedSupervisors(newer);
+      resolveSession(sessionWithSupervisors);
+      await pending;
+      expect(useUserStore.getState().selectedSupervisors).toEqual(
+        change === 'selection' ? newer : []
+      );
+    }
+  );
 });

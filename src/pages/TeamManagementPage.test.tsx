@@ -809,4 +809,52 @@ describe('TeamManagementPage', () => {
       expect(screen.getByText('Team speichern')).toBeInTheDocument();
     });
   });
+  it('preserves an edited and saved team when initialization finishes late', async () => {
+    let resolveSession!: (value: CurrentSession) => void;
+    mockedApi.getCurrentSession.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveSession = resolve;
+        })
+    );
+    setupStore({
+      currentSession: activeSession,
+      selectedSupervisors: [teachers[0]],
+      toggleSupervisor: (person: { id: number; name: string }) =>
+        useUserStore.setState({ selectedSupervisors: [teachers[0], person] }),
+    });
+    renderPage();
+    await waitFor(() => expect(mockedApi.getCurrentSession).toHaveBeenCalled());
+    fireEvent.click(screen.getByText('Herr Schmidt'));
+    fireEvent.click(screen.getByText('Team speichern'));
+    await waitFor(() =>
+      expect(mockedApi.updateSessionSupervisors).toHaveBeenCalledWith('1234', 42, [1, 2])
+    );
+    mockSetSelectedSupervisors.mockClear();
+    await act(async () => {
+      resolveSession(activeSession);
+    });
+    expect(mockSetSelectedSupervisors).not.toHaveBeenCalled();
+    expect(useUserStore.getState().selectedSupervisors).toEqual([teachers[0], teachers[1]]);
+  });
+  it('does not reinitialize the draft when polling refreshes the same session', async () => {
+    setupStore({ currentSession: activeSession });
+    renderPage();
+    await waitFor(() => expect(mockedApi.getCurrentSession).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText('Herr Schmidt'));
+    act(() => useUserStore.setState({ currentSession: { ...activeSession } }));
+    await act(async () => {});
+    expect(mockedApi.getCurrentSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the selection fixed while its save is pending', async () => {
+    const user = userEvent.setup();
+    mockedApi.updateSessionSupervisors.mockImplementationOnce(() => new Promise(() => {}));
+    setupStore({ currentSession: activeSession, selectedSupervisors: [teachers[0]] });
+    renderPage();
+    await user.click(screen.getByText('Team speichern'));
+    expect(screen.getByRole('button', { name: /Herr Schmidt/ })).toBeDisabled();
+    await user.click(screen.getByText('Herr Schmidt'));
+    expect(mockToggleSupervisor).not.toHaveBeenCalled();
+  });
 });

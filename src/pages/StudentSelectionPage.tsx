@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 
 import {
@@ -56,6 +56,13 @@ function StudentSelectionPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as LocationState;
+
+  const assignmentGeneration = useRef(0);
+  useEffect(() => {
+    return () => {
+      assignmentGeneration.current += 1;
+    };
+  }, [authenticatedUser, location.key]);
 
   const [entities, setEntities] = useState<AssignableEntity[]>([]);
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null); // Format: "student-{id}" or "teacher-{id}"
@@ -185,6 +192,11 @@ function StudentSelectionPage() {
       return;
     }
 
+    if (isSaving) return;
+    const generation = ++assignmentGeneration.current;
+    const isCurrentAssignment = () =>
+      generation === assignmentGeneration.current &&
+      useUserStore.getState().authenticatedUser === authenticatedUser;
     setIsSaving(true);
 
     // Find selected entity
@@ -223,9 +235,12 @@ function StudentSelectionPage() {
               state.scannedTag
             );
 
-      if (result.success) {
-        clearTagScan(state.scannedTag);
+      // A completed write may have reached the server even after leaving.
+      // Invalidate its cache, but never restore the old page workflow.
+      if (result.success) clearTagScan(state.scannedTag);
+      if (!isCurrentAssignment()) return;
 
+      if (result.success) {
         logUserAction('tag_assignment_complete', { type: selectedEntity.type });
 
         // Navigate back with success message
@@ -242,16 +257,18 @@ function StudentSelectionPage() {
         throw new Error(result.message ?? 'Armband-Zuweisung fehlgeschlagen');
       }
     } catch (err) {
+      if (!isCurrentAssignment()) return;
       const error = err instanceof Error ? err : new Error(String(err));
       logger.error('Failed to assign tag', { error: serializeError(error) });
       setError(texts.assignFailedError);
       setShowErrorModal(true);
     } finally {
-      setIsSaving(false);
+      if (isCurrentAssignment()) setIsSaving(false);
     }
   };
 
   const handleBack = () => {
+    assignmentGeneration.current += 1;
     logger.info('User navigating back to tag assignment');
     logUserAction('student_selection_back');
     // Pass back the scan state so TagAssignmentPage shows the scan result
