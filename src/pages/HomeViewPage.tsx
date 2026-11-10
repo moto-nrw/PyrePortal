@@ -4,8 +4,14 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 
 import { BackgroundWrapper } from '../components/background-wrapper';
-import { ContactlessPaymentIcon, ModalBase, ModalActionButtons } from '../components/ui';
+import {
+  ContactlessPaymentIcon,
+  ErrorModal,
+  ModalBase,
+  ModalActionButtons,
+} from '../components/ui';
 import { api, type CurrentSession } from '../services/api';
+import { isSessionLostError } from '../services/apiErrors';
 import { useUserStore } from '../store/userStore';
 import { designSystem } from '../styles/designSystem';
 import { createLogger, logNavigation, logUserAction, serializeError } from '../utils/logger';
@@ -28,6 +34,7 @@ const texts = {
   endSessionWarningHighlight: 'unterwegs',
   endSessionWarningSuffix: 'umgestellt.',
   endSessionConfirmButton: 'Ja, beenden',
+  endSessionFailed: 'Die Aufsicht wurde nicht beendet. Bitte noch einmal versuchen.',
 } as const;
 
 // ============================================================================
@@ -96,18 +103,36 @@ function HomeViewPage() {
   const navigate = useNavigate();
   const [touchedButton, setTouchedButton] = useState<string | null>(null);
   const [showEndSessionModal, setShowEndSessionModal] = useState(false);
+  const [endSessionFailed, setEndSessionFailed] = useState(false);
 
   const hasHistory = (sessionSettings?.session_history.length ?? 0) > 0;
 
-  // Helper to end the current session
+  // Helper to end the current session. A failed answer does not mean the
+  // session still runs: the server may have ended it already, so its current
+  // state decides what the kiosk shows.
   const endCurrentSession = async () => {
     logUserAction('Ending current session');
+    const endingSessionId = currentSession?.active_group_id;
     try {
       await api.endSession(authenticatedUser!.pin);
       await fetchCurrentSession();
       logUserAction('Session ended successfully');
     } catch (error) {
       logger.error('Failed to end session', { error: serializeError(error) });
+      await fetchCurrentSession();
+      const shownSession = useUserStore.getState().currentSession;
+      // The server no longer runs the session that was to end: it counts as ended.
+      if (shownSession?.active_group_id !== endingSessionId) {
+        logUserAction('Session was already ended');
+        return;
+      }
+      // The server said so, but the check afterwards did not answer.
+      if (isSessionLostError(error)) {
+        logUserAction('Session was already ended');
+        useUserStore.getState().clearSessionState();
+        return;
+      }
+      setEndSessionFailed(true);
     }
   };
 
@@ -675,6 +700,13 @@ function HomeViewPage() {
           confirmGradient={designSystem.flat.danger}
         />
       </ModalBase>
+
+      <ErrorModal
+        isOpen={endSessionFailed}
+        onClose={() => setEndSessionFailed(false)}
+        message={texts.endSessionFailed}
+        autoCloseDelay={6000}
+      />
     </BackgroundWrapper>
   );
 }

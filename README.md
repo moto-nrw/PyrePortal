@@ -92,6 +92,16 @@ VITE_MOCK_RFID_TAGS=04:D6:94:82:97:6A:80
 
 Mock tags must exist in the connected Project Phoenix database.
 
+### Optional browser automation in Devbox
+
+The Devbox init hook tries to install `agent-browser` and its browser when the command is missing. This tool is optional; installation failures print a warning and let development commands continue. Lint, type checks and builds do not need it.
+
+To retry the setup manually in a Devbox shell:
+
+```bash
+pnpm add -g agent-browser && agent-browser install
+```
+
 ### Commands
 
 | Command                        | Purpose                                                |

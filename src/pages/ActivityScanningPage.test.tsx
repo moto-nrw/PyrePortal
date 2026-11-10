@@ -35,7 +35,17 @@ vi.mock('../services/api', async () => {
   return {
     ...actual,
     api: {
-      getCurrentSession: vi.fn().mockResolvedValue(null),
+      // Like the server, the poll reports the store's session (defaultStoreState).
+      getCurrentSession: vi.fn().mockResolvedValue({
+        active_group_id: 100,
+        activity_id: 1,
+        activity_name: 'Nachmittagsbetreuung',
+        room_id: 1,
+        room_name: 'Raum 101',
+        device_id: 1,
+        start_time: '2024-01-01T00:00:00Z',
+        duration: '1h',
+      }),
       getRooms: vi.fn().mockResolvedValue([]),
       processRfidScan: vi.fn().mockResolvedValue({}),
       moveToOpenRoom: vi.fn().mockResolvedValue({}),
@@ -2458,15 +2468,19 @@ describe.each(['checked_out', 'checked_out_daily'] as const)('Scan page (%s)', a
     });
   });
 
-  it('sets student count to 0 when session info returns null', async () => {
-    mockedApi.getCurrentSession.mockResolvedValueOnce(null);
+  it('leaves the session when the server reports none for this device', async () => {
+    // Poll and the following reconciliation both see no session.
+    mockedApi.getCurrentSession.mockResolvedValueOnce(null).mockResolvedValueOnce(null);
 
     await act(async () => {
       renderPage();
     });
 
-    // Count stays at 0
-    expect(screen.getByText('0')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(useUserStore.getState().currentSession).toBeNull();
+    });
+    expect(useUserStore.getState().selectedActivity).toBeNull();
+    expect(useUserStore.getState().kioskNotice?.title).toBe('Aufsicht beendet');
   });
 
   it('handles session info fetch error gracefully', async () => {

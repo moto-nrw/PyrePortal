@@ -424,6 +424,48 @@ export function mapAttendanceErrorToGerman(
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Codes with which Phoenix says this device runs no session (any more):
+ * a supervisor scan or attendance call without a device session, a check-in
+ * into a room without an open session, and ending a session that is gone.
+ */
+const SESSION_LOST_CODES: ReadonlySet<ErrorCode> = new Set<ErrorCode>([
+  'iot.no_active_session',
+  'iot.no_active_groups_in_room',
+  'iot.no_session_to_end',
+]);
+
+/** Whether the server answered that the device's session no longer exists. */
+export function isSessionLostError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return false;
+  const code = toErrorCode(error.code);
+  return code !== undefined && SESSION_LOST_CODES.has(code);
+}
+
+/**
+ * Why the server no longer accepts the kiosk's login: the stored PIN is
+ * refused, the device lost its access, or the school no longer books the
+ * module every kiosk route needs (project-phoenix #4896).
+ */
+export type AccessLossReason = 'pin' | 'device' | 'module';
+
+/** The reason an API error ends the kiosk login, or undefined if it does not. */
+export function getAccessLossReason(error: unknown): AccessLossReason | undefined {
+  if (!(error instanceof ApiError)) return undefined;
+  switch (toErrorCode(error.code)) {
+    case 'iot.device_pin_invalid':
+      return 'pin';
+    case 'iot.device_inactive':
+    case 'iot.device_api_key_invalid':
+      return 'device';
+    case 'module.not_booked':
+      // Only NFC-Anwesenheit gates every kiosk route; Zeiterfassung only stamping.
+      return error.details?.module === 'nfc_anwesenheit' ? 'module' : undefined;
+    default:
+      return undefined;
+  }
+}
+
 /** Detect 404 responses by the HTTP status `apiCall` records on an ApiError. */
 export const isNotFoundError = (error: unknown): boolean =>
   error instanceof ApiError && error.statusCode === 404;

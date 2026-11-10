@@ -35,10 +35,13 @@ PyrePortal uses **one centralized Zustand store** (`userStore.ts`) for all appli
 4. **Network**
    - `networkStatus` - Online/offline quality and response time
 
+5. **UI**
+   - `kioskNotice` - Notice shown above every page (`components/KioskNotice.tsx`), e.g. why the kiosk left a session or logged out
+
 ### Action Categories
 
-1. **Authentication**: `setAuthenticatedUser`, `fetchTeachers`, `logout`
-2. **Session**: `fetchRooms`, `selectRoom`, `fetchCurrentSession`, `setSelectedActivity`, `fetchActivities`, `clearSessionState`
+1. **Authentication**: `setAuthenticatedUser`, `fetchTeachers`, `logout`, `handleAccessError` (central logout when the server refuses the stored PIN, the device or the module NFC-Anwesenheit; `App` registers it as the `apiClient` error callback)
+2. **Session**: `fetchRooms`, `selectRoom`, `fetchCurrentSession`, `setSelectedActivity`, `fetchActivities`, `clearSessionState`, `reconcileSession` (asks the server after a poll without session or a session refusal of a scan; never repeats a scan)
 3. **Supervisors**: `setSelectedSupervisors`, `toggleSupervisor`, `addSupervisorFromRfid`, `addActiveSupervisorTag`, `isActiveSupervisor`
 4. **RFID**: `startRfidScanning`, `stopRfidScanning`, `setScanResult`, `showScanModal`, `hideScanModal`, pickup-query mode actions, and the duplicate-prevention actions below
 5. **Session settings**: `loadSessionSettings`, `saveLastSessionData`, `removeSessionHistoryEntry`, `clearSessionHistory`, `validateAndRecreateSession`
