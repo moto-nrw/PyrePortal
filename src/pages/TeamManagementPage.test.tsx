@@ -78,6 +78,13 @@ const teachers = [
   { id: 5, name: 'Frau Klein' },
 ];
 
+// Real store actions, captured before setupStore() replaces some with mocks.
+const realStoreActions = {
+  toggleSupervisor: useUserStore.getState().toggleSupervisor,
+  setSelectedSupervisors: useUserStore.getState().setSelectedSupervisors,
+  fetchCurrentSession: useUserStore.getState().fetchCurrentSession,
+};
+
 const mockFetchTeachers = vi.fn().mockResolvedValue(undefined);
 const mockToggleSupervisor = vi.fn();
 const mockSetSelectedSupervisors = vi.fn();
@@ -837,6 +844,53 @@ describe('TeamManagementPage', () => {
     expect(mockSetSelectedSupervisors).not.toHaveBeenCalled();
     expect(useUserStore.getState().selectedSupervisors).toEqual([teachers[0], teachers[1]]);
   });
+  it('keeps a saved team when a session fetch started before the edit answers late (#520)', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, 'getActivities').mockResolvedValue([]);
+    vi.spyOn(api, 'getRooms').mockResolvedValue([]);
+    setupStore({
+      currentSession: activeSession,
+      selectedSupervisors: [teachers[0]],
+      toggleSupervisor: realStoreActions.toggleSupervisor,
+      setSelectedSupervisors: realStoreActions.setSelectedSupervisors,
+    });
+    renderPage();
+    await waitFor(() => expect(mockedApi.getCurrentSession).toHaveBeenCalledTimes(1));
+    await act(async () => {});
+
+    // A poll or the home page asks for the session; the answer is slow.
+    let resolveSession!: (value: CurrentSession) => void;
+    mockedApi.getCurrentSession.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveSession = resolve;
+        })
+    );
+    let lateFetch!: Promise<void>;
+    act(() => {
+      lateFetch = realStoreActions.fetchCurrentSession();
+    });
+
+    mockedApi.updateSessionSupervisors.mockResolvedValueOnce({
+      supervisors: [
+        activeSession.supervisors![0],
+        { ...activeSession.supervisors![0], staff_id: 2, display_name: 'Herr Schmidt' },
+      ],
+    });
+    await user.click(screen.getByText('Herr Schmidt'));
+    await user.click(screen.getByText('Team speichern'));
+    await waitFor(() =>
+      expect(mockedApi.updateSessionSupervisors).toHaveBeenCalledWith('1234', 42, [1, 2])
+    );
+
+    await act(async () => {
+      resolveSession(activeSession);
+      await lateFetch;
+    });
+
+    expect(useUserStore.getState().selectedSupervisors.map(s => s.id)).toEqual([1, 2]);
+  });
+
   it('does not reinitialize the draft when polling refreshes the same session', async () => {
     setupStore({ currentSession: activeSession });
     renderPage();

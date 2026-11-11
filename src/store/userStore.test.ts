@@ -803,6 +803,134 @@ describe('fetchCurrentSession', () => {
 });
 
 // ====================================================================
+// fetchCurrentSession vs. local team and room changes (#520)
+// ====================================================================
+
+describe('fetchCurrentSession after a local change during the request', () => {
+  const herrTest = { id: 1, name: 'Herr Test' };
+  const frauTest = { id: 2, name: 'Frau Test' };
+  const herrNeu = { id: 3, name: 'Herr Neu' };
+
+  const serverSession = (supervisorIds: number[], roomId = 5): CurrentSession => ({
+    active_group_id: 1,
+    activity_id: 10,
+    activity_name: 'Test',
+    device_id: 1,
+    start_time: '2024-01-01T10:00:00Z',
+    duration: '2h',
+    room_id: roomId,
+    room_name: `Raum ${roomId}`,
+    is_active: true,
+    supervisors: supervisorIds.map(id => ({
+      staff_id: id,
+      first_name: 'X',
+      last_name: 'Test',
+      display_name: [herrTest, frauTest, herrNeu].find(s => s.id === id)!.name,
+      role: 'teacher',
+    })),
+  });
+
+  // Starts fetchCurrentSession with a session answer that arrives only on resolve().
+  const startDelayedFetch = (session: CurrentSession) => {
+    let resolveSession: (value: CurrentSession) => void = () => undefined;
+    mockGetCurrentSession.mockImplementationOnce(
+      () =>
+        new Promise<CurrentSession>(resolve => {
+          resolveSession = resolve;
+        })
+    );
+    mockGetActivities.mockResolvedValue([mockActivity({ id: 10, name: 'Test' })]);
+    mockGetRooms.mockResolvedValue([mockRoom({ id: 5, name: 'Raum 5' })]);
+    const promise = useUserStore.getState().fetchCurrentSession();
+    return {
+      finish: async () => {
+        resolveSession(session);
+        await promise;
+      },
+    };
+  };
+
+  beforeEach(() => {
+    setAuthenticated();
+    useUserStore.setState({ selectedSupervisors: [herrTest, frauTest] });
+  });
+
+  it('keeps a supervisor selected during a late answer', async () => {
+    const fetch = startDelayedFetch(serverSession([1, 2]));
+
+    useUserStore.getState().toggleSupervisor(herrNeu);
+    await fetch.finish();
+
+    const state = useUserStore.getState();
+    expect(state.selectedSupervisors).toEqual([herrTest, frauTest, herrNeu]);
+    expect(state.currentSession?.active_group_id).toBe(1);
+    expect(state.selectedActivity?.id).toBe(10);
+  });
+
+  it('keeps a supervisor removed during a late answer', async () => {
+    const fetch = startDelayedFetch(serverSession([1, 2]));
+
+    useUserStore.getState().toggleSupervisor(frauTest);
+    await fetch.finish();
+
+    expect(useUserStore.getState().selectedSupervisors).toEqual([herrTest]);
+  });
+
+  it('keeps a team saved during a late answer', async () => {
+    const fetch = startDelayedFetch(serverSession([1, 2]));
+
+    // TeamManagementPage stores the server-confirmed team after saving.
+    useUserStore.getState().setSelectedSupervisors([herrTest, herrNeu]);
+    await fetch.finish();
+
+    expect(useUserStore.getState().selectedSupervisors).toEqual([herrTest, herrNeu]);
+  });
+
+  it('keeps a supervisor added by RFID during a late answer', async () => {
+    const fetch = startDelayedFetch(serverSession([1, 2]));
+
+    useUserStore.getState().addSupervisorFromRfid(3, 'Herr Neu');
+    await fetch.finish();
+
+    expect(useUserStore.getState().selectedSupervisors.map(s => s.id)).toEqual([1, 2, 3]);
+  });
+
+  it('adopts the server team in a fetch started after the change', async () => {
+    useUserStore.getState().toggleSupervisor(herrNeu);
+
+    const fetch = startDelayedFetch(serverSession([2]));
+    await fetch.finish();
+
+    expect(useUserStore.getState().selectedSupervisors).toEqual([frauTest]);
+  });
+
+  it('adopts the server team of another session without a local change', async () => {
+    const fetch = startDelayedFetch({ ...serverSession([3]), active_group_id: 7 });
+    await fetch.finish();
+
+    const state = useUserStore.getState();
+    expect(state.currentSession?.active_group_id).toBe(7);
+    expect(state.selectedSupervisors).toEqual([herrNeu]);
+  });
+
+  it('keeps a room selected during a late answer after the selection window', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      useUserStore.setState({ rooms: [mockRoom({ id: 9, name: 'Raum 9' })] });
+      const fetch = startDelayedFetch(serverSession([1, 2], 5));
+
+      useUserStore.getState().selectRoom(9);
+      vi.setSystemTime(Date.now() + 10_000);
+      await fetch.finish();
+
+      expect(useUserStore.getState().selectedRoom?.id).toBe(9);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// ====================================================================
 // logout
 // ====================================================================
 
