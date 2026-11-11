@@ -852,7 +852,10 @@ describe('fetchCurrentSession after a local change during the request', () => {
 
   beforeEach(() => {
     setAuthenticated();
-    useUserStore.setState({ selectedSupervisors: [herrTest, frauTest] });
+    useUserStore.setState({
+      currentSession: serverSession([1, 2]),
+      selectedSupervisors: [herrTest, frauTest],
+    });
   });
 
   it('keeps a supervisor selected during a late answer', async () => {
@@ -906,6 +909,17 @@ describe('fetchCurrentSession after a local change during the request', () => {
 
   it('adopts the server team of another session without a local change', async () => {
     const fetch = startDelayedFetch({ ...serverSession([3]), active_group_id: 7 });
+    await fetch.finish();
+
+    const state = useUserStore.getState();
+    expect(state.currentSession?.active_group_id).toBe(7);
+    expect(state.selectedSupervisors).toEqual([herrNeu]);
+  });
+
+  it('adopts the server team of another session despite a local change', async () => {
+    const fetch = startDelayedFetch({ ...serverSession([3]), active_group_id: 7 });
+
+    useUserStore.getState().toggleSupervisor(frauTest);
     await fetch.finish();
 
     const state = useUserStore.getState();

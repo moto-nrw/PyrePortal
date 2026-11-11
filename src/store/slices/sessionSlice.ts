@@ -412,9 +412,15 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
       // Local team and room as of the request start. Every write to them
       // (toggle, save, RFID, room switch) stores a new value, so a different
       // value at the end means a newer local change that this answer must not
-      // undo, however long the request took. The next fetch adopts the server.
-      const { authenticatedUser, selectedSupervisors: supervisorsAtStart } = get();
-      const roomAtStart = get().selectedRoom;
+      // undo, however long the request took. This holds only for the same
+      // session: a session change adopts the server team. The next fetch
+      // adopts the server state.
+      const {
+        authenticatedUser,
+        selectedSupervisors: supervisorsAtStart,
+        selectedRoom: roomAtStart,
+      } = get();
+      const sessionIdAtStart = get().currentSession?.active_group_id;
 
       if (!authenticatedUser?.pin) {
         storeLogger.warn('Cannot fetch current session: no authenticated user or PIN');
@@ -481,8 +487,9 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
         const roomSelectedAt = get()._roomSelectedAt;
         const isRecentManualSelection =
           roomSelectedAt != null && Date.now() - roomSelectedAt < 5000;
+        const isSameSession = session.active_group_id === sessionIdAtStart;
         const shouldPreserveRoom =
-          (isRecentManualSelection || currentSelectedRoom !== roomAtStart) &&
+          (isRecentManualSelection || (isSameSession && currentSelectedRoom !== roomAtStart)) &&
           currentSelectedRoom != null &&
           currentSelectedRoom.id !== sessionRoom?.id;
 
@@ -496,7 +503,8 @@ export const createSessionSlice = (set: SetState<UserState>, get: GetState<UserS
           });
         }
 
-        const shouldPreserveSupervisors = get().selectedSupervisors !== supervisorsAtStart;
+        const shouldPreserveSupervisors =
+          isSameSession && get().selectedSupervisors !== supervisorsAtStart;
         if (shouldPreserveSupervisors && session.supervisors) {
           storeLogger.debug('Preserving team changed during fetchCurrentSession', {
             localSupervisorCount: get().selectedSupervisors.length,
