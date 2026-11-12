@@ -76,9 +76,9 @@ error the kiosk already handles. `POST /api/iot/session/activity` itself is
 unchanged and stays the call for everything outside this promise.
 
 Source of truth: project-phoenix `docs/agents/contracts.md`, "A scan keeps the
-session alive". Since moto-nrw/PyrePortal#479 the kiosk sends no activity call
+session alive". Since moto-ogs/PyrePortal#479 the kiosk sends no activity call
 after a scan or a pickup query: each scan is one request. This needs Phoenix
-with moto-nrw/project-phoenix#5040 (release 1.2.0); with an older backend,
+with moto-ogs/project-phoenix#5040 (release 1.2.0); with an older backend,
 scans no longer keep the session alive.
 
 ## Released rooms as destinations (project-phoenix #3067)

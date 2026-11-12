@@ -34,9 +34,6 @@ dist-*
 # Test coverage
 coverage/
 
-# SonarQube
-.scannerwork/
-
 # Git worktrees
 .worktrees/
 
