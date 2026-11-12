@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { describe, expect, it, vi } from 'vitest';
@@ -1244,5 +1244,30 @@ describe('StudentSelectionPage', () => {
       expect(screen.getByText('Clara Weber')).toBeInTheDocument();
     });
     expect(screen.getByText('David Fischer')).toBeInTheDocument();
+  });
+  it.each(['back', 'unmount', 'auth'])('ignores assignment completion after %s', async leaving => {
+    const user = userEvent.setup();
+    mockedApi.getStudents.mockResolvedValue(mockStudents);
+    let resolveAssignment!: (value: { success: boolean }) => void;
+    mockedApi.assignTag.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveAssignment = resolve;
+        })
+    );
+    const { unmount } = renderPage();
+    await user.click(await screen.findByText('Anna Müller'));
+    await user.click(screen.getByRole('button', { name: 'Armband zuweisen' }));
+    await waitFor(() => expect(mockedApi.assignTag).toHaveBeenCalled());
+    if (leaving === 'back') await user.click(screen.getByText('Zurück'));
+    if (leaving === 'unmount') unmount();
+    if (leaving === 'auth')
+      act(() => useUserStore.setState({ authenticatedUser: { ...baseUser, staffId: 2 } }));
+    mockNavigate.mockClear();
+    await act(async () => {
+      resolveAssignment({ success: true });
+    });
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(mockedApi.assignTag).toHaveBeenCalledTimes(1);
   });
 });
