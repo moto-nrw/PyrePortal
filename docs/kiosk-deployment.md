@@ -15,7 +15,7 @@ and production retain separate API URLs and directories.
   must not silently switch to Wedge.
 - Staff authentication and API requests are unchanged. Credential import is
   described in the rollout section below. Pairing is
-  tracked separately in [#425](https://github.com/moto-nrw/PyrePortal/issues/425).
+  tracked separately in [#425](https://github.com/moto-ogs/PyrePortal/issues/425).
 
 `pnpm run dev` retains the browser mock. `pnpm run dev:kiosk` exercises automatic
 selection against localhost; `BUILD_TARGET=gkt pnpm run dev` forces the GKT path

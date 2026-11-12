@@ -7,7 +7,7 @@ name: Product screenshots
 # als Artefakt anhängen (7 Tage) und an das GitHub-Release vX.Y.Z hängen:
 # einmal als product-screenshots-<version>.zip und einmal als
 # product-screenshots.zip. Die zweite Datei macht
-# https://github.com/moto-nrw/PyrePortal/releases/latest/download/product-screenshots.zip
+# https://github.com/moto-ogs/PyrePortal/releases/latest/download/product-screenshots.zip
 # zum festen Link auf die neuesten Bilder.
 #
 # Auslöser:
@@ -217,7 +217,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag=$(gh release list --repo moto-nrw/project-phoenix --exclude-drafts --limit 100 \
+          tag=$(gh release list --repo moto-ogs/project-phoenix --exclude-drafts --limit 100 \
             --json tagName,createdAt \
             --jq '[.[] | select(.tagName | test("^v[0-9]+[.][0-9]+[.][0-9]+$"))] | sort_by(.createdAt) | last | .tagName // ""')
           if [ -z "${tag}" ]; then
@@ -233,7 +233,7 @@ jobs:
       - name: Checkout project-phoenix
         uses: actions/checkout@v7
         with:
-          repository: moto-nrw/project-phoenix
+          repository: moto-ogs/project-phoenix
           ref: ${{ steps.phoenix.outputs.tag }}
           path: phoenix
           persist-credentials: false

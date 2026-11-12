@@ -8,7 +8,7 @@ name: CI cost
 on:
   workflow_run:
     # Every pull_request workflow, so the check run refreshes after the last one.
-    workflows: [PyrePortal CI, SonarCloud Analysis, CodeQL Analysis]
+    workflows: [PyrePortal CI, CodeQL Analysis]
     types: [completed]
 permissions: {}
 
@@ -28,4 +28,4 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Our own org repo: development keeps both repos on one price table.
-      - uses: moto-nrw/project-phoenix/.github/actions/ci-cost@development
+      - uses: moto-ogs/project-phoenix/.github/actions/ci-cost@development

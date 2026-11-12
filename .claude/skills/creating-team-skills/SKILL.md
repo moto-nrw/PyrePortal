@@ -2,7 +2,7 @@
 name: creating-team-skills
 description: Use when discovering a novel solution, pattern, or technique that could benefit the team. Triggers when solving a non-obvious problem, finding a useful workflow, or learning something worth sharing. Also use when user says "make this a skill" or "share this with team".
 metadata:
-  author: moto-nrw
+  author: moto-ogs
   version: '1.0.0'
 ---
 
@@ -107,7 +107,7 @@ Use WebSearch:
 name: skill-name-with-hyphens
 description: Use when [specific triggers]. Triggers on [symptoms/situations].
 metadata:
-  author: moto-nrw
+  author: moto-ogs
   version: '1.0.0'
 ---
 ```

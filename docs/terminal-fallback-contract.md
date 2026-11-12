@@ -1,7 +1,7 @@
 # Terminal and web fallback contract
 
-Scope: [PyrePortal #365](https://github.com/moto-nrw/PyrePortal/issues/365), mirroring
-[Phoenix #1452](https://github.com/moto-nrw/project-phoenix/issues/1452).
+Scope: [PyrePortal #365](https://github.com/moto-ogs/PyrePortal/issues/365), mirroring
+[Phoenix #1452](https://github.com/moto-ogs/project-phoenix/issues/1452).
 Compared on 2026-09-13 against PyrePortal `ea53f896379b481e57ec1326591d2b63f58272ba`
 and Phoenix `d1d7dc356987fb07baf72a35baf96035bbdd0992`.
 

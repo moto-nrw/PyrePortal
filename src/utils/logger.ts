@@ -64,7 +64,7 @@ const testConfig: LoggerConfig = {
   consoleOutput: false,
 };
 
-// Get the appropriate configuration based on environment (avoids nested ternary - SonarCloud S3358)
+// Get the appropriate configuration based on environment (avoids a nested ternary)
 const getEnvironmentConfig = (): LoggerConfig => {
   if (import.meta.env.TEST) {
     return testConfig;
