@@ -206,6 +206,10 @@ jobs:
             health_key=$(openssl rand -base64 32)
             echo "::add-mask::${health_key}" >&2
             echo "HEALTH_DATA_KEYS=ci:${health_key}"
+            # Eigener Ring für Bank- und Steuerdaten, Pflicht seit project-phoenix v1.8.0.
+            bank_key=$(openssl rand -base64 32)
+            echo "::add-mask::${bank_key}" >&2
+            echo "BANK_DATA_KEYS=cibank:${bank_key}"
           } >> "${GITHUB_ENV}"
 
       - name: Resolve project-phoenix release
