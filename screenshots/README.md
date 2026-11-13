@@ -11,7 +11,7 @@ Every release `vX.Y.Z` carries the product screenshots as assets:
 - `product-screenshots-<version>.zip` — the images of exactly that release.
 - `product-screenshots.zip` — the same file under a fixed name, so the latest
   release's images are at
-  <https://github.com/moto-nrw/PyrePortal/releases/latest/download/product-screenshots.zip>.
+  <https://github.com/moto-ogs/PyrePortal/releases/latest/download/product-screenshots.zip>.
   The capture takes about 15 minutes after the release is created; until then,
   or if that run failed, the link answers 404 and the files are on the previous
   release.
@@ -78,7 +78,7 @@ happens:
 
 `pnpm exec playwright install chromium` is no longer needed. This is an
 interim measure until a Playwright release bundles a patched Chromium
-(moto-nrw/PyrePortal#496, moto-nrw/project-phoenix#5612).
+(moto-ogs/PyrePortal#496, moto-ogs/project-phoenix#5612).
 
 ## Prerequisites
 

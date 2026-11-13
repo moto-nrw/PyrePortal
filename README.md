@@ -4,7 +4,7 @@
 
 [![React](https://img.shields.io/badge/react-19-blue)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/typescript-6-blue)](https://www.typescriptlang.org)
-[![Version](https://img.shields.io/github/package-json/v/moto-nrw/PyrePortal)](package.json)
+[![Version](https://img.shields.io/github/package-json/v/moto-ogs/PyrePortal)](package.json)
 
 PyrePortal is moto's browser-based kiosk for German after-school care (OGS). Staff use NFC/RFID wristbands to manage attendance, rooms, activities and staff working time.
 
@@ -69,13 +69,13 @@ Project Phoenix is the source of truth for students, staff, rooms, sessions, att
 
 - Node.js 22.12 or newer
 - pnpm 10
-- A local [Project Phoenix](https://github.com/moto-nrw/project-phoenix) backend for end-to-end flows
+- A local [Project Phoenix](https://github.com/moto-ogs/project-phoenix) backend for end-to-end flows
 - Google Chrome 156.0.8078.73 or newer for `pnpm run screenshots`. Playwright uses the installed Chrome with its sandbox enabled and no longer downloads its own Chromium (see [screenshots/README.md](screenshots/README.md#browser))
 
 ### Setup
 
 ```bash
-git clone git@github.com:moto-nrw/PyrePortal.git
+git clone git@github.com:moto-ogs/PyrePortal.git
 cd PyrePortal
 pnpm install
 cp .env.example .env

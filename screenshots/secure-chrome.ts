@@ -1,8 +1,8 @@
 import type { LaunchOptions } from '@playwright/test';
 
 /**
- * Interim hardening until Playwright ships a patched Chromium (moto-nrw/PyrePortal#496,
- * moto-nrw/project-phoenix#5612).
+ * Interim hardening until Playwright ships a patched Chromium (moto-ogs/PyrePortal#496,
+ * moto-ogs/project-phoenix#5612).
  *
  * The Chromium bundled with Playwright 1.64.1 (156.0.8078.4) is affected by
  * CVE-2026-118306, -118331, -118344 and -118348, all fixed in Chrome 156.0.8078.73.
